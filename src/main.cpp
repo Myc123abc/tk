@@ -1,0 +1,18 @@
+#include "Window.hpp"
+#include "GraphicsEngine.hpp"
+#include "Log.hpp"
+
+using namespace tk;
+
+int main()
+{
+  try
+  {
+    Window win(960, 540, "Breakout");
+    GraphicsEngine graphicsEngine(win);
+  }
+  catch (const std::exception& e)
+  {
+    log::error(e.what());
+  }
+}
