@@ -356,8 +356,8 @@ void GraphicsEngine::create_pipeline()
   // shader stages
   std::vector<VkPipelineShaderStageCreateInfo> shader_stages;
 
-  Shader vertex_shader(_device, "shader/vertex.spv");
-  Shader fragment_shader(_device, "shader/fragment.spv");
+  Shader vertex_shader(_device, "build/vertex.spv");
+  Shader fragment_shader(_device, "build/fragment.spv");
 
   VkPipelineShaderStageCreateInfo shader_info
   {
