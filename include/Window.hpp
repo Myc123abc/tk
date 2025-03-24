@@ -23,10 +23,13 @@ namespace tk
     Window(uint32_t width, uint32_t height, std::string_view title);
     ~Window();
 
-    Window(const Window&)            = delete;
+    Window(Window const&)            = delete;
     Window(Window&&)                 = delete;
-    Window& operator=(const Window&) = delete;
+    Window& operator=(Window const&) = delete;
     Window& operator=(Window&&)      = delete;
+
+    auto create_surface(VkInstance instance) const -> VkSurfaceKHR;
+    void get_framebuffer_size(int& width, int& height) const;
 
   private:
     GLFWwindow* _window;

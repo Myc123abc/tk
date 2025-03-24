@@ -28,4 +28,17 @@ Window::~Window()
   glfwTerminate();
 }
 
+auto Window::create_surface(VkInstance instance) const -> VkSurfaceKHR
+{
+  VkSurfaceKHR surface;
+  throw_if(glfwCreateWindowSurface(instance, _window, nullptr, &surface) != VK_SUCCESS,
+           "failed to create surface");
+  return surface;
+}
+
+void Window::get_framebuffer_size(int& width, int& height) const
+{
+  glfwGetFramebufferSize(_window, &width, &height);
+}
+
 }
