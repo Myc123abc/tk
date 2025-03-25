@@ -14,6 +14,8 @@
 
 namespace tk
 {
+  // TODO: graphics engine only initialize.
+  // you need add vertices, indices, uniform, and shaders to run it.
   class GraphicsEngine final
   {
   public:
@@ -24,6 +26,16 @@ namespace tk
     GraphicsEngine(GraphicsEngine&&)                 = delete;
     GraphicsEngine& operator=(GraphicsEngine const&) = delete;
     GraphicsEngine& operator=(GraphicsEngine&&)      = delete;
+
+    //
+    // run
+    //
+    // HACK: this not should in here, it should in use engine's place
+    void run();
+  private:
+    void update();
+    void draw();
+    void record_command_buffer(VkCommandBuffer command_buffer, uint32_t image_index);
 
   private:
     //
@@ -38,28 +50,68 @@ namespace tk
     void create_swapchain_and_get_swapchain_images_info();
     void create_swapchain_image_views();
     void create_render_pass();
+    void create_frame_buffers();
     void create_descriptor_set_layout();
     void create_pipeline();
+    void create_command_pool();
+    void create_command_buffers();
+    void create_buffers();
+    void create_descriptor_pool();
+    void create_descriptor_sets();
+    void create_sync_objects();
+
+    //
+    // util 
+    //
+    // HACK: repeat single command, performance bad
+    auto begin_single_time_commands() -> VkCommandBuffer;
+    void end_single_time_commands(VkCommandBuffer command_buffer);
+    void copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size);
+    // HACK: suballoc and single buffer
+    void create_buffer(VkBuffer& buffer, VmaAllocation& allocation, 
+                       uint32_t size, VkBufferUsageFlags usage,
+                       void const* data = nullptr);
 
   private:
     // HACK: expand to multi-windows manage, use WindowManager in future.
-    Window const&            _window;
-    VkInstance               _instance;
-    VkDebugUtilsMessengerEXT _debug_messenger;
-    VkSurfaceKHR             _surface;
-    VkPhysicalDevice         _physical_device;
-    VkDevice                 _device;
-    VkQueue                  _graphics_queue;
-    VkQueue                  _present_queue;
-    VmaAllocator             _vma_allocator;
-    VkSwapchainKHR           _swapchain;
-    std::vector<VkImage>     _swapchain_images;
-    VkFormat                 _swapchain_image_format;
-    VkExtent2D               _swapchain_image_extent;
-    std::vector<VkImageView> _swapchain_image_views;
-    VkRenderPass             _render_pass;
-    VkDescriptorSetLayout    _descriptor_set_layout;
-    VkPipeline               _pipeline;
-    VkPipelineLayout         _pipeline_layout;
+    Window const&                _window;
+
+    VkInstance                   _instance                 = VK_NULL_HANDLE;
+    VkDebugUtilsMessengerEXT     _debug_messenger          = VK_NULL_HANDLE;
+    VkSurfaceKHR                 _surface                  = VK_NULL_HANDLE;
+    VkPhysicalDevice             _physical_device          = VK_NULL_HANDLE;
+    VkDevice                     _device                   = VK_NULL_HANDLE;
+    VkQueue                      _graphics_queue           = VK_NULL_HANDLE;
+    VkQueue                      _present_queue            = VK_NULL_HANDLE;
+    VmaAllocator                 _vma_allocator            = VK_NULL_HANDLE;
+    VkSwapchainKHR               _swapchain                = VK_NULL_HANDLE;
+    std::vector<VkImage>         _swapchain_images;
+    VkFormat                     _swapchain_image_format   = VK_FORMAT_UNDEFINED;
+    VkExtent2D                   _swapchain_image_extent   = {};
+    std::vector<VkImageView>     _swapchain_image_views;  
+    VkRenderPass                 _render_pass              = VK_NULL_HANDLE;
+    std::vector<VkFramebuffer>   _frame_buffers;
+    VkDescriptorSetLayout        _descriptor_set_layout    = VK_NULL_HANDLE;
+    VkPipeline                   _pipeline                 = VK_NULL_HANDLE;
+    VkPipelineLayout             _pipeline_layout          = VK_NULL_HANDLE;
+    VkCommandPool                _command_pool             = VK_NULL_HANDLE;
+    std::vector<VkCommandBuffer> _command_buffers;
+    
+    // HACK: use suballoc memory and single buffer
+    VkBuffer                     _vertex_buffer            = VK_NULL_HANDLE;
+    VmaAllocation                _vertex_buffer_allocation = VK_NULL_HANDLE;
+    VkBuffer                     _index_buffer             = VK_NULL_HANDLE;
+    VmaAllocation                _index_buffer_allocation  = VK_NULL_HANDLE;
+    std::vector<VkBuffer>        _uniform_buffers;
+    std::vector<VmaAllocation>   _uniform_buffer_allocations;
+
+    // HACK: make frame resource for anything in a frame
+    VkDescriptorPool             _descriptor_pool          = VK_NULL_HANDLE;
+    std::vector<VkDescriptorSet> _descriptor_sets;
+    std::vector<VkSemaphore>     _image_available_semaphores;
+    std::vector<VkSemaphore>     _render_finished_semaphores;
+    std::vector<VkFence>         _in_flight_fences; 
+
+    uint32_t                     _current_frame            = 0;
   };
 }

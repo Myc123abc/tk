@@ -29,17 +29,38 @@ GraphicsEngine::GraphicsEngine(Window const& window)
   create_swapchain_and_get_swapchain_images_info();
   create_swapchain_image_views();
   create_render_pass();
+  create_frame_buffers();
   create_descriptor_set_layout();
   create_pipeline();
+  create_command_pool();
+  create_command_buffers();
+  create_buffers();
+  create_descriptor_pool();
+  create_descriptor_sets();
+  create_sync_objects();
 }
 
 GraphicsEngine::~GraphicsEngine()
 {
+  for (uint32_t i = 0; i < Max_Frame_Number; ++i)
+  {
+    vkDestroySemaphore(_device, _image_available_semaphores[i], nullptr);
+    vkDestroySemaphore(_device, _render_finished_semaphores[i], nullptr);
+    vkDestroyFence(_device, _in_flight_fences[i], nullptr);
+  }
+  vkDestroyDescriptorPool(_device, _descriptor_pool, nullptr);
+  for (uint32_t i = 0; i < _uniform_buffers.size(); ++i)
+    vmaDestroyBuffer(_vma_allocator, _uniform_buffers[i], _uniform_buffer_allocations[i]);
+  vmaDestroyBuffer(_vma_allocator, _index_buffer, _index_buffer_allocation);
+  vmaDestroyBuffer(_vma_allocator, _vertex_buffer, _vertex_buffer_allocation);
+  vkDestroyCommandPool(_device, _command_pool, nullptr);
   vkDestroyPipeline(_device, _pipeline, nullptr);
   vkDestroyPipelineLayout(_device, _pipeline_layout, nullptr);
   vkDestroyDescriptorSetLayout(_device, _descriptor_set_layout, nullptr);
+  for (uint32_t i = 0; i < _frame_buffers.size(); ++i)
+    vkDestroyFramebuffer(_device, _frame_buffers[i], nullptr);
   vkDestroyRenderPass(_device, _render_pass, nullptr);
-  for (uint32_t i = 0; i < _swapchain_images.size(); ++i)
+  for (uint32_t i = 0; i < _swapchain_image_views.size(); ++i)
     vkDestroyImageView(_device, _swapchain_image_views[i], nullptr);
   vkDestroySwapchainKHR(_device, _swapchain, nullptr);
   vmaDestroyAllocator(_vma_allocator);
@@ -324,6 +345,26 @@ void GraphicsEngine::create_render_pass()
            "failed to create render pass");
 }
 
+void GraphicsEngine::create_frame_buffers()
+{
+  _frame_buffers.resize(_swapchain_images.size());
+  for (uint32_t i = 0; i < _swapchain_images.size(); ++i)
+  {
+    VkFramebufferCreateInfo info
+    {
+      .sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+      .renderPass      = _render_pass,
+      .attachmentCount = 1,
+      .pAttachments    = &_swapchain_image_views[i],
+      .width           = _swapchain_image_extent.width,
+      .height          = _swapchain_image_extent.height,
+      .layers          = 1,
+    };
+    throw_if(vkCreateFramebuffer(_device, &info, nullptr, &_frame_buffers[i]) != VK_SUCCESS,
+            "failed to create frame buffers");
+  }
+}
+
 void GraphicsEngine::create_descriptor_set_layout()
 {
   std::vector<VkDescriptorSetLayoutBinding> layouts
@@ -408,7 +449,7 @@ void GraphicsEngine::create_pipeline()
     .rasterizerDiscardEnable = VK_FALSE,
     .polygonMode             = VK_POLYGON_MODE_FILL,
     .cullMode                = VK_CULL_MODE_BACK_BIT,
-    .frontFace               = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+    .frontFace               = VK_FRONT_FACE_CLOCKWISE,
     .depthBiasEnable         = VK_FALSE,
     .lineWidth               = 1.f,
   };
@@ -484,6 +525,132 @@ void GraphicsEngine::create_pipeline()
 
   throw_if(vkCreateGraphicsPipelines(_device, VK_NULL_HANDLE, 1, &create_info, nullptr, &_pipeline) != VK_SUCCESS,
            "failed to create pipeline");
+}
+
+void GraphicsEngine::create_command_pool()
+{
+  auto queue_families = get_queue_family_indices(_physical_device, _surface);
+  VkCommandPoolCreateInfo info
+  {
+    .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+    .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+    .queueFamilyIndex = queue_families.graphics_family.value(),
+  };
+  throw_if(vkCreateCommandPool(_device, &info, nullptr, &_command_pool) != VK_SUCCESS,
+           "failed to create command pool");
+}
+
+void GraphicsEngine::create_command_buffers()
+{
+  _command_buffers.resize(Max_Frame_Number);
+  VkCommandBufferAllocateInfo info
+  {
+    .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+    .commandPool        = _command_pool,
+    .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+    .commandBufferCount = Max_Frame_Number,
+  };
+  throw_if(vkAllocateCommandBuffers(_device, &info, _command_buffers.data()) != VK_SUCCESS,
+           "failed to create command buffers");
+}
+
+void GraphicsEngine::create_buffers()
+{
+  create_buffer(_vertex_buffer, _vertex_buffer_allocation, sizeof(Vertices[0]) * Vertices.size(),VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, Vertices.data());
+  create_buffer(_index_buffer, _index_buffer_allocation, sizeof(Indices[0]) * Indices.size(), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, Indices.data());
+
+  _uniform_buffers.resize(Max_Frame_Number);
+  _uniform_buffer_allocations.resize(Max_Frame_Number);
+  for (int i = 0; i < Max_Frame_Number; ++i)
+    create_buffer(_uniform_buffers[i], _uniform_buffer_allocations[i], sizeof(UniformBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+}
+
+void GraphicsEngine::create_descriptor_pool()
+{
+  std::vector<VkDescriptorPoolSize> sizes
+  {
+    {
+      .type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+      .descriptorCount = Max_Frame_Number,
+    },
+    {
+      .type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+      .descriptorCount = Max_Frame_Number,
+    },
+  };
+  VkDescriptorPoolCreateInfo info
+  {
+    .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+    .maxSets       = Max_Frame_Number,
+    .poolSizeCount = (uint32_t)sizes.size(),
+    .pPoolSizes    = sizes.data(),
+  };
+  throw_if(vkCreateDescriptorPool(_device, &info, nullptr, &_descriptor_pool) != VK_SUCCESS,
+           "failed to create descriptor pool");
+}
+
+void GraphicsEngine::create_descriptor_sets()
+{
+  _descriptor_sets.resize(Max_Frame_Number);
+
+  std::vector<VkDescriptorSetLayout> layouts(Max_Frame_Number, _descriptor_set_layout);
+  VkDescriptorSetAllocateInfo info
+  {
+    .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+    .descriptorPool     = _descriptor_pool,
+    .descriptorSetCount = Max_Frame_Number,
+    .pSetLayouts        = layouts.data(),
+  };
+  throw_if(vkAllocateDescriptorSets(_device, &info, _descriptor_sets.data()) != VK_SUCCESS,
+           "failed to create descriptor sets");
+
+  for (uint32_t i = 0; i < Max_Frame_Number; ++i)
+  {
+    VkDescriptorBufferInfo info
+    {
+      .buffer = _uniform_buffers[i],
+      .range  = sizeof(UniformBufferObject),
+    };
+
+    std::vector<VkWriteDescriptorSet> writes
+    {
+      {
+        .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .dstSet          = _descriptor_sets[i],
+        .dstBinding      = 0,
+        .descriptorCount = 1,
+        .descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .pBufferInfo     = &info,
+      },
+    };
+    vkUpdateDescriptorSets(_device, writes.size(), writes.data(), 0, nullptr);
+  }
+}
+
+void GraphicsEngine::create_sync_objects()
+{
+  _image_available_semaphores.resize(Max_Frame_Number);
+  _render_finished_semaphores.resize(Max_Frame_Number);
+  _in_flight_fences.resize(Max_Frame_Number);
+  VkSemaphoreCreateInfo sem_info
+  {
+    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+  };
+  VkFenceCreateInfo fence_info
+  {
+    .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+    .flags = VK_FENCE_CREATE_SIGNALED_BIT,
+  };
+  for (uint32_t i = 0; i < Max_Frame_Number; ++i)
+  {
+    throw_if
+    (
+      vkCreateSemaphore(_device, &sem_info, nullptr, &_image_available_semaphores[i]) != VK_SUCCESS |
+      vkCreateSemaphore(_device, &sem_info, nullptr, &_render_finished_semaphores[i]) != VK_SUCCESS |
+      vkCreateFence(_device, &fence_info, nullptr, &_in_flight_fences[i]) != VK_SUCCESS,
+      "faield to create sync objects"
+    );
+  }
 }
 
 }

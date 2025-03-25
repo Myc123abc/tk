@@ -28,8 +28,11 @@ namespace tk
     Window& operator=(Window const&) = delete;
     Window& operator=(Window&&)      = delete;
 
-    auto create_surface(VkInstance instance) const -> VkSurfaceKHR;
+    auto create_surface(VkInstance instance)           const -> VkSurfaceKHR;
     void get_framebuffer_size(int& width, int& height) const;
+    auto is_closed()                                   const -> int;
+    
+    static void process_events();
 
   private:
     GLFWwindow* _window;

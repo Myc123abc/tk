@@ -40,5 +40,15 @@ void Window::get_framebuffer_size(int& width, int& height) const
 {
   glfwGetFramebufferSize(_window, &width, &height);
 }
+    
+auto Window::is_closed() const -> int
+{
+  return glfwWindowShouldClose(_window);
+}
+
+void Window::process_events()
+{
+  glfwPollEvents();
+}
 
 }

@@ -5,7 +5,6 @@
 #include "Window.hpp"
 
 #include <fmt/color.h>
-#include <glm/glm.hpp>
 
 #include <fstream>
 
@@ -20,7 +19,7 @@ namespace tk { namespace graphics_engine_init_util {
 inline VKAPI_ATTR VkBool32 VKAPI_CALL debug_messenger_callback(
   VkDebugUtilsMessageSeverityFlagBitsEXT      message_severity,
   VkDebugUtilsMessageTypeFlagsEXT             message_type,
-  const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
+  VkDebugUtilsMessengerCallbackDataEXT const* callback_data,
   void*                                       user_data)
 {
   log::info(callback_data->pMessage);
@@ -44,8 +43,8 @@ inline auto get_debug_messenger_create_info()
 
 inline VkResult vkCreateDebugUtilsMessengerEXT(
   VkInstance                                  instance,
-  const VkDebugUtilsMessengerCreateInfoEXT*   pCreateInfo,
-  const VkAllocationCallbacks*                pAllocator,
+  VkDebugUtilsMessengerCreateInfoEXT const*   pCreateInfo,
+  VkAllocationCallbacks const*                pAllocator,
   VkDebugUtilsMessengerEXT*                   pMessenger)
 {
   auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance,"vkCreateDebugUtilsMessengerEXT");
@@ -57,7 +56,7 @@ inline VkResult vkCreateDebugUtilsMessengerEXT(
 inline void vkDestroyDebugUtilsMessengerEXT(
   VkInstance                                  instance,
   VkDebugUtilsMessengerEXT                    messenger,
-  const VkAllocationCallbacks*                pAllocator)
+  VkAllocationCallbacks const*                pAllocator)
 {
   auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
   if (func != nullptr)
@@ -87,7 +86,7 @@ inline auto print_supported_instance_layers()
   fmt::println("");
 }
 
-inline auto check_layers_support(const std::vector<std::string_view>& layers)
+inline auto check_layers_support(std::vector<std::string_view> const& layers)
 {
   auto supported_layers = get_supported_instance_layers();
 
@@ -175,13 +174,17 @@ inline auto get_supported_physical_devices(VkInstance instance)
   return devices;
 }
 
-inline auto get_physical_devices_score(const std::vector<VkPhysicalDevice>& devices)
+inline auto get_physical_devices_score(std::vector<VkPhysicalDevice> const& devices)
 {
   std::multimap<int, VkPhysicalDevice> devices_score;
 
   VkPhysicalDeviceProperties properties;
   VkPhysicalDeviceVulkan13Features features13{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES };
-  VkPhysicalDeviceFeatures2 features2;
+  VkPhysicalDeviceFeatures2 features2
+  {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+    .pNext = &features13
+  };
   features2.pNext = &features13;
   for (const auto& device : devices)
   {
@@ -235,7 +238,7 @@ inline auto print_supported_device_extensions(VkPhysicalDevice device)
   fmt::println("");
 }
 
-inline auto check_device_extensions_support(VkPhysicalDevice device, const std::vector<const char*>& extensions)
+inline auto check_device_extensions_support(VkPhysicalDevice device, std::vector<const char*> const& extensions)
 {
   auto supported_extensions = get_supported_device_extensions(device);
   for (auto extension : extensions) 
@@ -467,43 +470,7 @@ private:
 
 
 ////////////////////////////////////////////////////////////////////////////////
-//                               Shader 
+//                               Vertex 
 ////////////////////////////////////////////////////////////////////////////////
-
-struct Vertex
-{
-  glm::vec2 position;
-  glm::vec3 color;
-
-  static constexpr auto get_attribute_descriptions() -> std::vector<VkVertexInputAttributeDescription>
-  {
-    return
-    {
-      {
-        .location = 0,
-        .binding  = 0,
-        .format   = VK_FORMAT_R32G32_SFLOAT,
-        .offset   = offsetof(Vertex, position),
-      },
-      {
-        .location = 1,
-        .binding  = 0,
-        .format   = VK_FORMAT_R32G32B32_SFLOAT,
-        .offset   = offsetof(Vertex, color),
-      },
-    };
-  }
-
-  static constexpr auto get_binding_description()
-  {
-    return VkVertexInputBindingDescription
-    {
-      .binding   = 0,
-      .stride    = sizeof(Vertex),
-      .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-    };
-  }
-
-};
 
 } }

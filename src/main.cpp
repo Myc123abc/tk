@@ -10,6 +10,7 @@ int main()
   {
     Window win(960, 540, "Breakout");
     GraphicsEngine graphicsEngine(win);
+    graphicsEngine.run();
   }
   catch (const std::exception& e)
   {
