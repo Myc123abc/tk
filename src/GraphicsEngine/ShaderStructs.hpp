@@ -18,7 +18,7 @@ namespace tk
   
   struct Vertex
   {
-    glm::vec2 position;
+    glm::vec3 position;
     glm::vec3 color;
   
     static constexpr auto get_attribute_descriptions() -> std::vector<VkVertexInputAttributeDescription>
@@ -28,7 +28,7 @@ namespace tk
         {
           .location = 0,
           .binding  = 0,
-          .format   = VK_FORMAT_R32G32_SFLOAT,
+          .format   = VK_FORMAT_R32G32B32_SFLOAT,
           .offset   = offsetof(Vertex, position),
         },
         {

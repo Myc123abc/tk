@@ -29,7 +29,7 @@ GraphicsEngine::GraphicsEngine(Window const& window)
   create_swapchain_and_get_swapchain_images_info();
   create_swapchain_image_views();
   create_render_pass();
-  create_frame_buffers();
+  create_framebuffers();
   create_descriptor_set_layout();
   create_pipeline();
   create_command_pool();
@@ -57,8 +57,8 @@ GraphicsEngine::~GraphicsEngine()
   vkDestroyPipeline(_device, _pipeline, nullptr);
   vkDestroyPipelineLayout(_device, _pipeline_layout, nullptr);
   vkDestroyDescriptorSetLayout(_device, _descriptor_set_layout, nullptr);
-  for (uint32_t i = 0; i < _frame_buffers.size(); ++i)
-    vkDestroyFramebuffer(_device, _frame_buffers[i], nullptr);
+  for (uint32_t i = 0; i < _framebuffers.size(); ++i)
+    vkDestroyFramebuffer(_device, _framebuffers[i], nullptr);
   vkDestroyRenderPass(_device, _render_pass, nullptr);
   for (uint32_t i = 0; i < _swapchain_image_views.size(); ++i)
     vkDestroyImageView(_device, _swapchain_image_views[i], nullptr);
@@ -235,6 +235,9 @@ void GraphicsEngine::create_swapchain_and_get_swapchain_images_info()
   auto details         = get_swapchain_details(_physical_device, _surface);
   auto surface_format  = details.get_surface_format();
   auto present_mode    = details.get_present_mode();
+#ifndef NDEBUG 
+  print_present_mode(present_mode);
+#endif
   auto extent          = details.get_swap_extent(_window);
   uint32_t image_count = details.capabilities.minImageCount + 1;
   if (details.capabilities.maxImageCount > 0 &&
@@ -345,9 +348,9 @@ void GraphicsEngine::create_render_pass()
            "failed to create render pass");
 }
 
-void GraphicsEngine::create_frame_buffers()
+void GraphicsEngine::create_framebuffers()
 {
-  _frame_buffers.resize(_swapchain_images.size());
+  _framebuffers.resize(_swapchain_images.size());
   for (uint32_t i = 0; i < _swapchain_images.size(); ++i)
   {
     VkFramebufferCreateInfo info
@@ -360,7 +363,7 @@ void GraphicsEngine::create_frame_buffers()
       .height          = _swapchain_image_extent.height,
       .layers          = 1,
     };
-    throw_if(vkCreateFramebuffer(_device, &info, nullptr, &_frame_buffers[i]) != VK_SUCCESS,
+    throw_if(vkCreateFramebuffer(_device, &info, nullptr, &_framebuffers[i]) != VK_SUCCESS,
             "failed to create frame buffers");
   }
 }
@@ -448,7 +451,7 @@ void GraphicsEngine::create_pipeline()
     .depthClampEnable        = VK_FALSE,   
     .rasterizerDiscardEnable = VK_FALSE,
     .polygonMode             = VK_POLYGON_MODE_FILL,
-    .cullMode                = VK_CULL_MODE_BACK_BIT,
+    // .cullMode                = VK_CULL_MODE_FRONT_BIT,
     .frontFace               = VK_FRONT_FACE_CLOCKWISE,
     .depthBiasEnable         = VK_FALSE,
     .lineWidth               = 1.f,

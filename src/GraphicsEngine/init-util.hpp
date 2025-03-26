@@ -395,6 +395,16 @@ inline auto get_swapchain_details(VkPhysicalDevice device, VkSurfaceKHR surface)
   return details;
 }
 
+inline void print_present_mode(VkPresentModeKHR present_mode)
+{
+  fmt::print(fg(fmt::color::green), "present mode: ");
+  if (present_mode == VK_PRESENT_MODE_FIFO_KHR)
+    fmt::print(fg(fmt::color::green), "V-Sync");
+  else if (present_mode == VK_PRESENT_MODE_MAILBOX_KHR)
+    fmt::print(fg(fmt::color::green), "Mailbox");
+  fmt::println("\n");
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 //                               Image 
@@ -467,10 +477,5 @@ struct Shader
 private:
   VkDevice _device;
 };
-
-
-////////////////////////////////////////////////////////////////////////////////
-//                               Vertex 
-////////////////////////////////////////////////////////////////////////////////
 
 } }

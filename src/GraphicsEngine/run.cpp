@@ -30,10 +30,10 @@ void GraphicsEngine::update()
 
   UniformBufferObject ubo;
   ubo.model = glm::mat4(1.f);
-  // ubo.view = glm::mat4(1.f);
+  ubo.view = glm::mat4(1.f);
   ubo.proj = glm::mat4(1.f);
   // ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-  ubo.view = glm::lookAt(glm::vec3(.0f, .0f, -1.f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, .0f));
+  // ubo.view = glm::lookAt(glm::vec3(.0f, .0f, -1.f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, .0f));
   // ubo.proj = glm::perspective(45.0f, _swapchain_image_extent.width / (float) _swapchain_image_extent.height, 0.1f, 10.0f);
   // ubo.view  = glm::lookAt(glm::vec3(0.f, 0.f, 1.f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 1.f, 0.f));
   // ubo.proj  = glm::ortho(-1.f, 1.f, -1.f, 1.f, -1.f, 100.f);
@@ -109,7 +109,7 @@ void GraphicsEngine::record_command_buffer(VkCommandBuffer command_buffer, uint3
   {
     .sType       = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
     .renderPass  = _render_pass,
-    .framebuffer = _frame_buffers[image_index],
+    .framebuffer = _framebuffers[image_index],
     .renderArea  =
     {
       .offset = { 0, 0 },

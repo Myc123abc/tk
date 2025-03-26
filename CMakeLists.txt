@@ -9,7 +9,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_definitions(-DFMT_HEADER_ONLY)
 add_definitions(-DSPDLOG_HEADER_ONLY)
 add_definitions(-DGLM_FORCE_DEPTH_ZERO_TO_ONE)
-add_definitions(-DGLM_FORCE_LEFT_HANDED)
+add_definitions(-DGLM_FORCE_RADIANS)
+# add_definitions(-DGLM_FORCE_LEFT_HANDED)
 
 find_package(spdlog CONFIG REQUIRED)
 

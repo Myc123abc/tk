@@ -50,7 +50,7 @@ namespace tk
     void create_swapchain_and_get_swapchain_images_info();
     void create_swapchain_image_views();
     void create_render_pass();
-    void create_frame_buffers();
+    void create_framebuffers();
     void create_descriptor_set_layout();
     void create_pipeline();
     void create_command_pool();
@@ -90,7 +90,7 @@ namespace tk
     VkExtent2D                   _swapchain_image_extent   = {};
     std::vector<VkImageView>     _swapchain_image_views;  
     VkRenderPass                 _render_pass              = VK_NULL_HANDLE;
-    std::vector<VkFramebuffer>   _frame_buffers;
+    std::vector<VkFramebuffer>   _framebuffers;
     VkDescriptorSetLayout        _descriptor_set_layout    = VK_NULL_HANDLE;
     VkPipeline                   _pipeline                 = VK_NULL_HANDLE;
     VkPipelineLayout             _pipeline_layout          = VK_NULL_HANDLE;
