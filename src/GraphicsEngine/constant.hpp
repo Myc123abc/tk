@@ -20,25 +20,25 @@ inline const std::vector<const char*> Device_Extensions =
 
 inline constexpr uint32_t Max_Frame_Number = 2;
 
-inline const std::vector<Vertex> Vertices
+inline std::vector<Vertex> Vertices
 {
   // { { -1.f, -1.f }, { 1.f, 0.f, 0.f }, },
   // { {  1.f, -1.f }, { 0.f, 1.f, 0.f }, },
   // { {  1.f,  1.f }, { 0.f, 0.f, 1.f }, },
   // { { -1.f,  1.f }, { 1.f, 1.f, 1.f }, },
-  { { -.5f, -.5f,  0.f }, { 1.f, 0.f, 0.f }, },
-  { {  .5f, -.5f,  0.f }, { 0.f, 1.f, 0.f }, },
-  { {  .5f,  .5f,  5.f }, { 0.f, 0.f, 1.f }, },
-  { { -.5f,  .5f,  0.f }, { 1.f, 1.f, 1.f }, },
-  // { {  .0f, -1.f,  0.f }, { 1.f, 0.f, 0.f }, },
-  // { { -1.f,  1.f,  0.f }, { 0.f, 1.f, 0.f }, },
-  // { {  1.f,  1.f,  5.f }, { 0.f, 0.f, 0.f }, },
+  // { { -.5f, -.5f,  0.f }, { 1.f, 0.f, 0.f }, },
+  // { {  .5f, -.5f,  0.f }, { 0.f, 1.f, 0.f }, },
+  // { {  .5f,  .5f,  5.f }, { 0.f, 0.f, 1.f }, },
+  // { { -.5f,  .5f,  0.f }, { 1.f, 1.f, 1.f }, },
+  { {  .0f, -1.f,  0.f }, { 1.f, 0.f, 0.f }, },
+  { {  1.f,  1.f,  0.f }, { 0.f, 0.f, 1.f }, },
+  { { -1.f,  1.f,  0.f }, { 0.f, 1.f, 0.f }, },
 };
 
 inline const std::vector<uint16_t> Indices 
 {
   0, 1, 2,
-  0, 2, 3,
+  // 0, 2, 3,
 };
 
 }

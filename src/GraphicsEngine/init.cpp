@@ -32,8 +32,7 @@ GraphicsEngine::GraphicsEngine(Window const& window)
   create_framebuffers();
   create_descriptor_set_layout();
   create_pipeline();
-  create_command_pool();
-  create_command_buffers();
+  create_command_pool_and_command_buffers();
   create_buffers();
   create_descriptor_pool();
   create_descriptor_sets();
@@ -53,7 +52,7 @@ GraphicsEngine::~GraphicsEngine()
     vmaDestroyBuffer(_vma_allocator, _uniform_buffers[i], _uniform_buffer_allocations[i]);
   vmaDestroyBuffer(_vma_allocator, _index_buffer, _index_buffer_allocation);
   vmaDestroyBuffer(_vma_allocator, _vertex_buffer, _vertex_buffer_allocation);
-  vkDestroyCommandPool(_device, _command_pool, nullptr);
+  _command_pool.destroy();
   vkDestroyPipeline(_device, _pipeline, nullptr);
   vkDestroyPipelineLayout(_device, _pipeline_layout, nullptr);
   vkDestroyDescriptorSetLayout(_device, _descriptor_set_layout, nullptr);
@@ -235,11 +234,12 @@ void GraphicsEngine::create_swapchain_and_get_swapchain_images_info()
   auto details         = get_swapchain_details(_physical_device, _surface);
   auto surface_format  = details.get_surface_format();
   auto present_mode    = details.get_present_mode();
-#ifndef NDEBUG 
-  print_present_mode(present_mode);
-#endif
   auto extent          = details.get_swap_extent(_window);
   uint32_t image_count = details.capabilities.minImageCount + 1;
+#ifndef NDEBUG 
+  print_present_mode(present_mode);
+  fmt::print(fg(fmt::color::green), "swapchain image counts: {}\n\n", image_count);
+#endif
   if (details.capabilities.maxImageCount > 0 &&
       image_count > details.capabilities.maxImageCount)
     image_count = details.capabilities.maxImageCount;
@@ -530,31 +530,11 @@ void GraphicsEngine::create_pipeline()
            "failed to create pipeline");
 }
 
-void GraphicsEngine::create_command_pool()
+void GraphicsEngine::create_command_pool_and_command_buffers()
 {
   auto queue_families = get_queue_family_indices(_physical_device, _surface);
-  VkCommandPoolCreateInfo info
-  {
-    .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-    .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-    .queueFamilyIndex = queue_families.graphics_family.value(),
-  };
-  throw_if(vkCreateCommandPool(_device, &info, nullptr, &_command_pool) != VK_SUCCESS,
-           "failed to create command pool");
-}
-
-void GraphicsEngine::create_command_buffers()
-{
-  _command_buffers.resize(Max_Frame_Number);
-  VkCommandBufferAllocateInfo info
-  {
-    .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-    .commandPool        = _command_pool,
-    .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-    .commandBufferCount = Max_Frame_Number,
-  };
-  throw_if(vkAllocateCommandBuffers(_device, &info, _command_buffers.data()) != VK_SUCCESS,
-           "failed to create command buffers");
+  _command_pool.init(_device, queue_families.graphics_family.value());
+  _command_buffers = _command_pool.create_buffers(Max_Frame_Number);
 }
 
 void GraphicsEngine::create_buffers()

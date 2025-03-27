@@ -7,6 +7,7 @@
 #pragma once
 
 #include "Window.hpp"
+#include "CommandPool.hpp"
 
 #include <vk_mem_alloc.h>
 
@@ -35,7 +36,7 @@ namespace tk
   private:
     void update();
     void draw();
-    void record_command_buffer(VkCommandBuffer command_buffer, uint32_t image_index);
+    void record_command_buffer(CommandBuffer& command_buffer, uint32_t image_index);
 
   private:
     //
@@ -53,8 +54,7 @@ namespace tk
     void create_framebuffers();
     void create_descriptor_set_layout();
     void create_pipeline();
-    void create_command_pool();
-    void create_command_buffers();
+    void create_command_pool_and_command_buffers();
     void create_buffers();
     void create_descriptor_pool();
     void create_descriptor_sets();
@@ -64,8 +64,8 @@ namespace tk
     // util 
     //
     // HACK: repeat single command, performance bad
-    auto begin_single_time_commands() -> VkCommandBuffer;
-    void end_single_time_commands(VkCommandBuffer command_buffer);
+    auto begin_single_time_commands() -> CommandBuffer;
+    void end_single_time_commands(CommandBuffer command_buffer);
     void copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size);
     // HACK: suballoc and single buffer
     void create_buffer(VkBuffer& buffer, VmaAllocation& allocation, 
@@ -94,8 +94,8 @@ namespace tk
     VkDescriptorSetLayout        _descriptor_set_layout    = VK_NULL_HANDLE;
     VkPipeline                   _pipeline                 = VK_NULL_HANDLE;
     VkPipelineLayout             _pipeline_layout          = VK_NULL_HANDLE;
-    VkCommandPool                _command_pool             = VK_NULL_HANDLE;
-    std::vector<VkCommandBuffer> _command_buffers;
+    CommandPool                  _command_pool;
+    std::vector<CommandBuffer>   _command_buffers;
     
     // HACK: use suballoc memory and single buffer
     VkBuffer                     _vertex_buffer            = VK_NULL_HANDLE;

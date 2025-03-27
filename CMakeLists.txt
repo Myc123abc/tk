@@ -36,7 +36,10 @@ set(LIBS
 
 add_executable(Breakout src/main.cpp ${SOURCE})
 
-target_include_directories(Breakout PRIVATE include)
+target_include_directories(Breakout PRIVATE
+  include
+  include/GraphicsEngine
+)
 
 target_link_libraries(Breakout PRIVATE ${LIBS})
 target_link_libraries(Breakout PRIVATE GPUOpen::VulkanMemoryAllocator)
