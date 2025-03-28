@@ -116,9 +116,7 @@ inline auto get_instance_extensions()
   };
 
   // glfw extensions
-  uint32_t count;
-  auto glfw_extensions = glfwGetRequiredInstanceExtensions(&count);
-  extensions.insert(extensions.end(), glfw_extensions, glfw_extensions + count);
+  extensions.append_range(Window::get_vulkan_instance_extensions());
 
   // debug messenger extension
 #ifndef NDEBUG

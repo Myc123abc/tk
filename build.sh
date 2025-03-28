@@ -1,6 +1,9 @@
 #!/bin/bash
 
-cmake -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_BUILD_TYPE=Debug -GNinja -Bbuild
+if [ ! -d build ]; then
+  cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_BUILD_TYPE=Debug -GNinja -Bbuild
+fi
+
 cmake --build build
 
 glslc -fshader-stage=vertex shader/vertex.glsl -o build/vertex.spv

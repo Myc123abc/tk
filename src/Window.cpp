@@ -51,4 +51,11 @@ void Window::process_events()
   glfwPollEvents();
 }
 
+auto Window::get_vulkan_instance_extensions() -> std::vector<const char*>
+{
+  uint32_t count;
+  auto ret = glfwGetRequiredInstanceExtensions(&count);
+  return std::vector(ret, ret + count);
+}
+
 }
