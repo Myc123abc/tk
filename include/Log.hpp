@@ -9,7 +9,8 @@
 
 #pragma once
 
-#include <spdlog/spdlog.h>
+#include <fmt/base.h>
+#include <fmt/color.h>
 
 #include <string_view>
 
@@ -28,19 +29,20 @@ namespace tk
         return log;
       }
 
-      Log()
-      {
-        spdlog::set_pattern("%^%L:%$ %v");
-      }
+      Log() = default;
 
       void error(std::string_view msg)
       {
-        spdlog::error(msg.data());
+        fmt::print("[");
+        fmt::print(fg(fmt::color::red), "error");
+        fmt::print("] {}\n", msg);
       }
 
       void info(std::string_view msg)
       {
-        spdlog::info(msg.data());
+        fmt::print("[");
+        fmt::print(fg(fmt::color::green), "info");
+        fmt::print("] {}\n", msg);
       }
     };
 

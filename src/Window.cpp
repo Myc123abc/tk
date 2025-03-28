@@ -1,7 +1,7 @@
 #include "Window.hpp"
 #include "ErrorHandling.hpp"
 
-#include <assert.h>
+#include <cassert>
 
 namespace tk
 {

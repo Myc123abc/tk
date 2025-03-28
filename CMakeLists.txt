@@ -6,13 +6,17 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_definitions(-DFMT_HEADER_ONLY)
-add_definitions(-DSPDLOG_HEADER_ONLY)
 add_definitions(-DGLM_FORCE_DEPTH_ZERO_TO_ONE)
 add_definitions(-DGLM_FORCE_RADIANS)
 # add_definitions(-DGLM_FORCE_LEFT_HANDED)
 
-find_package(spdlog CONFIG REQUIRED)
+include(FetchContent)
+FetchContent_Declare(
+  fmt
+  GIT_REPOSITORY https://github.com/fmtlib/fmt
+  GIT_TAG        master
+)
+FetchContent_MakeAvailable(fmt)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -42,4 +46,7 @@ target_include_directories(Breakout PRIVATE
 )
 
 target_link_libraries(Breakout PRIVATE ${LIBS})
-target_link_libraries(Breakout PRIVATE GPUOpen::VulkanMemoryAllocator)
+target_link_libraries(Breakout PRIVATE
+  fmt::fmt
+  GPUOpen::VulkanMemoryAllocator
+)
