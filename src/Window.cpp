@@ -6,8 +6,7 @@
 
 #include <cassert>
 
-namespace tk
-{
+namespace tk { namespace graphics_engine {
 
 Window::Window(uint32_t width, uint32_t height, std::string_view title)
 {
@@ -49,4 +48,4 @@ auto Window::get_vulkan_instance_extensions() -> std::vector<const char*>
   return std::vector(ret, ret + count);
 }
 
-}
+} }

@@ -3,8 +3,7 @@
 
 #include <ranges>
 
-namespace tk
-{
+namespace tk { namespace graphics_engine {
 
 ////////////////////////////////////////////////////////////////////////////////
 //                            Command Pool
@@ -106,4 +105,4 @@ auto CommandBuffer::reset() -> CommandBuffer&
   return *this;
 }
 
-}
+} }

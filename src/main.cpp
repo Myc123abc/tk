@@ -3,6 +3,7 @@
 #include "Log.hpp"
 
 using namespace tk;
+using namespace tk::graphics_engine;
 
 int main()
 {

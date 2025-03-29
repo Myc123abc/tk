@@ -6,8 +6,7 @@
 #include <vector>
 
 
-namespace tk
-{
+namespace tk { namespace graphics_engine {
 
   struct UniformBufferObject
   {
@@ -52,4 +51,4 @@ namespace tk
   
   };
 
-}
+} }

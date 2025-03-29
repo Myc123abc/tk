@@ -1,8 +1,7 @@
 #include "GraphicsEngine.hpp"
 #include "ErrorHandling.hpp"
 
-namespace tk
-{
+namespace tk { namespace graphics_engine {
 
 auto GraphicsEngine::begin_single_time_commands() -> CommandBuffer
 {
@@ -92,4 +91,4 @@ void GraphicsEngine::create_buffer(VkBuffer& buffer, VmaAllocation& allocation, 
   return;
 }
 
-}
+} }

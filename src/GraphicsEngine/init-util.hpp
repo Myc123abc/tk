@@ -9,7 +9,7 @@
 #include <fstream>
 #include <map>
 
-namespace tk { namespace graphics_engine_init_util {
+namespace tk { namespace graphics_engine {
 
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -9,8 +9,7 @@
 #include <thread>
 #include <chrono>
 
-namespace tk
-{
+namespace tk { namespace graphics_engine {
 
 void GraphicsEngine::run()
 {
@@ -172,4 +171,4 @@ void GraphicsEngine::record_command_buffer(CommandBuffer& command_buffer, uint32
   command_buffer.end();
 }
 
-}
+} }

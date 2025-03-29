@@ -5,10 +5,7 @@
 #include <ranges>
 #include <set>
 
-namespace tk
-{
-
-using namespace graphics_engine_init_util;
+namespace tk { namespace graphics_engine { 
 
 GraphicsEngine::GraphicsEngine(Window const& window)
   :_window(window)
@@ -66,7 +63,7 @@ GraphicsEngine::~GraphicsEngine()
   vkDestroyDevice(_device, nullptr);
   vkDestroySurfaceKHR(_instance, _surface, nullptr);
 #ifndef NDEBUG
-  tk::vkDestroyDebugUtilsMessengerEXT(_instance, _debug_messenger, nullptr);
+  graphics_engine::vkDestroyDebugUtilsMessengerEXT(_instance, _debug_messenger, nullptr);
 #endif
   vkDestroyInstance(_instance, nullptr);
 }
@@ -124,7 +121,7 @@ void GraphicsEngine::create_instance()
 void GraphicsEngine::create_debug_messenger()
 {
   auto info = get_debug_messenger_create_info();
-  throw_if(tk::vkCreateDebugUtilsMessengerEXT(_instance, &info, nullptr, &_debug_messenger) != VK_SUCCESS,
+  throw_if(graphics_engine::vkCreateDebugUtilsMessengerEXT(_instance, &info, nullptr, &_debug_messenger) != VK_SUCCESS,
           "failed to create debug utils messenger extension");
 }
 
@@ -654,4 +651,4 @@ void GraphicsEngine::create_sync_objects()
   }
 }
 
-}
+} }

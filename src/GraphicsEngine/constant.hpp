@@ -6,8 +6,7 @@
 
 #include <vector>
 
-namespace tk
-{
+namespace tk { namespace graphics_engine {
 
 inline constexpr auto Vulkan_Version = VK_API_VERSION_1_4;
 
@@ -39,4 +38,4 @@ inline const std::vector<uint16_t> Indices
   // 0, 2, 3,
 };
 
-}
+} }

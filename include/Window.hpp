@@ -17,9 +17,9 @@
 
 struct SDL_Window;
 
-namespace tk
-{
-  class Window final
+namespace tk { namespace graphics_engine {
+
+  class Window
   {
   public:
     Window(uint32_t width, uint32_t height, std::string_view title);
@@ -40,4 +40,5 @@ namespace tk
   private:
     SDL_Window* _window;
   };
-}
+
+} }

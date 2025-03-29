@@ -18,7 +18,7 @@ namespace tk
 {
   namespace log
   {
-    class Log final
+    class Log
     {
       friend void error(std::string_view msg);
       friend void info(std::string_view msg);

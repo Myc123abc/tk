@@ -13,11 +13,11 @@
 
 #include <vector>
 
-namespace tk
-{
+namespace tk { namespace graphics_engine {
+
   // TODO: graphics engine only initialize.
   // you need add vertices, indices, uniform, and shaders to run it.
-  class GraphicsEngine final
+  class GraphicsEngine
   {
   public:
     GraphicsEngine(Window const& window);
@@ -114,4 +114,5 @@ namespace tk
 
     uint32_t                     _current_frame            = 0;
   };
-}
+
+} }

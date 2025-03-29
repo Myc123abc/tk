@@ -11,8 +11,7 @@
 #include <vector>
 #include <cassert>
 
-namespace tk
-{
+namespace tk { namespace graphics_engine {
 
   class CommandBuffer;
 
@@ -74,4 +73,4 @@ namespace tk
     VkCommandBuffer _command_buffer;
   };
 
-}
+} }
