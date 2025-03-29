@@ -97,6 +97,9 @@ void GraphicsEngine::create_instance()
   print_supported_instance_extensions();
 #endif
   check_instance_extensions_support(extensions);
+#ifndef NDEBUG
+  print_enabled_extensions("instance", extensions);
+#endif
 
   // create instance
   VkInstanceCreateInfo create_info =
@@ -200,6 +203,9 @@ void GraphicsEngine::create_device_and_get_queues()
     .enabledExtensionCount = (uint32_t)Device_Extensions.size(),
     .ppEnabledExtensionNames = Device_Extensions.data(),
   };
+#ifndef NDEBUG
+  print_enabled_extensions("device", Device_Extensions);
+#endif
 
   // create logical device
   throw_if(vkCreateDevice(_physical_device, &create_info, nullptr, &_device) != VK_SUCCESS,

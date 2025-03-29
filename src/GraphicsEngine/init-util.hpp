@@ -115,7 +115,7 @@ inline auto get_instance_extensions()
     VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
   };
 
-  // glfw extensions
+  // instance extensions
   extensions.append_range(Window::get_vulkan_instance_extensions());
 
   // debug messenger extension
@@ -138,9 +138,17 @@ inline auto get_supported_instance_extensions()
 inline auto print_supported_instance_extensions()
 {
   auto extensions = get_supported_instance_extensions();
-  fmt::print(fg(fmt::color::green), "available extensions:\n");
+  fmt::print(fg(fmt::color::green), "available instance extensions:\n");
   for (const auto& extension : extensions)
     fmt::print(fg(fmt::color::green), "  {}\n", extension.extensionName);
+  fmt::println("");
+}
+
+inline auto print_enabled_extensions(std::string_view header_msg, std::vector<const char*> const& extensions)
+{
+  fmt::print(fg(fmt::color::green), "Enabled {} extensions:\n", header_msg);
+  for (const auto& extension : extensions)
+    fmt::print(fg(fmt::color::green), "  {}\n", extension);
   fmt::println("");
 }
 
