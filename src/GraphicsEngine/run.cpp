@@ -44,8 +44,6 @@ void GraphicsEngine::run()
     else
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
-
-  vkDeviceWaitIdle(_device);
 }
 
 void GraphicsEngine::update()
@@ -80,8 +78,10 @@ void GraphicsEngine::draw()
 
   vkResetFences(_device, 1, &_in_flight_fences[_current_frame]);
 
-  _command_buffers[_current_frame].reset();
-  record_command_buffer(_command_buffers[_current_frame], image_index);
+  auto frame = get_current_frame();
+
+  vkResetCommandBuffer(frame.command_buffer, 0);
+  record_command_buffer(frame.command_buffer, image_index);
 
   VkSemaphore wait_sems[] = { _image_available_semaphores[_current_frame] };
   VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
@@ -93,7 +93,7 @@ void GraphicsEngine::draw()
     .pWaitSemaphores      = wait_sems,
     .pWaitDstStageMask    = wait_stages,
     .commandBufferCount   = 1,
-    .pCommandBuffers      = _command_buffers[_current_frame].get_pointer(),
+    .pCommandBuffers      = &frame.command_buffer,
     .signalSemaphoreCount = 1,
     .pSignalSemaphores    = signal_sems,
   };
@@ -115,9 +115,13 @@ void GraphicsEngine::draw()
   _current_frame = ++_current_frame % Max_Frame_Number;
 }
     
-void GraphicsEngine::record_command_buffer(CommandBuffer& command_buffer, uint32_t image_index)
+void GraphicsEngine::record_command_buffer(VkCommandBuffer command_buffer, uint32_t image_index)
 {
-  command_buffer.begin(); 
+  VkCommandBufferBeginInfo beg_info
+  {
+    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+  };
+  vkBeginCommandBuffer(command_buffer, &beg_info);
 
   VkClearValue clear
   {
@@ -139,9 +143,9 @@ void GraphicsEngine::record_command_buffer(CommandBuffer& command_buffer, uint32
     .clearValueCount = 1,
     .pClearValues    = &clear,
   };
-  vkCmdBeginRenderPass(command_buffer.get(), &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+  vkCmdBeginRenderPass(command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
 
-  vkCmdBindPipeline(command_buffer.get(), VK_PIPELINE_BIND_POINT_GRAPHICS, _pipeline);
+  vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _pipeline);
 
   VkViewport viewport
   {
@@ -149,26 +153,26 @@ void GraphicsEngine::record_command_buffer(CommandBuffer& command_buffer, uint32
     .height   = (float)_swapchain_image_extent.height,
     .maxDepth = 1.f,
   };
-  vkCmdSetViewport(command_buffer.get(), 0, 1, &viewport);
+  vkCmdSetViewport(command_buffer, 0, 1, &viewport);
 
   VkRect2D scissor
   {
     .offset = { 0, 0 },
     .extent = _swapchain_image_extent,
   };
-  vkCmdSetScissor(command_buffer.get(), 0, 1, &scissor);
+  vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
   VkDeviceSize offsets[] = { 0 };
-  vkCmdBindVertexBuffers(command_buffer.get(), 0, 1, &_vertex_buffer, offsets);
-  vkCmdBindIndexBuffer(command_buffer.get(), _index_buffer, 0, VK_INDEX_TYPE_UINT16);
+  vkCmdBindVertexBuffers(command_buffer, 0, 1, &_vertex_buffer, offsets);
+  vkCmdBindIndexBuffer(command_buffer, _index_buffer, 0, VK_INDEX_TYPE_UINT16);
 
-  vkCmdBindDescriptorSets(command_buffer.get(), VK_PIPELINE_BIND_POINT_GRAPHICS, _pipeline_layout, 0, 1, &_descriptor_sets[_current_frame], 0, nullptr);
+  vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _pipeline_layout, 0, 1, &_descriptor_sets[_current_frame], 0, nullptr);
 
-  vkCmdDrawIndexed(command_buffer.get(), (uint32_t)Indices.size(), 1, 0, 0, 0);
+  vkCmdDrawIndexed(command_buffer, (uint32_t)Indices.size(), 1, 0, 0, 0);
 
-  vkCmdEndRenderPass(command_buffer.get());
+  vkCmdEndRenderPass(command_buffer);
 
-  command_buffer.end();
+  vkEndCommandBuffer(command_buffer);
 }
 
 } }

@@ -3,20 +3,38 @@
 
 namespace tk { namespace graphics_engine {
 
-auto GraphicsEngine::begin_single_time_commands() -> CommandBuffer
+auto GraphicsEngine::begin_single_time_commands() -> VkCommandBuffer
 {
-  return _command_pool.create_buffer().begin(CommandBuffer::usage::one_time_submit);
+  VkCommandBuffer buffer;
+  VkCommandBufferAllocateInfo command_buffer_info
+  {
+    .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+    .commandPool        = _command_pool,
+    .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+    .commandBufferCount = 1,
+  };
+  throw_if(vkAllocateCommandBuffers(_device, &command_buffer_info, &buffer) != VK_SUCCESS,
+           "failed to create command buffers");
+
+  VkCommandBufferBeginInfo beg_info
+  {
+    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+    .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+  };
+  vkBeginCommandBuffer(buffer, &beg_info);
+
+  return buffer;
 }
 
-void GraphicsEngine::end_single_time_commands(CommandBuffer command_buffer)
+void GraphicsEngine::end_single_time_commands(VkCommandBuffer command_buffer)
 {
-  command_buffer.end();
+  vkEndCommandBuffer(command_buffer);
 
   VkSubmitInfo info
   {
     .sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO,
     .commandBufferCount = 1,
-    .pCommandBuffers    = command_buffer.get_pointer(),
+    .pCommandBuffers    = &command_buffer,
   };
 
   throw_if(vkQueueSubmit(_graphics_queue, 1, &info, VK_NULL_HANDLE) != VK_SUCCESS,
@@ -24,7 +42,7 @@ void GraphicsEngine::end_single_time_commands(CommandBuffer command_buffer)
   throw_if(vkQueueWaitIdle(_graphics_queue) != VK_SUCCESS,
            "failed to wait queue");
 
-  _command_pool.free_buffer(command_buffer);
+  vkFreeCommandBuffers(_device, _command_pool, 1, &command_buffer);
 }
 
 void GraphicsEngine::copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size) 
@@ -37,7 +55,7 @@ void GraphicsEngine::copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size)
   {
     .size = size,
   };
-  vkCmdCopyBuffer(buf.get(), src, dst, 1, &copy_region);
+  vkCmdCopyBuffer(buf, src, dst, 1, &copy_region);
 
   // end record command
   end_single_time_commands(buf);

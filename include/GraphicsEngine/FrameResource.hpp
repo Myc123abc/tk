@@ -1,5 +1,5 @@
 //
-// frame
+// frame resource
 // render one frame needs resources
 //
 
@@ -9,20 +9,19 @@
 
 namespace tk { namespace graphics_engine {
 
-  class Frame
+  struct FrameResource
   {
-  public:
-    Frame();
-    ~Frame();
-
-    Frame(Frame const&)            = delete;
-    Frame(Frame&&)                 = delete;
-    Frame& operator=(Frame const&) = delete;
-    Frame& operator=(Frame&&)      = delete;
-
-  private:
-    VkCommandPool   _command_pool  { VK_NULL_HANDLE };
-    VkCommandBuffer _command_buffer{ VK_NULL_HANDLE };
+  // public:
+  //   FrameResource();
+  //   ~FrameResource();
+  //
+  //   FrameResource(FrameResource const&)            = delete;
+  //   FrameResource(FrameResource&&)                 = delete;
+  //   FrameResource& operator=(FrameResource const&) = delete;
+  //   FrameResource& operator=(FrameResource&&)      = delete;
+  //
+  // private:
+    VkCommandBuffer command_buffer{ VK_NULL_HANDLE };
   };
 
 } }

@@ -29,15 +29,18 @@ GraphicsEngine::GraphicsEngine(Window const& window)
   create_framebuffers();
   create_descriptor_set_layout();
   create_pipeline();
-  create_command_pool_and_command_buffers();
+  create_command_pool();
   create_buffers();
   create_descriptor_pool();
   create_descriptor_sets();
   create_sync_objects();
+  create_frame_resources();
 }
 
 GraphicsEngine::~GraphicsEngine()
 {
+  vkDeviceWaitIdle(_device);
+
   for (uint32_t i = 0; i < Max_Frame_Number; ++i)
   {
     vkDestroySemaphore(_device, _image_available_semaphores[i], nullptr);
@@ -49,7 +52,7 @@ GraphicsEngine::~GraphicsEngine()
     vmaDestroyBuffer(_vma_allocator, _uniform_buffers[i], _uniform_buffer_allocations[i]);
   vmaDestroyBuffer(_vma_allocator, _index_buffer, _index_buffer_allocation);
   vmaDestroyBuffer(_vma_allocator, _vertex_buffer, _vertex_buffer_allocation);
-  _command_pool.destroy();
+  vkDestroyCommandPool(_device, _command_pool, nullptr);
   vkDestroyPipeline(_device, _pipeline, nullptr);
   vkDestroyPipelineLayout(_device, _pipeline_layout, nullptr);
   vkDestroyDescriptorSetLayout(_device, _descriptor_set_layout, nullptr);
@@ -545,11 +548,18 @@ void GraphicsEngine::create_pipeline()
            "failed to create pipeline");
 }
 
-void GraphicsEngine::create_command_pool_and_command_buffers()
+void GraphicsEngine::create_command_pool()
 {
+  // create command pool
   auto queue_families = get_queue_family_indices(_physical_device, _surface);
-  _command_pool.init(_device, queue_families.graphics_family.value());
-  _command_buffers = _command_pool.create_buffers(Max_Frame_Number);
+  VkCommandPoolCreateInfo command_pool_info
+  {
+    .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+    .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+    .queueFamilyIndex = queue_families.graphics_family.value(),
+  };
+  throw_if(vkCreateCommandPool(_device, &command_pool_info, nullptr, &_command_pool) != VK_SUCCESS,
+           "failed to create command pool");
 }
 
 void GraphicsEngine::create_buffers()
@@ -648,6 +658,29 @@ void GraphicsEngine::create_sync_objects()
       vkCreateFence(_device, &fence_info, nullptr, &_in_flight_fences[i]) != VK_SUCCESS,
       "faield to create sync objects"
     );
+  }
+}
+
+void GraphicsEngine::create_frame_resources()
+{
+  _frames.resize(Max_Frame_Number);
+
+  // create command buffers
+  auto cmd_bufs = std::vector<VkCommandBuffer>(_frames.size());
+  VkCommandBufferAllocateInfo command_buffer_info
+  {
+    .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+    .commandPool        = _command_pool,
+    .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+    .commandBufferCount = (uint32_t)_frames.size(),
+  };
+  throw_if(vkAllocateCommandBuffers(_device, &command_buffer_info, cmd_bufs.data()) != VK_SUCCESS,
+           "failed to create command buffers");
+
+  // set to frame resouces
+  for (uint32_t i = 0; i < _frames.size(); ++i)
+  {
+    _frames[i].command_buffer = cmd_bufs[i];
   }
 }
 

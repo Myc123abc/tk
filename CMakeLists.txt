@@ -54,7 +54,7 @@ set(LIBS
   Xi
 )
 
-add_executable(Breakout src/main.cpp ${SOURCE})
+add_executable(Breakout ${SOURCE})
 
 target_include_directories(Breakout PRIVATE
   include

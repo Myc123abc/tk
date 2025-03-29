@@ -7,7 +7,7 @@
 #pragma once
 
 #include "Window.hpp"
-#include "CommandPool.hpp"
+#include "FrameResource.hpp"
 
 #include <vk_mem_alloc.h>
 
@@ -36,7 +36,7 @@ namespace tk { namespace graphics_engine {
   private:
     void update();
     void draw();
-    void record_command_buffer(CommandBuffer& command_buffer, uint32_t image_index);
+    void record_command_buffer(VkCommandBuffer command_buffer, uint32_t image_index);
 
   private:
     //
@@ -54,18 +54,20 @@ namespace tk { namespace graphics_engine {
     void create_framebuffers();
     void create_descriptor_set_layout();
     void create_pipeline();
-    void create_command_pool_and_command_buffers();
+    void create_command_pool();
     void create_buffers();
     void create_descriptor_pool();
     void create_descriptor_sets();
     void create_sync_objects();
 
+    void create_frame_resources();
+
     //
     // util 
     //
     // HACK: repeat single command, performance bad
-    auto begin_single_time_commands() -> CommandBuffer;
-    void end_single_time_commands(CommandBuffer command_buffer);
+    auto begin_single_time_commands() -> VkCommandBuffer;
+    void end_single_time_commands(VkCommandBuffer command_buffer);
     void copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size);
     // HACK: suballoc and single buffer
     void create_buffer(VkBuffer& buffer, VmaAllocation& allocation, 
@@ -73,9 +75,11 @@ namespace tk { namespace graphics_engine {
                        void const* data = nullptr);
 
   private:
+    //
+    // common resources
+    //
     // HACK: expand to multi-windows manage, use WindowManager in future.
     Window const&                _window;
-
     VkInstance                   _instance                 = VK_NULL_HANDLE;
     VkDebugUtilsMessengerEXT     _debug_messenger          = VK_NULL_HANDLE;
     VkSurfaceKHR                 _surface                  = VK_NULL_HANDLE;
@@ -94,8 +98,14 @@ namespace tk { namespace graphics_engine {
     VkDescriptorSetLayout        _descriptor_set_layout    = VK_NULL_HANDLE;
     VkPipeline                   _pipeline                 = VK_NULL_HANDLE;
     VkPipelineLayout             _pipeline_layout          = VK_NULL_HANDLE;
-    CommandPool                  _command_pool;
-    std::vector<CommandBuffer>   _command_buffers;
+    VkCommandPool                _command_pool             = VK_NULL_HANDLE;
+
+    //
+    // frame resources
+    //
+    std::vector<FrameResource>   _frames;
+    uint32_t                     _current_frame            = 0;
+    auto get_current_frame() -> FrameResource& { return _frames[_current_frame]; }
     
     // HACK: use suballoc memory and single buffer
     VkBuffer                     _vertex_buffer            = VK_NULL_HANDLE;
@@ -111,8 +121,6 @@ namespace tk { namespace graphics_engine {
     std::vector<VkSemaphore>     _image_available_semaphores;
     std::vector<VkSemaphore>     _render_finished_semaphores;
     std::vector<VkFence>         _in_flight_fences; 
-
-    uint32_t                     _current_frame            = 0;
   };
 
 } }
