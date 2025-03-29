@@ -5,18 +5,17 @@
 //
 // TODO:
 // expand to window manager
-// one init glfw, multi-generate windows
+// one init sdl3, multi-generate windows
 //
 
 #pragma once
-
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
 
 #include <vulkan/vulkan.h>
 
 #include <vector>
 #include <string_view>
+
+struct SDL_Window;
 
 namespace tk
 {
@@ -39,6 +38,6 @@ namespace tk
     static auto get_vulkan_instance_extensions() -> std::vector<const char*>;
 
   private:
-    GLFWwindow* _window;
+    SDL_Window* _window;
   };
 }

@@ -111,8 +111,8 @@ inline auto get_instance_extensions()
   std::vector<const char*> extensions =
   {
     // VK_EXT_swapchain_maintenance_1 extension need these
-    VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
-    VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
+    // VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
+    // VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
   };
 
   // instance extensions

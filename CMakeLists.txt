@@ -11,14 +11,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 ################################################################################
-#                               Macro Definition
-################################################################################
-
-add_definitions(-DGLM_FORCE_DEPTH_ZERO_TO_ONE)
-add_definitions(-DGLM_FORCE_RADIANS)
-# add_definitions(-DGLM_FORCE_LEFT_HANDED)
-
-################################################################################
 #                                Library
 ################################################################################
 
@@ -74,4 +66,10 @@ target_link_libraries(Breakout PRIVATE
   fmt::fmt
   SDL3::SDL3
   GPUOpen::VulkanMemoryAllocator
+)
+
+target_compile_definitions(Breakout PRIVATE
+  GLM_FORCE_DEPTH_ZERO_TO_ONE
+  GLM_FORCE_RADIANS
+  # GLM_FORCE_LEFT_HANDED
 )

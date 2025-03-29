@@ -81,7 +81,8 @@ void GraphicsEngine::create_instance()
   // app info
   VkApplicationInfo app_info
   {
-    .apiVersion = Vulkan_Version,
+    .pApplicationName = "tk",
+    .apiVersion       = Vulkan_Version,
   };
 
   // layers

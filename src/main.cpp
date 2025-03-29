@@ -8,7 +8,7 @@ int main()
 {
   try
   {
-    Window win(960, 540, "Breakout");
+    Window win(540, 540, "Breakout");
     GraphicsEngine graphicsEngine(win);
     graphicsEngine.run();
   }

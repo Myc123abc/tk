@@ -3,8 +3,10 @@
 #include "ErrorHandling.hpp"
 #include "constant.hpp"
 
+#include <SDL3/SDL_events.h>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <thread>
 #include <chrono>
 
 namespace tk
@@ -12,11 +14,36 @@ namespace tk
 
 void GraphicsEngine::run()
 {
-  while (!_window.is_closed())
+  bool quit  = false;
+  bool pause = false;
+
+  SDL_Event event;
+
+  while (!quit)
   {
-    Window::process_events();
-    update();
-    draw();
+    while (SDL_PollEvent(&event))
+    {
+      switch (event.type)
+      {
+      case SDL_EVENT_QUIT:
+        quit = true;
+        break;
+      case SDL_EVENT_WINDOW_MINIMIZED:
+        pause = true;
+        break;
+      case SDL_EVENT_WINDOW_MAXIMIZED:
+        pause = false;
+        break;
+      }
+    }
+
+    if (!pause)
+    {
+      update();
+      draw();
+    }
+    else
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
 
   vkDeviceWaitIdle(_device);

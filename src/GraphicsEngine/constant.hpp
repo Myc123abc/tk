@@ -15,7 +15,7 @@ inline const std::vector<const char*> Device_Extensions =
 {
   VK_KHR_SWAPCHAIN_EXTENSION_NAME,
   // swapchain maintenance extension can auto recreate swapchain
-  VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
+  // VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
 };
 
 inline constexpr uint32_t Max_Frame_Number = 2;
