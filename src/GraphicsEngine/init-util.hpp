@@ -108,12 +108,7 @@ inline auto check_layers_support(std::vector<std::string_view> const& layers)
 
 inline auto get_instance_extensions()
 {
-  std::vector<const char*> extensions =
-  {
-    // VK_EXT_swapchain_maintenance_1 extension need these
-    // VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
-    // VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
-  };
+  std::vector<const char*> extensions;
 
   // instance extensions
   extensions.append_range(Window::get_vulkan_instance_extensions());

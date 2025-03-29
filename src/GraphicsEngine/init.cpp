@@ -186,13 +186,24 @@ void GraphicsEngine::create_device_and_get_queues()
     });
 
   // features
-  VkPhysicalDeviceVulkan13Features features13{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES };
+  VkPhysicalDeviceVulkan13Features features13
+  { 
+    .sType               = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+    .synchronization2    = true,
+    .dynamicRendering    = true,
+  };
+  VkPhysicalDeviceVulkan12Features features12
+  { 
+    .sType               = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+    .pNext               = &features13,
+    .descriptorIndexing  = true,
+    .bufferDeviceAddress = true,
+  };
   VkPhysicalDeviceFeatures2 features2
   {
     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-    .pNext = &features13
+    .pNext = &features12
   };
-  vkGetPhysicalDeviceFeatures2(_physical_device, &features2);
 
   // device info 
   VkDeviceCreateInfo create_info
