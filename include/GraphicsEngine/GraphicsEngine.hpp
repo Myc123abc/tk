@@ -61,6 +61,7 @@ namespace tk { namespace graphics_engine {
     void create_sync_objects();
 
     void create_frame_resources();
+    void destroy_frame_resources();
 
     //
     // util 
@@ -73,6 +74,9 @@ namespace tk { namespace graphics_engine {
     void create_buffer(VkBuffer& buffer, VmaAllocation& allocation, 
                        uint32_t size, VkBufferUsageFlags usage,
                        void const* data = nullptr);
+
+    static void transition_image_layout(VkCommandBuffer cmd, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout);
+    static auto get_image_subresource_range(VkImageAspectFlags aspect) -> VkImageSubresourceRange;
 
   private:
     //
@@ -94,6 +98,11 @@ namespace tk { namespace graphics_engine {
     VkExtent2D                   _swapchain_image_extent   = {};
     std::vector<VkImageView>     _swapchain_image_views;  
     VkRenderPass                 _render_pass              = VK_NULL_HANDLE;
+    // framebuffer is used on swapchain image,
+    // which will be presented on screen when commanded to queue.
+    // it's not the concept of frame resource,
+    // which is use for CPU to handle every frame.
+    // frambuffer is handled by GPU btw.
     std::vector<VkFramebuffer>   _framebuffers;
     VkDescriptorSetLayout        _descriptor_set_layout    = VK_NULL_HANDLE;
     VkPipeline                   _pipeline                 = VK_NULL_HANDLE;
@@ -118,9 +127,6 @@ namespace tk { namespace graphics_engine {
     // HACK: make frame resource for anything in a frame
     VkDescriptorPool             _descriptor_pool          = VK_NULL_HANDLE;
     std::vector<VkDescriptorSet> _descriptor_sets;
-    std::vector<VkSemaphore>     _image_available_semaphores;
-    std::vector<VkSemaphore>     _render_finished_semaphores;
-    std::vector<VkFence>         _in_flight_fences; 
   };
 
 } }

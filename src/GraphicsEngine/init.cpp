@@ -33,7 +33,6 @@ GraphicsEngine::GraphicsEngine(Window const& window)
   create_buffers();
   create_descriptor_pool();
   create_descriptor_sets();
-  create_sync_objects();
   create_frame_resources();
 }
 
@@ -41,12 +40,8 @@ GraphicsEngine::~GraphicsEngine()
 {
   vkDeviceWaitIdle(_device);
 
-  for (uint32_t i = 0; i < Max_Frame_Number; ++i)
-  {
-    vkDestroySemaphore(_device, _image_available_semaphores[i], nullptr);
-    vkDestroySemaphore(_device, _render_finished_semaphores[i], nullptr);
-    vkDestroyFence(_device, _in_flight_fences[i], nullptr);
-  }
+  destroy_frame_resources();
+
   vkDestroyDescriptorPool(_device, _descriptor_pool, nullptr);
   for (uint32_t i = 0; i < _uniform_buffers.size(); ++i)
     vmaDestroyBuffer(_vma_allocator, _uniform_buffers[i], _uniform_buffer_allocations[i]);
@@ -271,7 +266,8 @@ void GraphicsEngine::create_swapchain_and_get_swapchain_images_info()
     .imageColorSpace  = surface_format.colorSpace,
     .imageExtent      = extent,
     .imageArrayLayers = 1,
-    .imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+    .imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                        VK_IMAGE_USAGE_TRANSFER_DST_BIT,
     .preTransform     = details.capabilities.currentTransform,
     .compositeAlpha   = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
     .presentMode      = present_mode,
@@ -635,32 +631,6 @@ void GraphicsEngine::create_descriptor_sets()
   }
 }
 
-void GraphicsEngine::create_sync_objects()
-{
-  _image_available_semaphores.resize(Max_Frame_Number);
-  _render_finished_semaphores.resize(Max_Frame_Number);
-  _in_flight_fences.resize(Max_Frame_Number);
-  VkSemaphoreCreateInfo sem_info
-  {
-    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-  };
-  VkFenceCreateInfo fence_info
-  {
-    .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-    .flags = VK_FENCE_CREATE_SIGNALED_BIT,
-  };
-  for (uint32_t i = 0; i < Max_Frame_Number; ++i)
-  {
-    throw_if
-    (
-      vkCreateSemaphore(_device, &sem_info, nullptr, &_image_available_semaphores[i]) != VK_SUCCESS |
-      vkCreateSemaphore(_device, &sem_info, nullptr, &_render_finished_semaphores[i]) != VK_SUCCESS |
-      vkCreateFence(_device, &fence_info, nullptr, &_in_flight_fences[i]) != VK_SUCCESS,
-      "faield to create sync objects"
-    );
-  }
-}
-
 void GraphicsEngine::create_frame_resources()
 {
   _frames.resize(Max_Frame_Number);
@@ -676,11 +646,33 @@ void GraphicsEngine::create_frame_resources()
   };
   throw_if(vkAllocateCommandBuffers(_device, &command_buffer_info, cmd_bufs.data()) != VK_SUCCESS,
            "failed to create command buffers");
-
-  // set to frame resouces
   for (uint32_t i = 0; i < _frames.size(); ++i)
-  {
     _frames[i].command_buffer = cmd_bufs[i];
+
+  // async objects 
+  VkFenceCreateInfo fence_info
+  {
+    .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+    .flags = VK_FENCE_CREATE_SIGNALED_BIT,
+  };
+  VkSemaphoreCreateInfo sem_info
+  {
+    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+  };
+  for (auto& frame : _frames)
+    throw_if(vkCreateFence(_device, &fence_info, nullptr, &frame.fence)                 != VK_SUCCESS ||
+             vkCreateSemaphore(_device, &sem_info, nullptr, &frame.image_available_sem) != VK_SUCCESS || 
+             vkCreateSemaphore(_device, &sem_info, nullptr, &frame.render_finished_sem) != VK_SUCCESS,
+             "faield to create sync objects");
+}
+
+void GraphicsEngine::destroy_frame_resources()
+{
+  for (auto const& frame : _frames)
+  {
+    vkDestroyFence(_device, frame.fence, nullptr);
+    vkDestroySemaphore(_device, frame.image_available_sem, nullptr);
+    vkDestroySemaphore(_device, frame.render_finished_sem, nullptr);
   }
 }
 

@@ -3,6 +3,10 @@
 
 namespace tk { namespace graphics_engine {
 
+////////////////////////////////////////////////////////////////////////////////
+//                               Buffer
+////////////////////////////////////////////////////////////////////////////////
+
 auto GraphicsEngine::begin_single_time_commands() -> VkCommandBuffer
 {
   VkCommandBuffer buffer;
@@ -107,6 +111,54 @@ void GraphicsEngine::create_buffer(VkBuffer& buffer, VmaAllocation& allocation, 
 
   vmaDestroyBuffer(_vma_allocator, stage_buffer, alloc);
   return;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+//                               Image 
+////////////////////////////////////////////////////////////////////////////////
+
+void GraphicsEngine::transition_image_layout(VkCommandBuffer cmd, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout)
+{
+  auto aspect_mask = new_layout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL ?
+                     VK_IMAGE_ASPECT_DEPTH_BIT :
+                     VK_IMAGE_ASPECT_COLOR_BIT;
+
+  VkImageMemoryBarrier2 barrier
+  {
+    .sType            = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+    // HACK: use all commands bit will stall the GPU pipeline a bit, is inefficient.
+    // should make stageMask more accurate.
+    // reference: https://github.com/KhronosGroup/Vulkan-Docs/wiki/Synchronization-Examples
+    .srcStageMask     = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+    .srcAccessMask    = VK_ACCESS_2_MEMORY_WRITE_BIT,
+    .dstStageMask     = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+    .dstAccessMask    = VK_ACCESS_2_MEMORY_READ_BIT  |
+                        VK_ACCESS_2_MEMORY_WRITE_BIT,
+    .oldLayout        = old_layout,
+    .newLayout        = new_layout,
+    .image            = image,
+    .subresourceRange = get_image_subresource_range(aspect_mask),
+  };
+
+  VkDependencyInfo dep_info
+  {
+    .sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+    .imageMemoryBarrierCount = 1,
+    .pImageMemoryBarriers    = &barrier,
+  };
+
+  vkCmdPipelineBarrier2(cmd, &dep_info);
+}
+
+auto GraphicsEngine::get_image_subresource_range(VkImageAspectFlags aspect) -> VkImageSubresourceRange
+{
+  return
+  {
+    .aspectMask = aspect, 
+    .levelCount = VK_REMAINING_MIP_LEVELS,
+    .layerCount = VK_REMAINING_ARRAY_LAYERS,
+  };
 }
 
 } }
