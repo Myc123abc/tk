@@ -534,6 +534,7 @@ void GraphicsEngine::create_pipeline()
     .pColorBlendState    = &color_blend,
     .pDynamicState       = &dynamic,
     .layout              = _pipeline_layout,
+    // FIX: use dynamic rendering, not need render pass and framebuffers
     .renderPass          = _render_pass,
     .subpass             = 0,
     .basePipelineHandle  = VK_NULL_HANDLE,
