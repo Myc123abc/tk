@@ -161,4 +161,43 @@ auto GraphicsEngine::get_image_subresource_range(VkImageAspectFlags aspect) -> V
   };
 }
 
+// HACK: VkCmdCopyImage can be faster but most restriction such as src and dst are same format and extent. 
+void GraphicsEngine::copy_image(VkCommandBuffer cmd, VkImage src, VkImage dst, VkExtent2D src_extent, VkExtent2D dst_extent)
+{
+  VkImageBlit2 blit
+  { 
+    .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2,
+    .srcSubresource =
+    {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .layerCount = 1,
+    },
+    .dstSubresource =
+    {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .layerCount = 1,
+    },
+  };
+  blit.srcOffsets[1].x = src_extent.width;
+  blit.srcOffsets[1].y = src_extent.height;
+  blit.srcOffsets[1].z = 1;
+  blit.dstOffsets[1].x = dst_extent.width;
+  blit.dstOffsets[1].y = dst_extent.height;
+  blit.dstOffsets[1].z = 1;
+
+  VkBlitImageInfo2 info
+  {
+    .sType          = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2,
+    .srcImage       = src,
+    .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    .dstImage       = dst,
+    .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    .regionCount    = 1,
+    .pRegions       = &blit,
+    .filter         = VK_FILTER_LINEAR,
+  };
+
+  vkCmdBlitImage2(cmd, &info);
+}
+
 } }

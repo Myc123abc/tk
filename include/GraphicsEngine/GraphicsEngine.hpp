@@ -9,6 +9,7 @@
 #include "Window.hpp"
 #include "FrameResource.hpp"
 #include "DestructorStack.hpp"
+#include "Image.hpp"
 
 #include <vk_mem_alloc.h>
 
@@ -37,6 +38,7 @@ namespace tk { namespace graphics_engine {
   private:
     void update();
     void draw();
+    void draw_background(VkCommandBuffer cmd);
     void record_command_buffer(VkCommandBuffer command_buffer, uint32_t image_index);
 
   private:
@@ -76,6 +78,7 @@ namespace tk { namespace graphics_engine {
 
     static void transition_image_layout(VkCommandBuffer cmd, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout);
     static auto get_image_subresource_range(VkImageAspectFlags aspect) -> VkImageSubresourceRange;
+    static void copy_image(VkCommandBuffer cmd, VkImage src, VkImage dst, VkExtent2D src_extent, VkExtent2D dst_extent);
 
   private:
     //
@@ -91,18 +94,26 @@ namespace tk { namespace graphics_engine {
     VkQueue                      _graphics_queue           = VK_NULL_HANDLE;
     VkQueue                      _present_queue            = VK_NULL_HANDLE;
     VmaAllocator                 _vma_allocator            = VK_NULL_HANDLE;
+
+    // use dynamic rendering
     VkSwapchainKHR               _swapchain                = VK_NULL_HANDLE;
     std::vector<VkImage>         _swapchain_images;
-    VkFormat                     _swapchain_image_format   = VK_FORMAT_UNDEFINED;
     VkExtent2D                   _swapchain_image_extent   = {};
-    std::vector<VkImageView>     _swapchain_image_views;  
-    VkRenderPass                 _render_pass              = VK_NULL_HANDLE;
+    Image                        _image                    = {};
+
+    // FIX: these will not be used
+    //
     // framebuffer is used on swapchain image,
     // which will be presented on screen when commanded to queue.
     // it's not the concept of frame resource,
     // which is use for CPU to handle every frame.
     // frambuffer is handled by GPU btw.
     std::vector<VkFramebuffer>   _framebuffers;
+    VkFormat                     _swapchain_image_format   = VK_FORMAT_UNDEFINED;
+    std::vector<VkImageView>     _swapchain_image_views;  
+    VkRenderPass                 _render_pass              = VK_NULL_HANDLE;
+
+
     VkDescriptorSetLayout        _descriptor_set_layout    = VK_NULL_HANDLE;
     VkPipeline                   _pipeline                 = VK_NULL_HANDLE;
     VkPipelineLayout             _pipeline_layout          = VK_NULL_HANDLE;

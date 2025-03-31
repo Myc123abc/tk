@@ -82,6 +82,10 @@ void GraphicsEngine::update()
   Clear_Value = { { r, g, b, 1.f } };
 }
 
+//
+// use independent image to draw, and copy it to swapchain image has may resons,
+// detail reference: https://vkguide.dev/docs/new_chapter_2/vulkan_new_rendering/#new-draw-loop
+//
 void GraphicsEngine::draw()
 {
   //
@@ -131,19 +135,18 @@ void GraphicsEngine::draw()
   //   render_end();    // submit commands to queue and end everything like command buffer, etc.
 
   // transition image layout to writeable
-  transition_image_layout(frame.command_buffer, _swapchain_images[image_index], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-  // clear color
-  VkClearColorValue clear_value;
+  transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
-  // 
-  // change to red to green to blue
-  //
-  auto clear_range = get_image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
-  vkCmdClearColorImage(frame.command_buffer, _swapchain_images[image_index], VK_IMAGE_LAYOUT_GENERAL, &Clear_Value, 1, &clear_range);
+  draw_background(frame.command_buffer);
+
+  // copy image to swapchain image
+  transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  transition_image_layout(frame.command_buffer, _swapchain_images[image_index], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  VkExtent2D extent { _image.extent.width, _image.extent.height };
+  copy_image(frame.command_buffer, _image.image, _swapchain_images[image_index], extent, _swapchain_image_extent);
+
   // transition image layout to presentable
-  transition_image_layout(frame.command_buffer, _swapchain_images[image_index], VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-
-  // record_command_buffer(frame.command_buffer, image_index);
+  transition_image_layout(frame.command_buffer, _swapchain_images[image_index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
   throw_if(vkEndCommandBuffer(frame.command_buffer) != VK_SUCCESS,
            "failed to end command buffer");
@@ -197,6 +200,12 @@ void GraphicsEngine::draw()
 
   // update frame index
   _current_frame = ++_current_frame % Max_Frame_Number;
+}
+
+void GraphicsEngine::draw_background(VkCommandBuffer cmd)
+{
+  auto clear_range = get_image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
+  vkCmdClearColorImage(cmd, _image.image, VK_IMAGE_LAYOUT_GENERAL, &Clear_Value, 1, &clear_range);
 }
     
 void GraphicsEngine::record_command_buffer(VkCommandBuffer command_buffer, uint32_t image_index)

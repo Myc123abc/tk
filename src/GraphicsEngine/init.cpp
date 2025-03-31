@@ -214,7 +214,8 @@ void GraphicsEngine::create_vma_allocator()
 {
   VmaAllocatorCreateInfo alloc_info
   {
-    .flags            = VMA_ALLOCATOR_CREATE_EXTERNALLY_SYNCHRONIZED_BIT,
+    .flags            = VMA_ALLOCATOR_CREATE_EXTERNALLY_SYNCHRONIZED_BIT |
+                        VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
     .physicalDevice   = _physical_device,
     .device           = _device,
     .instance         = _instance,
@@ -222,6 +223,7 @@ void GraphicsEngine::create_vma_allocator()
   };
   throw_if(vmaCreateAllocator(&alloc_info, &_vma_allocator) != VK_SUCCESS,
            "failed to create Vulkan Memory Allocator");
+
   _destructors.push([this] { vmaDestroyAllocator(_vma_allocator); });
 }
 
@@ -279,7 +281,59 @@ void GraphicsEngine::create_swapchain_and_get_swapchain_images_info()
   throw_if(vkCreateSwapchainKHR(_device, &create_info, nullptr, &_swapchain) != VK_SUCCESS,
       "failed to create swapchain");
 
-  _destructors.push([this] { vkDestroySwapchainKHR(_device, _swapchain, nullptr); });
+  //
+  // dynamic rendering use image
+  //
+  _image.extent = { extent.width, extent.height, 1 };
+  _image.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+  
+  VkImageCreateInfo image_info
+  {
+    .sType       = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+    .imageType   = VK_IMAGE_TYPE_2D,
+    .format      = _image.format,
+    .extent      = _image.extent,
+    .mipLevels   = 1,
+    .arrayLayers = 1,
+    .samples     = VK_SAMPLE_COUNT_1_BIT,
+    .tiling      = VK_IMAGE_TILING_OPTIMAL,
+    .usage       = VK_IMAGE_USAGE_TRANSFER_SRC_BIT     |
+                   VK_IMAGE_USAGE_TRANSFER_DST_BIT     | 
+                   VK_IMAGE_USAGE_STORAGE_BIT          |
+                   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+  };
+
+  VmaAllocationCreateInfo alloc_info
+  {
+    .usage         = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+    .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+  };
+  throw_if(vmaCreateImage(_vma_allocator, &image_info, &alloc_info, &_image.image, &_image.allocation, nullptr) != VK_SUCCESS,
+           "failed to create image");
+
+  VkImageViewCreateInfo image_view_info
+  {
+    .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+    .image    = _image.image,
+    .viewType = VK_IMAGE_VIEW_TYPE_2D,
+    .format   = _image.format,
+    .subresourceRange =
+    {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .levelCount = 1,
+      .layerCount = 1,
+    },
+  };
+  throw_if(vkCreateImageView(_device, &image_view_info, nullptr, &_image.view) != VK_SUCCESS,
+           "failed to create image view");
+
+  _destructors.push([this]
+  {
+    vkDestroyImageView(_device, _image.view, nullptr);
+    vmaDestroyImage(_vma_allocator, _image.image, _image.allocation);
+    vkDestroySwapchainKHR(_device, _swapchain, nullptr);
+  });
+
 
   //
   // get swapchain images info
@@ -295,10 +349,13 @@ void GraphicsEngine::create_swapchain_image_views()
 {
   _swapchain_image_views.resize(_swapchain_images.size());
   for (uint32_t i = 0; i < _swapchain_images.size(); ++i)
-  {
     _swapchain_image_views[i] = create_image_view(_device, _swapchain_images[i], _swapchain_image_format);
-    _destructors.push([this, i] { vkDestroyImageView(_device, _swapchain_image_views[i], nullptr); });
-  }
+
+  _destructors.push([this] 
+  {
+    for (uint32_t i = 0; i < _swapchain_images.size(); ++i)
+      vkDestroyImageView(_device, _swapchain_image_views[i], nullptr);
+  });
 }
 
 void GraphicsEngine::create_render_pass()
@@ -372,8 +429,13 @@ void GraphicsEngine::create_framebuffers()
     };
     throw_if(vkCreateFramebuffer(_device, &info, nullptr, &_framebuffers[i]) != VK_SUCCESS,
             "failed to create frame buffers");
-    _destructors.push([this, i] { vkDestroyFramebuffer(_device, _framebuffers[i], nullptr); });
   }
+  
+  _destructors.push([this]
+  {
+    for (uint32_t i = 0; i < _swapchain_images.size(); ++i)
+      vkDestroyFramebuffer(_device, _framebuffers[i], nullptr);
+  });
 }
 
 void GraphicsEngine::create_descriptor_set_layout()
@@ -540,8 +602,11 @@ void GraphicsEngine::create_pipeline()
   throw_if(vkCreateGraphicsPipelines(_device, VK_NULL_HANDLE, 1, &create_info, nullptr, &_pipeline) != VK_SUCCESS,
            "failed to create pipeline");
 
-  _destructors.push([this] { vkDestroyPipelineLayout(_device, _pipeline_layout, nullptr); });
-  _destructors.push([this] { vkDestroyPipeline(_device, _pipeline, nullptr); });
+  _destructors.push([this]
+  { 
+    vkDestroyPipeline(_device, _pipeline, nullptr);
+    vkDestroyPipelineLayout(_device, _pipeline_layout, nullptr);
+  });
 }
 
 void GraphicsEngine::create_command_pool()
@@ -570,10 +635,13 @@ void GraphicsEngine::create_buffers()
   for (int i = 0; i < Max_Frame_Number; ++i)
     create_buffer(_uniform_buffers[i], _uniform_buffer_allocations[i], sizeof(UniformBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
-  for (uint32_t i = 0; i < _uniform_buffers.size(); ++i)
-    _destructors.push([this, i] { vmaDestroyBuffer(_vma_allocator, _uniform_buffers[i], _uniform_buffer_allocations[i]); });
-  _destructors.push([this] { vmaDestroyBuffer(_vma_allocator, _index_buffer, _index_buffer_allocation); });
-  _destructors.push([this] { vmaDestroyBuffer(_vma_allocator, _vertex_buffer, _vertex_buffer_allocation); });
+  _destructors.push([this]
+  { 
+    for (uint32_t i = 0; i < _uniform_buffers.size(); ++i)
+      vmaDestroyBuffer(_vma_allocator, _uniform_buffers[i], _uniform_buffer_allocations[i]);
+    vmaDestroyBuffer(_vma_allocator, _index_buffer, _index_buffer_allocation);
+    vmaDestroyBuffer(_vma_allocator, _vertex_buffer, _vertex_buffer_allocation);
+  });
 }
 
 void GraphicsEngine::create_descriptor_pool()
@@ -669,19 +737,20 @@ void GraphicsEngine::create_frame_resources()
     .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
   };
   for (auto& frame : _frames) 
-  {
     throw_if(vkCreateFence(_device, &fence_info, nullptr, &frame.fence)                 != VK_SUCCESS ||
              vkCreateSemaphore(_device, &sem_info, nullptr, &frame.image_available_sem) != VK_SUCCESS || 
              vkCreateSemaphore(_device, &sem_info, nullptr, &frame.render_finished_sem) != VK_SUCCESS,
              "faield to create sync objects");
 
-    _destructors.push([&]
+  _destructors.push([&]
+  {
+    for (auto& frame : _frames)
     {
       vkDestroyFence(_device, frame.fence, nullptr);
       vkDestroySemaphore(_device, frame.image_available_sem, nullptr);
       vkDestroySemaphore(_device, frame.render_finished_sem, nullptr);
-    });
-  }
+    }
+  });
 }
 
 } }
