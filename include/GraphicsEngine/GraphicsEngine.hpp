@@ -8,6 +8,7 @@
 
 #include "Window.hpp"
 #include "FrameResource.hpp"
+#include "DestructorStack.hpp"
 
 #include <vk_mem_alloc.h>
 
@@ -59,9 +60,7 @@ namespace tk { namespace graphics_engine {
     void create_descriptor_pool();
     void create_descriptor_sets();
     void create_sync_objects();
-
     void create_frame_resources();
-    void destroy_frame_resources();
 
     //
     // util 
@@ -127,6 +126,8 @@ namespace tk { namespace graphics_engine {
     // HACK: make frame resource for anything in a frame
     VkDescriptorPool             _descriptor_pool          = VK_NULL_HANDLE;
     std::vector<VkDescriptorSet> _descriptor_sets;
+
+    DestructorStack              _destructors;
   };
 
 } }

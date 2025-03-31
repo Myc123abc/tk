@@ -39,31 +39,9 @@ GraphicsEngine::GraphicsEngine(Window const& window)
 GraphicsEngine::~GraphicsEngine()
 {
   vkDeviceWaitIdle(_device);
-
-  destroy_frame_resources();
-
-  vkDestroyDescriptorPool(_device, _descriptor_pool, nullptr);
-  for (uint32_t i = 0; i < _uniform_buffers.size(); ++i)
-    vmaDestroyBuffer(_vma_allocator, _uniform_buffers[i], _uniform_buffer_allocations[i]);
-  vmaDestroyBuffer(_vma_allocator, _index_buffer, _index_buffer_allocation);
-  vmaDestroyBuffer(_vma_allocator, _vertex_buffer, _vertex_buffer_allocation);
-  vkDestroyCommandPool(_device, _command_pool, nullptr);
-  vkDestroyPipeline(_device, _pipeline, nullptr);
-  vkDestroyPipelineLayout(_device, _pipeline_layout, nullptr);
-  vkDestroyDescriptorSetLayout(_device, _descriptor_set_layout, nullptr);
-  for (uint32_t i = 0; i < _framebuffers.size(); ++i)
-    vkDestroyFramebuffer(_device, _framebuffers[i], nullptr);
-  vkDestroyRenderPass(_device, _render_pass, nullptr);
-  for (uint32_t i = 0; i < _swapchain_image_views.size(); ++i)
-    vkDestroyImageView(_device, _swapchain_image_views[i], nullptr);
-  vkDestroySwapchainKHR(_device, _swapchain, nullptr);
-  vmaDestroyAllocator(_vma_allocator);
-  vkDestroyDevice(_device, nullptr);
-  vkDestroySurfaceKHR(_instance, _surface, nullptr);
-#ifndef NDEBUG
-  graphics_engine::vkDestroyDebugUtilsMessengerEXT(_instance, _debug_messenger, nullptr);
-#endif
-  vkDestroyInstance(_instance, nullptr);
+  for (auto& frame : _frames)
+    frame.destructors.clear();
+  _destructors.clear();
 }
 
 void GraphicsEngine::create_instance()
@@ -114,6 +92,8 @@ void GraphicsEngine::create_instance()
   };
   throw_if(vkCreateInstance(&create_info, nullptr, &_instance) != VK_SUCCESS,
            "failed to create vulkan instance!");
+
+  _destructors.push([this] { vkDestroyInstance(_instance, nullptr); });
 }
 
 void GraphicsEngine::create_debug_messenger()
@@ -121,11 +101,14 @@ void GraphicsEngine::create_debug_messenger()
   auto info = get_debug_messenger_create_info();
   throw_if(graphics_engine::vkCreateDebugUtilsMessengerEXT(_instance, &info, nullptr, &_debug_messenger) != VK_SUCCESS,
           "failed to create debug utils messenger extension");
+
+  _destructors.push([this] { graphics_engine::vkDestroyDebugUtilsMessengerEXT(_instance, _debug_messenger, nullptr); });
 }
 
 void GraphicsEngine::create_surface()
 {
   _surface = _window.create_surface(_instance);
+  _destructors.push([this] { vkDestroySurfaceKHR(_instance, _surface, nullptr); });
 }
 
 void GraphicsEngine::select_physical_device()
@@ -218,6 +201,8 @@ void GraphicsEngine::create_device_and_get_queues()
   throw_if(vkCreateDevice(_physical_device, &create_info, nullptr, &_device) != VK_SUCCESS,
            "failed to create logical device");
 
+  _destructors.push([this] { vkDestroyDevice(_device, nullptr); });
+
   //
   // get queues
   //
@@ -237,6 +222,7 @@ void GraphicsEngine::create_vma_allocator()
   };
   throw_if(vmaCreateAllocator(&alloc_info, &_vma_allocator) != VK_SUCCESS,
            "failed to create Vulkan Memory Allocator");
+  _destructors.push([this] { vmaDestroyAllocator(_vma_allocator); });
 }
 
 void GraphicsEngine::create_swapchain_and_get_swapchain_images_info()
@@ -293,6 +279,8 @@ void GraphicsEngine::create_swapchain_and_get_swapchain_images_info()
   throw_if(vkCreateSwapchainKHR(_device, &create_info, nullptr, &_swapchain) != VK_SUCCESS,
       "failed to create swapchain");
 
+  _destructors.push([this] { vkDestroySwapchainKHR(_device, _swapchain, nullptr); });
+
   //
   // get swapchain images info
   //
@@ -307,7 +295,10 @@ void GraphicsEngine::create_swapchain_image_views()
 {
   _swapchain_image_views.resize(_swapchain_images.size());
   for (uint32_t i = 0; i < _swapchain_images.size(); ++i)
+  {
     _swapchain_image_views[i] = create_image_view(_device, _swapchain_images[i], _swapchain_image_format);
+    _destructors.push([this, i] { vkDestroyImageView(_device, _swapchain_image_views[i], nullptr); });
+  }
 }
 
 void GraphicsEngine::create_render_pass()
@@ -360,6 +351,8 @@ void GraphicsEngine::create_render_pass()
 
   throw_if(vkCreateRenderPass(_device, &create_info, nullptr, &_render_pass) != VK_SUCCESS,
            "failed to create render pass");
+
+  _destructors.push([this] {   vkDestroyRenderPass(_device, _render_pass, nullptr); });
 }
 
 void GraphicsEngine::create_framebuffers()
@@ -379,6 +372,7 @@ void GraphicsEngine::create_framebuffers()
     };
     throw_if(vkCreateFramebuffer(_device, &info, nullptr, &_framebuffers[i]) != VK_SUCCESS,
             "failed to create frame buffers");
+    _destructors.push([this, i] { vkDestroyFramebuffer(_device, _framebuffers[i], nullptr); });
   }
 }
 
@@ -407,6 +401,8 @@ void GraphicsEngine::create_descriptor_set_layout()
   };
   throw_if(vkCreateDescriptorSetLayout(_device, &info, nullptr, &_descriptor_set_layout) != VK_SUCCESS,
            "failed to create descriptor set layout");
+
+  _destructors.push([this] {   vkDestroyDescriptorSetLayout(_device, _descriptor_set_layout, nullptr); });
 }
 
 void GraphicsEngine::create_pipeline()
@@ -543,6 +539,9 @@ void GraphicsEngine::create_pipeline()
 
   throw_if(vkCreateGraphicsPipelines(_device, VK_NULL_HANDLE, 1, &create_info, nullptr, &_pipeline) != VK_SUCCESS,
            "failed to create pipeline");
+
+  _destructors.push([this] { vkDestroyPipelineLayout(_device, _pipeline_layout, nullptr); });
+  _destructors.push([this] { vkDestroyPipeline(_device, _pipeline, nullptr); });
 }
 
 void GraphicsEngine::create_command_pool()
@@ -557,6 +556,8 @@ void GraphicsEngine::create_command_pool()
   };
   throw_if(vkCreateCommandPool(_device, &command_pool_info, nullptr, &_command_pool) != VK_SUCCESS,
            "failed to create command pool");
+
+  _destructors.push([this] {   vkDestroyCommandPool(_device, _command_pool, nullptr); });
 }
 
 void GraphicsEngine::create_buffers()
@@ -568,6 +569,11 @@ void GraphicsEngine::create_buffers()
   _uniform_buffer_allocations.resize(Max_Frame_Number);
   for (int i = 0; i < Max_Frame_Number; ++i)
     create_buffer(_uniform_buffers[i], _uniform_buffer_allocations[i], sizeof(UniformBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+
+  for (uint32_t i = 0; i < _uniform_buffers.size(); ++i)
+    _destructors.push([this, i] { vmaDestroyBuffer(_vma_allocator, _uniform_buffers[i], _uniform_buffer_allocations[i]); });
+  _destructors.push([this] { vmaDestroyBuffer(_vma_allocator, _index_buffer, _index_buffer_allocation); });
+  _destructors.push([this] { vmaDestroyBuffer(_vma_allocator, _vertex_buffer, _vertex_buffer_allocation); });
 }
 
 void GraphicsEngine::create_descriptor_pool()
@@ -592,6 +598,8 @@ void GraphicsEngine::create_descriptor_pool()
   };
   throw_if(vkCreateDescriptorPool(_device, &info, nullptr, &_descriptor_pool) != VK_SUCCESS,
            "failed to create descriptor pool");
+  
+  _destructors.push([this] { vkDestroyDescriptorPool(_device, _descriptor_pool, nullptr); });
 }
 
 void GraphicsEngine::create_descriptor_sets()
@@ -660,20 +668,19 @@ void GraphicsEngine::create_frame_resources()
   {
     .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
   };
-  for (auto& frame : _frames)
+  for (auto& frame : _frames) 
+  {
     throw_if(vkCreateFence(_device, &fence_info, nullptr, &frame.fence)                 != VK_SUCCESS ||
              vkCreateSemaphore(_device, &sem_info, nullptr, &frame.image_available_sem) != VK_SUCCESS || 
              vkCreateSemaphore(_device, &sem_info, nullptr, &frame.render_finished_sem) != VK_SUCCESS,
              "faield to create sync objects");
-}
 
-void GraphicsEngine::destroy_frame_resources()
-{
-  for (auto const& frame : _frames)
-  {
-    vkDestroyFence(_device, frame.fence, nullptr);
-    vkDestroySemaphore(_device, frame.image_available_sem, nullptr);
-    vkDestroySemaphore(_device, frame.render_finished_sem, nullptr);
+    _destructors.push([&]
+    {
+      vkDestroyFence(_device, frame.fence, nullptr);
+      vkDestroySemaphore(_device, frame.image_available_sem, nullptr);
+      vkDestroySemaphore(_device, frame.render_finished_sem, nullptr);
+    });
   }
 }
 
