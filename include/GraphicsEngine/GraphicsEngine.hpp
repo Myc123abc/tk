@@ -39,7 +39,6 @@ namespace tk { namespace graphics_engine {
     void update();
     void draw();
     void draw_background(VkCommandBuffer cmd);
-    void record_command_buffer(VkCommandBuffer command_buffer, uint32_t image_index);
 
   private:
     //
@@ -52,13 +51,9 @@ namespace tk { namespace graphics_engine {
     void create_device_and_get_queues();
     void create_vma_allocator();
     void create_swapchain_and_get_swapchain_images_info();
-    void create_swapchain_image_views();
-    void create_render_pass();
-    void create_framebuffers();
     void create_descriptor_set_layout();
-    void create_pipeline();
+    void create_compute_pipeline();
     void create_command_pool();
-    void create_buffers();
     void create_descriptor_pool();
     void create_descriptor_sets();
     void create_sync_objects();
@@ -91,9 +86,9 @@ namespace tk { namespace graphics_engine {
     VkSurfaceKHR                 _surface                  = VK_NULL_HANDLE;
     VkPhysicalDevice             _physical_device          = VK_NULL_HANDLE;
     VkDevice                     _device                   = VK_NULL_HANDLE;
+    VmaAllocator                 _vma_allocator            = VK_NULL_HANDLE;
     VkQueue                      _graphics_queue           = VK_NULL_HANDLE;
     VkQueue                      _present_queue            = VK_NULL_HANDLE;
-    VmaAllocator                 _vma_allocator            = VK_NULL_HANDLE;
 
     // use dynamic rendering
     VkSwapchainKHR               _swapchain                = VK_NULL_HANDLE;
@@ -101,22 +96,9 @@ namespace tk { namespace graphics_engine {
     VkExtent2D                   _swapchain_image_extent   = {};
     Image                        _image                    = {};
 
-    // FIX: these will not be used
-    //
-    // framebuffer is used on swapchain image,
-    // which will be presented on screen when commanded to queue.
-    // it's not the concept of frame resource,
-    // which is use for CPU to handle every frame.
-    // frambuffer is handled by GPU btw.
-    std::vector<VkFramebuffer>   _framebuffers;
-    VkFormat                     _swapchain_image_format   = VK_FORMAT_UNDEFINED;
-    std::vector<VkImageView>     _swapchain_image_views;  
-    VkRenderPass                 _render_pass              = VK_NULL_HANDLE;
+    VkPipeline                   _compute_pipeline         = VK_NULL_HANDLE;
+    VkPipelineLayout             _compute_pipeline_layout  = VK_NULL_HANDLE;
 
-
-    VkDescriptorSetLayout        _descriptor_set_layout    = VK_NULL_HANDLE;
-    VkPipeline                   _pipeline                 = VK_NULL_HANDLE;
-    VkPipelineLayout             _pipeline_layout          = VK_NULL_HANDLE;
     VkCommandPool                _command_pool             = VK_NULL_HANDLE;
 
     //
@@ -126,19 +108,11 @@ namespace tk { namespace graphics_engine {
     uint32_t                     _current_frame            = 0;
     auto get_current_frame() -> FrameResource& { return _frames[_current_frame]; }
     
-    // HACK: use suballoc memory and single buffer
-    VkBuffer                     _vertex_buffer            = VK_NULL_HANDLE;
-    VmaAllocation                _vertex_buffer_allocation = VK_NULL_HANDLE;
-    VkBuffer                     _index_buffer             = VK_NULL_HANDLE;
-    VmaAllocation                _index_buffer_allocation  = VK_NULL_HANDLE;
-    std::vector<VkBuffer>        _uniform_buffers;
-    std::vector<VmaAllocation>   _uniform_buffer_allocations;
-
-    // HACK: make frame resource for anything in a frame
-    VkDescriptorPool             _descriptor_pool          = VK_NULL_HANDLE;
-    std::vector<VkDescriptorSet> _descriptor_sets;
-
     DestructorStack              _destructors;
+
+    VkDescriptorPool             _descriptor_pool          = VK_NULL_HANDLE;
+    VkDescriptorSetLayout        _descriptor_set_layout    = VK_NULL_HANDLE;
+    VkDescriptorSet              _descriptor_set           = VK_NULL_HANDLE;
   };
 
 } }

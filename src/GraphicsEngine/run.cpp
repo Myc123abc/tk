@@ -66,7 +66,7 @@ void GraphicsEngine::update()
   // ubo.proj  = glm::ortho(-1.f, 1.f, -1.f, 1.f, -1.f, 100.f);
 
   // TODO: use vma to presently mapped, and vma's copy memory function
-  vmaCopyMemoryToAllocation(_vma_allocator, &ubo, _uniform_buffer_allocations[_current_frame], 0, sizeof(ubo));
+  // vmaCopyMemoryToAllocation(_vma_allocator, &ubo, _uniform_buffer_allocations[_current_frame], 0, sizeof(ubo));
 
   // clear value
   uint32_t circle = time / 3;
@@ -204,60 +204,11 @@ void GraphicsEngine::draw()
 
 void GraphicsEngine::draw_background(VkCommandBuffer cmd)
 {
-  auto clear_range = get_image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
-  vkCmdClearColorImage(cmd, _image.image, VK_IMAGE_LAYOUT_GENERAL, &Clear_Value, 1, &clear_range);
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _compute_pipeline);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _compute_pipeline_layout, 0, 1, &_descriptor_set, 0, nullptr);
+  vkCmdDispatch(cmd, std::ceil(_swapchain_image_extent.width / 16.f), std::ceil(_swapchain_image_extent.height / 16.f), 1);
+  // auto clear_range = get_image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
+  // vkCmdClearColorImage(cmd, _image.image, VK_IMAGE_LAYOUT_GENERAL, &Clear_Value, 1, &clear_range);
 }
     
-void GraphicsEngine::record_command_buffer(VkCommandBuffer command_buffer, uint32_t image_index)
-{
-  VkClearValue clear
-  {
-    (float)40/255,
-    (float)44/255,
-    (float)52/255,
-    1.f,
-  };
-  VkRenderPassBeginInfo render_pass_begin_info
-  {
-    .sType       = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-    .renderPass  = _render_pass,
-    .framebuffer = _framebuffers[image_index],
-    .renderArea  =
-    {
-      .offset = { 0, 0 },
-      .extent = _swapchain_image_extent,
-    },
-    .clearValueCount = 1,
-    .pClearValues    = &clear,
-  };
-  vkCmdBeginRenderPass(command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
-
-  vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _pipeline);
-
-  VkViewport viewport
-  {
-    .width    = (float)_swapchain_image_extent.width,
-    .height   = (float)_swapchain_image_extent.height,
-    .maxDepth = 1.f,
-  };
-  vkCmdSetViewport(command_buffer, 0, 1, &viewport);
-
-  VkRect2D scissor
-  {
-    .offset = { 0, 0 },
-    .extent = _swapchain_image_extent,
-  };
-  vkCmdSetScissor(command_buffer, 0, 1, &scissor);
-
-  VkDeviceSize offsets[] = { 0 };
-  vkCmdBindVertexBuffers(command_buffer, 0, 1, &_vertex_buffer, offsets);
-  vkCmdBindIndexBuffer(command_buffer, _index_buffer, 0, VK_INDEX_TYPE_UINT16);
-
-  vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _pipeline_layout, 0, 1, &_descriptor_sets[_current_frame], 0, nullptr);
-
-  vkCmdDrawIndexed(command_buffer, (uint32_t)Indices.size(), 1, 0, 0, 0);
-
-  vkCmdEndRenderPass(command_buffer);
-}
-
 } }

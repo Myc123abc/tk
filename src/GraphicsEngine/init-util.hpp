@@ -442,11 +442,12 @@ inline auto get_file_data(std::string_view filename)
   std::ifstream file(filename.data(), std::ios::ate | std::ios::binary);
   throw_if(!file.is_open(), fmt::format("failed to open {}", filename));
 
-  size_t file_size = (size_t)file.tellg();
-  std::vector<char> buffer(file_size);
+  auto file_size = (size_t)file.tellg();
+  // A SPIR-V module is defined a stream of 32bit words
+  auto buffer    = std::vector<uint32_t>(file_size / sizeof(uint32_t));
   
   file.seekg(0);
-  file.read(buffer.data(), file_size);
+  file.read((char*)buffer.data(), file_size);
 
   file.close();
   return buffer;
@@ -463,8 +464,8 @@ struct Shader
     VkShaderModuleCreateInfo info
     {
       .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-      .codeSize = data.size(),
-      .pCode    = reinterpret_cast<const uint32_t*>(data.data()),
+      .codeSize = data.size() * sizeof(uint32_t),
+      .pCode    = reinterpret_cast<uint32_t const*>(data.data()),
     };
     throw_if(vkCreateShaderModule(device, &info, nullptr, &shader) != VK_SUCCESS,
              fmt::format("failed to create shader from {}", filename));
