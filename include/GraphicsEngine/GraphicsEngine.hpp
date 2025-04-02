@@ -96,8 +96,8 @@ namespace tk { namespace graphics_engine {
     VkExtent2D                   _swapchain_image_extent   = {};
     Image                        _image                    = {};
 
-    VkPipeline                   _compute_pipeline         = VK_NULL_HANDLE;
-    VkPipelineLayout             _compute_pipeline_layout  = VK_NULL_HANDLE;
+    std::vector<VkPipeline>      _compute_pipeline;
+    std::vector<VkPipelineLayout>_compute_pipeline_layout;
 
     VkCommandPool                _command_pool             = VK_NULL_HANDLE;
 

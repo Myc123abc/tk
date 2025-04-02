@@ -365,18 +365,33 @@ void GraphicsEngine::create_descriptor_set_layout()
 
 void GraphicsEngine::create_compute_pipeline()
 {
+  _compute_pipeline_layout.resize(2);
+  _compute_pipeline.resize(2);
+
   // create pipeline layout
   VkPipelineLayoutCreateInfo layout_info
   {
-    .sType          = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-    .setLayoutCount = 1,
-    .pSetLayouts    = &_descriptor_set_layout,
+    .sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+    .setLayoutCount         = 1,
+    .pSetLayouts            = &_descriptor_set_layout,
   };
-  throw_if(vkCreatePipelineLayout(_device, &layout_info, nullptr, &_compute_pipeline_layout) != VK_SUCCESS,
+  throw_if(vkCreatePipelineLayout(_device, &layout_info, nullptr, &_compute_pipeline_layout[0]) != VK_SUCCESS,
+           "failed to create pipeline layout");
+
+  VkPushConstantRange push_constant
+  {
+    .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+    .offset     = 0,
+    .size       = sizeof(PushContant),
+  };
+  layout_info.pushConstantRangeCount = 1;
+  layout_info.pPushConstantRanges    = &push_constant;
+  throw_if(vkCreatePipelineLayout(_device, &layout_info, nullptr, &_compute_pipeline_layout[1]) != VK_SUCCESS,
            "failed to create pipeline layout");
 
   // create pipeline 
-  Shader shader(_device, "build/compute.spv");
+  Shader shader0(_device, "build/compute.spv");
+  Shader shader1(_device, "build/gradient_color.spv");
   VkComputePipelineCreateInfo pipeline_info
   {
     .sType  = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
@@ -384,18 +399,24 @@ void GraphicsEngine::create_compute_pipeline()
     {
       .sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       .stage  = VK_SHADER_STAGE_COMPUTE_BIT,
-      .module = shader.shader,
+      .module = shader0.shader,
       .pName = "main",
     },
-    .layout = _compute_pipeline_layout,
+    .layout = _compute_pipeline_layout[0],
   };
-  throw_if(vkCreateComputePipelines(_device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &_compute_pipeline),
+  throw_if(vkCreateComputePipelines(_device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &_compute_pipeline[0]),
+           "failed to create compute pipeline");
+  pipeline_info.stage.module = shader1.shader;
+  pipeline_info.layout       = _compute_pipeline_layout[1];
+  throw_if(vkCreateComputePipelines(_device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &_compute_pipeline[1]),
            "failed to create compute pipeline");
 
   _destructors.push([this]
   { 
-    vkDestroyPipeline(_device, _compute_pipeline, nullptr);
-    vkDestroyPipelineLayout(_device, _compute_pipeline_layout, nullptr);
+    vkDestroyPipeline(_device, _compute_pipeline[0], nullptr);
+    vkDestroyPipelineLayout(_device, _compute_pipeline_layout[0], nullptr);
+    vkDestroyPipeline(_device, _compute_pipeline[1], nullptr);
+    vkDestroyPipelineLayout(_device, _compute_pipeline_layout[1], nullptr);
   });
 }
 

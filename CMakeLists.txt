@@ -59,6 +59,7 @@ add_executable(Breakout ${SOURCE})
 target_include_directories(Breakout PRIVATE
   include
   include/GraphicsEngine
+  include/GraphicsEngine/imgui
 )
 
 target_link_libraries(Breakout PRIVATE ${LIBS})

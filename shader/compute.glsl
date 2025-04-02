@@ -13,7 +13,7 @@ void main()
   {
     vec4 color = vec4(0.0, 0.0, 0.0, 1.0);
 
-    // if (gl_LocalInvocationID.x != 0 && gl_LocalInvocationID.y != 0)
+    if (gl_LocalInvocationID.x != 0 && gl_LocalInvocationID.y != 0)
     {
       color.x = float(texel_coord.x) / size.x;
       color.y = float(texel_coord.y) / size.y;

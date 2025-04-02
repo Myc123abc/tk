@@ -204,8 +204,19 @@ void GraphicsEngine::draw()
 
 void GraphicsEngine::draw_background(VkCommandBuffer cmd)
 {
-  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _compute_pipeline);
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _compute_pipeline_layout, 0, 1, &_descriptor_set, 0, nullptr);
+  int i = 1;
+
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _compute_pipeline[i]);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _compute_pipeline_layout[i], 0, 1, &_descriptor_set, 0, nullptr);
+
+  if (i != 0)
+  {
+    PushContant pc;
+    pc.data1 = glm::vec4(1, 0, 0, 1);
+    pc.data2 = glm::vec4(0, 0, 1, 1);
+    vkCmdPushConstants(cmd, _compute_pipeline_layout[i], VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
+  }
+
   vkCmdDispatch(cmd, std::ceil(_swapchain_image_extent.width / 16.f), std::ceil(_swapchain_image_extent.height / 16.f), 1);
   // auto clear_range = get_image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
   // vkCmdClearColorImage(cmd, _image.image, VK_IMAGE_LAYOUT_GENERAL, &Clear_Value, 1, &clear_range);

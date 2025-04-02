@@ -8,6 +8,12 @@
 
 namespace tk { namespace graphics_engine {
 
+  struct PushContant
+  {
+    glm::vec4 data1;
+    glm::vec4 data2;
+  };
+
   struct UniformBufferObject
   {
     alignas(16) glm::mat4 model;
