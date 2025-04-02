@@ -37,6 +37,8 @@ namespace tk { namespace graphics_engine {
     static void process_events();
     static auto get_vulkan_instance_extensions() -> std::vector<const char*>;
 
+    auto get() const noexcept { return _window; }
+
   private:
     SDL_Window* _window;
   };

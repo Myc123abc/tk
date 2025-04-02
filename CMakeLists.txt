@@ -34,9 +34,17 @@ include(FetchContent)
 FetchContent_Declare(
   VMA
   GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
-  GIT_TAG       master 
+  GIT_TAG        master 
 )
 FetchContent_MakeAvailable(VMA)
+
+include(FetchContent)
+FetchContent_Declare(
+  imgui
+  GIT_REPOSITORY https://github.com/Myc123abc/imgui.git
+  GIT_TAG        main
+)
+FetchContent_MakeAvailable(imgui)
 
 ################################################################################
 #                               Build Binrary 
@@ -67,6 +75,7 @@ target_link_libraries(Breakout PRIVATE
   fmt::fmt
   SDL3::SDL3
   GPUOpen::VulkanMemoryAllocator
+  imgui
 )
 
 target_compile_definitions(Breakout PRIVATE
