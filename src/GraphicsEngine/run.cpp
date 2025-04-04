@@ -2,6 +2,7 @@
 #include "ShaderStructs.hpp"
 #include "ErrorHandling.hpp"
 #include "constant.hpp"
+#include "Log.hpp"
 
 #include <SDL3/SDL_events.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -33,6 +34,9 @@ void GraphicsEngine::run()
       case SDL_EVENT_WINDOW_MAXIMIZED:
         pause = false;
         break;
+      case SDL_EVENT_KEY_DOWN:
+        keyboard_process(event.key);
+        break;
       }
     }
 
@@ -44,6 +48,19 @@ void GraphicsEngine::run()
     else
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
+}
+
+void GraphicsEngine::keyboard_process(SDL_KeyboardEvent const& key)
+{
+  switch (key.key)
+  {
+  case SDLK_1:
+    _pipeline_index = 0;
+    break;
+  case SDLK_2:
+    _pipeline_index = 1;
+    break;
+  };
 }
 
 VkClearColorValue Clear_Value;
@@ -206,17 +223,15 @@ void GraphicsEngine::draw()
 
 void GraphicsEngine::draw_background(VkCommandBuffer cmd)
 {
-  int i = 1;
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _compute_pipeline[_pipeline_index]);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _compute_pipeline_layout[_pipeline_index], 0, 1, &_descriptor_set, 0, nullptr);
 
-  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _compute_pipeline[i]);
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _compute_pipeline_layout[i], 0, 1, &_descriptor_set, 0, nullptr);
-
-  if (i != 0)
+  if (_pipeline_index != 0)
   {
     PushContant pc;
     pc.data1 = glm::vec4(1, 0, 0, 1);
     pc.data2 = glm::vec4(0, 0, 1, 1);
-    vkCmdPushConstants(cmd, _compute_pipeline_layout[i], VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
+    vkCmdPushConstants(cmd, _compute_pipeline_layout[_pipeline_index], VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
   }
 
   vkCmdDispatch(cmd, std::ceil(_swapchain_image_extent.width / 16.f), std::ceil(_swapchain_image_extent.height / 16.f), 1);

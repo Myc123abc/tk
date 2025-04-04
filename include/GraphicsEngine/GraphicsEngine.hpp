@@ -12,6 +12,7 @@
 #include "Image.hpp"
 
 #include <vk_mem_alloc.h>
+#include <SDL3/SDL_events.h>
 
 #include <vector>
 
@@ -40,6 +41,9 @@ namespace tk { namespace graphics_engine {
     void draw();
     void draw_background(VkCommandBuffer cmd);
     void draw_geometry(VkCommandBuffer cmd);
+
+    uint32_t _pipeline_index = 0;
+    void keyboard_process(SDL_KeyboardEvent const& key);
 
   private:
     //
