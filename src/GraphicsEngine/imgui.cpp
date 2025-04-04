@@ -31,7 +31,7 @@ void GraphicsEngine::init_imgui()
   auto queue_family = get_queue_family_indices(_physical_device, _surface);
   init_info.QueueFamily = queue_family.graphics_family.value();
   init_info.Queue = _graphics_queue;
-  init_info.PipelineCache = nullptr;
+  // init_info.PipelineRenderingCreateInfo = ;
 
   VkDescriptorPoolSize pool_sizes[] =
   {
@@ -47,6 +47,7 @@ void GraphicsEngine::init_imgui()
   pool_info.pPoolSizes = pool_sizes;
   throw_if(vkCreateDescriptorPool(_device, &pool_info, nullptr, &_imgui_descriptor_pool) != VK_SUCCESS,
            "failed to create imgui descriptor pool");
+  _destructors.push([&] { vkDestroyDescriptorPool(_device, _imgui_descriptor_pool, nullptr); });
 
   init_info.DescriptorPool = _imgui_descriptor_pool;
   init_info.Subpass = 0;
@@ -56,30 +57,54 @@ void GraphicsEngine::init_imgui()
   init_info.Allocator = nullptr;
   init_info.CheckVkResultFn = check_vk_result;
 
-  VkAttachmentDescription attachment = {};
-  attachment.format = _image.format;
-  attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-  attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-  attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-  VkRenderPassCreateInfo info = {};
-  info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-  info.attachmentCount = 1;
-  info.pAttachments = &attachment;
-  info.subpassCount = 1;
-  info.dependencyCount = 1;
-  throw_if(vkCreateRenderPass(_device, &info, nullptr, &_imgui_render_pass) != VK_SUCCESS,
-           "failed to create imgui render pass");
-  init_info.RenderPass = _imgui_render_pass;
+  // VkAttachmentDescription attachment = {};
+  // attachment.format = _image.format;
+  // attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+  // attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+  // attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+  // attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+  // attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+  // attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  // attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+  // VkAttachmentReference color_attachment = {};
+  // color_attachment.attachment = 0;
+  // color_attachment.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+  // VkSubpassDescription subpass = {};
+  // subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+  // subpass.colorAttachmentCount = 1;
+  // subpass.pColorAttachments = &color_attachment;
+  // VkSubpassDependency dependency = {};
+  // dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+  // dependency.dstSubpass = 0;
+  // dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  // dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  // dependency.srcAccessMask = 0;
+  // dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+  // VkRenderPassCreateInfo info = {};
+  // info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+  // info.attachmentCount = 1;
+  // info.pAttachments = &attachment;
+  // info.subpassCount = 1;
+  // info.pSubpasses = &subpass;
+  // info.dependencyCount = 1;
+  // info.pDependencies = &dependency;
+  // throw_if(vkCreateRenderPass(_device, &info, nullptr, &_imgui_render_pass) != VK_SUCCESS,
+  //          "failed to create imgui render pass");
+  // init_info.RenderPass = _imgui_render_pass;
+  // _destructors.push([&] { vkDestroyRenderPass(_device, _imgui_render_pass, nullptr); });
 
-  ImGui_ImplVulkan_Init(&init_info);
+  init_info.UseDynamicRendering = true;
+
+  // ImGui_ImplVulkan_Init(&init_info);
+
   // // (this gets a bit more complicated, see example app for full reference)
   // ImGui_ImplVulkan_CreateFontsTexture(YOUR_COMMAND_BUFFER);
   // // (your code submit a queue)
   // ImGui_ImplVulkan_DestroyFontUploadObjects();
+
+  // ImGui_ImplVulkan_Shutdown();
+  // ImGui_ImplSDL3_Shutdown();
+  // ImGui::DestroyContext();
 }
 
 } }

@@ -6,6 +6,9 @@
 #include <SDL3/SDL_events.h>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <imgui_impl_vulkan.h>
+#include <imgui_impl_sdl3.h>
+
 #include <thread>
 #include <chrono>
 #include <numbers>
@@ -41,6 +44,13 @@ void GraphicsEngine::run()
     {
       update();
       draw();
+
+      // ImGui_ImplVulkan_NewFrame();
+      // ImGui_ImplSDL3_NewFrame();
+      // ImGui::NewFrame();
+      //
+      // ImGui::Render();
+      // ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), );
     }
     else
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -139,8 +149,11 @@ void GraphicsEngine::draw()
 
   draw_background(frame.command_buffer);
 
+  transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  draw_geometry(frame.command_buffer);
+
   // copy image to swapchain image
-  transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   transition_image_layout(frame.command_buffer, _swapchain_images[image_index], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
   VkExtent2D extent { _image.extent.width, _image.extent.height };
   copy_image(frame.command_buffer, _image.image, _swapchain_images[image_index], extent, _swapchain_image_extent);
@@ -220,6 +233,53 @@ void GraphicsEngine::draw_background(VkCommandBuffer cmd)
   vkCmdDispatch(cmd, std::ceil(_swapchain_image_extent.width / 16.f), std::ceil(_swapchain_image_extent.height / 16.f), 1);
   // auto clear_range = get_image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
   // vkCmdClearColorImage(cmd, _image.image, VK_IMAGE_LAYOUT_GENERAL, &Clear_Value, 1, &clear_range);
+}
+
+void GraphicsEngine::draw_geometry(VkCommandBuffer cmd)
+{
+  VkRenderingAttachmentInfo attachment
+  {
+    .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+    .imageView   = _image.view,
+    .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    .loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD,
+    .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
+  };
+  VkRenderingInfo rendering
+  {
+    .sType                = VK_STRUCTURE_TYPE_RENDERING_INFO,
+    .renderArea           =
+    {
+      .extent = { _image.extent.width , _image.extent.height },
+    },
+    .layerCount           = 1,
+    .colorAttachmentCount = 1,
+    .pColorAttachments    = &attachment,
+  };
+  vkCmdBeginRendering(cmd, &rendering);
+
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _graphics_pipeline);
+
+  VkViewport viewport
+  {
+    .width  = (float)_image.extent.width,
+    .height = (float)_image.extent.height, 
+    .maxDepth = 1.f,
+  };
+  vkCmdSetViewport(cmd, 0, 1, &viewport);
+  VkRect2D scissor 
+  {
+    .extent =
+    {
+      .width  = _image.extent.width,
+      .height = _image.extent.height, 
+    },
+  };
+  vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+  vkCmdDraw(cmd, 3, 1, 0, 0);
+
+  vkCmdEndRendering(cmd);
 }
     
 } }

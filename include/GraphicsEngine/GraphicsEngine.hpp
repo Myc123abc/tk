@@ -39,6 +39,7 @@ namespace tk { namespace graphics_engine {
     void update();
     void draw();
     void draw_background(VkCommandBuffer cmd);
+    void draw_geometry(VkCommandBuffer cmd);
 
   private:
     //
@@ -53,6 +54,7 @@ namespace tk { namespace graphics_engine {
     void create_swapchain_and_get_swapchain_images_info();
     void create_descriptor_set_layout();
     void create_compute_pipeline();
+    void create_graphics_pipeline();
     void create_command_pool();
     void create_descriptor_pool();
     void create_descriptor_sets();
@@ -101,6 +103,8 @@ namespace tk { namespace graphics_engine {
 
     std::vector<VkPipeline>      _compute_pipeline;
     std::vector<VkPipelineLayout>_compute_pipeline_layout;
+    VkPipeline                   _graphics_pipeline        = VK_NULL_HANDLE;
+    VkPipelineLayout             _graphics_pipeline_layout = VK_NULL_HANDLE;
 
     VkCommandPool                _command_pool             = VK_NULL_HANDLE;
 

@@ -26,6 +26,7 @@ GraphicsEngine::GraphicsEngine(Window const& window)
   create_swapchain_and_get_swapchain_images_info();
   create_descriptor_set_layout();
   create_compute_pipeline();
+  create_graphics_pipeline();
   create_command_pool();
   create_descriptor_pool();
   create_descriptor_sets();
