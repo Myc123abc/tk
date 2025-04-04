@@ -77,9 +77,6 @@ namespace tk { namespace graphics_engine {
     static auto get_image_subresource_range(VkImageAspectFlags aspect) -> VkImageSubresourceRange;
     static void copy_image(VkCommandBuffer cmd, VkImage src, VkImage dst, VkExtent2D src_extent, VkExtent2D dst_extent);
 
-    // debug ui imgui
-    void init_imgui();
-
   private:
     //
     // common resources
@@ -120,12 +117,6 @@ namespace tk { namespace graphics_engine {
     VkDescriptorPool             _descriptor_pool          = VK_NULL_HANDLE;
     VkDescriptorSetLayout        _descriptor_set_layout    = VK_NULL_HANDLE;
     VkDescriptorSet              _descriptor_set           = VK_NULL_HANDLE;
-
-    //
-    // imgui
-    //
-    VkDescriptorPool             _imgui_descriptor_pool    = VK_NULL_HANDLE;
-    VkRenderPass                 _imgui_render_pass        = VK_NULL_HANDLE;
   };
 
 } }

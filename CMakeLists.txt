@@ -38,18 +38,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(VMA)
 
-include(FetchContent)
-FetchContent_Declare(
-  imgui
-  GIT_REPOSITORY https://github.com/Myc123abc/imgui.git
-  GIT_TAG        main
-)
-FetchContent_MakeAvailable(imgui)
-
 ################################################################################
 #                               Build Binrary 
 ################################################################################
 
+set(INCLUDE
+  include
+  include/GraphicsEngine
+)
 file(GLOB_RECURSE SOURCE src/*.cpp)
 set(LIBS
   glfw
@@ -60,23 +56,16 @@ set(LIBS
   Xxf86vm
   Xrandr
   Xi
+  fmt::fmt
+  SDL3::SDL3
+  GPUOpen::VulkanMemoryAllocator
 )
 
 add_executable(Breakout ${SOURCE})
 
-target_include_directories(Breakout PRIVATE
-  include
-  include/GraphicsEngine
-  include/GraphicsEngine/imgui
-)
+target_include_directories(Breakout PRIVATE ${INCLUDE})
 
 target_link_libraries(Breakout PRIVATE ${LIBS})
-target_link_libraries(Breakout PRIVATE
-  fmt::fmt
-  SDL3::SDL3
-  GPUOpen::VulkanMemoryAllocator
-  imgui
-)
 
 target_compile_definitions(Breakout PRIVATE
   GLM_FORCE_DEPTH_ZERO_TO_ONE

@@ -6,12 +6,8 @@
 #include <SDL3/SDL_events.h>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <imgui_impl_vulkan.h>
-#include <imgui_impl_sdl3.h>
-
 #include <thread>
 #include <chrono>
-#include <numbers>
 
 namespace tk { namespace graphics_engine {
 
@@ -44,13 +40,6 @@ void GraphicsEngine::run()
     {
       update();
       draw();
-
-      // ImGui_ImplVulkan_NewFrame();
-      // ImGui_ImplSDL3_NewFrame();
-      // ImGui::NewFrame();
-      //
-      // ImGui::Render();
-      // ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), );
     }
     else
       std::this_thread::sleep_for(std::chrono::milliseconds(100));

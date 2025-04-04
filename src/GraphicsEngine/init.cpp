@@ -31,8 +31,6 @@ GraphicsEngine::GraphicsEngine(Window const& window)
   create_descriptor_pool();
   create_descriptor_sets();
   create_frame_resources();
-
-  init_imgui();
 }
 
 GraphicsEngine::~GraphicsEngine()
