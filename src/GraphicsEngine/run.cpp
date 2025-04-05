@@ -283,6 +283,16 @@ void GraphicsEngine::draw_geometry(VkCommandBuffer cmd)
 
   vkCmdDraw(cmd, 3, 1, 0, 0);
 
+  // draw mesh
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _mesh_pipeline);
+  GeometryPushConstant push_constant;
+  push_constant.world_matrix = glm::mat4(1.f);
+  push_constant.address      = _mesh_buffer.address;
+  vkCmdPushConstants(cmd, _mesh_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constant), &push_constant);
+  vkCmdBindIndexBuffer(cmd, _mesh_buffer.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
+
+  vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
+
   vkCmdEndRendering(cmd);
 }
     

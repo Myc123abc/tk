@@ -101,12 +101,13 @@ auto PipelineBuilder::build(VkDevice device, VkPipelineLayout layout) -> VkPipel
   return pipeline;
 }
 
-void PipelineBuilder::clear()
+auto PipelineBuilder::clear() -> PipelineBuilder&
 {
   _shader_stages.clear();
   _rendering_info        = { VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO            };
   _rasterization_state   = { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO  };
   _rendering_info_format = { VK_FORMAT_UNDEFINED };
+  return *this;
 }
 
 auto PipelineBuilder::set_color_attachment_format(VkFormat format) -> PipelineBuilder&

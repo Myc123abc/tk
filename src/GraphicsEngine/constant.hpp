@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ShaderStructs.hpp"
+#include "Buffer.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -19,23 +19,16 @@ inline constexpr uint32_t Max_Frame_Number = 2;
 
 inline std::vector<Vertex> Vertices
 {
-  // { { -1.f, -1.f }, { 1.f, 0.f, 0.f }, },
-  // { {  1.f, -1.f }, { 0.f, 1.f, 0.f }, },
-  // { {  1.f,  1.f }, { 0.f, 0.f, 1.f }, },
-  // { { -1.f,  1.f }, { 1.f, 1.f, 1.f }, },
-  // { { -.5f, -.5f,  0.f }, { 1.f, 0.f, 0.f }, },
-  // { {  .5f, -.5f,  0.f }, { 0.f, 1.f, 0.f }, },
-  // { {  .5f,  .5f,  5.f }, { 0.f, 0.f, 1.f }, },
-  // { { -.5f,  .5f,  0.f }, { 1.f, 1.f, 1.f }, },
-  { {  .0f, -1.f,  0.f }, { 1.f, 0.f, 0.f }, },
-  { {  1.f,  1.f,  0.f }, { 0.f, 0.f, 1.f }, },
-  { { -1.f,  1.f,  0.f }, { 0.f, 1.f, 0.f }, },
+  { {  .5f, -.5f,  0.f }, {}, { 0.f, 0.f, 0.f, 1.f } },
+  { {  .5f,  .5f,  0.f }, {}, { .5f, .5f, .5f, 1.f } },
+  { { -.5f, -.5f,  0.f }, {}, { 1.f, 0.f, 0.f, 1.f } },
+  { { -.5f,  .5f,  0.f }, {}, { 0.f, 1.f, 0.f, 1.f } },
 };
 
-inline const std::vector<uint16_t> Indices 
+inline std::vector<uint32_t> Indices 
 {
   0, 1, 2,
-  // 0, 2, 3,
+  2, 1, 3,
 };
 
 } }

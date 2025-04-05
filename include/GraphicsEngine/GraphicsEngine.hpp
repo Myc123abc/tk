@@ -10,11 +10,13 @@
 #include "FrameResource.hpp"
 #include "DestructorStack.hpp"
 #include "Image.hpp"
+#include "Buffer.hpp"
 
 #include <vk_mem_alloc.h>
 #include <SDL3/SDL_events.h>
 
 #include <vector>
+#include <span>
 
 namespace tk { namespace graphics_engine {
 
@@ -65,6 +67,8 @@ namespace tk { namespace graphics_engine {
     void create_sync_objects();
     void create_frame_resources();
 
+    void upload_data();
+
     //
     // util 
     //
@@ -76,6 +80,10 @@ namespace tk { namespace graphics_engine {
     void create_buffer(VkBuffer& buffer, VmaAllocation& allocation, 
                        uint32_t size, VkBufferUsageFlags usage,
                        void const* data = nullptr);
+
+    auto create_buffer(uint32_t size, VkBufferUsageFlags usage, VmaAllocationCreateFlags flag = 0) -> Buffer;
+    // HACK: 32bit indices? not 16bit?
+    auto create_mesh_buffer(std::span<Vertex> vertices, std::span<uint32_t> indices) -> MeshBuffer;
 
     static void transition_image_layout(VkCommandBuffer cmd, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout);
     static auto get_image_subresource_range(VkImageAspectFlags aspect) -> VkImageSubresourceRange;
@@ -106,6 +114,9 @@ namespace tk { namespace graphics_engine {
     std::vector<VkPipelineLayout>_compute_pipeline_layout;
     VkPipeline                   _graphics_pipeline        = VK_NULL_HANDLE;
     VkPipelineLayout             _graphics_pipeline_layout = VK_NULL_HANDLE;
+    VkPipeline                   _mesh_pipeline            = VK_NULL_HANDLE;
+    VkPipelineLayout             _mesh_pipeline_layout     = VK_NULL_HANDLE;
+    MeshBuffer                   _mesh_buffer;
 
     VkCommandPool                _command_pool             = VK_NULL_HANDLE;
 

@@ -1,6 +1,7 @@
 #include "GraphicsEngine.hpp"
 #include "init-util.hpp"
 #include "constant.hpp"
+#include "PipelineBuilder.hpp"
 
 #include <ranges>
 #include <set>
@@ -31,6 +32,8 @@ GraphicsEngine::GraphicsEngine(Window const& window)
   create_descriptor_pool();
   create_descriptor_sets();
   create_frame_resources();
+
+  upload_data();
 }
 
 GraphicsEngine::~GraphicsEngine()
@@ -383,7 +386,7 @@ void GraphicsEngine::create_compute_pipeline()
   {
     .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
     .offset     = 0,
-    .size       = sizeof(PushContant),
+    .size       = sizeof(GeometryPushConstant),
   };
   layout_info.pushConstantRangeCount = 1;
   layout_info.pPushConstantRanges    = &push_constant;
@@ -418,6 +421,52 @@ void GraphicsEngine::create_compute_pipeline()
     vkDestroyPipelineLayout(_device, _compute_pipeline_layout[0], nullptr);
     vkDestroyPipeline(_device, _compute_pipeline[1], nullptr);
     vkDestroyPipelineLayout(_device, _compute_pipeline_layout[1], nullptr);
+  });
+}
+
+void GraphicsEngine::create_graphics_pipeline()
+{
+  Shader vertex_shader(_device, "build/triangle_vert.spv");
+  Shader fragment_shader(_device, "build/triangle_frag.spv");
+
+  VkPipelineLayoutCreateInfo layout_info
+  {
+    .sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+  };
+  throw_if(vkCreatePipelineLayout(_device, &layout_info, nullptr, &_graphics_pipeline_layout) != VK_SUCCESS,
+           "failed to create graphics pipeline layout");
+
+  auto builder = PipelineBuilder();
+  _graphics_pipeline = builder 
+                       .set_shaders(vertex_shader.shader, fragment_shader.shader)
+                       .set_cull_mode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE)
+                       .set_color_attachment_format(_image.format)
+                       .build(_device, _graphics_pipeline_layout);
+  
+  // create mesh pipeline
+  Shader mesh_vertex_shader(_device, "build/triangle_mesh_vert.spv");
+  VkPushConstantRange range
+  {
+    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+    .size       = sizeof(GeometryPushConstant),
+  };
+  layout_info.pPushConstantRanges    = &range;
+  layout_info.pushConstantRangeCount = 1;
+  throw_if(vkCreatePipelineLayout(_device, &layout_info, nullptr, &_mesh_pipeline_layout) != VK_SUCCESS,
+           "failed to create graphics pipeline layout");
+  _mesh_pipeline = builder
+                   .clear()
+                   .set_shaders(mesh_vertex_shader.shader, fragment_shader.shader)
+                   .set_cull_mode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE)
+                   .set_color_attachment_format(_image.format)
+                   .build(_device, _mesh_pipeline_layout);
+
+  _destructors.push([this]
+  { 
+    vkDestroyPipeline(_device, _graphics_pipeline, nullptr);
+    vkDestroyPipelineLayout(_device, _graphics_pipeline_layout, nullptr);
+    vkDestroyPipeline(_device, _mesh_pipeline, nullptr);
+    vkDestroyPipelineLayout(_device, _mesh_pipeline_layout, nullptr);
   });
 }
 
@@ -533,6 +582,12 @@ void GraphicsEngine::create_frame_resources()
       vkDestroySemaphore(_device, frame.render_finished_sem, nullptr);
     }
   });
+}
+
+void GraphicsEngine::upload_data()
+{
+  _mesh_buffer = create_mesh_buffer(Vertices, Indices);
+  _destructors.push([&] { _mesh_buffer.destroy(_vma_allocator); });
 }
 
 } }

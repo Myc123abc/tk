@@ -30,8 +30,8 @@ namespace tk { namespace graphics_engine {
     PipelineBuilder& operator=(PipelineBuilder&&)      = delete;
 
     // TODO: when use dynamic rendering, can make return type is a class which can use in rendering process
-    auto build(VkDevice device, VkPipelineLayout layout) -> VkPipeline;
-    void clear();
+    auto build(VkDevice device, VkPipelineLayout layout)                           -> VkPipeline;
+    auto clear()                                                                   -> PipelineBuilder&;
 
     // TODO: expand to multiple attachments
     auto set_color_attachment_format(VkFormat format)                              -> PipelineBuilder&;
