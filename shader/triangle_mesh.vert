@@ -5,11 +5,11 @@ layout (location = 0) out vec3 out_color;
 
 struct Vertex
 {
-  vec3 pos;
-  float pad0;
-  vec3 normal;
-  float pad1;
-  vec4 color;
+  vec3  pos;
+  float uv_x;
+  vec3  normal;
+  float uv_y;
+  vec4  color;
 };
 
 layout (buffer_reference, std430) readonly buffer VertexBuffer 

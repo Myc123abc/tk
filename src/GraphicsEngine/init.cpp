@@ -34,6 +34,8 @@ GraphicsEngine::GraphicsEngine(Window const& window)
   create_frame_resources();
 
   upload_data();
+
+  load_gltf();
 }
 
 GraphicsEngine::~GraphicsEngine()

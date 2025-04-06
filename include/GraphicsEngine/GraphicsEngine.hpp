@@ -38,6 +38,10 @@ namespace tk { namespace graphics_engine {
     //
     // HACK: this not should in here, it should in use engine's place
     void run();
+
+    // HACK: 32bit indices? not 16bit?
+    auto create_mesh_buffer(std::span<Vertex> vertices, std::span<uint32_t> indices) -> MeshBuffer;
+
   private:
     void update();
     void draw();
@@ -82,12 +86,12 @@ namespace tk { namespace graphics_engine {
                        void const* data = nullptr);
 
     auto create_buffer(uint32_t size, VkBufferUsageFlags usage, VmaAllocationCreateFlags flag = 0) -> Buffer;
-    // HACK: 32bit indices? not 16bit?
-    auto create_mesh_buffer(std::span<Vertex> vertices, std::span<uint32_t> indices) -> MeshBuffer;
 
     static void transition_image_layout(VkCommandBuffer cmd, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout);
     static auto get_image_subresource_range(VkImageAspectFlags aspect) -> VkImageSubresourceRange;
     static void copy_image(VkCommandBuffer cmd, VkImage src, VkImage dst, VkExtent2D src_extent, VkExtent2D dst_extent);
+
+    void load_gltf();
 
   private:
     //
