@@ -40,19 +40,12 @@ auto PipelineBuilder::build(VkDevice device, VkPipelineLayout layout) -> VkPipel
   };
 
   // HACK: can be nullptr for dynamic rendering, see spec
-  VkPipelineColorBlendAttachmentState attachment 
-  {
-    .colorWriteMask = VK_COLOR_COMPONENT_R_BIT |
-                      VK_COLOR_COMPONENT_G_BIT |
-                      VK_COLOR_COMPONENT_B_BIT |
-                      VK_COLOR_COMPONENT_A_BIT,
-  };
   VkPipelineColorBlendStateCreateInfo color_blend_state
   { 
     .sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
     .logicOp         = VK_LOGIC_OP_COPY,
     .attachmentCount = 1,
-    .pAttachments    = &attachment,
+    .pAttachments    = &_color_blend_attachment,
   };
 
   // dynamic config
@@ -104,10 +97,17 @@ auto PipelineBuilder::build(VkDevice device, VkPipelineLayout layout) -> VkPipel
 auto PipelineBuilder::clear() -> PipelineBuilder&
 {
   _shader_stages.clear();
-  _rendering_info        = { VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO           };
-  _rasterization_state   = { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
-  _depth_stencil_state   = { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
-  _rendering_info_format = { VK_FORMAT_UNDEFINED };
+  _rendering_info         = { VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO           };
+  _rasterization_state    = { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
+  _depth_stencil_state    = { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
+  _rendering_info_format  = { VK_FORMAT_UNDEFINED };
+  _color_blend_attachment =
+  {
+    .colorWriteMask = VK_COLOR_COMPONENT_R_BIT |
+                      VK_COLOR_COMPONENT_G_BIT |
+                      VK_COLOR_COMPONENT_B_BIT |
+                      VK_COLOR_COMPONENT_A_BIT,
+  };
   return *this;
 }
 
@@ -153,6 +153,30 @@ auto PipelineBuilder::enable_depth_test(VkFormat format) -> PipelineBuilder&
   _depth_stencil_state.depthWriteEnable = VK_TRUE;
   _depth_stencil_state.depthCompareOp   = VK_COMPARE_OP_GREATER_OR_EQUAL;
   _depth_stencil_state.maxDepthBounds   = 1.f;
+  return *this;
+}
+
+auto PipelineBuilder::enable_additive_blending() -> PipelineBuilder&
+{
+  _color_blend_attachment.blendEnable = VK_TRUE;
+  _color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+  _color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+  _color_blend_attachment.colorBlendOp        = VK_BLEND_OP_ADD;
+  _color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+  _color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+  _color_blend_attachment.alphaBlendOp        = VK_BLEND_OP_ADD;
+  return *this;
+}
+
+auto PipelineBuilder::enable_alpha_blending() -> PipelineBuilder&
+{
+  _color_blend_attachment.blendEnable = VK_TRUE;
+  _color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_COLOR;
+  _color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+  _color_blend_attachment.colorBlendOp        = VK_BLEND_OP_ADD;
+  _color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+  _color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+  _color_blend_attachment.alphaBlendOp        = VK_BLEND_OP_ADD;
   return *this;
 }
 

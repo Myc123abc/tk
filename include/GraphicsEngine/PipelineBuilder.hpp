@@ -41,6 +41,8 @@ namespace tk { namespace graphics_engine {
     // HACK: should be discard because of dynamic rendering, see spec
     auto set_cull_mode(VkCullModeFlags cull_mode, VkFrontFace front_face)          -> PipelineBuilder&;
     auto enable_depth_test(VkFormat format)                                        -> PipelineBuilder&;
+    auto enable_additive_blending()                                                -> PipelineBuilder&;
+    auto enable_alpha_blending()                                                   -> PipelineBuilder&;
 
   private:
     std::vector<VkPipelineShaderStageCreateInfo> _shader_stages;
@@ -48,6 +50,13 @@ namespace tk { namespace graphics_engine {
     VkPipelineRasterizationStateCreateInfo       _rasterization_state   { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO  };
     VkPipelineDepthStencilStateCreateInfo        _depth_stencil_state   { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
     VkFormat                                     _rendering_info_format { VK_FORMAT_UNDEFINED };
-  };
+    VkPipelineColorBlendAttachmentState          _color_blend_attachment
+    {
+      .colorWriteMask = VK_COLOR_COMPONENT_R_BIT |
+                        VK_COLOR_COMPONENT_G_BIT |
+                        VK_COLOR_COMPONENT_B_BIT |
+                        VK_COLOR_COMPONENT_A_BIT,
+    };
+ };
 
 } }

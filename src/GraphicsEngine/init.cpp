@@ -497,6 +497,8 @@ void GraphicsEngine::create_graphics_pipeline()
                    .set_cull_mode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE)
                    .set_color_attachment_format(_image.format)
                    .enable_depth_test(_depth_image.format)
+                   // .enable_additive_blending()
+                   .enable_alpha_blending()
                    .build(_device, _mesh_pipeline_layout);
 
   _destructors.push([this]
