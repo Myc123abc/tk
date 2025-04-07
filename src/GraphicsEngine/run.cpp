@@ -60,6 +60,24 @@ void GraphicsEngine::keyboard_process(SDL_KeyboardEvent const& key)
   case SDLK_2:
     _pipeline_index = 1;
     break;
+  case SDLK_H:
+    x -= 1;
+    break;
+  case SDLK_L:
+    x += 1;
+    break;
+  case SDLK_J:
+    y -= 1;
+    break;
+  case SDLK_K:
+    y += 1;
+    break;
+  case SDLK_F:
+    z += 1;
+    break;
+  case SDLK_B:
+    z -= 1;
+    break;
   };
 }
 
@@ -73,8 +91,8 @@ void GraphicsEngine::update()
 
   UniformBufferObject ubo;
   ubo.model = glm::mat4(1.f);
-  ubo.view = glm::mat4(1.f);
-  ubo.proj = glm::mat4(1.f);
+  ubo.view = glm::translate(glm::mat4(1.f), glm::vec3{ 0, 0, -5.f });
+  ubo.proj = glm::perspective(70.f, (float)_image.extent.width / _image.extent.height, 1000.f, 0.1f);
   // ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
   // ubo.view = glm::lookAt(glm::vec3(.0f, .0f, -1.f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, .0f));
   // ubo.proj = glm::perspective(45.0f, _swapchain_image_extent.width / (float) _swapchain_image_extent.height, 0.1f, 10.0f);
@@ -156,6 +174,7 @@ void GraphicsEngine::draw()
   draw_background(frame.command_buffer);
 
   transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  transition_image_layout(frame.command_buffer, _depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
   draw_geometry(frame.command_buffer);
 
   // copy image to swapchain image
@@ -249,6 +268,14 @@ void GraphicsEngine::draw_geometry(VkCommandBuffer cmd)
     .loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD,
     .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
   };
+  VkRenderingAttachmentInfo depth_attachment
+  {
+    .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+    .imageView   = _depth_image.view,
+    .imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+    .loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR,
+    .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
+  };
   VkRenderingInfo rendering
   {
     .sType                = VK_STRUCTURE_TYPE_RENDERING_INFO,
@@ -259,10 +286,9 @@ void GraphicsEngine::draw_geometry(VkCommandBuffer cmd)
     .layerCount           = 1,
     .colorAttachmentCount = 1,
     .pColorAttachments    = &attachment,
+    .pDepthAttachment     = &depth_attachment,
   };
   vkCmdBeginRendering(cmd, &rendering);
-
-  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _graphics_pipeline);
 
   VkViewport viewport
   {
@@ -281,8 +307,6 @@ void GraphicsEngine::draw_geometry(VkCommandBuffer cmd)
   };
   vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-  vkCmdDraw(cmd, 3, 1, 0, 0);
-
   // draw mesh
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _mesh_pipeline);
   GeometryPushConstant push_constant;
@@ -290,8 +314,27 @@ void GraphicsEngine::draw_geometry(VkCommandBuffer cmd)
   push_constant.address      = _mesh_buffer.address;
   vkCmdPushConstants(cmd, _mesh_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constant), &push_constant);
   vkCmdBindIndexBuffer(cmd, _mesh_buffer.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
-
   vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
+
+  // draw monkey
+  // auto view = glm::translate(glm::mat4(1.f), glm::vec3{ x, y, z });
+  auto view = glm::translate(glm::mat4(1.f), glm::vec3{ 0, 0, -5.f });
+  auto proj = glm::perspective(70.f, (float)_image.extent.width / _image.extent.height, 10000.f, 0.1f);
+  proj[1][1] *= -1;
+  push_constant.world_matrix = proj * view;
+  push_constant.address = _meshs[0]->mesh_buffer.address;
+  vkCmdPushConstants(cmd, _mesh_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constant), &push_constant);
+  vkCmdBindIndexBuffer(cmd, _meshs[0]->mesh_buffer.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
+  vkCmdDrawIndexed(cmd, _meshs[0]->surfaces[0].count, 1, _meshs[0]->surfaces[0].start_index, 0, 0);
+
+  // draw triangle
+  // vkCmdEndRendering(cmd);
+  // rendering.pDepthAttachment = nullptr;
+  // vkCmdBeginRendering(cmd, &rendering);
+  // vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _graphics_pipeline);
+  // vkCmdSetViewport(cmd, 0, 1, &viewport);
+  // vkCmdSetScissor(cmd, 0, 1, &scissor);
+  // vkCmdDraw(cmd, 3, 1, 0, 0);
 
   vkCmdEndRendering(cmd);
 }

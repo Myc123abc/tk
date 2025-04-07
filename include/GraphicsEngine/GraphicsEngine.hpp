@@ -11,6 +11,7 @@
 #include "DestructorStack.hpp"
 #include "Image.hpp"
 #include "Buffer.hpp"
+#include "gltf.hpp"
 
 #include <vk_mem_alloc.h>
 #include <SDL3/SDL_events.h>
@@ -113,6 +114,7 @@ namespace tk { namespace graphics_engine {
     std::vector<VkImage>         _swapchain_images;
     VkExtent2D                   _swapchain_image_extent   = {};
     Image                        _image                    = {};
+    Image                        _depth_image              = {};
 
     std::vector<VkPipeline>      _compute_pipeline;
     std::vector<VkPipelineLayout>_compute_pipeline_layout;
@@ -136,6 +138,10 @@ namespace tk { namespace graphics_engine {
     VkDescriptorPool             _descriptor_pool          = VK_NULL_HANDLE;
     VkDescriptorSetLayout        _descriptor_set_layout    = VK_NULL_HANDLE;
     VkDescriptorSet              _descriptor_set           = VK_NULL_HANDLE;
+
+    // mesh
+    std::vector<std::shared_ptr<MeshAsset>> _meshs;
+    int x = 0, y = 0, z = 0;
   };
 
 } }

@@ -89,8 +89,8 @@ auto PipelineBuilder::build(VkDevice device, VkPipelineLayout layout) -> VkPipel
     .pRasterizationState = &_rasterization_state,
     // HACK: can be nullptr for dynamic rendering, see spec
     .pMultisampleState   = &multisample_state,
-    // currently not use depth and stencil, which can be dynamic rendering
-    .pDepthStencilState  = nullptr,
+    // HACK: can be dynamic rendering
+    .pDepthStencilState  = &_depth_stencil_state,
     // HACK: can be nullptr for dynamic rendering, see spec
     .pColorBlendState    = &color_blend_state,
     .pDynamicState       = &dynamic_state,
@@ -104,8 +104,9 @@ auto PipelineBuilder::build(VkDevice device, VkPipelineLayout layout) -> VkPipel
 auto PipelineBuilder::clear() -> PipelineBuilder&
 {
   _shader_stages.clear();
-  _rendering_info        = { VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO            };
-  _rasterization_state   = { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO  };
+  _rendering_info        = { VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO           };
+  _rasterization_state   = { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
+  _depth_stencil_state   = { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
   _rendering_info_format = { VK_FORMAT_UNDEFINED };
   return *this;
 }
@@ -142,6 +143,16 @@ auto PipelineBuilder::set_cull_mode(VkCullModeFlags cull_mode, VkFrontFace front
 {
   _rasterization_state.cullMode  = cull_mode;
   _rasterization_state.frontFace = front_face;
+  return *this;
+}
+
+auto PipelineBuilder::enable_depth_test(VkFormat format) -> PipelineBuilder&
+{
+  _rendering_info.depthAttachmentFormat = format;
+  _depth_stencil_state.depthTestEnable  = VK_TRUE;
+  _depth_stencil_state.depthWriteEnable = VK_TRUE;
+  _depth_stencil_state.depthCompareOp   = VK_COMPARE_OP_GREATER_OR_EQUAL;
+  _depth_stencil_state.maxDepthBounds   = 1.f;
   return *this;
 }
 

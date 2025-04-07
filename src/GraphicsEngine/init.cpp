@@ -329,8 +329,43 @@ void GraphicsEngine::create_swapchain_and_get_swapchain_images_info()
   throw_if(vkCreateImageView(_device, &image_view_info, nullptr, &_image.view) != VK_SUCCESS,
            "failed to create image view");
 
+  // create depth image
+  _depth_image.format = VK_FORMAT_D32_SFLOAT;
+  _depth_image.extent = _image.extent;
+  VkImageCreateInfo depth_info
+  {
+    .sType       = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+    .imageType   = VK_IMAGE_TYPE_2D,
+    .format      = _depth_image.format,
+    .extent      = _depth_image.extent,
+    .mipLevels   = 1,
+    .arrayLayers = 1,
+    .samples     = VK_SAMPLE_COUNT_1_BIT,
+    .tiling      = VK_IMAGE_TILING_OPTIMAL,
+    .usage       = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+  };
+  throw_if(vmaCreateImage(_vma_allocator, &depth_info, &alloc_info, &_depth_image.image, &_depth_image.allocation, nullptr) != VK_SUCCESS,
+           "failed to create depth image");
+  VkImageViewCreateInfo depth_view_info
+  {
+    .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+    .image    = _depth_image.image,
+    .viewType = VK_IMAGE_VIEW_TYPE_2D,
+    .format   = _depth_image.format,
+    .subresourceRange =
+    {
+      .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+      .levelCount = 1,
+      .layerCount = 1,
+    },
+  };
+  throw_if(vkCreateImageView(_device, &depth_view_info, nullptr, &_depth_image.view) != VK_SUCCESS,
+           "failed to create depth image view");
+
   _destructors.push([this]
   {
+    vkDestroyImageView(_device, _depth_image.view, nullptr);
+    vmaDestroyImage(_vma_allocator, _depth_image.image, _depth_image.allocation);
     vkDestroyImageView(_device, _image.view, nullptr);
     vmaDestroyImage(_vma_allocator, _image.image, _image.allocation);
     vkDestroySwapchainKHR(_device, _swapchain, nullptr);
@@ -461,6 +496,7 @@ void GraphicsEngine::create_graphics_pipeline()
                    .set_shaders(mesh_vertex_shader.shader, fragment_shader.shader)
                    .set_cull_mode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE)
                    .set_color_attachment_format(_image.format)
+                   .enable_depth_test(_depth_image.format)
                    .build(_device, _mesh_pipeline_layout);
 
   _destructors.push([this]

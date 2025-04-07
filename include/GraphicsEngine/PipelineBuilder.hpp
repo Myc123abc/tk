@@ -40,11 +40,13 @@ namespace tk { namespace graphics_engine {
     auto set_shaders(VkShaderModule vertex_shader, VkShaderModule fragment_shader) -> PipelineBuilder&;
     // HACK: should be discard because of dynamic rendering, see spec
     auto set_cull_mode(VkCullModeFlags cull_mode, VkFrontFace front_face)          -> PipelineBuilder&;
+    auto enable_depth_test(VkFormat format)                                        -> PipelineBuilder&;
 
   private:
     std::vector<VkPipelineShaderStageCreateInfo> _shader_stages;
     VkPipelineRenderingCreateInfo                _rendering_info        { VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO            };
     VkPipelineRasterizationStateCreateInfo       _rasterization_state   { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO  };
+    VkPipelineDepthStencilStateCreateInfo        _depth_stencil_state   { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
     VkFormat                                     _rendering_info_format { VK_FORMAT_UNDEFINED };
   };
 
