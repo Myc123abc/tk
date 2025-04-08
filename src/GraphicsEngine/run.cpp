@@ -144,8 +144,18 @@ void GraphicsEngine::draw()
   // so we can save render result on it.
   //
   uint32_t image_index;
-  throw_if(vkAcquireNextImageKHR(_device, _swapchain, UINT64_MAX, frame.image_available_sem, VK_NULL_HANDLE, &image_index) != VK_SUCCESS,
-           "failed to acquire swap chain image");
+  auto res = vkAcquireNextImageKHR(_device, _swapchain, UINT64_MAX, frame.image_available_sem, VK_NULL_HANDLE, &image_index);
+  if (res == VK_ERROR_OUT_OF_DATE_KHR)
+  {
+    resize_swapchain();
+    return;
+  }
+  else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
+    throw_if(true, "failed to acquire swapechain image");
+
+  // get draw extent
+  _draw_extent.width  = std::min(_swapchain_image_extent.width, _image.extent.width);
+  _draw_extent.height = std::min(_swapchain_image_extent.height, _image.extent.height);
 
   //
   // now we know current frame resource is available,
@@ -180,8 +190,7 @@ void GraphicsEngine::draw()
   // copy image to swapchain image
   transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   transition_image_layout(frame.command_buffer, _swapchain_images[image_index], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-  VkExtent2D extent { _image.extent.width, _image.extent.height };
-  copy_image(frame.command_buffer, _image.image, _swapchain_images[image_index], extent, _swapchain_image_extent);
+  copy_image(frame.command_buffer, _image.image, _swapchain_images[image_index], _draw_extent, _swapchain_image_extent);
 
   // transition image layout to presentable
   transition_image_layout(frame.command_buffer, _swapchain_images[image_index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
@@ -233,8 +242,11 @@ void GraphicsEngine::draw()
     .pSwapchains        = &_swapchain,
     .pImageIndices      = &image_index,
   };
-  throw_if(vkQueuePresentKHR(_present_queue, &presentation_info) != VK_SUCCESS,
-           "failed to present swapchain image");
+  res = vkQueuePresentKHR(_present_queue, &presentation_info); 
+  if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR)
+    resize_swapchain(); 
+  else if (res != VK_SUCCESS)
+    throw_if(true, "failed to present swapchain image");
 
   // update frame index
   _current_frame = ++_current_frame % Max_Frame_Number;
@@ -253,7 +265,7 @@ void GraphicsEngine::draw_background(VkCommandBuffer cmd)
     vkCmdPushConstants(cmd, _compute_pipeline_layout[_pipeline_index], VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
   }
 
-  vkCmdDispatch(cmd, std::ceil(_swapchain_image_extent.width / 16.f), std::ceil(_swapchain_image_extent.height / 16.f), 1);
+  vkCmdDispatch(cmd, std::ceil(_draw_extent.width / 16.f), std::ceil(_draw_extent.height / 16.f), 1);
   // auto clear_range = get_image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
   // vkCmdClearColorImage(cmd, _image.image, VK_IMAGE_LAYOUT_GENERAL, &Clear_Value, 1, &clear_range);
 }
@@ -281,7 +293,7 @@ void GraphicsEngine::draw_geometry(VkCommandBuffer cmd)
     .sType                = VK_STRUCTURE_TYPE_RENDERING_INFO,
     .renderArea           =
     {
-      .extent = { _image.extent.width , _image.extent.height },
+      .extent = { _draw_extent.width , _draw_extent.height },
     },
     .layerCount           = 1,
     .colorAttachmentCount = 1,
@@ -292,8 +304,8 @@ void GraphicsEngine::draw_geometry(VkCommandBuffer cmd)
 
   VkViewport viewport
   {
-    .width  = (float)_image.extent.width,
-    .height = (float)_image.extent.height, 
+    .width  = (float)_draw_extent.width,
+    .height = (float)_draw_extent.height, 
     .maxDepth = 1.f,
   };
   vkCmdSetViewport(cmd, 0, 1, &viewport);
@@ -301,8 +313,8 @@ void GraphicsEngine::draw_geometry(VkCommandBuffer cmd)
   {
     .extent =
     {
-      .width  = _image.extent.width,
-      .height = _image.extent.height, 
+      .width  = _draw_extent.width,
+      .height = _draw_extent.height, 
     },
   };
   vkCmdSetScissor(cmd, 0, 1, &scissor);
@@ -319,7 +331,7 @@ void GraphicsEngine::draw_geometry(VkCommandBuffer cmd)
   // draw monkey
   // auto view = glm::translate(glm::mat4(1.f), glm::vec3{ x, y, z });
   auto view = glm::translate(glm::mat4(1.f), glm::vec3{ 0, 0, -5.f });
-  auto proj = glm::perspective(70.f, (float)_image.extent.width / _image.extent.height, 10000.f, 0.1f);
+  auto proj = glm::perspective(70.f, (float)_draw_extent.width / _draw_extent.height, 10000.f, 0.1f);
   proj[1][1] *= -1;
   push_constant.world_matrix = proj * view;
   push_constant.address = _meshs[0]->mesh_buffer.address;

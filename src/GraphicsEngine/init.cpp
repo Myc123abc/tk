@@ -24,7 +24,7 @@ GraphicsEngine::GraphicsEngine(Window const& window)
   select_physical_device();
   create_device_and_get_queues();
   create_vma_allocator();
-  create_swapchain_and_get_swapchain_images_info();
+  create_swapchain_and_rendering_image();
   create_descriptor_set_layout();
   create_compute_pipeline();
   create_graphics_pipeline();
@@ -229,59 +229,24 @@ void GraphicsEngine::create_vma_allocator()
   _destructors.push([this] { vmaDestroyAllocator(_vma_allocator); });
 }
 
-void GraphicsEngine::create_swapchain_and_get_swapchain_images_info()
+void GraphicsEngine::create_swapchain_and_rendering_image()
 {
   //
   // create swapchain
   //
   auto details         = get_swapchain_details(_physical_device, _surface);
-  auto surface_format  = details.get_surface_format();
   auto present_mode    = details.get_present_mode();
-  auto extent          = details.get_swap_extent(_window);
-  uint32_t image_count = details.capabilities.minImageCount + 1;
+  auto image_count     = details.capabilities.minImageCount + 1;
+  uint32_t w;
+  uint32_t h;
+  _window.get_screen_size(w, h);
+  auto extent          = VkExtent2D{ w, h, };
+
 #ifndef NDEBUG 
   print_present_mode(present_mode);
   fmt::print(fg(fmt::color::green), "swapchain image counts: {}\n\n", image_count);
 #endif
-  if (details.capabilities.maxImageCount > 0 &&
-      image_count > details.capabilities.maxImageCount)
-    image_count = details.capabilities.maxImageCount;
-
-  VkSwapchainCreateInfoKHR create_info
-  {
-    .sType            = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-    .surface          = _surface,
-    .minImageCount    = image_count,
-    .imageFormat      = surface_format.format,
-    .imageColorSpace  = surface_format.colorSpace,
-    .imageExtent      = extent,
-    .imageArrayLayers = 1,
-    .imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                        VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-    .preTransform     = details.capabilities.currentTransform,
-    .compositeAlpha   = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-    .presentMode      = present_mode,
-    .clipped          = VK_TRUE,
-  };
-
-  auto queue_families = get_queue_family_indices(_physical_device, _surface);
-  uint32_t indices[]
-  {
-    queue_families.graphics_family.value(),
-    queue_families.present_family.value(),
-  };
-
-  if (queue_families.graphics_family != queue_families.present_family)
-  {
-    create_info.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
-    create_info.queueFamilyIndexCount = 2;
-    create_info.pQueueFamilyIndices   = indices;
-  }
-  else
-    create_info.imageSharingMode      = VK_SHARING_MODE_EXCLUSIVE;
-
-  throw_if(vkCreateSwapchainKHR(_device, &create_info, nullptr, &_swapchain) != VK_SUCCESS,
-      "failed to create swapchain");
+  create_swapchain();
 
   //
   // dynamic rendering use image
@@ -370,7 +335,55 @@ void GraphicsEngine::create_swapchain_and_get_swapchain_images_info()
     vmaDestroyImage(_vma_allocator, _image.image, _image.allocation);
     vkDestroySwapchainKHR(_device, _swapchain, nullptr);
   });
+}
 
+void GraphicsEngine::create_swapchain()
+{
+  auto details         = get_swapchain_details(_physical_device, _surface);
+  auto surface_format  = details.get_surface_format();
+  auto present_mode    = details.get_present_mode();
+  auto extent          = details.get_swap_extent(_window);
+  uint32_t image_count = details.capabilities.minImageCount + 1;
+
+  if (details.capabilities.maxImageCount > 0 &&
+      image_count > details.capabilities.maxImageCount)
+    image_count = details.capabilities.maxImageCount;
+
+  VkSwapchainCreateInfoKHR create_info
+  {
+    .sType            = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+    .surface          = _surface,
+    .minImageCount    = image_count,
+    .imageFormat      = surface_format.format,
+    .imageColorSpace  = surface_format.colorSpace,
+    .imageExtent      = extent,
+    .imageArrayLayers = 1,
+    .imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                        VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+    .preTransform     = details.capabilities.currentTransform,
+    .compositeAlpha   = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+    .presentMode      = present_mode,
+    .clipped          = VK_TRUE,
+  };
+
+  auto queue_families = get_queue_family_indices(_physical_device, _surface);
+  uint32_t indices[]
+  {
+    queue_families.graphics_family.value(),
+    queue_families.present_family.value(),
+  };
+
+  if (queue_families.graphics_family != queue_families.present_family)
+  {
+    create_info.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
+    create_info.queueFamilyIndexCount = 2;
+    create_info.pQueueFamilyIndices   = indices;
+  }
+  else
+    create_info.imageSharingMode      = VK_SHARING_MODE_EXCLUSIVE;
+
+  throw_if(vkCreateSwapchainKHR(_device, &create_info, nullptr, &_swapchain) != VK_SUCCESS,
+      "failed to create swapchain");
 
   //
   // get swapchain images info
@@ -628,6 +641,13 @@ void GraphicsEngine::upload_data()
 {
   _mesh_buffer = create_mesh_buffer(Vertices, Indices);
   _destructors.push([&] { _mesh_buffer.destroy(_vma_allocator); });
+}
+
+void GraphicsEngine::resize_swapchain()
+{
+  vkDeviceWaitIdle(_device);
+  vkDestroySwapchainKHR(_device, _swapchain, nullptr);
+  create_swapchain();
 }
 
 } }

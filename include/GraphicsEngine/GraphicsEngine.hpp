@@ -3,6 +3,10 @@
 //
 // use Vulkan to implement
 //
+// TODO:
+// 1. use offscreen rendering, but when window size bigger than image size, it will be stretch,
+//    maybe need to recreate image in this case.
+//
 
 #pragma once
 
@@ -62,7 +66,8 @@ namespace tk { namespace graphics_engine {
     void select_physical_device();
     void create_device_and_get_queues();
     void create_vma_allocator();
-    void create_swapchain_and_get_swapchain_images_info();
+    void create_swapchain_and_rendering_image();
+    void create_swapchain();
     void create_descriptor_set_layout();
     void create_compute_pipeline();
     void create_graphics_pipeline();
@@ -71,6 +76,8 @@ namespace tk { namespace graphics_engine {
     void create_descriptor_sets();
     void create_sync_objects();
     void create_frame_resources();
+
+    void resize_swapchain();
 
     void upload_data();
 
@@ -115,6 +122,7 @@ namespace tk { namespace graphics_engine {
     VkExtent2D                   _swapchain_image_extent   = {};
     Image                        _image                    = {};
     Image                        _depth_image              = {};
+    VkExtent2D                   _draw_extent              = {};
 
     std::vector<VkPipeline>      _compute_pipeline;
     std::vector<VkPipelineLayout>_compute_pipeline_layout;

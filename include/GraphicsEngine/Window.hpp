@@ -30,9 +30,10 @@ namespace tk { namespace graphics_engine {
     Window& operator=(Window const&) = delete;
     Window& operator=(Window&&)      = delete;
 
-    auto create_surface(VkInstance instance)           const -> VkSurfaceKHR;
-    void get_framebuffer_size(int& width, int& height) const;
-    auto is_closed()                                   const -> int;
+    auto create_surface(VkInstance instance)                     const -> VkSurfaceKHR;
+    void get_framebuffer_size(uint32_t& width, uint32_t& height) const;
+    void get_screen_size(uint32_t& width, uint32_t& height)      const;
+    auto is_closed()                                             const -> int;
     
     static void process_events();
     static auto get_vulkan_instance_extensions() -> std::vector<const char*>;

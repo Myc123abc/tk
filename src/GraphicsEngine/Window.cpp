@@ -36,9 +36,19 @@ auto Window::create_surface(VkInstance instance) const -> VkSurfaceKHR
   return surface;
 }
 
-void Window::get_framebuffer_size(int& width, int& height) const
+void Window::get_framebuffer_size(uint32_t& width, uint32_t& height) const
 {
-  SDL_GetWindowSizeInPixels(_window, &width, &height);
+  int w = width;
+  int h = height; 
+  SDL_GetWindowSizeInPixels(_window, &w, &h);
+}
+
+void Window::get_screen_size(uint32_t& width, uint32_t& height) const
+{
+  auto id   = SDL_GetDisplayForWindow(_window);
+  auto mode = SDL_GetCurrentDisplayMode(id);
+  width  = mode->w;
+  height = mode->h;
 }
     
 auto Window::get_vulkan_instance_extensions() -> std::vector<const char*>

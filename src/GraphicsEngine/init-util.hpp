@@ -361,14 +361,10 @@ struct SwapChainSupportDetails
     if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
       return capabilities.currentExtent;
   
-    int width, height;
+    uint32_t width, height;
     window.get_framebuffer_size(width, height);
   
-    VkExtent2D actual_extent
-    {
-      (uint32_t)width,
-      (uint32_t)height,
-    };
+    VkExtent2D actual_extent{ width, height };
   
     actual_extent.width = std::clamp(actual_extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
     actual_extent.height = std::clamp(actual_extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
@@ -465,7 +461,7 @@ struct Shader
     {
       .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
       .codeSize = data.size() * sizeof(uint32_t),
-      .pCode    = reinterpret_cast<uint32_t const*>(data.data()),
+      .pCode    = reinterpret_cast<uint32_t*>(data.data()),
     };
     throw_if(vkCreateShaderModule(device, &info, nullptr, &shader) != VK_SUCCESS,
              fmt::format("failed to create shader from {}", filename));
