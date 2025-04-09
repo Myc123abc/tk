@@ -67,7 +67,7 @@ namespace tk { namespace graphics_engine {
     void create_device_and_get_queues();
     void create_vma_allocator();
     void create_swapchain_and_rendering_image();
-    void create_swapchain();
+    void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE);
     void create_descriptor_set_layout();
     void create_compute_pipeline();
     void create_graphics_pipeline();

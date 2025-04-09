@@ -337,7 +337,7 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
   });
 }
 
-void GraphicsEngine::create_swapchain()
+void GraphicsEngine::create_swapchain(VkSwapchainKHR old_swapchain)
 {
   auto details         = get_swapchain_details(_physical_device, _surface);
   auto surface_format  = details.get_surface_format();
@@ -364,6 +364,7 @@ void GraphicsEngine::create_swapchain()
     .compositeAlpha   = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
     .presentMode      = present_mode,
     .clipped          = VK_TRUE,
+    .oldSwapchain     = old_swapchain,
   };
 
   auto queue_families = get_queue_family_indices(_physical_device, _surface);
@@ -646,8 +647,9 @@ void GraphicsEngine::upload_data()
 void GraphicsEngine::resize_swapchain()
 {
   vkDeviceWaitIdle(_device);
-  vkDestroySwapchainKHR(_device, _swapchain, nullptr);
-  create_swapchain();
+  auto old_swapchain = _swapchain;
+  create_swapchain(old_swapchain);
+  vkDestroySwapchainKHR(_device, old_swapchain, nullptr);
 }
 
 } }
