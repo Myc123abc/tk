@@ -96,7 +96,7 @@ inline auto check_layers_support(std::vector<std::string_view> const& layers)
                            {
                              return supported_layer.layerName == layer;
                            });
-    throw_if(it == supported_layers.end(), std::format("unsupported layer: {}", layer));
+    throw_if(it == supported_layers.end(), "unsupported layer: {}", layer);
   }
 }
 
@@ -155,7 +155,7 @@ inline auto check_instance_extensions_support(std::vector<const char*> extension
                            [extension] (const auto& supported_extension) {
                              return strcmp(supported_extension.extensionName, extension) == 0;
                            });
-    throw_if(it == supported_extensions.end(), std::format("unsupported extension: {}", extension));
+    throw_if(it == supported_extensions.end(), "unsupported extension: {}", extension);
   }
 }
 
@@ -433,7 +433,7 @@ inline VkImageView create_image_view(VkDevice device, VkImage image, VkFormat fo
 inline auto get_file_data(std::string_view filename)
 {
   std::ifstream file(filename.data(), std::ios::ate | std::ios::binary);
-  throw_if(!file.is_open(), std::format("failed to open {}", filename));
+  throw_if(!file.is_open(), "failed to open {}", filename);
 
   auto file_size = (size_t)file.tellg();
   // A SPIR-V module is defined a stream of 32bit words
@@ -461,7 +461,7 @@ struct Shader
       .pCode    = reinterpret_cast<uint32_t*>(data.data()),
     };
     throw_if(vkCreateShaderModule(device, &info, nullptr, &shader) != VK_SUCCESS,
-             std::format("failed to create shader from {}", filename));
+             "failed to create shader from {}", filename);
   }
 
   ~Shader()

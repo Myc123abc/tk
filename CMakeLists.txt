@@ -14,8 +14,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #                                Library
 ################################################################################
 
-find_package(spdlog)
+add_definitions(-DSPDLOG_USE_STD_FORMAT)
+find_package(spdlog CONFIG REQUIRED)
 
+set(SDL_SHARED OFF)
+set(SDL_STATIC ON)
 include(FetchContent)
 FetchContent_Declare(
   SDL3 
@@ -50,7 +53,6 @@ set(INCLUDE
 )
 file(GLOB_RECURSE SOURCE src/*.cpp)
 set(LIBS
-  glfw
   vulkan
   dl
   pthread
@@ -58,8 +60,7 @@ set(LIBS
   Xxf86vm
   Xrandr
   Xi
-  spdlog::spdlog
-  SDL3::SDL3
+  SDL3::SDL3-static
   GPUOpen::VulkanMemoryAllocator
   fastgltf
 )

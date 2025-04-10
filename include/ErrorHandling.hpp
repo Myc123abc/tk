@@ -1,14 +1,21 @@
 #pragma once
 
 #include <stdexcept>
-#include <string_view>
+#include <format>
 
 namespace tk
 {
 
-inline void throw_if(bool b, std::string_view msg)
-{
-  if (b) throw std::runtime_error(msg.data());
-}
+  template <typename T>
+  inline void throw_if(bool b, T const& msg)
+  {
+    if (b) throw std::runtime_error(msg);
+  }
+  
+  template <typename... Args>
+  inline void throw_if(bool b, std::format_string<Args...> fmt, Args&&... args)
+  {
+    if (b) throw std::runtime_error(std::format(fmt, std::forward<Args>(args)...));
+  }
 
 }
