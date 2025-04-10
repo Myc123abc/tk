@@ -14,13 +14,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #                                Library
 ################################################################################
 
-include(FetchContent)
-FetchContent_Declare(
-  fmt
-  GIT_REPOSITORY https://github.com/fmtlib/fmt
-  GIT_TAG        master
-)
-FetchContent_MakeAvailable(fmt)
+find_package(spdlog)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -64,7 +58,7 @@ set(LIBS
   Xxf86vm
   Xrandr
   Xi
-  fmt::fmt
+  spdlog::spdlog
   SDL3::SDL3
   GPUOpen::VulkanMemoryAllocator
   fastgltf
@@ -79,5 +73,4 @@ target_link_libraries(Breakout PRIVATE ${LIBS})
 target_compile_definitions(Breakout PRIVATE
   GLM_FORCE_DEPTH_ZERO_TO_ONE
   GLM_FORCE_RADIANS
-  # GLM_FORCE_LEFT_HANDED
 )

@@ -4,10 +4,9 @@
 #include "ErrorHandling.hpp"
 #include "Window.hpp"
 
-#include <fmt/color.h>
-
 #include <fstream>
 #include <map>
+#include <print>
 
 namespace tk { namespace graphics_engine {
 
@@ -80,10 +79,10 @@ inline auto get_supported_instance_layers()
 inline auto print_supported_instance_layers()
 {
   auto layers = get_supported_instance_layers();
-  fmt::print(fg(fmt::color::green), "available instance layers:\n");
+  std::println("available instance layers:");
   for (const auto& layer : layers)
-    fmt::print(fg(fmt::color::green), "  {}\n", layer.layerName);
-  fmt::println("");
+    std::println("  {}", layer.layerName);
+  std::println();
 }
 
 inline auto check_layers_support(std::vector<std::string_view> const& layers)
@@ -97,7 +96,7 @@ inline auto check_layers_support(std::vector<std::string_view> const& layers)
                            {
                              return supported_layer.layerName == layer;
                            });
-    throw_if(it == supported_layers.end(), fmt::format("unsupported layer: {}", layer));
+    throw_if(it == supported_layers.end(), std::format("unsupported layer: {}", layer));
   }
 }
 
@@ -133,18 +132,18 @@ inline auto get_supported_instance_extensions()
 inline auto print_supported_instance_extensions()
 {
   auto extensions = get_supported_instance_extensions();
-  fmt::print(fg(fmt::color::green), "available instance extensions:\n");
+  std::println("available instance extensions:");
   for (const auto& extension : extensions)
-    fmt::print(fg(fmt::color::green), "  {}\n", extension.extensionName);
-  fmt::println("");
+    std::println("  {}", extension.extensionName);
+  std::println();
 }
 
 inline auto print_enabled_extensions(std::string_view header_msg, std::vector<const char*> const& extensions)
 {
-  fmt::print(fg(fmt::color::green), "Enabled {} extensions:\n", header_msg);
+  std::println("Enabled {} extensions:", header_msg);
   for (const auto& extension : extensions)
-    fmt::print(fg(fmt::color::green), "  {}\n", extension);
-  fmt::println("");
+    std::println("  {}", extension);
+  std::println();
 }
 
 inline auto check_instance_extensions_support(std::vector<const char*> extensions)
@@ -156,7 +155,7 @@ inline auto check_instance_extensions_support(std::vector<const char*> extension
                            [extension] (const auto& supported_extension) {
                              return strcmp(supported_extension.extensionName, extension) == 0;
                            });
-    throw_if(it == supported_extensions.end(), fmt::format("unsupported extension: {}", extension));
+    throw_if(it == supported_extensions.end(), std::format("unsupported extension: {}", extension));
   }
 }
 
@@ -209,17 +208,15 @@ inline void print_supported_physical_devices(VkInstance instance)
 {
   auto devices = get_supported_physical_devices(instance);
   auto devices_score = get_physical_devices_score(devices);
-  fmt::print(fg(fmt::color::green),
-             "available physical devices:\n"
-             "  name\t\t\t\t\tscore\n");
+  std::println("available physical devices:\n"
+               "  name\t\t\t\t\tscore");
   VkPhysicalDeviceProperties property;
   for (const auto& [score, device] : devices_score)
   {
     vkGetPhysicalDeviceProperties(device, &property);
-    fmt::print(fg(fmt::color::green),
-               "  {}\t{}\n", property.deviceName, score);
+    std::println("  {}\t{}", property.deviceName, score);
   }
-  fmt::println("");
+  std::println();
 }
 
 inline auto get_supported_device_extensions(VkPhysicalDevice device)
@@ -233,10 +230,10 @@ inline auto get_supported_device_extensions(VkPhysicalDevice device)
 
 inline auto print_supported_device_extensions(VkPhysicalDevice device)
 {
-  fmt::print(fg(fmt::color::green), "available device extensions:\n");
+  std::println("available device extensions:");
   for (const auto& extension : get_supported_device_extensions(device))
-    fmt::print(fg(fmt::color::green), "  {}\n", extension.extensionName);
-  fmt::println("");
+    std::println("  {}", extension.extensionName);
+  std::println();
 }
 
 inline auto check_device_extensions_support(VkPhysicalDevice device, std::vector<const char*> const& extensions)
@@ -394,12 +391,12 @@ inline auto get_swapchain_details(VkPhysicalDevice device, VkSurfaceKHR surface)
 
 inline void print_present_mode(VkPresentModeKHR present_mode)
 {
-  fmt::print(fg(fmt::color::green), "present mode:\t\t");
+  std::print("present mode:\t\t");
   if (present_mode == VK_PRESENT_MODE_FIFO_KHR)
-    fmt::print(fg(fmt::color::green), "V-Sync");
+    std::print("V-Sync");
   else if (present_mode == VK_PRESENT_MODE_MAILBOX_KHR)
-    fmt::print(fg(fmt::color::green), "Mailbox");
-  fmt::println("");
+    std::print("Mailbox");
+  std::println();
 }
 
 
@@ -436,7 +433,7 @@ inline VkImageView create_image_view(VkDevice device, VkImage image, VkFormat fo
 inline auto get_file_data(std::string_view filename)
 {
   std::ifstream file(filename.data(), std::ios::ate | std::ios::binary);
-  throw_if(!file.is_open(), fmt::format("failed to open {}", filename));
+  throw_if(!file.is_open(), std::format("failed to open {}", filename));
 
   auto file_size = (size_t)file.tellg();
   // A SPIR-V module is defined a stream of 32bit words
@@ -464,7 +461,7 @@ struct Shader
       .pCode    = reinterpret_cast<uint32_t*>(data.data()),
     };
     throw_if(vkCreateShaderModule(device, &info, nullptr, &shader) != VK_SUCCESS,
-             fmt::format("failed to create shader from {}", filename));
+             std::format("failed to create shader from {}", filename));
   }
 
   ~Shader()

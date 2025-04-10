@@ -5,6 +5,7 @@
 
 #include <ranges>
 #include <set>
+#include <print>
 
 namespace tk { namespace graphics_engine { 
 
@@ -244,7 +245,7 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
 
 #ifndef NDEBUG 
   print_present_mode(present_mode);
-  fmt::print(fg(fmt::color::green), "swapchain image counts: {}\n\n", image_count);
+  std::println("swapchain image counts: {}\n", image_count);
 #endif
   create_swapchain();
 

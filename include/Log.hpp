@@ -9,8 +9,7 @@
 
 #pragma once
 
-#include <fmt/base.h>
-#include <fmt/color.h>
+#include <spdlog/spdlog.h>
 
 #include <string_view>
 
@@ -33,16 +32,16 @@ namespace tk
 
       void error(std::string_view msg)
       {
-        fmt::print("[");
-        fmt::print(fg(fmt::color::red), "error");
-        fmt::print("] {}\n", msg);
+        // fmt::print("[");
+        // fmt::print(fg(fmt::color::red), "error");
+        // fmt::print("] {}\n", msg);
       }
 
       void info(std::string_view msg)
       {
-        fmt::print("[");
-        fmt::print(fg(fmt::color::green), "info");
-        fmt::print("] {}\n", msg);
+        // fmt::print("[");
+        // fmt::print(fg(fmt::color::green), "info");
+        // fmt::print("] {}\n", msg);
       }
     };
 
