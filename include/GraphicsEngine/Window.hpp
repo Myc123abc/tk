@@ -7,6 +7,11 @@
 // expand to window manager
 // one init sdl3, multi-generate windows
 //
+// HACK:
+// 1. on windows, event loop resize event only tringle once, use callback system is normal...
+// 2. in wayland, sdl3 defaul use x11, which resize window is suck.
+//    forcely use wayland the framebuffer size return 16384x16384 out of device memory...
+//
 
 #pragma once
 
