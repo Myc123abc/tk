@@ -42,19 +42,20 @@ namespace tk { namespace graphics_engine {
     // run
     //
     // HACK: this not should in here, it should in use engine's place
-    void run();
+    // maybe update and draw should be user's codes
+    // also with keyboard_process
+    void update();
+    void draw();
+    void keyboard_process(SDL_KeyboardEvent const& key);
 
     // HACK: 32bit indices? not 16bit?
     auto create_mesh_buffer(std::span<Vertex> vertices, std::span<uint32_t> indices) -> MeshBuffer;
 
   private:
-    void update();
-    void draw();
     void draw_background(VkCommandBuffer cmd);
     void draw_geometry(VkCommandBuffer cmd);
 
     uint32_t _pipeline_index = 0;
-    void keyboard_process(SDL_KeyboardEvent const& key);
 
   private:
     //

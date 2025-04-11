@@ -2,53 +2,11 @@
 #include "ShaderStructs.hpp"
 #include "ErrorHandling.hpp"
 #include "constant.hpp"
-#include "Log.hpp"
 
 #include <SDL3/SDL_events.h>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <thread>
-#include <chrono>
-
 namespace tk { namespace graphics_engine {
-
-void GraphicsEngine::run()
-{
-  bool quit  = false;
-  bool pause = false;
-
-  SDL_Event event;
-
-  while (!quit)
-  {
-    while (SDL_PollEvent(&event))
-    {
-      switch (event.type)
-      {
-      case SDL_EVENT_QUIT:
-        quit = true;
-        break;
-      case SDL_EVENT_WINDOW_MINIMIZED:
-        pause = true;
-        break;
-      case SDL_EVENT_WINDOW_MAXIMIZED:
-        pause = false;
-        break;
-      case SDL_EVENT_KEY_DOWN:
-        keyboard_process(event.key);
-        break;
-      }
-    }
-
-    if (!pause)
-    {
-      update();
-      draw();
-    }
-    else
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  }
-}
 
 void GraphicsEngine::keyboard_process(SDL_KeyboardEvent const& key)
 {
