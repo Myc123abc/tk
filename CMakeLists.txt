@@ -35,14 +35,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(VMA)
 
-include(FetchContent)
-FetchContent_Declare(
-  fastgltf 
-  GIT_REPOSITORY https://github.com/spnda/fastgltf.git
-  GIT_TAG        main 
-)
-FetchContent_MakeAvailable(fastgltf)
-
 ################################################################################
 #                               Build Binrary 
 ################################################################################
@@ -62,7 +54,6 @@ set(LIBS
   Xi
   SDL3::SDL3-static
   GPUOpen::VulkanMemoryAllocator
-  fastgltf
 )
 
 add_executable(Breakout ${SOURCE})

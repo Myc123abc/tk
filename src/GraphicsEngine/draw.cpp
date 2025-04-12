@@ -1,83 +1,21 @@
 #include "GraphicsEngine.hpp"
-#include "ShaderStructs.hpp"
 #include "ErrorHandling.hpp"
 #include "constant.hpp"
+#include "Shape.hpp"
 
 #include <SDL3/SDL_events.h>
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace tk { namespace graphics_engine {
 
-void GraphicsEngine::keyboard_process(SDL_KeyboardEvent const& key)
-{
-  switch (key.key)
-  {
-  case SDLK_1:
-    _pipeline_index = 0;
-    break;
-  case SDLK_2:
-    _pipeline_index = 1;
-    break;
-  case SDLK_H:
-    x -= 1;
-    break;
-  case SDLK_L:
-    x += 1;
-    break;
-  case SDLK_J:
-    y -= 1;
-    break;
-  case SDLK_K:
-    y += 1;
-    break;
-  case SDLK_F:
-    z += 1;
-    break;
-  case SDLK_B:
-    z -= 1;
-    break;
-  };
-}
-
 VkClearColorValue Clear_Value;
 
 void GraphicsEngine::update()
 {
-  static auto start_time   = std::chrono::high_resolution_clock::now();
-  auto        current_time = std::chrono::high_resolution_clock::now();
-  float       time         = std::chrono::duration<float, std::chrono::seconds::period>(current_time - start_time).count();
-
-  UniformBufferObject ubo;
-  ubo.model = glm::mat4(1.f);
-  ubo.view = glm::translate(glm::mat4(1.f), glm::vec3{ 0, 0, -5.f });
-  ubo.proj = glm::perspective(70.f, (float)_image.extent.width / _image.extent.height, 1000.f, 0.1f);
-  // ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-  // ubo.view = glm::lookAt(glm::vec3(.0f, .0f, -1.f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, .0f));
-  // ubo.proj = glm::perspective(45.0f, _swapchain_image_extent.width / (float) _swapchain_image_extent.height, 0.1f, 10.0f);
-  // ubo.view  = glm::lookAt(glm::vec3(0.f, 0.f, 1.f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 1.f, 0.f));
-  // ubo.proj  = glm::ortho(-1.f, 1.f, -1.f, 1.f, -1.f, 100.f);
-
-  // TODO: use vma to presently mapped, and vma's copy memory function
-  // vmaCopyMemoryToAllocation(_vma_allocator, &ubo, _uniform_buffer_allocations[_current_frame], 0, sizeof(ubo));
-
-  // clear value
-  uint32_t circle = time / 3;
-  auto val = std::abs(std::sin(time / 3 * M_PI));
-  float r{}, g{}, b{};
-  auto mod = circle % 3;
-  if (mod == 0)
-    r = val;
-  else if (mod == 1)
-    g = val;
-  else
-    b = val;
-  Clear_Value = { { r, g, b, 1.f } };
 }
 
-//
 // use independent image to draw, and copy it to swapchain image has may resons,
 // detail reference: https://vkguide.dev/docs/new_chapter_2/vulkan_new_rendering/#new-draw-loop
-//
 void GraphicsEngine::draw()
 {
   //
@@ -134,17 +72,15 @@ void GraphicsEngine::draw()
   //   render_end();    // submit commands to queue and end everything like command buffer, etc.
 
   // transition image layout to writeable
-  transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-
-  draw_background(frame.command_buffer);
-
-  transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   transition_image_layout(frame.command_buffer, _depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-  draw_geometry(frame.command_buffer);
+
+  draw(frame.command_buffer);
 
   // copy image to swapchain image
   transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   transition_image_layout(frame.command_buffer, _swapchain_images[image_index], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
   copy_image(frame.command_buffer, _image.image, _swapchain_images[image_index], _draw_extent, _swapchain_image_extent);
 
   // transition image layout to presentable
@@ -207,40 +143,18 @@ void GraphicsEngine::draw()
   _current_frame = ++_current_frame % Max_Frame_Number;
 }
 
-void GraphicsEngine::draw_background(VkCommandBuffer cmd)
-{
-  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _compute_pipeline[_pipeline_index]);
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _compute_pipeline_layout[_pipeline_index], 0, 1, &_descriptor_set, 0, nullptr);
-
-  if (_pipeline_index != 0)
-  {
-    PushContant pc;
-    pc.data1 = glm::vec4(1, 0, 0, 1);
-    pc.data2 = glm::vec4(0, 0, 1, 1);
-    vkCmdPushConstants(cmd, _compute_pipeline_layout[_pipeline_index], VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
-  }
-
-  vkCmdDispatch(cmd, std::ceil(_draw_extent.width / 16.f), std::ceil(_draw_extent.height / 16.f), 1);
-  // auto clear_range = get_image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
-  // vkCmdClearColorImage(cmd, _image.image, VK_IMAGE_LAYOUT_GENERAL, &Clear_Value, 1, &clear_range);
-}
-
-void GraphicsEngine::draw_geometry(VkCommandBuffer cmd)
+// HACK:
+// temporary render begin function, it should also have reset command, image transoform, etc. 
+// and also need to abstract VkCommandBuffer
+// also view and extent mostly is fixed
+void render_begin(VkCommandBuffer cmd, VkImageView view, VkExtent2D extent)
 {
   VkRenderingAttachmentInfo attachment
   {
     .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-    .imageView   = _image.view,
+    .imageView   = view,
     .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
     .loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD,
-    .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
-  };
-  VkRenderingAttachmentInfo depth_attachment
-  {
-    .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-    .imageView   = _depth_image.view,
-    .imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-    .loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR,
     .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
   };
   VkRenderingInfo rendering
@@ -248,62 +162,48 @@ void GraphicsEngine::draw_geometry(VkCommandBuffer cmd)
     .sType                = VK_STRUCTURE_TYPE_RENDERING_INFO,
     .renderArea           =
     {
-      .extent = { _draw_extent.width , _draw_extent.height },
+      .extent = extent,
     },
     .layerCount           = 1,
     .colorAttachmentCount = 1,
     .pColorAttachments    = &attachment,
-    .pDepthAttachment     = &depth_attachment,
   };
   vkCmdBeginRendering(cmd, &rendering);
 
   VkViewport viewport
   {
-    .width  = (float)_draw_extent.width,
-    .height = (float)_draw_extent.height, 
+    .width  = (float)extent.width,
+    .height = (float)extent.height, 
     .maxDepth = 1.f,
   };
   vkCmdSetViewport(cmd, 0, 1, &viewport);
   VkRect2D scissor 
   {
-    .extent =
-    {
-      .width  = _draw_extent.width,
-      .height = _draw_extent.height, 
-    },
+    .extent = extent,
   };
   vkCmdSetScissor(cmd, 0, 1, &scissor);
+}
 
-  // draw mesh
-  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _mesh_pipeline);
-  GeometryPushConstant push_constant;
-  push_constant.world_matrix = glm::mat4(1.f);
-  push_constant.address      = _mesh_buffer.address;
-  vkCmdPushConstants(cmd, _mesh_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constant), &push_constant);
-  vkCmdBindIndexBuffer(cmd, _mesh_buffer.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
-  vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
-
-  // draw monkey
-  // auto view = glm::translate(glm::mat4(1.f), glm::vec3{ x, y, z });
-  auto view = glm::translate(glm::mat4(1.f), glm::vec3{ 0, 0, -5.f });
-  auto proj = glm::perspective(70.f, (float)_draw_extent.width / _draw_extent.height, 10000.f, 0.1f);
-  proj[1][1] *= -1;
-  push_constant.world_matrix = proj * view;
-  push_constant.address = _meshs[0]->mesh_buffer.address;
-  vkCmdPushConstants(cmd, _mesh_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constant), &push_constant);
-  vkCmdBindIndexBuffer(cmd, _meshs[0]->mesh_buffer.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
-  vkCmdDrawIndexed(cmd, _meshs[0]->surfaces[0].count, 1, _meshs[0]->surfaces[0].start_index, 0, 0);
-
-  // draw triangle
-  // vkCmdEndRendering(cmd);
-  // rendering.pDepthAttachment = nullptr;
-  // vkCmdBeginRendering(cmd, &rendering);
-  // vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _graphics_pipeline);
-  // vkCmdSetViewport(cmd, 0, 1, &viewport);
-  // vkCmdSetScissor(cmd, 0, 1, &scissor);
-  // vkCmdDraw(cmd, 3, 1, 0, 0);
-
+// HACK: for consistence with render_begin, and need to as interface in VkCommandBuffer abstract
+void render_end(VkCommandBuffer cmd)
+{
   vkCmdEndRendering(cmd);
+}
+
+void GraphicsEngine::draw(VkCommandBuffer cmd)
+{
+  render_begin(cmd, _image.view, {_draw_extent.width, _draw_extent.height});
+
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _2D_pipeline);
+
+  // TransformMatrixs matrixs;
+  // matrixs.model = glm::mat4(1.f);
+  // vkCmdPushConstants(cmd, _2D_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(matrixs), &matrixs);
+  //
+  // vkCmdBindIndexBuffer(cmd, _mesh_buffer.indices.buffer, 0, VK_INDEX_TYPE_UINT8);
+  // vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
+
+  render_end(cmd);
 }
     
 } }

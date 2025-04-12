@@ -1,6 +1,5 @@
 #include "GraphicsEngine.hpp"
 #include "ErrorHandling.hpp"
-#include "Buffer.hpp"
 
 namespace tk { namespace graphics_engine {
 
@@ -114,73 +113,6 @@ void GraphicsEngine::create_buffer(VkBuffer& buffer, VmaAllocation& allocation, 
   return;
 }
 
-Buffer GraphicsEngine::create_buffer(uint32_t size, VkBufferUsageFlags usage, VmaAllocationCreateFlags flag)
-{
-  Buffer buffer;
-
-  VkBufferCreateInfo buf_info
-  {
-    .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-    .size  = size,
-    .usage = usage,
-  };
-  VmaAllocationCreateInfo alloc_info
-  {
-    .flags = flag,
-    .usage = VMA_MEMORY_USAGE_AUTO,
-  };
-  throw_if(vmaCreateBuffer(_vma_allocator, &buf_info, &alloc_info, &buffer.buffer, &buffer.allocation, nullptr) != VK_SUCCESS,
-           "failed to create buffer");
-
-  return buffer;
-}
-
-auto GraphicsEngine::create_mesh_buffer(std::span<Vertex> vertices, std::span<uint32_t> indices) -> MeshBuffer
-{
-  // create mesh buffer 
-  uint32_t vertices_size = vertices.size() * sizeof(Vertex);
-  uint32_t indices_size  = indices.size() * sizeof(uint32_t);
-
-  MeshBuffer mesh_buffer;
-  mesh_buffer.vertices = create_buffer(vertices_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT         |
-                                                      VK_BUFFER_USAGE_TRANSFER_DST_BIT           | 
-                                                      VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
-
-  VkBufferDeviceAddressInfo info
-  {
-    .sType  = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-    .buffer = mesh_buffer.vertices.buffer,
-  };
-  mesh_buffer.address = vkGetBufferDeviceAddress(_device, &info);
-
-  mesh_buffer.indices = create_buffer(indices_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | 
-                                                    VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-
-  // create stage buffer
-  auto stage = create_buffer(vertices_size + indices_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
-  throw_if(vmaCopyMemoryToAllocation(_vma_allocator, vertices.data(), stage.allocation, 0, vertices_size) != VK_SUCCESS,
-           "failed to copy vertices data to stage buffer");
-  throw_if(vmaCopyMemoryToAllocation(_vma_allocator, indices.data(), stage.allocation, vertices_size, indices_size) != VK_SUCCESS,
-           "failed to copy indices data to stage buffer");
-
-  // transform data to mesh buffer
-  auto cmd = begin_single_time_commands();
-
-  VkBufferCopy copy
-  {
-    .size = vertices_size,
-  };
-  vkCmdCopyBuffer(cmd, stage.buffer, mesh_buffer.vertices.buffer, 1, &copy);
-  copy.size = indices_size;
-  copy.srcOffset = vertices_size;
-  vkCmdCopyBuffer(cmd, stage.buffer, mesh_buffer.indices.buffer, 1, &copy);
-
-  end_single_time_commands(cmd);
-
-  stage.destroy(_vma_allocator);
-
-  return mesh_buffer;
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 //                               Image 

@@ -2,6 +2,7 @@
 #include "init-util.hpp"
 #include "constant.hpp"
 #include "PipelineBuilder.hpp"
+#include "Shape.hpp"
 
 #include <ranges>
 #include <set>
@@ -27,16 +28,11 @@ GraphicsEngine::GraphicsEngine(Window const& window)
   create_vma_allocator();
   create_swapchain_and_rendering_image();
   create_descriptor_set_layout();
-  create_compute_pipeline();
   create_graphics_pipeline();
   create_command_pool();
   create_descriptor_pool();
   create_descriptor_sets();
   create_frame_resources();
-
-  upload_data();
-
-  load_gltf();
 }
 
 GraphicsEngine::~GraphicsEngine()
@@ -419,109 +415,38 @@ void GraphicsEngine::create_descriptor_set_layout()
   _destructors.push([this] { vkDestroyDescriptorSetLayout(_device, _descriptor_set_layout, nullptr); });
 }
 
-void GraphicsEngine::create_compute_pipeline()
-{
-  _compute_pipeline_layout.resize(2);
-  _compute_pipeline.resize(2);
-
-  // create pipeline layout
-  VkPipelineLayoutCreateInfo layout_info
-  {
-    .sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-    .setLayoutCount         = 1,
-    .pSetLayouts            = &_descriptor_set_layout,
-  };
-  throw_if(vkCreatePipelineLayout(_device, &layout_info, nullptr, &_compute_pipeline_layout[0]) != VK_SUCCESS,
-           "failed to create pipeline layout");
-
-  VkPushConstantRange push_constant
-  {
-    .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-    .offset     = 0,
-    .size       = sizeof(GeometryPushConstant),
-  };
-  layout_info.pushConstantRangeCount = 1;
-  layout_info.pPushConstantRanges    = &push_constant;
-  throw_if(vkCreatePipelineLayout(_device, &layout_info, nullptr, &_compute_pipeline_layout[1]) != VK_SUCCESS,
-           "failed to create pipeline layout");
-
-  // create pipeline 
-  Shader shader0(_device, "build/compute.spv");
-  Shader shader1(_device, "build/gradient_color.spv");
-  VkComputePipelineCreateInfo pipeline_info
-  {
-    .sType  = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-    .stage  =
-    {
-      .sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-      .stage  = VK_SHADER_STAGE_COMPUTE_BIT,
-      .module = shader0.shader,
-      .pName = "main",
-    },
-    .layout = _compute_pipeline_layout[0],
-  };
-  throw_if(vkCreateComputePipelines(_device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &_compute_pipeline[0]),
-           "failed to create compute pipeline");
-  pipeline_info.stage.module = shader1.shader;
-  pipeline_info.layout       = _compute_pipeline_layout[1];
-  throw_if(vkCreateComputePipelines(_device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &_compute_pipeline[1]),
-           "failed to create compute pipeline");
-
-  _destructors.push([this]
-  { 
-    vkDestroyPipeline(_device, _compute_pipeline[0], nullptr);
-    vkDestroyPipelineLayout(_device, _compute_pipeline_layout[0], nullptr);
-    vkDestroyPipeline(_device, _compute_pipeline[1], nullptr);
-    vkDestroyPipelineLayout(_device, _compute_pipeline_layout[1], nullptr);
-  });
-}
-
 void GraphicsEngine::create_graphics_pipeline()
 {
-  Shader vertex_shader(_device, "build/triangle_vert.spv");
-  Shader fragment_shader(_device, "build/triangle_frag.spv");
-
+  // create pipeline layout
+  VkPushConstantRange push_constant_range 
+  {
+    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+    .size       = sizeof(TransformMatrixs),
+  };
   VkPipelineLayoutCreateInfo layout_info
   {
     .sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+    .pushConstantRangeCount = 1,
+    .pPushConstantRanges    = &push_constant_range,
   };
-  throw_if(vkCreatePipelineLayout(_device, &layout_info, nullptr, &_graphics_pipeline_layout) != VK_SUCCESS,
+  throw_if(vkCreatePipelineLayout(_device, &layout_info, nullptr, &_2D_pipeline_layout) != VK_SUCCESS,
            "failed to create graphics pipeline layout");
 
-  auto builder = PipelineBuilder();
-  _graphics_pipeline = builder 
-                       .set_shaders(vertex_shader.shader, fragment_shader.shader)
-                       .set_cull_mode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE)
-                       .set_color_attachment_format(_image.format)
-                       .build(_device, _graphics_pipeline_layout);
-  
-  // create mesh pipeline
-  Shader mesh_vertex_shader(_device, "build/triangle_mesh_vert.spv");
-  VkPushConstantRange range
-  {
-    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-    .size       = sizeof(GeometryPushConstant),
-  };
-  layout_info.pPushConstantRanges    = &range;
-  layout_info.pushConstantRangeCount = 1;
-  throw_if(vkCreatePipelineLayout(_device, &layout_info, nullptr, &_mesh_pipeline_layout) != VK_SUCCESS,
-           "failed to create graphics pipeline layout");
-  _mesh_pipeline = builder
-                   .clear()
-                   .set_shaders(mesh_vertex_shader.shader, fragment_shader.shader)
-                   .set_cull_mode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE)
-                   .set_color_attachment_format(_image.format)
-                   .enable_depth_test(_depth_image.format)
-                   // .enable_additive_blending()
-                   .enable_alpha_blending()
-                   .build(_device, _mesh_pipeline_layout);
+  // create pipeline
+  auto shader_vertex2D   = Shader(_device, "build/2D_vert.spv");
+  auto shader_fragment2D = Shader(_device, "build/2D_frag.spv");
+  _2D_pipeline = PipelineBuilder()
+                 .clear()
+                 .set_shaders(shader_vertex2D.shader, shader_fragment2D.shader)
+                 .set_cull_mode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE)
+                 .set_color_attachment_format(_image.format)
+                 .build(_device, _2D_pipeline_layout);
 
+  // set destructors
   _destructors.push([this]
   { 
-    vkDestroyPipeline(_device, _graphics_pipeline, nullptr);
-    vkDestroyPipelineLayout(_device, _graphics_pipeline_layout, nullptr);
-    vkDestroyPipeline(_device, _mesh_pipeline, nullptr);
-    vkDestroyPipelineLayout(_device, _mesh_pipeline_layout, nullptr);
+    vkDestroyPipeline(_device, _2D_pipeline, nullptr);
+    vkDestroyPipelineLayout(_device, _2D_pipeline_layout, nullptr);
   });
 }
 
@@ -637,12 +562,6 @@ void GraphicsEngine::create_frame_resources()
       vkDestroySemaphore(_device, frame.render_finished_sem, nullptr);
     }
   });
-}
-
-void GraphicsEngine::upload_data()
-{
-  _mesh_buffer = create_mesh_buffer(Vertices, Indices);
-  _destructors.push([&] { _mesh_buffer.destroy(_vma_allocator); });
 }
 
 void GraphicsEngine::resize_swapchain()

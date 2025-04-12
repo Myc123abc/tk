@@ -14,14 +14,11 @@
 #include "FrameResource.hpp"
 #include "DestructorStack.hpp"
 #include "Image.hpp"
-#include "Buffer.hpp"
-#include "gltf.hpp"
 
 #include <vk_mem_alloc.h>
 #include <SDL3/SDL_events.h>
 
 #include <vector>
-#include <span>
 
 namespace tk { namespace graphics_engine {
 
@@ -46,17 +43,10 @@ namespace tk { namespace graphics_engine {
     // also with keyboard_process
     void update();
     void draw();
-    void keyboard_process(SDL_KeyboardEvent const& key);
     void resize_swapchain();
 
-    // HACK: 32bit indices? not 16bit?
-    auto create_mesh_buffer(std::span<Vertex> vertices, std::span<uint32_t> indices) -> MeshBuffer;
-
   private:
-    void draw_background(VkCommandBuffer cmd);
-    void draw_geometry(VkCommandBuffer cmd);
-
-    uint32_t _pipeline_index = 0;
+    void draw(VkCommandBuffer cmd);
 
   private:
     //
@@ -79,8 +69,6 @@ namespace tk { namespace graphics_engine {
     void create_sync_objects();
     void create_frame_resources();
 
-    void upload_data();
-
     //
     // util 
     //
@@ -93,13 +81,9 @@ namespace tk { namespace graphics_engine {
                        uint32_t size, VkBufferUsageFlags usage,
                        void const* data = nullptr);
 
-    auto create_buffer(uint32_t size, VkBufferUsageFlags usage, VmaAllocationCreateFlags flag = 0) -> Buffer;
-
     static void transition_image_layout(VkCommandBuffer cmd, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout);
     static auto get_image_subresource_range(VkImageAspectFlags aspect) -> VkImageSubresourceRange;
     static void copy_image(VkCommandBuffer cmd, VkImage src, VkImage dst, VkExtent2D src_extent, VkExtent2D dst_extent);
-
-    void load_gltf();
 
   private:
     //
@@ -124,13 +108,8 @@ namespace tk { namespace graphics_engine {
     Image                        _depth_image              = {};
     VkExtent2D                   _draw_extent              = {};
 
-    std::vector<VkPipeline>      _compute_pipeline;
-    std::vector<VkPipelineLayout>_compute_pipeline_layout;
-    VkPipeline                   _graphics_pipeline        = VK_NULL_HANDLE;
-    VkPipelineLayout             _graphics_pipeline_layout = VK_NULL_HANDLE;
-    VkPipeline                   _mesh_pipeline            = VK_NULL_HANDLE;
-    VkPipelineLayout             _mesh_pipeline_layout     = VK_NULL_HANDLE;
-    MeshBuffer                   _mesh_buffer;
+    VkPipeline                   _2D_pipeline              = VK_NULL_HANDLE;
+    VkPipelineLayout             _2D_pipeline_layout       = VK_NULL_HANDLE;
 
     VkCommandPool                _command_pool             = VK_NULL_HANDLE;
 
@@ -146,10 +125,6 @@ namespace tk { namespace graphics_engine {
     VkDescriptorPool             _descriptor_pool          = VK_NULL_HANDLE;
     VkDescriptorSetLayout        _descriptor_set_layout    = VK_NULL_HANDLE;
     VkDescriptorSet              _descriptor_set           = VK_NULL_HANDLE;
-
-    // mesh
-    std::vector<std::shared_ptr<MeshAsset>> _meshs;
-    int x = 0, y = 0, z = 0;
   };
 
 } }
