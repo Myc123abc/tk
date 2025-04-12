@@ -1,0 +1,108 @@
+#include "MemoryAllocator.hpp"
+#include "ErrorHandling.hpp"
+#include "Shape.hpp"
+#include "CommandPool.hpp"
+
+namespace tk { namespace graphics_engine {
+
+void MemoryAllocator::init(VkPhysicalDevice physical_device, VkDevice device, VkInstance instance, uint32_t vulkan_version)
+{
+  _device = device;
+  VmaAllocatorCreateInfo alloc_info
+  {
+    .flags            = VMA_ALLOCATOR_CREATE_EXTERNALLY_SYNCHRONIZED_BIT |
+                        VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
+    .physicalDevice   = physical_device,
+    .device           = device,
+    .instance         = instance,
+    .vulkanApiVersion = vulkan_version,
+  };
+  throw_if(vmaCreateAllocator(&alloc_info, &_allocator) != VK_SUCCESS,
+           "failed to create Vulkan Memory Allocator");
+}
+
+void MemoryAllocator::destroy()
+{
+  if (_allocator != VK_NULL_HANDLE)
+    vmaDestroyAllocator(_allocator);
+  _device    = VK_NULL_HANDLE;
+  _allocator = VK_NULL_HANDLE;
+}
+
+auto MemoryAllocator::create_buffer(uint32_t size, VkBufferUsageFlags usages, VmaAllocationCreateFlags flags) -> Buffer
+{
+  Buffer buffer;
+  VkBufferCreateInfo buf_info
+  {
+    .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+    .size  = size,
+    .usage = usages,
+  };
+  VmaAllocationCreateInfo alloc_info
+  {
+    .flags = flags,
+    .usage = VMA_MEMORY_USAGE_AUTO,
+  };
+  throw_if(vmaCreateBuffer(_allocator, &buf_info, &alloc_info, &buffer.handle, &buffer.allocation, nullptr) != VK_SUCCESS,
+           "failed to create buffer");
+  return buffer;
+}
+
+void MemoryAllocator::destroy_buffer(Buffer& buffer)
+{
+  if (buffer.handle != VK_NULL_HANDLE && buffer.allocation != VK_NULL_HANDLE)
+    vmaDestroyBuffer(_allocator, buffer.handle, buffer.allocation);
+  buffer = {};
+}
+
+auto MemoryAllocator::create_mesh_buffer(Command& command, Mesh const& mesh, DestructorStack& destructor) -> MeshBuffer
+{
+  MeshBuffer buffer;
+
+  // create mesh buffer 
+  uint32_t vertices_size = sizeof(Vertex)  * mesh.vertices.size();
+  uint32_t indices_size  = sizeof(uint8_t) * mesh.indices.size();
+  buffer.vertices = create_buffer(vertices_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT        |
+                                                 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+                                                 VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+  buffer.indices  = create_buffer(indices_size,  VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                                                 VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+  // get address
+  VkBufferDeviceAddressInfo info
+  {
+    .sType  = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+    .buffer = buffer.vertices.handle,
+  };
+  buffer.address = vkGetBufferDeviceAddress(_device, &info);
+    
+  // create stage buffer
+  auto stage = create_buffer(vertices_size + indices_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+  // copy mesh data to stage buffer
+  throw_if(vmaCopyMemoryToAllocation(_allocator, mesh.vertices.data(), stage.allocation, 0, vertices_size) != VK_SUCCESS,
+           "failed to copy vertices data to stage buffer");
+  throw_if(vmaCopyMemoryToAllocation(_allocator, mesh.indices.data(), stage.allocation, vertices_size, indices_size) != VK_SUCCESS,
+           "failed to copy indices data to stage buffer");
+
+  // transform data from stage to mesh buffer
+  VkBufferCopy copy
+  {
+    .size = vertices_size,
+  };
+  vkCmdCopyBuffer(command, stage.handle, buffer.vertices.handle, 1, &copy);
+  copy.size      = indices_size;
+  copy.srcOffset = vertices_size;
+  vkCmdCopyBuffer(command, stage.handle, buffer.indices.handle, 1, &copy);
+
+  destructor.push([stage, this] mutable { destroy_buffer(stage); });
+
+  return buffer;
+}
+
+void MemoryAllocator::destroy_mesh_buffer(MeshBuffer& buffer)
+{
+  destroy_buffer(buffer.vertices);
+  destroy_buffer(buffer.indices);
+  buffer = {};
+}
+
+}}

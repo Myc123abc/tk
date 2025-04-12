@@ -25,14 +25,16 @@ GraphicsEngine::GraphicsEngine(Window const& window)
   create_surface();
   select_physical_device();
   create_device_and_get_queues();
-  create_vma_allocator();
+  init_memory_allocator();
   create_swapchain_and_rendering_image();
   create_descriptor_set_layout();
   create_graphics_pipeline();
-  create_command_pool();
+  init_command_pool();
   create_descriptor_pool();
   create_descriptor_sets();
   create_frame_resources();
+
+  tranform_mesh_data();
 }
 
 GraphicsEngine::~GraphicsEngine()
@@ -163,9 +165,15 @@ void GraphicsEngine::create_device_and_get_queues()
     });
 
   // features
+  VkPhysicalDeviceIndexTypeUint8Features index8bit_feature
+  {
+    .sType          = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INDEX_TYPE_UINT8_FEATURES,
+    .indexTypeUint8 = true,
+  };
   VkPhysicalDeviceVulkan13Features features13
   { 
     .sType               = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+    .pNext               = &index8bit_feature,
     .synchronization2    = true,
     .dynamicRendering    = true,
   };
@@ -209,21 +217,10 @@ void GraphicsEngine::create_device_and_get_queues()
   vkGetDeviceQueue(_device, queue_families.present_family.value(), 0, &_present_queue);
 }
     
-void GraphicsEngine::create_vma_allocator()
+void GraphicsEngine::init_memory_allocator()
 {
-  VmaAllocatorCreateInfo alloc_info
-  {
-    .flags            = VMA_ALLOCATOR_CREATE_EXTERNALLY_SYNCHRONIZED_BIT |
-                        VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
-    .physicalDevice   = _physical_device,
-    .device           = _device,
-    .instance         = _instance,
-    .vulkanApiVersion = Vulkan_Version,
-  };
-  throw_if(vmaCreateAllocator(&alloc_info, &_vma_allocator) != VK_SUCCESS,
-           "failed to create Vulkan Memory Allocator");
-
-  _destructors.push([this] { vmaDestroyAllocator(_vma_allocator); });
+  _mem_alloc.init(_physical_device, _device, _instance, Vulkan_Version);
+  _destructors.push([this] { _mem_alloc.destroy(); });
 }
 
 void GraphicsEngine::create_swapchain_and_rendering_image()
@@ -272,7 +269,7 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
     .usage         = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
     .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
   };
-  throw_if(vmaCreateImage(_vma_allocator, &image_info, &alloc_info, &_image.image, &_image.allocation, nullptr) != VK_SUCCESS,
+  throw_if(vmaCreateImage(_mem_alloc.get(), &image_info, &alloc_info, &_image.image, &_image.allocation, nullptr) != VK_SUCCESS,
            "failed to create image");
 
   VkImageViewCreateInfo image_view_info
@@ -306,7 +303,7 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
     .tiling      = VK_IMAGE_TILING_OPTIMAL,
     .usage       = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
   };
-  throw_if(vmaCreateImage(_vma_allocator, &depth_info, &alloc_info, &_depth_image.image, &_depth_image.allocation, nullptr) != VK_SUCCESS,
+  throw_if(vmaCreateImage(_mem_alloc.get(), &depth_info, &alloc_info, &_depth_image.image, &_depth_image.allocation, nullptr) != VK_SUCCESS,
            "failed to create depth image");
   VkImageViewCreateInfo depth_view_info
   {
@@ -327,9 +324,9 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
   _destructors.push([this]
   {
     vkDestroyImageView(_device, _depth_image.view, nullptr);
-    vmaDestroyImage(_vma_allocator, _depth_image.image, _depth_image.allocation);
+    vmaDestroyImage(_mem_alloc.get(), _depth_image.image, _depth_image.allocation);
     vkDestroyImageView(_device, _image.view, nullptr);
-    vmaDestroyImage(_vma_allocator, _image.image, _image.allocation);
+    vmaDestroyImage(_mem_alloc.get(), _image.image, _image.allocation);
     vkDestroySwapchainKHR(_device, _swapchain, nullptr);
   });
 }
@@ -421,7 +418,7 @@ void GraphicsEngine::create_graphics_pipeline()
   VkPushConstantRange push_constant_range 
   {
     .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-    .size       = sizeof(TransformMatrixs),
+    .size       = sizeof(ShapeInfo),
   };
   VkPipelineLayoutCreateInfo layout_info
   {
@@ -450,20 +447,12 @@ void GraphicsEngine::create_graphics_pipeline()
   });
 }
 
-void GraphicsEngine::create_command_pool()
+void GraphicsEngine::init_command_pool()
 {
   // create command pool
   auto queue_families = get_queue_family_indices(_physical_device, _surface);
-  VkCommandPoolCreateInfo command_pool_info
-  {
-    .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-    .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-    .queueFamilyIndex = queue_families.graphics_family.value(),
-  };
-  throw_if(vkCreateCommandPool(_device, &command_pool_info, nullptr, &_command_pool) != VK_SUCCESS,
-           "failed to create command pool");
-
-  _destructors.push([this] { vkDestroyCommandPool(_device, _command_pool, nullptr); });
+  _command_pool.init(_device, queue_families.graphics_family.value());
+  _destructors.push([this] { _command_pool.destroy(); });
 }
 
 void GraphicsEngine::create_descriptor_pool()
@@ -524,16 +513,7 @@ void GraphicsEngine::create_frame_resources()
   _frames.resize(Max_Frame_Number);
 
   // create command buffers
-  auto cmd_bufs = std::vector<VkCommandBuffer>(_frames.size());
-  VkCommandBufferAllocateInfo command_buffer_info
-  {
-    .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-    .commandPool        = _command_pool,
-    .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-    .commandBufferCount = (uint32_t)_frames.size(),
-  };
-  throw_if(vkAllocateCommandBuffers(_device, &command_buffer_info, cmd_bufs.data()) != VK_SUCCESS,
-           "failed to create command buffers");
+  auto cmd_bufs = _command_pool.create_commands(Max_Frame_Number);
   for (uint32_t i = 0; i < _frames.size(); ++i)
     _frames[i].command_buffer = cmd_bufs[i];
 
@@ -570,6 +550,17 @@ void GraphicsEngine::resize_swapchain()
   auto old_swapchain = _swapchain;
   create_swapchain(old_swapchain);
   vkDestroySwapchainKHR(_device, old_swapchain, nullptr);
+}
+
+void GraphicsEngine::tranform_mesh_data()
+{
+  DestructorStack destructor;
+  auto mesh    = create_quard(0.5f, 0.5f, Color::Red);
+  auto cmd     = _command_pool.create_command().begin();
+  _mesh_buffer = _mem_alloc.create_mesh_buffer(cmd, mesh, destructor);
+  cmd.end().submit_wait_free(_command_pool, _graphics_queue);
+  destructor.clear();
+  _destructors.push([&] { _mem_alloc.destroy_mesh_buffer(_mesh_buffer); });
 }
 
 } }

@@ -14,6 +14,8 @@
 #include "FrameResource.hpp"
 #include "DestructorStack.hpp"
 #include "Image.hpp"
+#include "MemoryAllocator.hpp"
+#include "CommandPool.hpp"
 
 #include <vk_mem_alloc.h>
 #include <SDL3/SDL_events.h>
@@ -57,17 +59,19 @@ namespace tk { namespace graphics_engine {
     void create_surface();
     void select_physical_device();
     void create_device_and_get_queues();
-    void create_vma_allocator();
+    void init_memory_allocator();
     void create_swapchain_and_rendering_image();
     void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE);
     void create_descriptor_set_layout();
     void create_compute_pipeline();
     void create_graphics_pipeline();
-    void create_command_pool();
+    void init_command_pool();
     void create_descriptor_pool();
     void create_descriptor_sets();
     void create_sync_objects();
     void create_frame_resources();
+
+    void tranform_mesh_data();
 
     //
     // util 
@@ -96,9 +100,11 @@ namespace tk { namespace graphics_engine {
     VkSurfaceKHR                 _surface                  = VK_NULL_HANDLE;
     VkPhysicalDevice             _physical_device          = VK_NULL_HANDLE;
     VkDevice                     _device                   = VK_NULL_HANDLE;
-    VmaAllocator                 _vma_allocator            = VK_NULL_HANDLE;
     VkQueue                      _graphics_queue           = VK_NULL_HANDLE;
     VkQueue                      _present_queue            = VK_NULL_HANDLE;
+
+    MemoryAllocator              _mem_alloc;
+    MeshBuffer                   _mesh_buffer;
 
     // use dynamic rendering
     VkSwapchainKHR               _swapchain                = VK_NULL_HANDLE;
@@ -111,7 +117,7 @@ namespace tk { namespace graphics_engine {
     VkPipeline                   _2D_pipeline              = VK_NULL_HANDLE;
     VkPipelineLayout             _2D_pipeline_layout       = VK_NULL_HANDLE;
 
-    VkCommandPool                _command_pool             = VK_NULL_HANDLE;
+    CommandPool                  _command_pool;
 
     //
     // frame resources

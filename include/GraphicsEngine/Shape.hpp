@@ -15,9 +15,10 @@
 namespace tk { namespace graphics_engine {
 
   // only transform object from local to world
-  struct TransformMatrixs
+  struct ShapeInfo 
   {
-    glm::mat4 model;
+    glm::mat4       model;
+    VkDeviceAddress vertices = {};
   };
 
   // for easy, we only have 2D position and color
@@ -45,7 +46,7 @@ namespace tk { namespace graphics_engine {
     Blue,
   };
 
-  /*
+  /**
    * transform color to vec3 for generate vertex
    * @param color
    * @return vec3
@@ -66,22 +67,24 @@ namespace tk { namespace graphics_engine {
     }
   }
 
-  /*
+  /**
    * create a quard mesh
    * @param width
    * @param height
    * @param color
    * @return mesh
    */
-  inline Mesh create_quard(uint32_t width, uint32_t height, Color color)
+  inline Mesh create_quard(float width, float height, Color color)
   {
+    auto w = width  / 2;
+    auto h = height / 2;
     return Mesh
     { 
       {
-        { { -1.f, -1.f }, to_vec3(color) },
-        { {  1.f, -1.f }, to_vec3(color) },
-        { {  1.f,  1.f }, to_vec3(color) },
-        { { -1.f,  1.f }, to_vec3(color) },
+        { { -w, -h }, to_vec3(color) },
+        { {  w, -h }, to_vec3(color) },
+        { {  w,  h }, to_vec3(color) },
+        { { -w,  h }, to_vec3(color) },
       },
       {
         0, 1, 2,

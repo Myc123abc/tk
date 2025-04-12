@@ -196,12 +196,15 @@ void GraphicsEngine::draw(VkCommandBuffer cmd)
 
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _2D_pipeline);
 
-  // TransformMatrixs matrixs;
-  // matrixs.model = glm::mat4(1.f);
-  // vkCmdPushConstants(cmd, _2D_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(matrixs), &matrixs);
-  //
-  // vkCmdBindIndexBuffer(cmd, _mesh_buffer.indices.buffer, 0, VK_INDEX_TYPE_UINT8);
-  // vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
+  ShapeInfo info
+  {
+    .model    = glm::mat4(1.f),
+    .vertices = _mesh_buffer.address,
+  };
+  vkCmdPushConstants(cmd, _2D_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(info), &info);
+
+  vkCmdBindIndexBuffer(cmd, _mesh_buffer.indices.handle, 0, VK_INDEX_TYPE_UINT8);
+  vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
 
   render_end(cmd);
 }

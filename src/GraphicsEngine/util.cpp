@@ -9,44 +9,12 @@ namespace tk { namespace graphics_engine {
 
 auto GraphicsEngine::begin_single_time_commands() -> VkCommandBuffer
 {
-  VkCommandBuffer buffer;
-  VkCommandBufferAllocateInfo command_buffer_info
-  {
-    .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-    .commandPool        = _command_pool,
-    .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-    .commandBufferCount = 1,
-  };
-  throw_if(vkAllocateCommandBuffers(_device, &command_buffer_info, &buffer) != VK_SUCCESS,
-           "failed to create command buffers");
-
-  VkCommandBufferBeginInfo beg_info
-  {
-    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-    .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-  };
-  vkBeginCommandBuffer(buffer, &beg_info);
-
-  return buffer;
+  return _command_pool.create_command().begin();
 }
 
 void GraphicsEngine::end_single_time_commands(VkCommandBuffer command_buffer)
 {
-  vkEndCommandBuffer(command_buffer);
-
-  VkSubmitInfo info
-  {
-    .sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-    .commandBufferCount = 1,
-    .pCommandBuffers    = &command_buffer,
-  };
-
-  throw_if(vkQueueSubmit(_graphics_queue, 1, &info, VK_NULL_HANDLE) != VK_SUCCESS,
-           "failed to submit by queue");
-  throw_if(vkQueueWaitIdle(_graphics_queue) != VK_SUCCESS,
-           "failed to wait queue");
-
-  vkFreeCommandBuffers(_device, _command_pool, 1, &command_buffer);
+  Command(command_buffer).end().submit_wait_free(_command_pool, _graphics_queue);
 }
 
 void GraphicsEngine::copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size) 
@@ -85,31 +53,31 @@ void GraphicsEngine::create_buffer(VkBuffer& buffer, VmaAllocation& allocation, 
   {
     buffer_create_info.usage = usage;
     alloc_create_info.flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
-    throw_if(vmaCreateBuffer(_vma_allocator, &buffer_create_info, &alloc_create_info, &buffer, &allocation, nullptr) != VK_SUCCESS,
+    throw_if(vmaCreateBuffer(_mem_alloc.get(), &buffer_create_info, &alloc_create_info, &buffer, &allocation, nullptr) != VK_SUCCESS,
              "failed to create buffer");
     return;
   }
 
   VkBuffer          stage_buffer;
   VmaAllocation     alloc;
-  throw_if(vmaCreateBuffer(_vma_allocator, &buffer_create_info, &alloc_create_info, &stage_buffer, &alloc, nullptr) != VK_SUCCESS,
+  throw_if(vmaCreateBuffer(_mem_alloc.get(), &buffer_create_info, &alloc_create_info, &stage_buffer, &alloc, nullptr) != VK_SUCCESS,
            "failed to create buffer");
 
   // copy data to stage buffer
   throw_if(data == nullptr, "data pointer is nullptr");
-  throw_if(vmaCopyMemoryToAllocation(_vma_allocator, data, alloc, 0, size) != VK_SUCCESS,
+  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), data, alloc, 0, size) != VK_SUCCESS,
            "failed to copy data to stage buffer");
 
   // create vertex buffer
   buffer_create_info.usage = usage |
                              VK_BUFFER_USAGE_TRANSFER_DST_BIT;
   alloc_create_info.flags  = 0;
-  throw_if(vmaCreateBuffer(_vma_allocator, &buffer_create_info, &alloc_create_info, &buffer, &allocation, nullptr) != VK_SUCCESS,
+  throw_if(vmaCreateBuffer(_mem_alloc.get(), &buffer_create_info, &alloc_create_info, &buffer, &allocation, nullptr) != VK_SUCCESS,
            "failed to create buffer");
   // copy stage buffer data to vertex buffer
   copy_buffer(stage_buffer, buffer, size);
 
-  vmaDestroyBuffer(_vma_allocator, stage_buffer, alloc);
+  vmaDestroyBuffer(_mem_alloc.get(), stage_buffer, alloc);
   return;
 }
 
