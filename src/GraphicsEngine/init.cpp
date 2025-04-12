@@ -555,7 +555,7 @@ void GraphicsEngine::resize_swapchain()
 void GraphicsEngine::tranform_mesh_data()
 {
   DestructorStack destructor;
-  auto mesh    = create_quard(0.5f, 0.5f, Color::Red);
+  auto mesh    = create_quard(.5f, 0.5f, 1.f, 1.f, Color::Red);
   auto cmd     = _command_pool.create_command().begin();
   _mesh_buffer = _mem_alloc.create_mesh_buffer(cmd, mesh, destructor);
   cmd.end().submit_wait_free(_command_pool, _graphics_queue);

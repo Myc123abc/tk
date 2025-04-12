@@ -49,6 +49,7 @@ namespace tk { namespace graphics_engine {
 
   private:
     void draw(VkCommandBuffer cmd);
+    void draw_background(Command cmd);
 
   private:
     //

@@ -6,12 +6,30 @@
 #include <SDL3/SDL_events.h>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <chrono>
+
 namespace tk { namespace graphics_engine {
 
 VkClearColorValue Clear_Value;
 
 void GraphicsEngine::update()
 {
+  static auto start_time   = std::chrono::high_resolution_clock::now();
+  auto        current_time = std::chrono::high_resolution_clock::now();
+  float       time         = std::chrono::duration<float, std::chrono::seconds::period>(current_time - start_time).count();
+
+  // clear value
+  uint32_t circle = time / 3;
+  auto val = std::abs(std::sin(time / 3 * M_PI));
+  float r{}, g{}, b{};
+  auto mod = circle % 3;
+  if (mod == 0)
+    r = val;
+  else if (mod == 1)
+    g = val;
+  else
+    b = val;
+  Clear_Value = { { r, g, b, 1.f } };
 }
 
 // use independent image to draw, and copy it to swapchain image has may resons,
@@ -72,7 +90,11 @@ void GraphicsEngine::draw()
   //   render_end();    // submit commands to queue and end everything like command buffer, etc.
 
   // transition image layout to writeable
-  transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+
+  draw_background(frame.command_buffer);
+
+  transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   transition_image_layout(frame.command_buffer, _depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
   draw(frame.command_buffer);
@@ -141,6 +163,12 @@ void GraphicsEngine::draw()
 
   // update frame index
   _current_frame = ++_current_frame % Max_Frame_Number;
+}
+
+void GraphicsEngine::draw_background(Command cmd)
+{
+  auto clear_range = get_image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
+  vkCmdClearColorImage(cmd, _image.image, VK_IMAGE_LAYOUT_GENERAL, &Clear_Value, 1, &clear_range);
 }
 
 // HACK:

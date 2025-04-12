@@ -25,8 +25,8 @@ namespace tk { namespace graphics_engine {
   // maybe expand to texture in future
   struct Vertex
   {
-    glm::vec2 position;
-    glm::vec3 color;
+    alignas(16) glm::vec2 position;
+    alignas(16) glm::vec3 color;
   };
 
   // mesh have vertices and indices
@@ -69,22 +69,24 @@ namespace tk { namespace graphics_engine {
 
   /**
    * create a quard mesh
+   * @param x
+   * @param y
    * @param width
    * @param height
    * @param color
    * @return mesh
    */
-  inline Mesh create_quard(float width, float height, Color color)
+  inline Mesh create_quard(float x, float y, float width, float height, Color color)
   {
     auto w = width  / 2;
     auto h = height / 2;
     return Mesh
     { 
       {
-        { { -w, -h }, to_vec3(color) },
-        { {  w, -h }, to_vec3(color) },
-        { {  w,  h }, to_vec3(color) },
-        { { -w,  h }, to_vec3(color) },
+        { { x-w, y-h }, to_vec3(color) },
+        { { x+w, y-h }, to_vec3(color) },
+        { { x+w, y+h }, to_vec3(color) },
+        { { x-w, y+h }, to_vec3(color) },
       },
       {
         0, 1, 2,

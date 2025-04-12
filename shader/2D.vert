@@ -3,11 +3,13 @@
 
 struct Vertex
 {
-  vec2 position;
-  vec3 color;
+  vec2  position;
+  float pad0[2];
+  vec3  color;
+  float pad1;
 };
 
-layout (std430, buffer_reference) readonly buffer Vertices 
+layout (std430, buffer_reference, buffer_reference_align = 32) readonly buffer Vertices 
 {
   Vertex data[];
 };
