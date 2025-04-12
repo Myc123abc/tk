@@ -47,6 +47,7 @@ namespace tk { namespace graphics_engine {
     void update();
     void draw();
     void keyboard_process(SDL_KeyboardEvent const& key);
+    void resize_swapchain();
 
     // HACK: 32bit indices? not 16bit?
     auto create_mesh_buffer(std::span<Vertex> vertices, std::span<uint32_t> indices) -> MeshBuffer;
@@ -77,8 +78,6 @@ namespace tk { namespace graphics_engine {
     void create_descriptor_sets();
     void create_sync_objects();
     void create_frame_resources();
-
-    void resize_swapchain();
 
     void upload_data();
 

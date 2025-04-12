@@ -104,10 +104,7 @@ void GraphicsEngine::draw()
   uint32_t image_index;
   auto res = vkAcquireNextImageKHR(_device, _swapchain, UINT64_MAX, frame.image_available_sem, VK_NULL_HANDLE, &image_index);
   if (res == VK_ERROR_OUT_OF_DATE_KHR)
-  {
-    resize_swapchain();
     return;
-  }
   else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
     throw_if(true, "failed to acquire swapechain image");
 
@@ -201,9 +198,9 @@ void GraphicsEngine::draw()
     .pImageIndices      = &image_index,
   };
   res = vkQueuePresentKHR(_present_queue, &presentation_info); 
-  if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR)
-    resize_swapchain(); 
-  else if (res != VK_SUCCESS)
+  if (res != VK_SUCCESS               &&
+      res != VK_ERROR_OUT_OF_DATE_KHR &&
+      res != VK_SUBOPTIMAL_KHR)
     throw_if(true, "failed to present swapchain image");
 
   // update frame index

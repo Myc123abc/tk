@@ -72,6 +72,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     case SDL_EVENT_KEY_DOWN:
       ctx->engine->keyboard_process(event->key);
       break;
+    case SDL_EVENT_WINDOW_RESIZED:
+      ctx->engine->resize_swapchain();
+      break;
     }
   }
   catch (const std::exception& e)
