@@ -10,6 +10,7 @@
 
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
+#include <vector>
 
 namespace tk { namespace graphics_engine {
 
@@ -24,6 +25,13 @@ namespace tk { namespace graphics_engine {
     Buffer          vertices;
     Buffer          indices;
     VkDeviceAddress address = {};
+  };
+
+  struct MeshInfo
+  {
+    uint32_t vertices_offset;
+    uint32_t inidces_offset;
+    uint32_t indices_count;
   };
 
   class MemoryAllocator
@@ -46,7 +54,7 @@ namespace tk { namespace graphics_engine {
     auto create_buffer(uint32_t size, VkBufferUsageFlags usages, VmaAllocationCreateFlags flags = 0) -> Buffer;
     void destroy_buffer(Buffer& buffer);
 
-    auto create_mesh_buffer(class Command& command, class Mesh const& mesh, DestructorStack& destructor) -> MeshBuffer;
+    auto create_mesh_buffer(class Command& command, std::vector<class Mesh>& meshs, DestructorStack& destructor, std::vector<MeshInfo>& mesh_infos) -> MeshBuffer;
     void destroy_mesh_buffer(MeshBuffer& buffer);
 
   private:

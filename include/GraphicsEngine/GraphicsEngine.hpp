@@ -16,6 +16,7 @@
 #include "Image.hpp"
 #include "MemoryAllocator.hpp"
 #include "CommandPool.hpp"
+#include "Shape.hpp"
 
 #include <vk_mem_alloc.h>
 #include <SDL3/SDL_events.h>
@@ -23,6 +24,13 @@
 #include <vector>
 
 namespace tk { namespace graphics_engine {
+
+  struct ShapeInfo
+  {
+    PushConstant pc;
+    uint32_t     indices_offset;
+    uint32_t     indices_count;
+  };
 
   // TODO: graphics engine only initialize.
   // you need add vertices, indices, uniform, and shaders to run it.
@@ -97,6 +105,7 @@ namespace tk { namespace graphics_engine {
 
     MemoryAllocator              _mem_alloc;
     MeshBuffer                   _mesh_buffer;
+    std::vector<ShapeInfo>       _shapes;
 
     // use dynamic rendering
     VkSwapchainKHR               _swapchain                = VK_NULL_HANDLE;

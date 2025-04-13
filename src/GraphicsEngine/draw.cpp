@@ -224,15 +224,12 @@ void GraphicsEngine::draw(VkCommandBuffer cmd)
 
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _2D_pipeline);
 
-  ShapeInfo info
+  for (auto const& shape : _shapes)
   {
-    .model    = glm::mat4(1.f),
-    .vertices = _mesh_buffer.address,
-  };
-  vkCmdPushConstants(cmd, _2D_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(info), &info);
-
-  vkCmdBindIndexBuffer(cmd, _mesh_buffer.indices.handle, 0, VK_INDEX_TYPE_UINT8);
-  vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
+    vkCmdPushConstants(cmd, _2D_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(shape.pc), &shape.pc);
+    vkCmdBindIndexBuffer(cmd, _mesh_buffer.indices.handle, 0, VK_INDEX_TYPE_UINT8);
+    vkCmdDrawIndexed(cmd, shape.indices_count, 1, shape.indices_offset, 0, 0);
+  }
 
   render_end(cmd);
 }

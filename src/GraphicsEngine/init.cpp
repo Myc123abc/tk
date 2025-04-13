@@ -554,13 +554,38 @@ void GraphicsEngine::resize_swapchain()
 
 void GraphicsEngine::tranform_mesh_data()
 {
-  DestructorStack destructor;
-  auto mesh    = create_quard(.5f, 0.5f, 1.f, 1.f, Color::Red);
+  auto meshs      = std::vector<Mesh>();
+  auto mesh_infos = std::vector<MeshInfo>();
+  auto destructor = DestructorStack();
+
+  // generate meshs 
+  meshs.emplace_back(create_quard(-.5f, -.5f, 1.f, 1.f, Color::Red));
+  meshs.emplace_back(create_quard(.5f, 0.5f, 1.f, 1.f, Color::Blue));
+
+  // create mush buffer and get mesh infos
   auto cmd     = _command_pool.create_command().begin();
-  _mesh_buffer = _mem_alloc.create_mesh_buffer(cmd, mesh, destructor);
+  _mesh_buffer = _mem_alloc.create_mesh_buffer(cmd, meshs, destructor, mesh_infos);
   cmd.end().submit_wait_free(_command_pool, _graphics_queue);
+
+  // destroy stage buffer
   destructor.clear();
+
+  // add mesh buffer destructor
   _destructors.push([&] { _mem_alloc.destroy_mesh_buffer(_mesh_buffer); });
+
+  // generate shape info from mesh info and mesh buffer
+  _shapes.reserve(meshs.size());
+  for (auto const& info : mesh_infos)
+    _shapes.emplace_back(ShapeInfo
+    {
+      .pc =
+      {
+        .model    = glm::mat4(1.f),
+        .vertices = _mesh_buffer.address + info.vertices_offset,
+      },
+      .indices_offset = info.inidces_offset, 
+      .indices_count  = info.indices_count,
+    });
 }
 
 } }

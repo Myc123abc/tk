@@ -15,7 +15,7 @@
 namespace tk { namespace graphics_engine {
 
   // only transform object from local to world
-  struct ShapeInfo 
+  struct PushConstant 
   {
     glm::mat4       model;
     VkDeviceAddress vertices = {};
