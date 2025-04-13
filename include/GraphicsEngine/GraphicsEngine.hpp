@@ -77,15 +77,6 @@ namespace tk { namespace graphics_engine {
     //
     // util 
     //
-    // HACK: repeat single command, performance bad
-    auto begin_single_time_commands() -> VkCommandBuffer;
-    void end_single_time_commands(VkCommandBuffer command_buffer);
-    void copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size);
-    // HACK: suballoc and single buffer
-    void create_buffer(VkBuffer& buffer, VmaAllocation& allocation, 
-                       uint32_t size, VkBufferUsageFlags usage,
-                       void const* data = nullptr);
-
     static void transition_image_layout(VkCommandBuffer cmd, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout);
     static auto get_image_subresource_range(VkImageAspectFlags aspect) -> VkImageSubresourceRange;
     static void copy_image(VkCommandBuffer cmd, VkImage src, VkImage dst, VkExtent2D src_extent, VkExtent2D dst_extent);
