@@ -24,7 +24,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
   try
   {
     ctx = new AppContext();
-    ctx->window = std::make_unique<Window>(540, 540, "Breakout");
+    ctx->window = std::make_unique<Window>(1000, 1000, "Breakout");
     ctx->engine = std::make_unique<GraphicsEngine>(*ctx->window.get());
   }
   catch (const std::exception& e)

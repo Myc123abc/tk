@@ -38,12 +38,12 @@ namespace tk { namespace graphics_engine {
     std::vector<uint8_t> indices;
   };
 
-  // simple color
   enum class Color
   {
     Red,
     Green,
     Blue,
+    OneDark,
   };
 
   /**
@@ -62,31 +62,27 @@ namespace tk { namespace graphics_engine {
       return { 0.f, 1.f, 0.f };
     case Color::Blue:
       return { 0.f, 0.f, 1.f };
+    case Color::OneDark:
+      return { (float)40/255, (float)44/255, (float)52/255,};
     default:
       throw_if(true, "unsupported color");
     }
   }
 
   /**
-   * create a quard mesh
-   * @param x
-   * @param y
-   * @param width
-   * @param height
+   * create a standard quard mesh which width and height is 2 and position in center
    * @param color
    * @return mesh
    */
-  inline Mesh create_quard(float x, float y, float width, float height, Color color)
+  inline Mesh create_quard(Color color)
   {
-    auto w = width  / 2;
-    auto h = height / 2;
     return Mesh
     { 
       {
-        { { x-w, y-h }, to_vec3(color) },
-        { { x+w, y-h }, to_vec3(color) },
-        { { x+w, y+h }, to_vec3(color) },
-        { { x-w, y+h }, to_vec3(color) },
+        { { -1.f, -1.f }, to_vec3(color) },
+        { {  1.f, -1.f }, to_vec3(color) },
+        { {  1.f,  1.f }, to_vec3(color) },
+        { { -1.f,  1.f }, to_vec3(color) },
       },
       {
         0, 1, 2,
@@ -95,4 +91,4 @@ namespace tk { namespace graphics_engine {
     };
   };
 
-} }
+}}

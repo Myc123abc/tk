@@ -20,6 +20,9 @@ Window::Window(uint32_t width, uint32_t height, std::string_view title)
   _window = SDL_CreateWindow(title.data(), width, height, SDL_WINDOW_VULKAN    |
                                                           SDL_WINDOW_RESIZABLE);
   throw_if(!_window, "failed to create window!");
+
+  _width  = width;
+  _height = height;
 }
 
 Window::~Window()

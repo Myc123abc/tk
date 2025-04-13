@@ -10,26 +10,26 @@
 
 namespace tk { namespace graphics_engine {
 
-VkClearColorValue Clear_Value;
+// VkClearColorValue Clear_Value;
 
 void GraphicsEngine::update()
 {
-  static auto start_time   = std::chrono::high_resolution_clock::now();
-  auto        current_time = std::chrono::high_resolution_clock::now();
-  float       time         = std::chrono::duration<float, std::chrono::seconds::period>(current_time - start_time).count();
-
-  // clear value
-  uint32_t circle = time / 3;
-  auto val = std::abs(std::sin(time / 3 * M_PI));
-  float r{}, g{}, b{};
-  auto mod = circle % 3;
-  if (mod == 0)
-    r = val;
-  else if (mod == 1)
-    g = val;
-  else
-    b = val;
-  Clear_Value = { { r, g, b, 1.f } };
+  // static auto start_time   = std::chrono::high_resolution_clock::now();
+  // auto        current_time = std::chrono::high_resolution_clock::now();
+  // float       time         = std::chrono::duration<float, std::chrono::seconds::period>(current_time - start_time).count();
+  //
+  // // clear value
+  // uint32_t circle = time / 3;
+  // auto val = std::abs(std::sin(time / 3 * M_PI));
+  // float r{}, g{}, b{};
+  // auto mod = circle % 3;
+  // if (mod == 0)
+  //   r = val;
+  // else if (mod == 1)
+  //   g = val;
+  // else
+  //   b = val;
+  // Clear_Value = { { r, g, b, 1.f } };
 }
 
 // use independent image to draw, and copy it to swapchain image has may resons,
@@ -92,7 +92,7 @@ void GraphicsEngine::draw()
   // transition image layout to writeable
   transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
-  draw_background(frame.command_buffer);
+  // draw_background(frame.command_buffer);
 
   transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   transition_image_layout(frame.command_buffer, _depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
@@ -167,8 +167,8 @@ void GraphicsEngine::draw()
 
 void GraphicsEngine::draw_background(Command cmd)
 {
-  auto clear_range = get_image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
-  vkCmdClearColorImage(cmd, _image.image, VK_IMAGE_LAYOUT_GENERAL, &Clear_Value, 1, &clear_range);
+  // auto clear_range = get_image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
+  // vkCmdClearColorImage(cmd, _image.image, VK_IMAGE_LAYOUT_GENERAL, &Clear_Value, 1, &clear_range);
 }
 
 // HACK:
@@ -224,16 +224,43 @@ void GraphicsEngine::draw(VkCommandBuffer cmd)
 
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _2D_pipeline);
 
+#if 0
   PushConstant pc 
   {
     .model    = glm::mat4(1.f),
     .vertices = _mesh_buffer.address,
   };
+
   for (auto const& shape : _shapes)
   {
     vkCmdPushConstants(cmd, _2D_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pc), &pc);
+    // HACK: only now, I can only draw max 128 indices
+    // 1. in one address global indices, cpu memory less, but global indices u8 is less, cannot draw more shapes.
+    // 2. in more address local indices, cpu memory more, but locale indices u8 is enough to draw simple 2D shaoe
+    //    which indices less than 128, so it can draw more shapes.
+    // change: use 2. but not storage more address, storage address offset which is uint32_t type better than 64int_t's
+    // device address. And indices size can also be u8 in single shape indices is less 128 count.
+    // maybe for same shape, we can only have single indices
     vkCmdBindIndexBuffer(cmd, _mesh_buffer.indices.handle, 0, VK_INDEX_TYPE_UINT8);
     vkCmdDrawIndexed(cmd, shape.indices_count, 1, shape.indices_offset, 0, 0);
+  }
+#endif
+
+  auto canvas_shape_matrix_infos = _painter.get_canvas_shape_matrix_infos();
+  for (auto const& [canvas, matrix_infos] : canvas_shape_matrix_infos)
+  {
+    for (auto const& matrix_info : matrix_infos)
+    {
+      auto mesh_info = _shape_mesh_infos[matrix_info.type];
+      PushConstant pc
+      {
+        .model = matrix_info.matrix,
+        .vertices = _mesh_buffer.address + mesh_info.vertices_offset,
+      };
+      vkCmdPushConstants(cmd, _2D_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pc), &pc);
+      vkCmdBindIndexBuffer(cmd, _mesh_buffer.indices.handle, 0, VK_INDEX_TYPE_UINT8);
+      vkCmdDrawIndexed(cmd, mesh_info.indices_count, 1, mesh_info.indices_offset, 0, 0);
+    }
   }
 
   render_end(cmd);

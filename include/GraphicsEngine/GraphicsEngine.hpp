@@ -16,6 +16,7 @@
 #include "Image.hpp"
 #include "MemoryAllocator.hpp"
 #include "CommandPool.hpp"
+#include "Painter.hpp"
 
 #include <vk_mem_alloc.h>
 #include <SDL3/SDL_events.h>
@@ -24,6 +25,7 @@
 
 namespace tk { namespace graphics_engine {
 
+  // HACK: discard because of painter
   struct ShapeInfo
   {
     uint32_t     indices_offset;
@@ -56,6 +58,7 @@ namespace tk { namespace graphics_engine {
   private:
     void draw(VkCommandBuffer cmd);
     void draw_background(Command cmd);
+    void painter_to_draw();
 
   private:
     //
@@ -103,7 +106,11 @@ namespace tk { namespace graphics_engine {
 
     MemoryAllocator              _mem_alloc;
     MeshBuffer                   _mesh_buffer;
+    // HACK: discard because of painter
     std::vector<ShapeInfo>       _shapes;
+
+    Painter                       _painter; 
+    std::map<ShapeType, MeshInfo> _shape_mesh_infos;
 
     // use dynamic rendering
     VkSwapchainKHR               _swapchain                = VK_NULL_HANDLE;
