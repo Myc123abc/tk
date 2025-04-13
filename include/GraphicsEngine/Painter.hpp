@@ -4,10 +4,15 @@
 // a painter can draw on canvas.
 // you should create your canvas, then draw.
 //
+// HACK:
+// 1. use double key(type, color) to store meshs
+//    same shape type have multiple color, shape vertices will be repeately
+//    this is memory waste
+// 2. present with draw desquence, not have depth test
+//
+//
 // TODO:
-// 1. every draw need a canvas parameter for draw on multiple canvas
-//    or use bind, like painter.use_canvas(canvas0);
-// 2. can replace clear value to draw background, just draw a quard fullscreen
+// 1. only static draw, expand to dynamic
 //
 
 #pragma once
@@ -66,6 +71,7 @@ namespace tk { namespace graphics_engine {
     struct ShapeMatrixInfo
     {
       ShapeType type;
+      Color     color;
       glm::mat4 matrix;
     };
 
@@ -120,7 +126,7 @@ namespace tk { namespace graphics_engine {
     std::map<std::string, Canvas> _canvases;
     Canvas*                       _canvas = nullptr;
 
-    std::map<ShapeType, Mesh>     _shape_meshs;
+    std::map<ShapeType, std::map<Color, Mesh>>          _shape_meshs;
     std::map<std::string, std::vector<ShapeMatrixInfo>> _canvas_shape_matrix_infos;
   };
 

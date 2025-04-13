@@ -61,7 +61,7 @@ auto MemoryAllocator::create_mesh_buffer(Command& command, std::vector<Mesh>& me
 
   // get mesh infos
   mesh_infos.reserve(meshs.size());
-  uint32_t prev_vertices_byte_size = 0, prev_indices_byte_size = 0;
+  uint32_t vertices_offset = 0, indices_offset = 0;
   auto vertices      = std::vector<Vertex>();
   auto indices       = std::vector<uint8_t>();
   for (auto const& mesh : meshs)
@@ -70,12 +70,12 @@ auto MemoryAllocator::create_mesh_buffer(Command& command, std::vector<Mesh>& me
     uint32_t indices_byte_size  = sizeof(uint8_t) * mesh.indices.size();
     mesh_infos.emplace_back(MeshInfo
     {
-      .vertices_offset = prev_vertices_byte_size,
-      .indices_offset  = prev_indices_byte_size,
+      .vertices_offset = vertices_offset,
+      .indices_offset  = indices_offset,
       .indices_count   = (uint32_t)mesh.indices.size(),
     });
-    prev_vertices_byte_size = vertices_byte_size;
-    prev_indices_byte_size  = indices_byte_size;
+    vertices_offset += vertices_byte_size;
+    indices_offset  += indices_byte_size;
     vertices.append_range(mesh.vertices);
     indices.append_range(mesh.indices);
   }

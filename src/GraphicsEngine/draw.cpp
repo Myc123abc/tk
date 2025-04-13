@@ -251,7 +251,7 @@ void GraphicsEngine::draw(VkCommandBuffer cmd)
   {
     for (auto const& matrix_info : matrix_infos)
     {
-      auto mesh_info = _shape_mesh_infos[matrix_info.type];
+      auto mesh_info = _shape_mesh_infos[matrix_info.type][matrix_info.color];
       PushConstant pc
       {
         .model = matrix_info.matrix,
@@ -270,16 +270,18 @@ void GraphicsEngine::painter_to_draw()
 {
   _painter
     // draw background
-    // .create_canvas("background", _window.width(), _window.height())
-    // .use_canvas("background")
-    // .draw_quard(_window.width()/2, _window.height()/2, _window.width(), _window.height(), Color::OneDark)
-    // .present("background", _window, 0, 0);
+    .create_canvas("background")
+    .use_canvas("background")
+    .draw_quard(_window.width()/2, _window.height()/2, _window.width(), _window.height(), Color::OneDark)
+    .present("background", _window, 0, 0)
     // draw shapes
     .create_canvas("shapes")
     .use_canvas("shapes")
-    .draw_quard(125, 125, 250, 250, Color::Green)
+    .draw_quard(125, 125, 250, 250, Color::Red)
+    .draw_quard(375, 125, 250, 250, Color::Green)
     .draw_quard(375, 375, 250, 250, Color::Blue)
-    .present("shapes", _window, 500, 500);
+    .draw_quard(125, 375, 250, 250, Color::Yellow)
+    .present("shapes", _window, 250, 250);
 
   // get shape meshs
   auto shape_meshs = _painter.get_shape_meshs();
@@ -287,8 +289,9 @@ void GraphicsEngine::painter_to_draw()
   auto mesh_infos  = std::vector<MeshInfo>();
   auto destructor  = DestructorStack();
   meshs.reserve(shape_meshs.size());
-  for (auto& [type, mesh] : shape_meshs)
-    meshs.emplace_back(mesh);
+  for (auto& [type, color_mesh] : shape_meshs)
+    for (auto& [color, mesh] : color_mesh)
+      meshs.emplace_back(mesh);
 
   // create mesh buffer
   auto cmd     = _command_pool.create_command().begin();
@@ -303,10 +306,13 @@ void GraphicsEngine::painter_to_draw()
 
   // get mesh info with shape type
   uint32_t i = 0;
-  for (auto& [type, mesh] : shape_meshs)
+  for (auto& [type, color_mesh] : shape_meshs)
   {
-    _shape_mesh_infos.emplace(type, mesh_infos[i]) ;
-    ++i;
+    for (auto& [color, mesh] : color_mesh)
+    {
+      _shape_mesh_infos[type][color] = mesh_infos[i];
+      ++i;
+    }
   }
 }
     

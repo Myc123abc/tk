@@ -109,8 +109,8 @@ namespace tk { namespace graphics_engine {
     // HACK: discard because of painter
     std::vector<ShapeInfo>       _shapes;
 
-    Painter                       _painter; 
-    std::map<ShapeType, MeshInfo> _shape_mesh_infos;
+    Painter                                        _painter; 
+    std::map<ShapeType, std::map<Color, MeshInfo>> _shape_mesh_infos;
 
     // use dynamic rendering
     VkSwapchainKHR               _swapchain                = VK_NULL_HANDLE;

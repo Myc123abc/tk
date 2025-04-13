@@ -43,6 +43,7 @@ namespace tk { namespace graphics_engine {
     Red,
     Green,
     Blue,
+    Yellow,
     OneDark,
   };
 
@@ -62,6 +63,8 @@ namespace tk { namespace graphics_engine {
       return { 0.f, 1.f, 0.f };
     case Color::Blue:
       return { 0.f, 0.f, 1.f };
+    case Color::Yellow:
+      return { 1.f, 1.f, 0.f };
     case Color::OneDark:
       return { (float)40/255, (float)44/255, (float)52/255,};
     default:

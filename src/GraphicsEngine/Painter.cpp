@@ -52,10 +52,9 @@ auto Painter::present(std::string_view canvas_name, Window const& window, uint32
     switch (info->type) 
     {
     case ShapeType::Quard:
-      // FIX: same shape type different color
-      //      position and color should seperate
-      _shape_meshs.try_emplace(info->type, create_quard(info->color));
-      shape_matrixs.emplace_back(info->type, get_quard_matrix(dynamic_cast<QuardInfo const&>(*info), window, x, y));
+      if (!_shape_meshs.contains(info->type) || !_shape_meshs[info->type].contains(info->color))
+        _shape_meshs[info->type][info->color] = create_quard(info->color);
+      shape_matrixs.emplace_back(info->type, info->color, get_quard_matrix(dynamic_cast<QuardInfo const&>(*info), window, x, y));
       break;
     }
   }
