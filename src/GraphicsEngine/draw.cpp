@@ -275,11 +275,11 @@ void GraphicsEngine::painter_to_draw()
     // .draw_quard(_window.width()/2, _window.height()/2, _window.width(), _window.height(), Color::OneDark)
     // .present("background", _window, 0, 0);
     // draw shapes
-    .create_canvas("shapes", 1000, 1000)
+    .create_canvas("shapes")
     .use_canvas("shapes")
-    .draw_quard(250, 250, 500, 500, Color::Green)
-    .draw_quard(750, 750, 500, 500, Color::Blue)
-    .present("shapes", _window, 0, 0);
+    .draw_quard(125, 125, 250, 250, Color::Green)
+    .draw_quard(375, 375, 250, 250, Color::Blue)
+    .present("shapes", _window, 500, 500);
 
   // get shape meshs
   auto shape_meshs = _painter.get_shape_meshs();

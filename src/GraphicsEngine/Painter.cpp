@@ -8,10 +8,10 @@
 
 namespace tk { namespace graphics_engine {
 
-auto Painter::create_canvas(std::string_view name, uint32_t width, uint32_t height) -> Painter&
+auto Painter::create_canvas(std::string_view name) -> Painter&
 {
   throw_if(_canvases.contains(name.data()), "canvas {} is existed", name);
-  _canvases[name.data()] = { width, height };
+  _canvases.emplace(name, Canvas());
   return *this;
 }
 
@@ -55,7 +55,7 @@ auto Painter::present(std::string_view canvas_name, Window const& window, uint32
       // FIX: same shape type different color
       //      position and color should seperate
       _shape_meshs.try_emplace(info->type, create_quard(info->color));
-      shape_matrixs.emplace_back(info->type, get_quard_matrix(*_canvas, dynamic_cast<QuardInfo const&>(*info), window, x, y));
+      shape_matrixs.emplace_back(info->type, get_quard_matrix(dynamic_cast<QuardInfo const&>(*info), window, x, y));
       break;
     }
   }
@@ -65,10 +65,10 @@ auto Painter::present(std::string_view canvas_name, Window const& window, uint32
   return *this;
 }
 
-auto Painter::get_quard_matrix(Canvas const& canvas, QuardInfo const& info, Window const& window, uint32_t x, uint32_t y) -> glm::mat4
+auto Painter::get_quard_matrix(QuardInfo const& info, Window const& window, uint32_t x, uint32_t y) -> glm::mat4
 {
-  auto scale_x = ((float)info.width / canvas.width) * ((float)canvas.width / window.width());
-  auto scale_y = ((float)info.height / canvas.height) * ((float)canvas.height / window.height());
+  auto scale_x = (float)info.width / window.width();
+  auto scale_y = (float)info.height / window.height();
   auto translate_x = (info.x + x) / ((float)window.width() / 2) - 1.f;
   auto translate_y = (info.y + y) / ((float)window.height() / 2) - 1.f;
   auto model = glm::mat4(1.f);

@@ -54,8 +54,6 @@ namespace tk { namespace graphics_engine {
     // every canvas can put on every where on screen
     struct Canvas
     {
-      uint32_t width  = 0;
-      uint32_t height = 0;
       std::vector<std::unique_ptr<ShapeInfo>> shape_infos;
     };
 
@@ -74,12 +72,13 @@ namespace tk { namespace graphics_engine {
   public:
     /** 
      * create a canvas
+     * a canvas begin with top left corner which is (0, 0)
+     * and x point to right, y point to down
+     * will minus space is also valid
      * @param name name of canvas
-     * @param width width of canvas
-     * @param height height of canvas
      * @throw std::runtime_error the name of canvas is existed
      */
-    auto create_canvas(std::string_view name, uint32_t width, uint32_t height) -> Painter&;
+    auto create_canvas(std::string_view name) -> Painter&;
 
     /**
      * select use which one canvas
@@ -115,7 +114,7 @@ namespace tk { namespace graphics_engine {
     auto get_canvas_shape_matrix_infos() const noexcept { return _canvas_shape_matrix_infos; }
 
   private:
-    static auto get_quard_matrix(Canvas const& canvas, QuardInfo const& info, class Window const& window, uint32_t x, uint32_t y) -> glm::mat4;
+    static auto get_quard_matrix(QuardInfo const& info, class Window const& window, uint32_t x, uint32_t y) -> glm::mat4;
 
   private:
     std::map<std::string, Canvas> _canvases;
