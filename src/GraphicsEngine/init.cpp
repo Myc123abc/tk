@@ -418,7 +418,7 @@ void GraphicsEngine::create_graphics_pipeline()
   VkPushConstantRange push_constant_range 
   {
     .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-    .size       = sizeof(ShapeInfo),
+    .size       = sizeof(PushConstant),
   };
   VkPipelineLayoutCreateInfo layout_info
   {
@@ -578,11 +578,6 @@ void GraphicsEngine::tranform_mesh_data()
   for (auto const& info : mesh_infos)
     _shapes.emplace_back(ShapeInfo
     {
-      .pc =
-      {
-        .model    = glm::mat4(1.f),
-        .vertices = _mesh_buffer.address + info.vertices_offset,
-      },
       .indices_offset = info.inidces_offset, 
       .indices_count  = info.indices_count,
     });

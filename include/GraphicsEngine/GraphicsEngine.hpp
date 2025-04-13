@@ -16,7 +16,6 @@
 #include "Image.hpp"
 #include "MemoryAllocator.hpp"
 #include "CommandPool.hpp"
-#include "Shape.hpp"
 
 #include <vk_mem_alloc.h>
 #include <SDL3/SDL_events.h>
@@ -27,7 +26,6 @@ namespace tk { namespace graphics_engine {
 
   struct ShapeInfo
   {
-    PushConstant pc;
     uint32_t     indices_offset;
     uint32_t     indices_count;
   };

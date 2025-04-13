@@ -29,7 +29,6 @@ namespace tk { namespace graphics_engine {
 
   struct MeshInfo
   {
-    uint32_t vertices_offset;
     uint32_t inidces_offset;
     uint32_t indices_count;
   };
