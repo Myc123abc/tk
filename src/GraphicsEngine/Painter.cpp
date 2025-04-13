@@ -71,8 +71,9 @@ auto Painter::get_quard_matrix(Canvas const& canvas, QuardInfo const& info, Wind
   auto scale_y = ((float)info.height / canvas.height) * ((float)canvas.height / window.height());
   auto translate_x = (info.x + x) / ((float)window.width() / 2) - 1.f;
   auto translate_y = (info.y + y) / ((float)window.height() / 2) - 1.f;
-  auto model = glm::scale(glm::mat4(1.f), glm::vec3(scale_x, scale_y, 1.f));
+  auto model = glm::mat4(1.f);
   model = glm::translate(model, glm::vec3(translate_x, translate_y, 0.f));
+  model = glm::scale(model, glm::vec3(scale_x, scale_y, 1.f));
   return model;
 };
 

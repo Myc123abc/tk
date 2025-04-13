@@ -265,5 +265,49 @@ void GraphicsEngine::draw(VkCommandBuffer cmd)
 
   render_end(cmd);
 }
+
+void GraphicsEngine::painter_to_draw()
+{
+  _painter
+    // draw background
+    // .create_canvas("background", _window.width(), _window.height())
+    // .use_canvas("background")
+    // .draw_quard(_window.width()/2, _window.height()/2, _window.width(), _window.height(), Color::OneDark)
+    // .present("background", _window, 0, 0);
+    // draw shapes
+    .create_canvas("shapes", 1000, 1000)
+    .use_canvas("shapes")
+    .draw_quard(250, 250, 500, 500, Color::Green)
+    .draw_quard(750, 750, 500, 500, Color::Blue)
+    .present("shapes", _window, 0, 0);
+
+  // get shape meshs
+  auto shape_meshs = _painter.get_shape_meshs();
+  auto meshs       = std::vector<Mesh>();
+  auto mesh_infos  = std::vector<MeshInfo>();
+  auto destructor  = DestructorStack();
+  meshs.reserve(shape_meshs.size());
+  for (auto& [type, mesh] : shape_meshs)
+    meshs.emplace_back(mesh);
+
+  // create mesh buffer
+  auto cmd     = _command_pool.create_command().begin();
+  _mesh_buffer = _mem_alloc.create_mesh_buffer(cmd, meshs, destructor, mesh_infos);
+  cmd.end().submit_wait_free(_command_pool, _graphics_queue);
+
+  // destroy stage buffer
+  destructor.clear();
+
+  // add mesh buffer destructor
+  _destructors.push([&] { _mem_alloc.destroy_mesh_buffer(_mesh_buffer); });
+
+  // get mesh info with shape type
+  uint32_t i = 0;
+  for (auto& [type, mesh] : shape_meshs)
+  {
+    _shape_mesh_infos.emplace(type, mesh_infos[i]) ;
+    ++i;
+  }
+}
     
 } }
