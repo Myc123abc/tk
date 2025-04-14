@@ -7,6 +7,7 @@
 #include <fstream>
 #include <map>
 #include <print>
+#include <algorithm>
 
 namespace tk { namespace graphics_engine {
 
