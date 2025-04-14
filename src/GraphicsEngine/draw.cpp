@@ -2,6 +2,7 @@
 #include "ErrorHandling.hpp"
 #include "constant.hpp"
 #include "Shape.hpp"
+#include "Log.hpp"
 
 #include <SDL3/SDL_events.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -246,6 +247,14 @@ void GraphicsEngine::draw(VkCommandBuffer cmd)
   }
 #endif
 
+  uint32_t width, height;
+  _window.get_framebuffer_size(width, height);
+  log::info(std::format("window : {}x{}", width, height));
+
+  _painter.
+    present("background", _window, 0, 0).
+    present("shapes", _window, 250, 250);
+
   auto canvas_shape_matrix_infos = _painter.get_canvas_shape_matrix_infos();
   for (auto const& [canvas, matrix_infos] : canvas_shape_matrix_infos)
   {
@@ -268,11 +277,14 @@ void GraphicsEngine::draw(VkCommandBuffer cmd)
 
 void GraphicsEngine::painter_to_draw()
 {
+  uint32_t width, height;
+  _window.get_framebuffer_size(width, height);
+
   _painter
     // draw background
     .create_canvas("background")
     .use_canvas("background")
-    .draw_quard(0, 0, _window.width(), _window.height(), Color::OneDark)
+    .draw_quard(0, 0, width, height, Color::OneDark)
     .present("background", _window, 0, 0)
     // draw shapes
     .create_canvas("shapes")

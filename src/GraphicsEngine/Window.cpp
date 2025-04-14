@@ -20,9 +20,6 @@ Window::Window(uint32_t width, uint32_t height, std::string_view title)
   _window = SDL_CreateWindow(title.data(), width, height, SDL_WINDOW_VULKAN    |
                                                           SDL_WINDOW_RESIZABLE);
   throw_if(!_window, "failed to create window!");
-
-  _width  = width;
-  _height = height;
 }
 
 Window::~Window()
@@ -41,11 +38,7 @@ auto Window::create_surface(VkInstance instance) const -> VkSurfaceKHR
 
 void Window::get_framebuffer_size(uint32_t& width, uint32_t& height) const
 {
-  int w = width;
-  int h = height; 
-  SDL_GetWindowSizeInPixels(_window, &w, &h);
-  _width  = w;
-  _height = h;
+  SDL_GetWindowSizeInPixels(_window, (int*)&width, (int*)&height);
 }
 
 void Window::get_screen_size(uint32_t& width, uint32_t& height) const

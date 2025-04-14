@@ -45,13 +45,8 @@ namespace tk { namespace graphics_engine {
 
     auto get() const noexcept { return _window; }
 
-    auto width()  const noexcept { return _width;  }
-    auto height() const noexcept { return _height; }
-
   private:
     SDL_Window* _window;
-    mutable uint32_t _width  = 0;
-    mutable uint32_t _height = 0;
   };
 
 } }

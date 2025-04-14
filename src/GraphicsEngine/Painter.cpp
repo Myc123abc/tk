@@ -66,10 +66,12 @@ auto Painter::present(std::string_view canvas_name, Window const& window, uint32
 
 auto Painter::get_quard_matrix(QuardInfo const& info, Window const& window, uint32_t x, uint32_t y) -> glm::mat4
 {
-  auto scale_x = (float)info.width / window.width();
-  auto scale_y = (float)info.height / window.height();
-  auto translate_x = (info.x + (float)info.width / 2 + x) / ((float)window.width() / 2) - 1.f;
-  auto translate_y = (info.y + (float)info.height / 2 + y) / ((float)window.height() / 2) - 1.f;
+  uint32_t window_width, window_height;
+  window.get_framebuffer_size(window_width, window_height);
+  auto scale_x = (float)info.width / window_width;
+  auto scale_y = (float)info.height / window_height;
+  auto translate_x = (info.x + (float)info.width / 2 + x) / ((float)window_width / 2) - 1.f;
+  auto translate_y = (info.y + (float)info.height / 2 + y) / ((float)window_height / 2) - 1.f;
   auto model = glm::mat4(1.f);
   model = glm::translate(model, glm::vec3(translate_x, translate_y, 0.f));
   model = glm::scale(model, glm::vec3(scale_x, scale_y, 1.f));
