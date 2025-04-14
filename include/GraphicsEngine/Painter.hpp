@@ -48,6 +48,7 @@ namespace tk { namespace graphics_engine {
     {
       virtual ~ShapeInfo() = default;
 
+      std::string name;
       ShapeType   type;
       uint32_t    x = 0;
       uint32_t    y = 0;
@@ -60,6 +61,11 @@ namespace tk { namespace graphics_engine {
     struct Canvas
     {
       std::vector<std::unique_ptr<ShapeInfo>> shape_infos;
+
+      // put on which window and put position (top left corner)
+      class Window const*                     window;
+      uint32_t                                x = 0;
+      uint32_t                                y = 0;
     };
 
     struct QuardInfo : public ShapeInfo
@@ -93,26 +99,31 @@ namespace tk { namespace graphics_engine {
     auto use_canvas(std::string_view name) -> Painter&;
 
     /**
+     * put using canvas on which window and put position
+     * xy is left top corner of window
+     * @param window put on window
+     * @param x
+     * @param y
+     */
+    auto put_on(class Window const& window, uint32_t x, uint32_t y) -> Painter&;
+
+    /**
      * draw a quard
-     * xy is top left corner of quard
+     * xy is left top corner of quard
+     * @param name
      * @param x
      * @param y
      * @param width
      * @param height
      * @param color
      */
-    auto draw_quard(uint32_t x, uint32_t y, uint32_t width, uint32_t height, Color color) -> Painter&;
+    auto draw_quard(std::string_view name, uint32_t x, uint32_t y, uint32_t width, uint32_t height, Color color) -> Painter&;
 
     /**
-     * exhibit the canvas on window's some position
-     * xy is window's left top corner
      * @param canvas_nanme exhibited canvas
-     * @param window window be exhibited
-     * @param x position x of window
-     * @param y position y of window
      * @throw std::runtime_error if canvas not existed 
      */
-    auto present(std::string_view canvas_name, class Window const& window, uint32_t x, uint32_t y) -> Painter&;
+    auto present(std::string_view canvas_name) -> Painter&;
 
     // HACK: I think these are bad way
     //       Painter internel create mesh and draw indexed?

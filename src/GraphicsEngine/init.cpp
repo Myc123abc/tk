@@ -552,6 +552,13 @@ void GraphicsEngine::resize_swapchain()
   auto old_swapchain = _swapchain;
   create_swapchain(old_swapchain);
   vkDestroySwapchainKHR(_device, old_swapchain, nullptr);
+
+  uint32_t width, height;
+  _window.get_framebuffer_size(width, height);
+  _painter.use_canvas("background")
+          .draw_quard("background picture", 0, 0, width, height, Color::OneDark)
+          .present("background")
+          .present("shapes");
 }
 
 void GraphicsEngine::tranform_mesh_data()

@@ -5,6 +5,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <cassert>
+#include <ranges>
 
 namespace tk { namespace graphics_engine {
 
@@ -22,17 +23,44 @@ auto Painter::use_canvas(std::string_view name) -> Painter&
   return *this;
 }
 
-auto Painter::draw_quard(uint32_t x, uint32_t y, uint32_t width, uint32_t height, Color color) -> Painter&
+auto Painter::put_on(class Window const& window, uint32_t x, uint32_t y) -> Painter&
 {
   assert(_canvas);
-  QuardInfo quard;
-  quard.type   = ShapeType::Quard;
-  quard.x      = x;
-  quard.y      = y;
-  quard.color  = color;
-  quard.width  = width;
-  quard.height = height;
-  _canvas->shape_infos.emplace_back(std::make_unique<QuardInfo>(quard));
+  _canvas->window = &window;
+  _canvas->x      = x;
+  _canvas->y      = y;
+  return *this;
+}
+
+auto Painter::draw_quard(std::string_view name, uint32_t x, uint32_t y, uint32_t width, uint32_t height, Color color) -> Painter&
+{
+  assert(_canvas);
+
+  auto it = std::ranges::find_if(_canvas->shape_infos, [name](auto const& info)
+  {
+    return info->name == name;
+  });
+  if (it != _canvas->shape_infos.end())
+  {
+      auto quard = dynamic_cast<QuardInfo*>(it->get());
+      quard->name   = name;
+      quard->x      = x;
+      quard->y      = y;
+      quard->color  = color;
+      quard->width  = width;
+      quard->height = height;
+      return *this;
+  }
+
+  auto quard    = std::make_unique<QuardInfo>();
+  quard->name   = name;
+  quard->type   = ShapeType::Quard;
+  quard->x      = x;
+  quard->y      = y;
+  quard->color  = color;
+  quard->width  = width;
+  quard->height = height;
+  _canvas->shape_infos.emplace_back(std::move(quard));
   return *this;
 }
 
@@ -40,7 +68,7 @@ auto Painter::draw_quard(uint32_t x, uint32_t y, uint32_t width, uint32_t height
 // vertices buffer and indices buffer only use storage data of every type shapes
 // different shapes use matrix to draw themselve
 //
-auto Painter::present(std::string_view canvas_name, Window const& window, uint32_t x, uint32_t y) -> Painter&
+auto Painter::present(std::string_view canvas_name) -> Painter&
 {
   throw_if(!_canvases.contains(canvas_name.data()), "canvas {} is not exist", canvas_name);
   auto& canvas = _canvases[canvas_name.data()];
@@ -54,7 +82,7 @@ auto Painter::present(std::string_view canvas_name, Window const& window, uint32
     case ShapeType::Quard:
       if (!_shape_meshs.contains(info->type) || !_shape_meshs[info->type].contains(info->color))
         _shape_meshs[info->type][info->color] = create_quard(info->color);
-      shape_matrixs.emplace_back(info->type, info->color, get_quard_matrix(dynamic_cast<QuardInfo const&>(*info), window, x, y));
+      shape_matrixs.emplace_back(info->type, info->color, get_quard_matrix(dynamic_cast<QuardInfo const&>(*info), *canvas.window, canvas.x, canvas.y));
       break;
     }
   }

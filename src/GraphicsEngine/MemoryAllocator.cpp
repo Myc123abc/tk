@@ -57,7 +57,7 @@ void MemoryAllocator::destroy_buffer(Buffer& buffer)
 
 auto MemoryAllocator::create_mesh_buffer(Command& command, std::vector<Mesh>& meshs, DestructorStack& destructor, std::vector<MeshInfo>& mesh_infos) -> MeshBuffer
 {
-  auto buffer     = MeshBuffer();
+  MeshBuffer buffer;
 
   // get mesh infos
   mesh_infos.reserve(meshs.size());
