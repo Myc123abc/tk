@@ -44,6 +44,8 @@ void Window::get_framebuffer_size(uint32_t& width, uint32_t& height) const
   int w = width;
   int h = height; 
   SDL_GetWindowSizeInPixels(_window, &w, &h);
+  _width  = w;
+  _height = h;
 }
 
 void Window::get_screen_size(uint32_t& width, uint32_t& height) const

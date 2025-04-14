@@ -272,15 +272,15 @@ void GraphicsEngine::painter_to_draw()
     // draw background
     .create_canvas("background")
     .use_canvas("background")
-    .draw_quard(_window.width()/2, _window.height()/2, _window.width(), _window.height(), Color::OneDark)
+    .draw_quard(0, 0, _window.width(), _window.height(), Color::OneDark)
     .present("background", _window, 0, 0)
     // draw shapes
     .create_canvas("shapes")
     .use_canvas("shapes")
-    .draw_quard(125, 125, 250, 250, Color::Red)
-    .draw_quard(375, 125, 250, 250, Color::Green)
-    .draw_quard(375, 375, 250, 250, Color::Blue)
-    .draw_quard(125, 375, 250, 250, Color::Yellow)
+    .draw_quard(0, 0, 250, 250, Color::Red)
+    .draw_quard(250, 0, 250, 250, Color::Green)
+    .draw_quard(0, 250, 250, 250, Color::Blue)
+    .draw_quard(250, 250, 250, 250, Color::Yellow)
     .present("shapes", _window, 250, 250);
 
   // get shape meshs

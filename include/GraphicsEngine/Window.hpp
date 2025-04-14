@@ -50,8 +50,8 @@ namespace tk { namespace graphics_engine {
 
   private:
     SDL_Window* _window;
-    uint32_t    _width  = 0;
-    uint32_t    _height = 0;
+    mutable uint32_t _width  = 0;
+    mutable uint32_t _height = 0;
   };
 
 } }

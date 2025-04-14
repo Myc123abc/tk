@@ -94,7 +94,7 @@ namespace tk { namespace graphics_engine {
 
     /**
      * draw a quard
-     * xy is center coordinate of quard
+     * xy is top left corner of quard
      * @param x
      * @param y
      * @param width
