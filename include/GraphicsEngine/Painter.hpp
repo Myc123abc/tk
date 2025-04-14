@@ -10,10 +10,6 @@
 //    this is memory waste
 // 2. present with draw desquence, not have depth test
 //
-//
-// TODO:
-// 1. only static draw, expand to dynamic
-//
 
 #pragma once
 
@@ -119,15 +115,14 @@ namespace tk { namespace graphics_engine {
      */
     auto draw_quard(std::string_view name, uint32_t x, uint32_t y, uint32_t width, uint32_t height, Color color) -> Painter&;
 
-    /**
-     * @param canvas_nanme exhibited canvas
-     * @throw std::runtime_error if canvas not existed 
-     */
+    // FIX: should be discard
     auto present(std::string_view canvas_name) -> Painter&;
 
-    // HACK: I think these are bad way
-    //       Painter internel create mesh and draw indexed?
+    // TODO: change to prepare_materials(std::span<Materical>)
+    //       struct Materical { shapetype, color };
+    //       and use get_materials() return _shape_meshs
     auto get_shape_meshs()               const noexcept { return _shape_meshs; }
+    // TODO: can change to get_shapes_draw_result, etc... mix with present function
     auto get_canvas_shape_matrix_infos() const noexcept { return _canvas_shape_matrix_infos; }
 
   private:
