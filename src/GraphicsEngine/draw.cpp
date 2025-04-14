@@ -247,12 +247,8 @@ void GraphicsEngine::draw(VkCommandBuffer cmd)
   }
 #endif
 
-  uint32_t width, height;
-  _window.get_framebuffer_size(width, height);
-  log::info(std::format("window : {}x{}", width, height));
-
   _painter.
-    present("background", _window, 0, 0).
+    // present("background", _window, 0, 0).
     present("shapes", _window, 250, 250);
 
   auto canvas_shape_matrix_infos = _painter.get_canvas_shape_matrix_infos();

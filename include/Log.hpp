@@ -78,7 +78,7 @@ namespace tk
     template <typename... Args>
     inline void error(std::format_string<Args...> fmt, Args&&... args)
     {
-      Log::instance().log(Log::Level::error, fmt, std::forward<Args>(args)...);
+      Log::instance().log(Log::Level::error, std::format(fmt, std::forward<Args>(args)...));
     }
 
     template <typename T>
@@ -90,7 +90,7 @@ namespace tk
     template <typename... Args>
     inline void info(std::format_string<Args...> fmt, Args&&... args)
     {
-      Log::instance().log(Log::Level::info, fmt, std::forward<Args>(args)...);
+      Log::instance().log(Log::Level::info, std::format(fmt, std::forward<Args>(args)...));
     }
 
   }
