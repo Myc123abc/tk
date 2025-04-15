@@ -7,6 +7,7 @@
 #pragma once
 
 #include "ErrorHandling.hpp"
+#include "MaterialLibrary.hpp"
 
 #include <vector>
 #include <glm/glm.hpp>
@@ -36,15 +37,6 @@ namespace tk { namespace graphics_engine {
   {
     std::vector<Vertex>   vertices;
     std::vector<uint16_t> indices;
-  };
-
-  enum class Color
-  {
-    Red,
-    Green,
-    Blue,
-    Yellow,
-    OneDark,
   };
 
   /**

@@ -14,6 +14,7 @@
 #pragma once
 
 #include "Shape.hpp"
+#include "MaterialLibrary.hpp"
 
 #include <vector>
 #include <string_view>
@@ -23,16 +24,6 @@
 
 namespace tk { namespace graphics_engine {
 
-  enum class ShapeType
-  {
-    Quard,
-  };
-
-  struct Material
-  {
-    ShapeType          type;
-    std::vector<Color> colors;
-  };
 
   class Painter
   {
