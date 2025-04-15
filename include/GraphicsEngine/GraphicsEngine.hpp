@@ -81,6 +81,7 @@ namespace tk { namespace graphics_engine {
     void create_sync_objects();
     void create_frame_resources();
     void init_painter();
+    void create_material_mesh_buffer();
 
     //
     // util 
@@ -105,11 +106,7 @@ namespace tk { namespace graphics_engine {
 
     MemoryAllocator              _mem_alloc;
     MeshBuffer                   _mesh_buffer;
-    // HACK: discard because of painter
-    std::vector<ShapeInfo>       _shapes;
-
-    Painter                                        _painter; 
-    std::map<ShapeType, std::map<Color, MeshInfo>> _shape_mesh_infos;
+    Painter                      _painter; 
 
     // use dynamic rendering
     VkSwapchainKHR               _swapchain                = VK_NULL_HANDLE;

@@ -1,7 +1,6 @@
 #include "GraphicsEngine.hpp"
 #include "ErrorHandling.hpp"
 #include "constant.hpp"
-#include "Shape.hpp"
 
 #include <SDL3/SDL_events.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -199,7 +198,7 @@ void GraphicsEngine::draw(VkCommandBuffer cmd)
   {
     for (auto const& matrix_info : matrix_infos)
     {
-      auto mesh_info = _shape_mesh_infos[matrix_info.type][matrix_info.color];
+      auto mesh_info = MaterialLibrary::get_mesh_infos()[matrix_info.type][matrix_info.color];
       PushConstant pc
       {
         .model = matrix_info.matrix,

@@ -13,14 +13,12 @@
 
 #pragma once
 
-#include "Shape.hpp"
 #include "MaterialLibrary.hpp"
 
 #include <vector>
 #include <string_view>
 #include <map>
 #include <memory>
-#include <span>
 
 namespace tk { namespace graphics_engine {
 
@@ -103,12 +101,6 @@ namespace tk { namespace graphics_engine {
     auto put(std::string_view canvas, class Window const& window, uint32_t x, uint32_t y) -> Painter&;
 
     /**
-     * prepare matertials, what shapes and colors need to be draw
-     * @param matertials
-     */
-    auto prepare_materials(std::span<Material> matertials) -> Painter&;
-
-    /**
      * draw a quard
      * xy is left top corner of quard
      * @param name
@@ -123,10 +115,6 @@ namespace tk { namespace graphics_engine {
     // FIX: should be discard
     auto present(std::string_view canvas_name) -> Painter&;
 
-    // TODO: change to prepare_materials(std::span<Materical>)
-    //       struct Materical { shapetype, color };
-    //       and use get_materials() return _shape_meshs
-    auto get_shape_meshs()               const noexcept { return _shape_meshs; }
     // TODO: can change to get_shapes_draw_result, etc... mix with present function
     auto get_canvas_shape_matrix_infos() const noexcept { return _canvas_shape_matrix_infos; }
 
@@ -137,7 +125,6 @@ namespace tk { namespace graphics_engine {
     std::map<std::string, Canvas> _canvases;
     Canvas*                       _canvas = nullptr;
 
-    std::map<ShapeType, std::map<Color, Mesh>>          _shape_meshs;
     std::map<std::string, std::vector<ShapeMatrixInfo>> _canvas_shape_matrix_infos;
   };
 

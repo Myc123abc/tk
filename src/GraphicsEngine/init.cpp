@@ -2,8 +2,8 @@
 #include "init-util.hpp"
 #include "constant.hpp"
 #include "PipelineBuilder.hpp"
-#include "Shape.hpp"
 #include "Painter.hpp"
+#include "MaterialLibrary.hpp"
 
 #include <ranges>
 #include <set>
@@ -35,6 +35,7 @@ GraphicsEngine::GraphicsEngine(Window const& window)
   create_descriptor_sets();
   create_frame_resources();
   init_painter();
+  create_material_mesh_buffer();
 
   // INFO: only draw static shape, so present once before resize window
   painter_to_draw();
@@ -557,31 +558,22 @@ void GraphicsEngine::resize_swapchain()
 
 void GraphicsEngine::init_painter()
 {
-  auto matertials = std::vector<Material>
-  {
-    { ShapeType::Quard, { Color::OneDark, Color::Red, Color::Blue, Color::Green, Color::Yellow } },
-  };
-
   _painter
-    // TODO: prepare materials should recevice cmd and directly get mesh buffer
-    .prepare_materials(matertials)
     .create_canvas("background")
     .put("background", _window, 0, 0)
     .create_canvas("shapes")
     .put("shapes", _window, 250, 250);
+}
 
+void GraphicsEngine::create_material_mesh_buffer()
+{
   // get shape meshs
-  auto shape_meshs = _painter.get_shape_meshs();
-  auto meshs       = std::vector<Mesh>();
-  auto mesh_infos  = std::vector<MeshInfo>();
-  auto destructor  = DestructorStack();
-  meshs.reserve(shape_meshs.size());
-  for (auto& [type, color_mesh] : shape_meshs)
-    for (auto& [color, mesh] : color_mesh)
-      meshs.emplace_back(mesh);
+  auto meshs      = MaterialLibrary::get_meshs();
 
   // create mesh buffer
-  auto cmd     = _command_pool.create_command().begin();
+  auto cmd        = _command_pool.create_command().begin();
+  auto destructor = DestructorStack();
+  auto mesh_infos = std::vector<MeshInfo>();
   _mesh_buffer = _mem_alloc.create_mesh_buffer(cmd, meshs, destructor, mesh_infos);
   cmd.end().submit_wait_free(_command_pool, _graphics_queue);
 
@@ -591,17 +583,8 @@ void GraphicsEngine::init_painter()
   // add mesh buffer destructor
   _destructors.push([&] { _mem_alloc.destroy_mesh_buffer(_mesh_buffer); });
 
-  // get mesh info with shape type
-  uint32_t i = 0;
-  for (auto& [type, color_mesh] : shape_meshs)
-  {
-    for (auto& [color, mesh] : color_mesh)
-    {
-      // TODO: these should be got by painter
-      _shape_mesh_infos[type][color] = mesh_infos[i];
-      ++i;
-    }
-  }
+  // build mesh info with shape type
+  MaterialLibrary::build_mesh_infos(mesh_infos);
 }
 
 } }

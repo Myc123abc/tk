@@ -32,22 +32,6 @@ auto Painter::put(std::string_view canvas, class Window const& window, uint32_t 
   return *this;
 }
 
-auto Painter::prepare_materials(std::span<Material> matertials) -> Painter&
-{
-  for (auto const& matertial : matertials)
-  {
-    switch (matertial.type) 
-    {
-    case ShapeType::Quard:
-      if (!_shape_meshs.contains(matertial.type))
-        for (auto color : matertial.colors)
-          _shape_meshs[matertial.type].emplace(color, create_quard(color));
-      break;
-    }
-  }
-  return *this;
-}
-
 auto Painter::draw_quard(std::string_view name, uint32_t x, uint32_t y, uint32_t width, uint32_t height, Color color) -> Painter&
 {
   assert(_canvas);

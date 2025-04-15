@@ -1,10 +1,53 @@
 #include "MaterialLibrary.hpp"
-#include "MemoryAllocator.hpp"
-#include "CommandPool.hpp"
+#include "ErrorHandling.hpp"
 
 namespace tk { namespace graphics_engine {
 
-MaterialLibrary::MaterialLibrary()
+////////////////////////////////////////////////////////////////////////////////
+//                           Mesh Generate Functions
+////////////////////////////////////////////////////////////////////////////////
+
+auto to_vec3(Color color) -> glm::vec3
+{
+  switch (color)
+  {
+  case Color::Red:
+    return { 1.f, 0.f, 0.f };
+  case Color::Green:
+    return { 0.f, 1.f, 0.f };
+  case Color::Blue:
+    return { 0.f, 0.f, 1.f };
+  case Color::Yellow:
+    return { 1.f, 1.f, 0.f };
+  case Color::OneDark:
+    return { (float)40/255, (float)44/255, (float)52/255,};
+  default:
+    throw_if(true, "unsupported color");
+  }
+}
+
+Mesh create_quard(Color color)
+{
+  return Mesh
+  { 
+    {
+      { { -1.f, -1.f }, to_vec3(color) },
+      { {  1.f, -1.f }, to_vec3(color) },
+      { {  1.f,  1.f }, to_vec3(color) },
+      { { -1.f,  1.f }, to_vec3(color) },
+    },
+    {
+      0, 1, 2,
+      0, 2, 3,
+    },
+  };
+};
+
+////////////////////////////////////////////////////////////////////////////////
+//                           Material Library 
+////////////////////////////////////////////////////////////////////////////////
+
+void MaterialLibrary::generate_materials()
 {
   // enumerate all materials
   auto shape_types = std::vector<ShapeType>
@@ -23,71 +66,41 @@ MaterialLibrary::MaterialLibrary()
 
   // save all material combination
   for (auto shape_type : shape_types)
-    for (auto color : colors)
-      _shape_infos.emplace(shape_types, colors);
+    _materials.emplace_back(shape_type, colors);
 }
 
-auto MaterialLibrary::create_mesh_buffer(Command& cmd) -> MeshBuffer
+auto MaterialLibrary::get_meshs() -> std::vector<Mesh>
 {
-  MeshBuffer buffer;
+  if (_materials.empty())
+    generate_materials();
 
-  // get shape meshs
-  std::vector<Mesh> ss;
-  for (auto [shape_type, colors] : _shape_infos)  
+  // get meshs
+  auto shape_meshs = std::vector<Mesh>();
+  for (auto const& [type, colors] : _materials)  
   {
-    switch (shape_type)
+    switch (type)
     {
     case ShapeType::Quard:
       for (auto color : colors)
-      {
-        
-      }
+        shape_meshs.emplace_back(create_quard(color));
       break;
     }
   }
 
+  return std::move(shape_meshs);
+}
 
-  // for (auto const& info : canvas.shape_infos)
-  // {
-  //   switch (info->type) 
-  //   {
-  //   case ShapeType::Quard:
-  //     shape_matrixs.emplace_back(info->type, info->color, get_quard_matrix(dynamic_cast<QuardInfo const&>(*info), *canvas.window, canvas.x, canvas.y));
-  //     break;
-  //   }
-  // auto shape_meshs = _painter.get_shape_meshs();
-  // auto meshs       = std::vector<Mesh>();
-  // auto mesh_infos  = std::vector<MeshInfo>();
-  // auto destructor  = DestructorStack();
-  // meshs.reserve(shape_meshs.size());
-  // for (auto& [type, color_mesh] : shape_meshs)
-  //   for (auto& [color, mesh] : color_mesh)
-  //     meshs.emplace_back(mesh);
-  //
-  // // create mesh buffer
-  // auto cmd     = _command_pool.create_command().begin();
-  // _mesh_buffer = _mem_alloc.create_mesh_buffer(cmd, meshs, destructor, mesh_infos);
-  // cmd.end().submit_wait_free(_command_pool, _graphics_queue);
-  //
-  // // destroy stage buffer
-  // destructor.clear();
-  //
-  // // add mesh buffer destructor
-  // _destructors.push([&] { _mem_alloc.destroy_mesh_buffer(_mesh_buffer); });
-  //
-  // // get mesh info with shape type
-  // uint32_t i = 0;
-  // for (auto& [type, color_mesh] : shape_meshs)
-  // {
-  //   for (auto& [color, mesh] : color_mesh)
-  //   {
-  //     // TODO: these should be got by painter
-  //     _shape_mesh_infos[type][color] = mesh_infos[i];
-  //     ++i;
-  //   }
-  // }
-  
-  return buffer;
+void MaterialLibrary::build_mesh_infos(std::span<MeshInfo> mesh_infos)
+{
+  uint32_t i = 0;
+  for (auto const& [type, colors] : _materials)
+  {
+    for (auto color : colors)
+    {
+      _mesh_infos[type][color] = mesh_infos[i];
+      ++i;
+    }
+  }
 }
 
 }}
