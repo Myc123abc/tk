@@ -46,7 +46,7 @@ auto CommandPool::create_commands(uint32_t count) -> std::vector<Command>
 
 auto CommandPool::create_command() -> Command
 {
-  return create_commands(1)[0];
+  return std::move(create_commands(1)[0]);
 }
 
 

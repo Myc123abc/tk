@@ -18,10 +18,14 @@ namespace tk
     DestructorStack()  = default;
     ~DestructorStack() = default;
 
-    DestructorStack(DestructorStack const&)            = default;
-    DestructorStack(DestructorStack&&)                 = delete;
+    DestructorStack(DestructorStack const&)            = delete;
+    DestructorStack(DestructorStack&& ds)              { *this = std::move(ds); }
     DestructorStack& operator=(DestructorStack const&) = delete;
-    DestructorStack& operator=(DestructorStack&&)      = delete;
+    DestructorStack& operator=(DestructorStack&& ds)
+    {
+      _destructors = std::move(ds._destructors);
+      return *this;
+    }
 
     void push(std::function<void()>&& func) { _destructors.push(func); }
     void clear()

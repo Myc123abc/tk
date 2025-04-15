@@ -43,8 +43,6 @@ GraphicsEngine::GraphicsEngine(Window const& window)
 GraphicsEngine::~GraphicsEngine()
 {
   vkDeviceWaitIdle(_device);
-  for (auto& frame : _frames)
-    frame.destructors.clear();
   _destructors.clear();
 }
 
@@ -513,7 +511,7 @@ void GraphicsEngine::create_frame_resources()
   // create command buffers
   auto cmd_bufs = _command_pool.create_commands(Max_Frame_Number);
   for (uint32_t i = 0; i < _frames.size(); ++i)
-    _frames[i].command_buffer = cmd_bufs[i];
+    _frames[i].command_buffer = std::move(cmd_bufs[i]);
 
   // async objects 
   VkFenceCreateInfo fence_info

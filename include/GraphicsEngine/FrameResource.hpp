@@ -20,8 +20,6 @@ namespace tk { namespace graphics_engine {
     VkFence         fence               = VK_NULL_HANDLE;
     VkSemaphore     image_available_sem = VK_NULL_HANDLE; 
     VkSemaphore     render_finished_sem = VK_NULL_HANDLE; 
-
-    DestructorStack destructors;
   };
 
 } }
