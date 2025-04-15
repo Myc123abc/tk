@@ -80,8 +80,7 @@ namespace tk { namespace graphics_engine {
     void create_descriptor_sets();
     void create_sync_objects();
     void create_frame_resources();
-
-    void tranform_mesh_data();
+    void init_painter();
 
     //
     // util 

@@ -23,12 +23,28 @@ auto Painter::use_canvas(std::string_view name) -> Painter&
   return *this;
 }
 
-auto Painter::put_on(class Window const& window, uint32_t x, uint32_t y) -> Painter&
+auto Painter::put(std::string_view canvas, class Window const& window, uint32_t x, uint32_t y) -> Painter&
 {
-  assert(_canvas);
-  _canvas->window = &window;
-  _canvas->x      = x;
-  _canvas->y      = y;
+  throw_if(!_canvases.contains(canvas.data()), "canvas {} is not exist", canvas);
+  _canvases[canvas.data()].window = &window;
+  _canvases[canvas.data()].x      = x;
+  _canvases[canvas.data()].y      = y;
+  return *this;
+}
+
+auto Painter::prepare_materials(std::span<Material> matertials) -> Painter&
+{
+  for (auto const& matertial : matertials)
+  {
+    switch (matertial.type) 
+    {
+    case ShapeType::Quard:
+      if (!_shape_meshs.contains(matertial.type))
+        for (auto color : matertial.colors)
+          _shape_meshs[matertial.type].emplace(color, create_quard(color));
+      break;
+    }
+  }
   return *this;
 }
 
@@ -80,8 +96,6 @@ auto Painter::present(std::string_view canvas_name) -> Painter&
     switch (info->type) 
     {
     case ShapeType::Quard:
-      if (!_shape_meshs.contains(info->type) || !_shape_meshs[info->type].contains(info->color))
-        _shape_meshs[info->type][info->color] = create_quard(info->color);
       shape_matrixs.emplace_back(info->type, info->color, get_quard_matrix(dynamic_cast<QuardInfo const&>(*info), *canvas.window, canvas.x, canvas.y));
       break;
     }

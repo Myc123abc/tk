@@ -19,12 +19,19 @@
 #include <string_view>
 #include <map>
 #include <memory>
+#include <span>
 
 namespace tk { namespace graphics_engine {
 
   enum class ShapeType
   {
     Quard,
+  };
+
+  struct Material
+  {
+    ShapeType          type;
+    std::vector<Color> colors;
   };
 
   class Painter
@@ -95,13 +102,20 @@ namespace tk { namespace graphics_engine {
     auto use_canvas(std::string_view name) -> Painter&;
 
     /**
-     * put using canvas on which window and put position
+     * put canvas on specific position of window
      * xy is left top corner of window
+     * @param canvas use which canvas
      * @param window put on window
      * @param x
      * @param y
      */
-    auto put_on(class Window const& window, uint32_t x, uint32_t y) -> Painter&;
+    auto put(std::string_view canvas, class Window const& window, uint32_t x, uint32_t y) -> Painter&;
+
+    /**
+     * prepare matertials, what shapes and colors need to be draw
+     * @param matertials
+     */
+    auto prepare_materials(std::span<Material> matertials) -> Painter&;
 
     /**
      * draw a quard

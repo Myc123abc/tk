@@ -63,7 +63,7 @@ auto MemoryAllocator::create_mesh_buffer(Command& command, std::vector<Mesh>& me
   mesh_infos.reserve(meshs.size());
   uint32_t vertices_offset = 0, indices_offset = 0;
   auto vertices      = std::vector<Vertex>();
-  auto indices       = std::vector<uint8_t>();
+  auto indices       = std::vector<uint16_t>();
   for (auto const& mesh : meshs)
   {
     uint32_t vertices_byte_size = sizeof(Vertex)  * mesh.vertices.size();
@@ -81,8 +81,8 @@ auto MemoryAllocator::create_mesh_buffer(Command& command, std::vector<Mesh>& me
   }
 
   // create mesh buffer 
-  uint32_t vertices_byte_size = sizeof(Vertex)  * vertices.size();
-  int32_t  indices_byte_size  = sizeof(uint8_t) * indices.size();
+  uint32_t vertices_byte_size = sizeof(Vertex)   * vertices.size();
+  int32_t  indices_byte_size  = sizeof(uint16_t) * indices.size();
   buffer.vertices = create_buffer(vertices_byte_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT        |
                                                       VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
                                                       VK_BUFFER_USAGE_TRANSFER_DST_BIT);

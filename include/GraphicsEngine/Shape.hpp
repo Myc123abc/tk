@@ -34,8 +34,8 @@ namespace tk { namespace graphics_engine {
   // simply 2D shape not need so many indices
   struct Mesh
   {
-    std::vector<Vertex>  vertices;
-    std::vector<uint8_t> indices;
+    std::vector<Vertex>   vertices;
+    std::vector<uint16_t> indices;
   };
 
   enum class Color

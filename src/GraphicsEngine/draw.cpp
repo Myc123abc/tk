@@ -206,7 +206,7 @@ void GraphicsEngine::draw(VkCommandBuffer cmd)
         .vertices = _mesh_buffer.address + mesh_info.vertices_offset,
       };
       vkCmdPushConstants(cmd, _2D_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pc), &pc);
-      vkCmdBindIndexBuffer(cmd, _mesh_buffer.indices.handle, 0, VK_INDEX_TYPE_UINT8);
+      vkCmdBindIndexBuffer(cmd, _mesh_buffer.indices.handle, 0, VK_INDEX_TYPE_UINT16);
       vkCmdDrawIndexed(cmd, mesh_info.indices_count, 1, mesh_info.indices_offset, 0, 0);
     }
   }
@@ -221,52 +221,16 @@ void GraphicsEngine::painter_to_draw()
 
   _painter
     // draw background
-    .create_canvas("background")
     .use_canvas("background")
-    .put_on(_window, 0, 0)
     .draw_quard("background picture", 0, 0, width, height, Color::OneDark)
     .present("background")
     // draw shapes
-    .create_canvas("shapes")
     .use_canvas("shapes")
-    .put_on(_window, 250, 250)
     .draw_quard("left top", 0, 0, 250, 250, Color::Red)
     .draw_quard("right top", 250, 0, 250, 250, Color::Green)
     .draw_quard("left down", 0, 250, 250, 250, Color::Blue)
     .draw_quard("right down", 250, 250, 250, 250, Color::Yellow)
     .present("shapes");
-
-  // get shape meshs
-  auto shape_meshs = _painter.get_shape_meshs();
-  auto meshs       = std::vector<Mesh>();
-  auto mesh_infos  = std::vector<MeshInfo>();
-  auto destructor  = DestructorStack();
-  meshs.reserve(shape_meshs.size());
-  for (auto& [type, color_mesh] : shape_meshs)
-    for (auto& [color, mesh] : color_mesh)
-      meshs.emplace_back(mesh);
-
-  // create mesh buffer
-  auto cmd     = _command_pool.create_command().begin();
-  _mesh_buffer = _mem_alloc.create_mesh_buffer(cmd, meshs, destructor, mesh_infos);
-  cmd.end().submit_wait_free(_command_pool, _graphics_queue);
-
-  // destroy stage buffer
-  destructor.clear();
-
-  // add mesh buffer destructor
-  _destructors.push([&] { _mem_alloc.destroy_mesh_buffer(_mesh_buffer); });
-
-  // get mesh info with shape type
-  uint32_t i = 0;
-  for (auto& [type, color_mesh] : shape_meshs)
-  {
-    for (auto& [color, mesh] : color_mesh)
-    {
-      _shape_mesh_infos[type][color] = mesh_infos[i];
-      ++i;
-    }
-  }
 }
     
 } }

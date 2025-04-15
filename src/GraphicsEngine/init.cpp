@@ -3,6 +3,7 @@
 #include "constant.hpp"
 #include "PipelineBuilder.hpp"
 #include "Shape.hpp"
+#include "Painter.hpp"
 
 #include <ranges>
 #include <set>
@@ -33,9 +34,9 @@ GraphicsEngine::GraphicsEngine(Window const& window)
   create_descriptor_pool();
   create_descriptor_sets();
   create_frame_resources();
+  init_painter();
 
-  // tranform_mesh_data();
-
+  // INFO: only draw static shape, so present once before resize window
   painter_to_draw();
 }
 
@@ -167,15 +168,10 @@ void GraphicsEngine::create_device_and_get_queues()
     });
 
   // features
-  VkPhysicalDeviceIndexTypeUint8Features index8bit_feature
-  {
-    .sType          = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INDEX_TYPE_UINT8_FEATURES,
-    .indexTypeUint8 = true,
-  };
   VkPhysicalDeviceVulkan13Features features13
   { 
     .sType               = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
-    .pNext               = &index8bit_feature,
+    .pNext               = nullptr, 
     .synchronization2    = true,
     .dynamicRendering    = true,
   };
@@ -561,16 +557,32 @@ void GraphicsEngine::resize_swapchain()
           .present("shapes");
 }
 
-void GraphicsEngine::tranform_mesh_data()
+void GraphicsEngine::init_painter()
 {
-  auto meshs      = std::vector<Mesh>();
-  auto mesh_infos = std::vector<MeshInfo>();
-  auto destructor = DestructorStack();
+  auto matertials = std::vector<Material>
+  {
+    { ShapeType::Quard, { Color::OneDark, Color::Red, Color::Blue, Color::Green, Color::Yellow } },
+  };
 
-  // generate meshs 
-  meshs.emplace_back(create_quard(Color::OneDark));
+  _painter
+    // TODO: prepare materials should recevice cmd and directly get mesh buffer
+    .prepare_materials(matertials)
+    .create_canvas("background")
+    .put("background", _window, 0, 0)
+    .create_canvas("shapes")
+    .put("shapes", _window, 250, 250);
 
-  // create mush buffer and get mesh infos
+  // get shape meshs
+  auto shape_meshs = _painter.get_shape_meshs();
+  auto meshs       = std::vector<Mesh>();
+  auto mesh_infos  = std::vector<MeshInfo>();
+  auto destructor  = DestructorStack();
+  meshs.reserve(shape_meshs.size());
+  for (auto& [type, color_mesh] : shape_meshs)
+    for (auto& [color, mesh] : color_mesh)
+      meshs.emplace_back(mesh);
+
+  // create mesh buffer
   auto cmd     = _command_pool.create_command().begin();
   _mesh_buffer = _mem_alloc.create_mesh_buffer(cmd, meshs, destructor, mesh_infos);
   cmd.end().submit_wait_free(_command_pool, _graphics_queue);
@@ -581,14 +593,17 @@ void GraphicsEngine::tranform_mesh_data()
   // add mesh buffer destructor
   _destructors.push([&] { _mem_alloc.destroy_mesh_buffer(_mesh_buffer); });
 
-  // generate shape info from mesh info and mesh buffer
-  _shapes.reserve(meshs.size());
-  for (auto const& info : mesh_infos)
-    _shapes.emplace_back(ShapeInfo
+  // get mesh info with shape type
+  uint32_t i = 0;
+  for (auto& [type, color_mesh] : shape_meshs)
+  {
+    for (auto& [color, mesh] : color_mesh)
     {
-      .indices_offset = info.indices_offset, 
-      .indices_count  = info.indices_count,
-    });
+      // TODO: these should be got by painter
+      _shape_mesh_infos[type][color] = mesh_infos[i];
+      ++i;
+    }
+  }
 }
 
 } }
