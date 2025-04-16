@@ -35,13 +35,24 @@ namespace tk { namespace graphics_engine {
   class GraphicsEngine
   {
   public:
-    GraphicsEngine(Window const& window);
-    ~GraphicsEngine();
+    GraphicsEngine()  = default;
+    ~GraphicsEngine() = default;
 
     GraphicsEngine(GraphicsEngine const&)            = delete;
     GraphicsEngine(GraphicsEngine&&)                 = delete;
     GraphicsEngine& operator=(GraphicsEngine const&) = delete;
     GraphicsEngine& operator=(GraphicsEngine&&)      = delete;
+
+    // HACK: expand to multi windows
+    /**
+     * initialize graphics engine
+     * need a main window (while vulkan can use offscreen rendering)
+     * @param window main window
+     * @throw std::runtime_error failed to init
+     */
+    void init(Window const& window);
+
+    void destroy();
 
     //
     // run
@@ -94,7 +105,7 @@ namespace tk { namespace graphics_engine {
     // common resources
     //
     // HACK: expand to multi-windows manage, use WindowManager in future.
-    Window const&                _window;
+    Window const*                _window                   = nullptr;
     VkInstance                   _instance                 = VK_NULL_HANDLE;
     VkDebugUtilsMessengerEXT     _debug_messenger          = VK_NULL_HANDLE;
     VkSurfaceKHR                 _surface                  = VK_NULL_HANDLE;

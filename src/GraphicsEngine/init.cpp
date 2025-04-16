@@ -11,13 +11,14 @@
 
 namespace tk { namespace graphics_engine { 
 
-GraphicsEngine::GraphicsEngine(Window const& window)
-  :_window(window)
+void GraphicsEngine::init(Window const& window)
 {
   // only have single graphics engine
   static bool first = true;
   assert(first);
   if (first)  first = false;
+
+  _window = &window;
 
   create_instance();
 #ifndef NDEBUG
@@ -41,7 +42,7 @@ GraphicsEngine::GraphicsEngine(Window const& window)
   painter_to_draw();
 }
 
-GraphicsEngine::~GraphicsEngine()
+void GraphicsEngine::destroy()
 {
   vkDeviceWaitIdle(_device);
   _destructors.clear();
@@ -110,7 +111,7 @@ void GraphicsEngine::create_debug_messenger()
 
 void GraphicsEngine::create_surface()
 {
-  _surface = _window.create_surface(_instance);
+  _surface = _window->create_surface(_instance);
   _destructors.push([this] { vkDestroySurfaceKHR(_instance, _surface, nullptr); });
 }
 
@@ -230,7 +231,7 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
   auto image_count     = details.capabilities.minImageCount + 1;
   uint32_t w;
   uint32_t h;
-  _window.get_screen_size(w, h);
+  _window->get_screen_size(w, h);
   auto extent          = VkExtent2D{ w, h, };
 
 #ifndef NDEBUG 
@@ -333,7 +334,7 @@ void GraphicsEngine::create_swapchain(VkSwapchainKHR old_swapchain)
   auto details         = get_swapchain_details(_physical_device, _surface);
   auto surface_format  = details.get_surface_format();
   auto present_mode    = details.get_present_mode();
-  auto extent          = details.get_swap_extent(_window);
+  auto extent          = details.get_swap_extent(*_window);
   uint32_t image_count = details.capabilities.minImageCount + 1;
 
   if (details.capabilities.maxImageCount > 0 &&
@@ -549,7 +550,7 @@ void GraphicsEngine::resize_swapchain()
   vkDestroySwapchainKHR(_device, old_swapchain, nullptr);
 
   uint32_t width, height;
-  _window.get_framebuffer_size(width, height);
+  _window->get_framebuffer_size(width, height);
   _painter.use_canvas("background")
           .redraw_quard(_background_id, 0, 0, width, height, Color::OneDark);
   _painter.generate_shape_matrix_info_of_all_canvases();
@@ -559,9 +560,9 @@ void GraphicsEngine::init_painter()
 {
   _painter
     .create_canvas("background")
-    .put("background", _window, 0, 0)
+    .put("background", *_window, 0, 0)
     .create_canvas("shapes")
-    .put("shapes", _window, 250, 250);
+    .put("shapes", *_window, 250, 250);
 }
 
 void GraphicsEngine::use_single_time_command_init_something()

@@ -8,7 +8,7 @@
 
 namespace tk { namespace graphics_engine {
 
-Window::Window(uint32_t width, uint32_t height, std::string_view title)
+void Window::init(uint32_t width, uint32_t height, std::string_view title)
 {
   // HACK: expand to multi-windows manage
   static bool first = true;
@@ -22,7 +22,7 @@ Window::Window(uint32_t width, uint32_t height, std::string_view title)
   throw_if(!_window, "failed to create window!");
 }
 
-Window::~Window()
+void Window::destroy() const
 {
   SDL_DestroyWindow(_window);
   SDL_Quit();

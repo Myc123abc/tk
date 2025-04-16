@@ -5,16 +5,20 @@
 #define SDL_MAIN_USE_CALLBACKS
 #include <SDL3/SDL_main.h>
 
-#include <memory>
-
 using namespace tk;
 using namespace tk::graphics_engine;
 
 struct AppContext
 {
-  std::unique_ptr<Window>         window;
-  std::unique_ptr<GraphicsEngine> engine;
-  bool                            paused = false;
+  ~AppContext()
+  {
+    engine.destroy();
+    window.destroy();
+  }
+
+  Window         window;
+  GraphicsEngine engine;
+  bool           paused = false;
 };
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
@@ -23,8 +27,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
   try
   {
     ctx = new AppContext();
-    ctx->window = std::make_unique<Window>(1000, 1000, "Breakout");
-    ctx->engine = std::make_unique<GraphicsEngine>(*ctx->window.get());
+    ctx->window.init(1000, 1000, "Breakout");
+    ctx->engine.init(ctx->window);
   }
   catch (const std::exception& e)
   {
@@ -42,8 +46,8 @@ SDL_AppResult SDL_AppIterate(void *appstate)
   {
     if (!ctx->paused)
     {
-      ctx->engine->update();
-      ctx->engine->draw();
+      ctx->engine.update();
+      ctx->engine.draw();
     }
   }
   catch (const std::exception& e)
@@ -70,7 +74,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
       ctx->paused = false;
       break;
     case SDL_EVENT_WINDOW_RESIZED:
-      ctx->engine->resize_swapchain();
+      ctx->engine.resize_swapchain();
       break;
     }
   }

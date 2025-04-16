@@ -42,6 +42,7 @@ FetchContent_MakeAvailable(VMA)
 set(INCLUDE
   include
   include/GraphicsEngine
+  include/UI
 )
 file(GLOB_RECURSE SOURCE src/*.cpp)
 set(LIBS

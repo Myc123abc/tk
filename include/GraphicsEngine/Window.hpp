@@ -27,13 +27,16 @@ namespace tk { namespace graphics_engine {
   class Window
   {
   public:
-    Window(uint32_t width, uint32_t height, std::string_view title);
-    ~Window();
+    Window()  = default;
+    ~Window() = default;
 
     Window(Window const&)            = delete;
     Window(Window&&)                 = delete;
     Window& operator=(Window const&) = delete;
     Window& operator=(Window&&)      = delete;
+
+    void init(uint32_t width, uint32_t height, std::string_view title);
+    void destroy() const;
 
     auto create_surface(VkInstance instance)                     const -> VkSurfaceKHR;
     void get_framebuffer_size(uint32_t& width, uint32_t& height) const;

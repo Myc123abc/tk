@@ -218,7 +218,7 @@ void GraphicsEngine::draw(VkCommandBuffer cmd)
 void GraphicsEngine::painter_to_draw()
 {
   uint32_t width, height;
-  _window.get_framebuffer_size(width, height);
+  _window->get_framebuffer_size(width, height);
 
   // draw background
   _painter.use_canvas("background");
