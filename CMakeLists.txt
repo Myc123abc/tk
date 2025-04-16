@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.30)
 
-project(Game-Breakout)
+project(tk)
 
 ################################################################################
 #                               CMake Setting
@@ -36,13 +36,11 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(VMA)
 
 ################################################################################
-#                               Build Binrary 
+#                               Build Static Library 
 ################################################################################
 
 set(INCLUDE
-  include/tk
-  include/tk/GraphicsEngine
-  include/tk/UI
+  include
 )
 file(GLOB_RECURSE SOURCE src/*.cpp)
 set(LIBS
@@ -57,13 +55,19 @@ set(LIBS
   GPUOpen::VulkanMemoryAllocator
 )
 
-add_executable(Breakout ${SOURCE})
+add_library(tk STATIC ${SOURCE})
 
-target_include_directories(Breakout PRIVATE ${INCLUDE})
+target_include_directories(tk PUBLIC ${INCLUDE})
 
-target_link_libraries(Breakout PRIVATE ${LIBS})
+target_link_libraries(tk PUBLIC ${LIBS})
 
-target_compile_definitions(Breakout PRIVATE
+target_compile_definitions(tk PUBLIC 
   GLM_FORCE_DEPTH_ZERO_TO_ONE
   GLM_FORCE_RADIANS
 )
+
+################################################################################
+#                              Example 
+################################################################################
+
+add_subdirectory(example)

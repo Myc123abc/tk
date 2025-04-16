@@ -1,5 +1,5 @@
-#include "GraphicsEngine.hpp"
-#include "ErrorHandling.hpp"
+#include "tk/GraphicsEngine/GraphicsEngine.hpp"
+#include "tk/ErrorHandling.hpp"
 
 namespace tk { namespace graphics_engine {
 

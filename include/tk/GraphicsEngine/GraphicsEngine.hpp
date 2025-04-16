@@ -10,8 +10,8 @@
 
 #pragma once
 
-#include "Window.hpp"
-#include "DestructorStack.hpp"
+#include "../Window.hpp"
+#include "../DestructorStack.hpp"
 #include "MemoryAllocator.hpp"
 #include "CommandPool.hpp"
 

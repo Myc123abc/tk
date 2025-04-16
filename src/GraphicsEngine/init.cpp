@@ -1,9 +1,9 @@
-#include "GraphicsEngine.hpp"
+#include "tk/GraphicsEngine/GraphicsEngine.hpp"
 #include "init-util.hpp"
 #include "constant.hpp"
-#include "PipelineBuilder.hpp"
-#include "Painter.hpp"
-#include "MaterialLibrary.hpp"
+#include "tk/GraphicsEngine/PipelineBuilder.hpp"
+#include "tk/GraphicsEngine/Painter.hpp"
+#include "tk/GraphicsEngine/MaterialLibrary.hpp"
 
 #include <ranges>
 #include <set>

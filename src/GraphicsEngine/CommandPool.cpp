@@ -1,5 +1,5 @@
-#include "CommandPool.hpp"
-#include "ErrorHandling.hpp"
+#include "tk/GraphicsEngine/CommandPool.hpp"
+#include "tk/ErrorHandling.hpp"
 #include <cassert>
 
 namespace tk { namespace graphics_engine {

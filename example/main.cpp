@@ -1,5 +1,5 @@
-#include "UI.hpp"
-#include "Log.hpp"
+#include "tk/UI/UI.hpp"
+#include "tk/Log.hpp"
 
 #define SDL_MAIN_USE_CALLBACKS
 #include <SDL3/SDL_main.h>

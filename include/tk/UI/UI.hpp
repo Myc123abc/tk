@@ -10,10 +10,10 @@
 
 #pragma once
 
-#include "Window.hpp"
-#include "GraphicsEngine.hpp"
-#include "Painter.hpp"
-#include "DestructorStack.hpp"
+#include "../Window.hpp"
+#include "../GraphicsEngine/GraphicsEngine.hpp"
+#include "../GraphicsEngine/Painter.hpp"
+#include "../DestructorStack.hpp"
 
 namespace tk { namespace ui {
 

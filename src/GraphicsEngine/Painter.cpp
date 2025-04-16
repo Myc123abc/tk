@@ -1,6 +1,6 @@
-#include "Painter.hpp"
-#include "ErrorHandling.hpp"
-#include "Window.hpp"
+#include "tk/GraphicsEngine/Painter.hpp"
+#include "tk/ErrorHandling.hpp"
+#include "tk/Window.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Log.hpp"
-#include "ErrorHandling.hpp"
-#include "Window.hpp"
+#include "tk/Log.hpp"
+#include "tk/ErrorHandling.hpp"
+#include "tk/Window.hpp"
 
 #include <fstream>
 #include <map>

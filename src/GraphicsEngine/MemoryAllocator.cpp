@@ -1,7 +1,7 @@
-#include "MemoryAllocator.hpp"
-#include "ErrorHandling.hpp"
-#include "CommandPool.hpp"
-#include "MaterialLibrary.hpp"
+#include "tk/GraphicsEngine/MemoryAllocator.hpp"
+#include "tk/ErrorHandling.hpp"
+#include "tk/GraphicsEngine/CommandPool.hpp"
+#include "tk/GraphicsEngine/MaterialLibrary.hpp"
 
 namespace tk { namespace graphics_engine {
 

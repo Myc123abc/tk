@@ -1,5 +1,5 @@
-#include "UI.hpp"
-#include "Log.hpp"
+#include "tk/UI/UI.hpp"
+#include "tk/Log.hpp"
 
 namespace tk { namespace ui {
 

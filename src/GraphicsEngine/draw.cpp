@@ -1,5 +1,5 @@
-#include "GraphicsEngine.hpp"
-#include "ErrorHandling.hpp"
+#include "tk/GraphicsEngine/GraphicsEngine.hpp"
+#include "tk/ErrorHandling.hpp"
 #include "constant.hpp"
 
 #include <SDL3/SDL_events.h>

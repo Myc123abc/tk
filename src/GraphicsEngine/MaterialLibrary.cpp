@@ -1,7 +1,7 @@
-#include "MaterialLibrary.hpp"
-#include "ErrorHandling.hpp"
-#include "DestructorStack.hpp"
-#include "CommandPool.hpp"
+#include "tk/GraphicsEngine/MaterialLibrary.hpp"
+#include "tk/ErrorHandling.hpp"
+#include "tk/DestructorStack.hpp"
+#include "tk/GraphicsEngine/CommandPool.hpp"
 
 namespace tk { namespace graphics_engine {
 

@@ -1,5 +1,5 @@
-#include "PipelineBuilder.hpp"
-#include "ErrorHandling.hpp"
+#include "tk/GraphicsEngine/PipelineBuilder.hpp"
+#include "tk/ErrorHandling.hpp"
 
 namespace tk { namespace graphics_engine {
 

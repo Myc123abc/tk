@@ -14,7 +14,7 @@
 #pragma once
 
 #include "MaterialLibrary.hpp"
-#include "Window.hpp"
+#include "../Window.hpp"
 
 #include <vector>
 #include <string_view>
