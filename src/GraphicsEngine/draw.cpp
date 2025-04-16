@@ -193,7 +193,7 @@ void GraphicsEngine::draw(VkCommandBuffer cmd)
 
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _2D_pipeline);
 
-  auto canvas_shape_matrix_infos = _painter.get_canvas_shape_matrix_infos();
+  auto canvas_shape_matrix_infos = _painter.get_shape_matrix_info_of_all_canvases();
   for (auto const& [canvas, matrix_infos] : canvas_shape_matrix_infos)
   {
     for (auto const& matrix_info : matrix_infos)
@@ -222,14 +222,13 @@ void GraphicsEngine::painter_to_draw()
     // draw background
     .use_canvas("background")
     .draw_quard("background picture", 0, 0, width, height, Color::OneDark)
-    .present("background")
     // draw shapes
     .use_canvas("shapes")
     .draw_quard("left top", 0, 0, 250, 250, Color::Red)
     .draw_quard("right top", 250, 0, 250, 250, Color::Green)
     .draw_quard("left down", 0, 250, 250, 250, Color::Blue)
     .draw_quard("right down", 250, 250, 250, 250, Color::Yellow)
-    .present("shapes");
+    .generate_shape_matrix_info_of_all_canvases();
 }
     
 } }

@@ -112,11 +112,17 @@ namespace tk { namespace graphics_engine {
      */
     auto draw_quard(std::string_view name, uint32_t x, uint32_t y, uint32_t width, uint32_t height, Color color) -> Painter&;
 
-    // FIX: should be discard
-    auto present(std::string_view canvas_name) -> Painter&;
+    // TODO: expand to can specific name of shape to generate its matrix info
+    //       and specific canvases to generate
+    /**
+     * generate shape matrix infos of all canvases
+     */
+    auto generate_shape_matrix_info_of_all_canvases() -> Painter&;
 
-    // TODO: can change to get_shapes_draw_result, etc... mix with present function
-    auto get_canvas_shape_matrix_infos() const noexcept { return _canvas_shape_matrix_infos; }
+    /**
+     * get shape matrix infos of all canvases
+     */
+    auto get_shape_matrix_info_of_all_canvases() const noexcept { return _canvas_shape_matrix_infos; }
 
   private:
     static auto get_quard_matrix(QuardInfo const& info, class Window const& window, uint32_t x, uint32_t y) -> glm::mat4;

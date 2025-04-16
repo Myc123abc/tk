@@ -64,28 +64,23 @@ auto Painter::draw_quard(std::string_view name, uint32_t x, uint32_t y, uint32_t
   return *this;
 }
 
-//
-// vertices buffer and indices buffer only use storage data of every type shapes
-// different shapes use matrix to draw themselve
-//
-auto Painter::present(std::string_view canvas_name) -> Painter&
+auto Painter::generate_shape_matrix_info_of_all_canvases() -> Painter&
 {
-  throw_if(!_canvases.contains(canvas_name.data()), "canvas {} is not exist", canvas_name);
-  auto& canvas = _canvases[canvas_name.data()];
-
-  auto shape_matrixs = std::vector<ShapeMatrixInfo>();
-
-  for (auto const& info : canvas.shape_infos)
+  for (auto const& [name, canvas] : _canvases)
   {
-    switch (info->type) 
-    {
-    case ShapeType::Quard:
-      shape_matrixs.emplace_back(info->type, info->color, get_quard_matrix(dynamic_cast<QuardInfo const&>(*info), *canvas.window, canvas.x, canvas.y));
-      break;
-    }
-  }
+    auto shape_matrixs = std::vector<ShapeMatrixInfo>();
 
-  _canvas_shape_matrix_infos[canvas_name.data()] = shape_matrixs;
+    for (auto const& info : canvas.shape_infos)
+    {
+      switch (info->type) 
+      {
+      case ShapeType::Quard:
+        shape_matrixs.emplace_back(info->type, info->color, get_quard_matrix(dynamic_cast<QuardInfo const&>(*info), *canvas.window, canvas.x, canvas.y));
+        break;
+      }
+    }
+      _canvas_shape_matrix_infos[name] = std::move(shape_matrixs);
+  }
 
   return *this;
 }
