@@ -218,17 +218,16 @@ void GraphicsEngine::painter_to_draw()
   uint32_t width, height;
   _window.get_framebuffer_size(width, height);
 
-  _painter
-    // draw background
-    .use_canvas("background")
-    .draw_quard("background picture", 0, 0, width, height, Color::OneDark)
-    // draw shapes
-    .use_canvas("shapes")
-    .draw_quard("left top", 0, 0, 250, 250, Color::Red)
-    .draw_quard("right top", 250, 0, 250, 250, Color::Green)
-    .draw_quard("left down", 0, 250, 250, 250, Color::Blue)
-    .draw_quard("right down", 250, 250, 250, 250, Color::Yellow)
-    .generate_shape_matrix_info_of_all_canvases();
+  // draw background
+  _painter.use_canvas("background");
+  _background_id = _painter.draw_quard(0, 0, width, height, Color::OneDark);
+  // draw shapes
+  _painter.use_canvas("shapes");
+  _painter.draw_quard(0, 0, 250, 250, Color::Red);
+  _painter.draw_quard(250, 0, 250, 250, Color::Green);
+  _painter.draw_quard(0, 250, 250, 250, Color::Blue);
+  _painter.draw_quard(250, 250, 250, 250, Color::Yellow);
+  _painter.generate_shape_matrix_info_of_all_canvases();
 }
     
 } }

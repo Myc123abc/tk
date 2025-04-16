@@ -551,8 +551,8 @@ void GraphicsEngine::resize_swapchain()
   uint32_t width, height;
   _window.get_framebuffer_size(width, height);
   _painter.use_canvas("background")
-          .draw_quard("background picture", 0, 0, width, height, Color::OneDark)
-          .generate_shape_matrix_info_of_all_canvases();
+          .redraw_quard(_background_id, 0, 0, width, height, Color::OneDark);
+  _painter.generate_shape_matrix_info_of_all_canvases();
 }
 
 void GraphicsEngine::init_painter()

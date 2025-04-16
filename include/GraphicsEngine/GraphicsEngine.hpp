@@ -105,8 +105,13 @@ namespace tk { namespace graphics_engine {
     VkQueue                      _present_queue            = VK_NULL_HANDLE;
 
     MemoryAllocator              _mem_alloc;
+
+    // FIX: discard
+    //      mesh_buffer should in MaterialLibrary
+    //      Painter and background id should in UI class
     MeshBuffer                   _mesh_buffer;
     Painter                      _painter; 
+    uint32_t                     _background_id = -1;
 
     // use dynamic rendering
     VkSwapchainKHR               _swapchain                = VK_NULL_HANDLE;

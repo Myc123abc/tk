@@ -40,7 +40,7 @@ namespace tk { namespace graphics_engine {
     {
       virtual ~ShapeInfo() = default;
 
-      std::string name;
+      uint32_t    id;
       ShapeType   type;
       uint32_t    x = 0;
       uint32_t    y = 0;
@@ -103,14 +103,27 @@ namespace tk { namespace graphics_engine {
     /**
      * draw a quard
      * xy is left top corner of quard
-     * @param name
      * @param x
      * @param y
      * @param width
      * @param height
      * @param color
+     * @return shape id
      */
-    auto draw_quard(std::string_view name, uint32_t x, uint32_t y, uint32_t width, uint32_t height, Color color) -> Painter&;
+    auto draw_quard(uint32_t x, uint32_t y, uint32_t width, uint32_t height, Color color) -> uint32_t;
+
+    /**
+     * redraw a quard
+     * xy is left top corner of quard
+     * @param id
+     * @param x
+     * @param y
+     * @param width
+     * @param height
+     * @param color
+     * @throw if id is invalid
+     */
+    auto redraw_quard(uint32_t id, uint32_t x, uint32_t y, uint32_t width, uint32_t height, Color color) -> Painter&;
 
     // TODO: expand to can specific name of shape to generate its matrix info
     //       and specific canvases to generate
@@ -125,6 +138,8 @@ namespace tk { namespace graphics_engine {
     auto get_shape_matrix_info_of_all_canvases() const noexcept { return _canvas_shape_matrix_infos; }
 
   private:
+    static auto generate_id() noexcept { return ++_id; }
+
     static auto get_quard_matrix(QuardInfo const& info, class Window const& window, uint32_t x, uint32_t y) -> glm::mat4;
 
   private:
@@ -132,6 +147,9 @@ namespace tk { namespace graphics_engine {
     Canvas*                       _canvas = nullptr;
 
     std::map<std::string, std::vector<ShapeMatrixInfo>> _canvas_shape_matrix_infos;
+
+    // global id
+    inline static uint32_t _id = -1;
   };
 
 }}

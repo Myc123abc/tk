@@ -32,28 +32,12 @@ auto Painter::put(std::string_view canvas, class Window const& window, uint32_t 
   return *this;
 }
 
-auto Painter::draw_quard(std::string_view name, uint32_t x, uint32_t y, uint32_t width, uint32_t height, Color color) -> Painter&
+auto Painter::draw_quard(uint32_t x, uint32_t y, uint32_t width, uint32_t height, Color color) -> uint32_t
 {
   assert(_canvas);
-
-  auto it = std::ranges::find_if(_canvas->shape_infos, [name](auto const& info)
-  {
-    return info->name == name;
-  });
-  if (it != _canvas->shape_infos.end())
-  {
-      auto quard = dynamic_cast<QuardInfo*>(it->get());
-      quard->name   = name;
-      quard->x      = x;
-      quard->y      = y;
-      quard->color  = color;
-      quard->width  = width;
-      quard->height = height;
-      return *this;
-  }
-
+  auto id = generate_id();
   auto quard    = std::make_unique<QuardInfo>();
-  quard->name   = name;
+  quard->id     = id;
   quard->type   = ShapeType::Quard;
   quard->x      = x;
   quard->y      = y;
@@ -61,6 +45,23 @@ auto Painter::draw_quard(std::string_view name, uint32_t x, uint32_t y, uint32_t
   quard->width  = width;
   quard->height = height;
   _canvas->shape_infos.emplace_back(std::move(quard));
+  return id;
+}
+
+auto Painter::redraw_quard(uint32_t id, uint32_t x, uint32_t y, uint32_t width, uint32_t height, Color color) -> Painter&
+{
+  assert(_canvas);
+
+  auto it = std::ranges::find_if(_canvas->shape_infos, [id](auto const& info) { return info->id ==id; });
+  throw_if(it == _canvas->shape_infos.end(), "invalid shape id {}", id);
+
+  auto quard = dynamic_cast<QuardInfo*>(it->get());
+  quard->x      = x;
+  quard->y      = y;
+  quard->color  = color;
+  quard->width  = width;
+  quard->height = height;
+
   return *this;
 }
 
