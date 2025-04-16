@@ -81,7 +81,8 @@ namespace tk { namespace graphics_engine {
     void create_sync_objects();
     void create_frame_resources();
     void init_painter();
-    void create_material_mesh_buffer();
+    // HACK: subtle naming...
+    void use_single_time_command_init_something();
 
     //
     // util 
@@ -107,9 +108,7 @@ namespace tk { namespace graphics_engine {
     MemoryAllocator              _mem_alloc;
 
     // FIX: discard
-    //      mesh_buffer should in MaterialLibrary
     //      Painter and background id should in UI class
-    MeshBuffer                   _mesh_buffer;
     Painter                      _painter; 
     uint32_t                     _background_id = -1;
 

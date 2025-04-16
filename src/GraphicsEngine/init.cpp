@@ -35,9 +35,9 @@ GraphicsEngine::GraphicsEngine(Window const& window)
   create_descriptor_sets();
   create_frame_resources();
   init_painter();
-  create_material_mesh_buffer();
+  use_single_time_command_init_something();
 
-  // INFO: only draw static shape, so present once before resize window
+  // FIX: discard, should be run by ui class
   painter_to_draw();
 }
 
@@ -564,26 +564,23 @@ void GraphicsEngine::init_painter()
     .put("shapes", _window, 250, 250);
 }
 
-void GraphicsEngine::create_material_mesh_buffer()
+void GraphicsEngine::use_single_time_command_init_something()
 {
-  // get shape meshs
-  auto meshs      = MaterialLibrary::get_meshs();
-
-  // create mesh buffer
+  // start single time command and destructor use for destruct stage buffer, etc.
   auto cmd        = _command_pool.create_command().begin();
   auto destructor = DestructorStack();
-  auto mesh_infos = std::vector<MeshInfo>();
-  _mesh_buffer = _mem_alloc.create_mesh_buffer(cmd, meshs, destructor, mesh_infos);
+
+  // use command
+  MaterialLibrary::init(_mem_alloc, cmd, destructor);
+
+  // end command
   cmd.end().submit_wait_free(_command_pool, _graphics_queue);
 
-  // destroy stage buffer
+  // destroy stage buffer and others
   destructor.clear();
 
-  // add mesh buffer destructor
-  _destructors.push([&] { _mem_alloc.destroy_mesh_buffer(_mesh_buffer); });
-
-  // build mesh info with shape type
-  MaterialLibrary::build_mesh_infos(mesh_infos);
+  // add material library destructor
+  _destructors.push([&] { MaterialLibrary::destroy(); });
 }
 
 } }

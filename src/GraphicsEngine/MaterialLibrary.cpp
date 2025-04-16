@@ -1,5 +1,7 @@
 #include "MaterialLibrary.hpp"
 #include "ErrorHandling.hpp"
+#include "DestructorStack.hpp"
+#include "CommandPool.hpp"
 
 namespace tk { namespace graphics_engine {
 
@@ -46,6 +48,30 @@ Mesh create_quard(Color color)
 ////////////////////////////////////////////////////////////////////////////////
 //                           Material Library 
 ////////////////////////////////////////////////////////////////////////////////
+
+void MaterialLibrary::init(MemoryAllocator& mem_alloc, Command& cmd, DestructorStack& destructor)
+{
+  _mem_alloc = &mem_alloc;
+
+  // get shape meshs
+  auto meshs      = MaterialLibrary::get_meshs();
+
+  // create mesh buffer
+  auto mesh_infos = std::vector<MeshInfo>();
+  _mesh_buffer = mem_alloc.create_mesh_buffer(cmd, meshs, destructor, mesh_infos);
+
+  // build mesh info with shape type
+  MaterialLibrary::build_mesh_infos(mesh_infos);
+}
+
+void MaterialLibrary::destroy()
+{
+  assert(_mem_alloc);
+  _mem_alloc->destroy_mesh_buffer(_mesh_buffer);
+  _mem_alloc = nullptr;
+  _materials.clear();
+  _mesh_infos.clear(); 
+}
 
 void MaterialLibrary::generate_materials()
 {

@@ -193,19 +193,21 @@ void GraphicsEngine::draw(VkCommandBuffer cmd)
 
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _2D_pipeline);
 
+  // HACK: these should in ui class
   auto canvas_shape_matrix_infos = _painter.get_shape_matrix_info_of_all_canvases();
   for (auto const& [canvas, matrix_infos] : canvas_shape_matrix_infos)
   {
     for (auto const& matrix_info : matrix_infos)
     {
-      auto mesh_info = MaterialLibrary::get_mesh_infos()[matrix_info.type][matrix_info.color];
+      auto mesh_info   = MaterialLibrary::get_mesh_infos()[matrix_info.type][matrix_info.color];
+      auto mesh_buffer = MaterialLibrary::get_mesh_buffer();
       PushConstant pc
       {
-        .model = matrix_info.matrix,
-        .vertices = _mesh_buffer.address + mesh_info.vertices_offset,
+        .model    = matrix_info.matrix,
+        .vertices = mesh_buffer.address + mesh_info.vertices_offset,
       };
       vkCmdPushConstants(cmd, _2D_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pc), &pc);
-      vkCmdBindIndexBuffer(cmd, _mesh_buffer.indices.handle, 0, VK_INDEX_TYPE_UINT16);
+      vkCmdBindIndexBuffer(cmd, mesh_buffer.indices.handle, 0, VK_INDEX_TYPE_UINT16);
       vkCmdDrawIndexed(cmd, mesh_info.indices_count, 1, mesh_info.indices_offset, 0, 0);
     }
   }

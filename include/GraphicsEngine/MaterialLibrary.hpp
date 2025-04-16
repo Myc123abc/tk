@@ -63,12 +63,17 @@ namespace tk { namespace graphics_engine {
   class MaterialLibrary
   {
   public:
+    // HACK: should it be use internal single time command?
+    static void init(MemoryAllocator& mem_alloc, class Command& cmd, class DestructorStack& destructor);
+    static void destroy();
+
+    static auto& get_mesh_infos() noexcept { return _mesh_infos; }
+    static auto& get_mesh_buffer() noexcept { return _mesh_buffer; }
+
+  private:
     static auto get_meshs() -> std::vector<Mesh>;
     static void build_mesh_infos(std::span<MeshInfo> mesh_infos);
 
-    static auto& get_mesh_infos() noexcept { return _mesh_infos; }
-
-  private:
     static void generate_materials();
 
   private:
@@ -87,6 +92,10 @@ namespace tk { namespace graphics_engine {
       std::vector<Color> colors;
     };
 
+    inline static MemoryAllocator* _mem_alloc = nullptr;
+
+    // HACK: only single mesh data and single mesh buffer, how to use on dynamic( and also materials and mesh infos)
+    inline static MeshBuffer _mesh_buffer;
     inline static std::vector<Material> _materials;
     inline static std::map<ShapeType, std::map<Color, MeshInfo>> _mesh_infos;
   };
