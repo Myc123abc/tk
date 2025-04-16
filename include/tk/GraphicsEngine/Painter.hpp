@@ -14,6 +14,7 @@
 #pragma once
 
 #include "MaterialLibrary.hpp"
+#include "Window.hpp"
 
 #include <vector>
 #include <string_view>
@@ -55,7 +56,7 @@ namespace tk { namespace graphics_engine {
       std::vector<std::unique_ptr<ShapeInfo>> shape_infos;
 
       // put on which window and put position (top left corner)
-      class Window const*                     window;
+      Window const*                     window;
       uint32_t                                x = 0;
       uint32_t                                y = 0;
     };
@@ -98,7 +99,7 @@ namespace tk { namespace graphics_engine {
      * @param x
      * @param y
      */
-    auto put(std::string_view canvas, class Window const& window, uint32_t x, uint32_t y) -> Painter&;
+    auto put(std::string_view canvas, Window const& window, uint32_t x, uint32_t y) -> Painter&;
 
     /**
      * draw a quard
@@ -140,7 +141,7 @@ namespace tk { namespace graphics_engine {
   private:
     static auto generate_id() noexcept { return ++_id; }
 
-    static auto get_quard_matrix(QuardInfo const& info, class Window const& window, uint32_t x, uint32_t y) -> glm::mat4;
+    static auto get_quard_matrix(QuardInfo const& info, Window const& window, uint32_t x, uint32_t y) -> glm::mat4;
 
   private:
     std::map<std::string, Canvas> _canvases;

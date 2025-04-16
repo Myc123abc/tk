@@ -1,24 +1,23 @@
-#include "Window.hpp"
-#include "GraphicsEngine.hpp"
+#include "UI.hpp"
 #include "Log.hpp"
 
 #define SDL_MAIN_USE_CALLBACKS
 #include <SDL3/SDL_main.h>
 
 using namespace tk;
-using namespace tk::graphics_engine;
+using namespace tk::ui;
 
 struct AppContext
 {
   ~AppContext()
   {
-    engine.destroy();
     window.destroy();
   }
 
-  Window         window;
-  GraphicsEngine engine;
-  bool           paused = false;
+  Window window; 
+  // Layout layout; 
+  // Button button; 
+  bool   paused = false;
 };
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
@@ -27,8 +26,14 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
   try
   {
     ctx = new AppContext();
-    ctx->window.init(1000, 1000, "Breakout");
-    ctx->engine.init(ctx->window);
+
+    ctx->window.init("Breakout", 1000, 1000);
+    UI::init(ctx->window);
+
+    // layout default create bound on main window
+    // ctx->layout = UI::create_layout();
+    // create button with width and height
+    // ctx->button = UI::create_button(100, 100);
   }
   catch (const std::exception& e)
   {
@@ -46,8 +51,8 @@ SDL_AppResult SDL_AppIterate(void *appstate)
   {
     if (!ctx->paused)
     {
-      ctx->engine.update();
-      ctx->engine.draw();
+      // ctx->layout.put_on("main window", )
+      UI::render();
     }
   }
   catch (const std::exception& e)
@@ -74,7 +79,11 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
       ctx->paused = false;
       break;
     case SDL_EVENT_WINDOW_RESIZED:
-      ctx->engine.resize_swapchain();
+      // ctx->engine.resize_swapchain();
+      break;
+    case SDL_EVENT_KEY_DOWN:
+      if (event->key.key == SDLK_Q)
+        return SDL_APP_SUCCESS;
       break;
     }
   }
@@ -88,6 +97,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 
 void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
+  UI::destroy();
   delete (AppContext*)appstate;
   if (result == SDL_APP_SUCCESS)
     exit(EXIT_SUCCESS);

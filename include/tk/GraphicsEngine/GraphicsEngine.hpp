@@ -14,7 +14,6 @@
 #include "DestructorStack.hpp"
 #include "MemoryAllocator.hpp"
 #include "CommandPool.hpp"
-#include "Painter.hpp"
 
 #include <vk_mem_alloc.h>
 #include <SDL3/SDL_events.h>
@@ -60,14 +59,12 @@ namespace tk { namespace graphics_engine {
     // HACK: this not should in here, it should in use engine's place
     // maybe update and draw should be user's codes
     // also with keyboard_process
-    void update();
     void draw();
     void resize_swapchain();
 
   private:
     void draw(VkCommandBuffer cmd);
     void draw_background(Command cmd);
-    void painter_to_draw();
 
   private:
     //
@@ -89,7 +86,6 @@ namespace tk { namespace graphics_engine {
     void create_descriptor_sets();
     void create_sync_objects();
     void create_frame_resources();
-    void init_painter();
     // HACK: subtle naming...
     void use_single_time_command_init_something();
 
@@ -115,11 +111,6 @@ namespace tk { namespace graphics_engine {
     VkQueue                      _present_queue            = VK_NULL_HANDLE;
 
     MemoryAllocator              _mem_alloc;
-
-    // FIX: discard
-    //      Painter and background id should in UI class
-    Painter                      _painter; 
-    uint32_t                     _background_id = -1;
 
     //
     // use dynamic rendering

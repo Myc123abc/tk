@@ -7,10 +7,6 @@
 
 namespace tk { namespace graphics_engine {
 
-void GraphicsEngine::update()
-{
-}
-
 // use independent image to draw, and copy it to swapchain image has may resons,
 // detail reference: https://vkguide.dev/docs/new_chapter_2/vulkan_new_rendering/#new-draw-loop
 void GraphicsEngine::draw()
@@ -189,47 +185,30 @@ void render_end(VkCommandBuffer cmd)
 
 void GraphicsEngine::draw(VkCommandBuffer cmd)
 {
-  render_begin(cmd, _image.view, {_draw_extent.width, _draw_extent.height});
-
-  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _2D_pipeline);
-
-  // HACK: these should in ui class
-  auto canvas_shape_matrix_infos = _painter.get_shape_matrix_info_of_all_canvases();
-  for (auto const& [canvas, matrix_infos] : canvas_shape_matrix_infos)
-  {
-    for (auto const& matrix_info : matrix_infos)
-    {
-      auto mesh_info   = MaterialLibrary::get_mesh_infos()[matrix_info.type][matrix_info.color];
-      auto mesh_buffer = MaterialLibrary::get_mesh_buffer();
-      PushConstant pc
-      {
-        .model    = matrix_info.matrix,
-        .vertices = mesh_buffer.address + mesh_info.vertices_offset,
-      };
-      vkCmdPushConstants(cmd, _2D_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pc), &pc);
-      vkCmdBindIndexBuffer(cmd, mesh_buffer.indices.handle, 0, VK_INDEX_TYPE_UINT16);
-      vkCmdDrawIndexed(cmd, mesh_info.indices_count, 1, mesh_info.indices_offset, 0, 0);
-    }
-  }
-
-  render_end(cmd);
-}
-
-void GraphicsEngine::painter_to_draw()
-{
-  uint32_t width, height;
-  _window->get_framebuffer_size(width, height);
-
-  // draw background
-  _painter.use_canvas("background");
-  _background_id = _painter.draw_quard(0, 0, width, height, Color::OneDark);
-  // draw shapes
-  _painter.use_canvas("shapes");
-  _painter.draw_quard(0, 0, 250, 250, Color::Red);
-  _painter.draw_quard(250, 0, 250, 250, Color::Green);
-  _painter.draw_quard(0, 250, 250, 250, Color::Blue);
-  _painter.draw_quard(250, 250, 250, 250, Color::Yellow);
-  _painter.generate_shape_matrix_info_of_all_canvases();
+  // render_begin(cmd, _image.view, {_draw_extent.width, _draw_extent.height});
+  //
+  // vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _2D_pipeline);
+  //
+  // // HACK: these should in ui class
+  // auto canvas_shape_matrix_infos = _painter.get_shape_matrix_info_of_all_canvases();
+  // for (auto const& [canvas, matrix_infos] : canvas_shape_matrix_infos)
+  // {
+  //   for (auto const& matrix_info : matrix_infos)
+  //   {
+  //     auto mesh_info   = MaterialLibrary::get_mesh_infos()[matrix_info.type][matrix_info.color];
+  //     auto mesh_buffer = MaterialLibrary::get_mesh_buffer();
+  //     PushConstant pc
+  //     {
+  //       .model    = matrix_info.matrix,
+  //       .vertices = mesh_buffer.address + mesh_info.vertices_offset,
+  //     };
+  //     vkCmdPushConstants(cmd, _2D_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pc), &pc);
+  //     vkCmdBindIndexBuffer(cmd, mesh_buffer.indices.handle, 0, VK_INDEX_TYPE_UINT16);
+  //     vkCmdDrawIndexed(cmd, mesh_info.indices_count, 1, mesh_info.indices_offset, 0, 0);
+  //   }
+  // }
+  //
+  // render_end(cmd);
 }
     
 } }

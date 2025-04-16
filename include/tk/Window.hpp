@@ -22,7 +22,7 @@
 
 struct SDL_Window;
 
-namespace tk { namespace graphics_engine {
+namespace tk {
 
   class Window
   {
@@ -35,7 +35,7 @@ namespace tk { namespace graphics_engine {
     Window& operator=(Window const&) = delete;
     Window& operator=(Window&&)      = delete;
 
-    void init(uint32_t width, uint32_t height, std::string_view title);
+    void init(std::string_view title, uint32_t width, uint32_t height);
     void destroy() const;
 
     auto create_surface(VkInstance instance)                     const -> VkSurfaceKHR;
@@ -52,4 +52,4 @@ namespace tk { namespace graphics_engine {
     SDL_Window* _window;
   };
 
-} }
+}

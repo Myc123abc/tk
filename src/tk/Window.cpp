@@ -6,9 +6,9 @@
 
 #include <cassert>
 
-namespace tk { namespace graphics_engine {
+namespace tk {
 
-void Window::init(uint32_t width, uint32_t height, std::string_view title)
+void Window::init(std::string_view title, uint32_t width, uint32_t height)
 {
   // HACK: expand to multi-windows manage
   static bool first = true;
@@ -56,4 +56,4 @@ auto Window::get_vulkan_instance_extensions() -> std::vector<const char*>
   return std::vector(ret, ret + count);
 }
 
-} }
+}

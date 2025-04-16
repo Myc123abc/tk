@@ -35,11 +35,7 @@ void GraphicsEngine::init(Window const& window)
   create_descriptor_pool();
   create_descriptor_sets();
   create_frame_resources();
-  init_painter();
   use_single_time_command_init_something();
-
-  // FIX: discard, should be run by ui class
-  painter_to_draw();
 }
 
 void GraphicsEngine::destroy()
@@ -548,21 +544,6 @@ void GraphicsEngine::resize_swapchain()
   auto old_swapchain = _swapchain;
   create_swapchain(old_swapchain);
   vkDestroySwapchainKHR(_device, old_swapchain, nullptr);
-
-  uint32_t width, height;
-  _window->get_framebuffer_size(width, height);
-  _painter.use_canvas("background")
-          .redraw_quard(_background_id, 0, 0, width, height, Color::OneDark);
-  _painter.generate_shape_matrix_info_of_all_canvases();
-}
-
-void GraphicsEngine::init_painter()
-{
-  _painter
-    .create_canvas("background")
-    .put("background", *_window, 0, 0)
-    .create_canvas("shapes")
-    .put("shapes", *_window, 250, 250);
 }
 
 void GraphicsEngine::use_single_time_command_init_something()
