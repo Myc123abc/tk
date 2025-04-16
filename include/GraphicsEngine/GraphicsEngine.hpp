@@ -11,9 +11,7 @@
 #pragma once
 
 #include "Window.hpp"
-#include "FrameResource.hpp"
 #include "DestructorStack.hpp"
-#include "Image.hpp"
 #include "MemoryAllocator.hpp"
 #include "CommandPool.hpp"
 #include "Painter.hpp"
@@ -112,7 +110,18 @@ namespace tk { namespace graphics_engine {
     Painter                      _painter; 
     uint32_t                     _background_id = -1;
 
+    //
     // use dynamic rendering
+    //
+    struct Image
+    {
+      VkImage       image      = VK_NULL_HANDLE;
+      VkImageView   view       = VK_NULL_HANDLE;
+      VmaAllocation allocation = VK_NULL_HANDLE;
+      VkExtent3D    extent     = {};
+      VkFormat      format     = VK_FORMAT_UNDEFINED;
+    };
+
     VkSwapchainKHR               _swapchain                = VK_NULL_HANDLE;
     std::vector<VkImage>         _swapchain_images;
     VkExtent2D                   _swapchain_image_extent   = {};
@@ -128,6 +137,15 @@ namespace tk { namespace graphics_engine {
     //
     // frame resources
     //
+    struct FrameResource
+    {
+      // HACK: will I want to use command not command_buffer, but adjust them it's so terrible... after day
+      Command         command_buffer;
+      VkFence         fence               = VK_NULL_HANDLE;
+      VkSemaphore     image_available_sem = VK_NULL_HANDLE; 
+      VkSemaphore     render_finished_sem = VK_NULL_HANDLE; 
+    };
+
     std::vector<FrameResource>   _frames;
     uint32_t                     _current_frame            = 0;
     auto get_current_frame() -> FrameResource& { return _frames[_current_frame]; }
