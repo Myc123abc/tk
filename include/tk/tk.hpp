@@ -1,44 +1,29 @@
 //
-// tk context
-//
-// contain all global resources
-//
-// TODO:
-// 1. all static resources create in here
+// tk
 //
 
 #pragma once
 
-#include "Window.hpp"
-#include "GraphicsEngine/GraphicsEngine.hpp"
+#include "tk/ui.hpp"
+
+#include <string_view>
+
+#include <SDL3/SDL_init.h>
 
 namespace tk
 {
   
-  struct tk_context
-  {
-    Window                          window;
-    graphics_engine::GraphicsEngine engine;
+  /**
+   * initialize tk context
+   * @param title title of main window
+   * @param width width of main window
+   * @param height height of main window
+   * @param user_data user_data pointer
+   */
+  void init_tk_context(std::string_view title, uint32_t width, uint32_t height, void* user_data);
 
-    /**
-     * initialize tk context
-     * create main window
-     * initialize graphics engine
-     * @param title title of main window
-     * @param width width of main window
-     * @param height height of main window
-     */
-    void init(std::string_view title, uint32_t width, uint32_t height)
-    {
-      window.init(title, width, height);
-      engine.init(window);
-    }
+  auto get_user_data() -> void*;
 
-    void destroy()
-    {
-      engine.destroy();
-      window.destroy();
-    }
-  };
+  auto get_main_window() -> class tk::Window&;
 
 }

@@ -1,31 +1,55 @@
-#include "tk/UI/UI.hpp"
-#include "tk/Log.hpp"
+#include "tk/ui.hpp"
 
 namespace tk { namespace ui {
 
-using namespace graphics_engine;
-
-void UI::init(tk_context& ctx)
+auto create_layout() -> Layout
 {
-  _ctx = &ctx;
-  _painter.create_canvas("background")
-          .put("background", ctx.window, 0, 0)
-          .use_canvas("background");
-
-  uint32_t width, height;
-  ctx.window.get_framebuffer_size(width, height);
-  _background_id = _painter.draw_quard(0, 0, width, height, Color::OneDark);
+  Layout layout;
+  return std::move(layout);
 }
 
-void UI::destroy()
+auto create_button(uint32_t width, uint32_t height) -> Button
 {
+  Button button;
+  return std::move(button);
 }
 
-void UI::render()
+void put(Layout& layout, tk::Window& window, uint32_t x, uint32_t y)
 {
-  _ctx->engine.draw();
+
 }
 
+void put(UIWidget& widget, Layout& layout, uint32_t x, uint32_t y)
+{
+
+}
+
+void render()
+{
+
+}
+
+// void UI::init(tk_context& ctx)
+// {
+//   _ctx = &ctx;
+//   _painter.create_canvas("background")
+//           .put("background", ctx.window, 0, 0)
+//           .use_canvas("background");
+//
+//   uint32_t width, height;
+//   ctx.window.get_framebuffer_size(width, height);
+//   _background_id = _painter.draw_quard(0, 0, width, height, Color::OneDark);
+// }
+//
+// void UI::destroy()
+// {
+// }
+//
+// void UI::render()
+// {
+//   _ctx->engine.draw();
+// }
+//
 // void GraphicsEngine::painter_to_draw()
 // {
 //   uint32_t width, height;

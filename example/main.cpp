@@ -1,107 +1,46 @@
-#include "tk/Log.hpp"
-#include "tk/UI/UI.hpp"
+//
+// test tk library
+//
+// tk use SDL3 callback system to organize program,
+// and using internal variables to process graphics engine initialization,
+// event handles and other.
+//
+
 #include "tk/tk.hpp"
+#include "tk/log.hpp"
 
-#define SDL_MAIN_USE_CALLBACKS
-#include <SDL3/SDL_main.h>
-
-using namespace tk;
-using namespace tk::ui;
-
-struct AppContext
+struct Context
 {
-  ~AppContext()
-  {
-    ctx.destroy();
-  }
-
-  tk_context ctx;
-  // Layout layout; 
-  // Button button; 
-  bool   paused = false;
+  tk::ui::Layout layout;
+  tk::ui::Button button;
 };
 
-SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
+void tk_init(int argc, char** argv)
 {
-  AppContext* ctx = nullptr;
-  try
-  {
-    ctx = new AppContext();
+  auto ctx = new Context();
+  tk::init_tk_context("tk", 1000, 1000, ctx);
 
-    ctx->ctx.init("Breakout", 1000, 1000);
-    UI::init(ctx->ctx);
+  ctx->layout = tk::ui::create_layout();
+  ctx->button = tk::ui::create_button(100, 100);
 
-    // layout default create bound on main window
-    // ctx->layout = UI::create_layout();
-    // create button with width and height
-    // ctx->button = UI::create_button(100, 100);
-  }
-  catch (const std::exception& e)
-  {
-    log::error(e.what());
-    return SDL_APP_FAILURE;
-  }
-  *appstate = ctx;
-  return SDL_APP_CONTINUE;
+  tk::ui::put(ctx->layout, tk::get_main_window(), 0, 0);
+  tk::ui::put(ctx->button, ctx->layout, 50, 50);
 }
 
-SDL_AppResult SDL_AppIterate(void *appstate)
+void tk_iterate()
 {
-  auto ctx = (AppContext*)appstate;
-  try
+  auto ctx = (Context*)tk::get_user_data();
+  if (ctx->button.is_clicked())
   {
-    if (!ctx->paused)
-    {
-      // ctx->layout.put_on("main window", )
-      UI::render();
-    }
+    tk::log::info("button is clicked!");
   }
-  catch (const std::exception& e)
-  {
-    log::error(e.what());
-    return SDL_APP_FAILURE;
-  }
-  return SDL_APP_CONTINUE;
 }
 
-SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
+void tk_event(SDL_Event* event)
 {
-  auto ctx = (AppContext*)appstate;
-  try
-  {
-    switch (event->type)
-    {
-    case SDL_EVENT_QUIT:
-      return SDL_APP_SUCCESS;
-    case SDL_EVENT_WINDOW_MINIMIZED:
-      ctx->paused = true;
-      break;
-    case SDL_EVENT_WINDOW_MAXIMIZED:
-      ctx->paused = false;
-      break;
-    case SDL_EVENT_WINDOW_RESIZED:
-      // ctx->engine.resize_swapchain();
-      break;
-    case SDL_EVENT_KEY_DOWN:
-      if (event->key.key == SDLK_Q)
-        return SDL_APP_SUCCESS;
-      break;
-    }
-  }
-  catch (const std::exception& e)
-  {
-    log::error(e.what());
-    return SDL_APP_FAILURE;
-  }
-  return SDL_APP_CONTINUE;
 }
 
-void SDL_AppQuit(void *appstate, SDL_AppResult result)
+void tk_quit()
 {
-  UI::destroy();
-  delete (AppContext*)appstate;
-  if (result == SDL_APP_SUCCESS)
-    exit(EXIT_SUCCESS);
-  if (result == SDL_APP_FAILURE)
-    exit(EXIT_FAILURE);
+  delete (Context*)tk::get_user_data();
 }

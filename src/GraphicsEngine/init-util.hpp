@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tk/Log.hpp"
+#include "tk/log.hpp"
 #include "tk/ErrorHandling.hpp"
 #include "tk/Window.hpp"
 
