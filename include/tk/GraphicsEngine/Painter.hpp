@@ -9,6 +9,7 @@
 //    same shape type have multiple color, shape vertices will be repeately
 //    this is memory waste
 // 2. present with draw desquence, not have depth test
+// 3. not painter, painter is static, should be dyanmic ui...
 //
 
 #pragma once

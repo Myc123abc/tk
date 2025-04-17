@@ -1,5 +1,6 @@
-#include "tk/UI/UI.hpp"
 #include "tk/Log.hpp"
+#include "tk/UI/UI.hpp"
+#include "tk/tk.hpp"
 
 #define SDL_MAIN_USE_CALLBACKS
 #include <SDL3/SDL_main.h>
@@ -11,10 +12,10 @@ struct AppContext
 {
   ~AppContext()
   {
-    window.destroy();
+    ctx.destroy();
   }
 
-  Window window; 
+  tk_context ctx;
   // Layout layout; 
   // Button button; 
   bool   paused = false;
@@ -27,8 +28,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
   {
     ctx = new AppContext();
 
-    ctx->window.init("Breakout", 1000, 1000);
-    UI::init(ctx->window);
+    ctx->ctx.init("Breakout", 1000, 1000);
+    UI::init(ctx->ctx);
 
     // layout default create bound on main window
     // ctx->layout = UI::create_layout();

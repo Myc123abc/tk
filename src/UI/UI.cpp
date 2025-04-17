@@ -5,31 +5,25 @@ namespace tk { namespace ui {
 
 using namespace graphics_engine;
 
-void UI::init(Window const& window)
+void UI::init(tk_context& ctx)
 {
-  _engine.init(window);
+  _ctx = &ctx;
   _painter.create_canvas("background")
-          .put("background", window, 0, 0)
+          .put("background", ctx.window, 0, 0)
           .use_canvas("background");
 
   uint32_t width, height;
-  window.get_framebuffer_size(width, height);
+  ctx.window.get_framebuffer_size(width, height);
   _background_id = _painter.draw_quard(0, 0, width, height, Color::OneDark);
-
-  _destructor.push([&]
-  {
-    _engine.destroy();
-  });
 }
 
 void UI::destroy()
 {
-  _destructor.clear(); 
 }
 
 void UI::render()
 {
-  _engine.draw();  
+  _ctx->engine.draw();
 }
 
 // void GraphicsEngine::painter_to_draw()
