@@ -14,6 +14,7 @@
 #include "../DestructorStack.hpp"
 #include "MemoryAllocator.hpp"
 #include "CommandPool.hpp"
+#include "MaterialLibrary.hpp"
 
 #include <vk_mem_alloc.h>
 #include <SDL3/SDL_events.h>
@@ -56,15 +57,11 @@ namespace tk { namespace graphics_engine {
     //
     // run
     //
-    // HACK: this not should in here, it should in use engine's place
-    // maybe update and draw should be user's codes
-    // also with keyboard_process
-    void draw();
     void resize_swapchain();
 
-  private:
-    void draw(VkCommandBuffer cmd);
-    void draw_background(Command cmd);
+    void render_begin();
+    void render_end();
+    void render_shape(ShapeType type, Color color, glm::mat4 model);
 
   private:
     //

@@ -7,9 +7,12 @@
 
 namespace tk { namespace graphics_engine {
 
+// FIX: tmp way
+static uint32_t image_index = 0;
+
 // use independent image to draw, and copy it to swapchain image has may resons,
 // detail reference: https://vkguide.dev/docs/new_chapter_2/vulkan_new_rendering/#new-draw-loop
-void GraphicsEngine::draw()
+void GraphicsEngine::render_begin()
 {
   //
   // get current frame resource
@@ -32,7 +35,6 @@ void GraphicsEngine::draw()
   // acquire an available image which GPU not used currently,
   // so we can save render result on it.
   //
-  uint32_t image_index;
   auto res = vkAcquireNextImageKHR(_device, _swapchain, UINT64_MAX, frame.image_available_sem, VK_NULL_HANDLE, &image_index);
   if (res == VK_ERROR_OUT_OF_DATE_KHR)
     return;
@@ -57,18 +59,56 @@ void GraphicsEngine::draw()
   };
   vkBeginCommandBuffer(frame.command_buffer, &beg_info);
 
-  // HACK: make frame.command_buffer and _swapchain_images[image_index] to frame resource function
-  // only need like as follow:
-  //   render_begin();  // get current frame, available command buffer and image.
-  //                    // also switch command buffer to available, and clear vlaue.
-  //   some_render_ops(); 
-  //   render_end();    // submit commands to queue and end everything like command buffer, etc.
-
   // transition image layout to writeable
   transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   transition_image_layout(frame.command_buffer, _depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-  draw(frame.command_buffer);
+  //
+  // dynamic rendering
+  //
+  VkRenderingAttachmentInfo attachment
+  {
+    .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+    .imageView   = _image.view,
+    .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    .loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD,
+    .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
+  };
+  VkRenderingInfo rendering
+  {
+    .sType                = VK_STRUCTURE_TYPE_RENDERING_INFO,
+    .renderArea           =
+    {
+      .extent = _draw_extent,
+    },
+    .layerCount           = 1,
+    .colorAttachmentCount = 1,
+    .pColorAttachments    = &attachment,
+  };
+  vkCmdBeginRendering(frame.command_buffer, &rendering);
+
+  VkViewport viewport
+  {
+    .width  = (float)_draw_extent.width,
+    .height = (float)_draw_extent.height, 
+    .maxDepth = 1.f,
+  };
+  vkCmdSetViewport(frame.command_buffer, 0, 1, &viewport);
+  VkRect2D scissor 
+  {
+    .extent = _draw_extent,
+  };
+  vkCmdSetScissor(frame.command_buffer, 0, 1, &scissor);
+}
+
+void GraphicsEngine::render_end()
+{
+  //
+  // get current frame resource
+  //
+  auto frame = get_current_frame();
+
+  vkCmdEndRendering(frame.command_buffer);
 
   // copy image to swapchain image
   transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -126,7 +166,7 @@ void GraphicsEngine::draw()
     .pSwapchains        = &_swapchain,
     .pImageIndices      = &image_index,
   };
-  res = vkQueuePresentKHR(_present_queue, &presentation_info); 
+  auto res = vkQueuePresentKHR(_present_queue, &presentation_info); 
   if (res != VK_SUCCESS               &&
       res != VK_ERROR_OUT_OF_DATE_KHR &&
       res != VK_SUBOPTIMAL_KHR)
@@ -136,79 +176,20 @@ void GraphicsEngine::draw()
   _current_frame = ++_current_frame % Max_Frame_Number;
 }
 
-// HACK:
-// temporary render begin function, it should also have reset command, image transoform, etc. 
-// and also need to abstract VkCommandBuffer
-// also view and extent mostly is fixed
-void render_begin(VkCommandBuffer cmd, VkImageView view, VkExtent2D extent)
+void GraphicsEngine::render_shape(ShapeType type, Color color, glm::mat4 model)
 {
-  VkRenderingAttachmentInfo attachment
+  auto mesh_info   = MaterialLibrary::get_mesh_infos()[type][color];
+  auto mesh_buffer = MaterialLibrary::get_mesh_buffer();
+  PushConstant pc
   {
-    .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-    .imageView   = view,
-    .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    .loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD,
-    .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
+    .model    = model,
+    .vertices = mesh_buffer.address + mesh_info.vertices_offset,
   };
-  VkRenderingInfo rendering
-  {
-    .sType                = VK_STRUCTURE_TYPE_RENDERING_INFO,
-    .renderArea           =
-    {
-      .extent = extent,
-    },
-    .layerCount           = 1,
-    .colorAttachmentCount = 1,
-    .pColorAttachments    = &attachment,
-  };
-  vkCmdBeginRendering(cmd, &rendering);
 
-  VkViewport viewport
-  {
-    .width  = (float)extent.width,
-    .height = (float)extent.height, 
-    .maxDepth = 1.f,
-  };
-  vkCmdSetViewport(cmd, 0, 1, &viewport);
-  VkRect2D scissor 
-  {
-    .extent = extent,
-  };
-  vkCmdSetScissor(cmd, 0, 1, &scissor);
-}
-
-// HACK: for consistence with render_begin, and need to as interface in VkCommandBuffer abstract
-void render_end(VkCommandBuffer cmd)
-{
-  vkCmdEndRendering(cmd);
-}
-
-void GraphicsEngine::draw(VkCommandBuffer cmd)
-{
-  // render_begin(cmd, _image.view, {_draw_extent.width, _draw_extent.height});
-  //
-  // vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _2D_pipeline);
-  //
-  // // HACK: these should in ui class
-  // auto canvas_shape_matrix_infos = _painter.get_shape_matrix_info_of_all_canvases();
-  // for (auto const& [canvas, matrix_infos] : canvas_shape_matrix_infos)
-  // {
-  //   for (auto const& matrix_info : matrix_infos)
-  //   {
-  //     auto mesh_info   = MaterialLibrary::get_mesh_infos()[matrix_info.type][matrix_info.color];
-  //     auto mesh_buffer = MaterialLibrary::get_mesh_buffer();
-  //     PushConstant pc
-  //     {
-  //       .model    = matrix_info.matrix,
-  //       .vertices = mesh_buffer.address + mesh_info.vertices_offset,
-  //     };
-  //     vkCmdPushConstants(cmd, _2D_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pc), &pc);
-  //     vkCmdBindIndexBuffer(cmd, mesh_buffer.indices.handle, 0, VK_INDEX_TYPE_UINT16);
-  //     vkCmdDrawIndexed(cmd, mesh_info.indices_count, 1, mesh_info.indices_offset, 0, 0);
-  //   }
-  // }
-  //
-  // render_end(cmd);
+  auto cmd = _frames[_current_frame].command_buffer;
+  vkCmdPushConstants(cmd, _2D_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pc), &pc);
+  vkCmdBindIndexBuffer(cmd, mesh_buffer.indices.handle, 0, VK_INDEX_TYPE_UINT16);
+  vkCmdDrawIndexed(cmd, mesh_info.indices_count, 1, mesh_info.indices_offset, 0, 0);
 }
     
 } }

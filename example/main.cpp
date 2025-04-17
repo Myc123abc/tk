@@ -11,8 +11,8 @@
 
 struct Context
 {
-  tk::ui::Layout layout;
-  tk::ui::Button button;
+  tk::ui::Layout* layout;
+  tk::ui::Button  button;
 };
 
 void tk_init(int argc, char** argv)
@@ -23,8 +23,9 @@ void tk_init(int argc, char** argv)
   ctx->layout = tk::ui::create_layout();
   ctx->button = tk::ui::create_button(100, 100);
 
+  // TODO: try dynamic change
   tk::ui::put(ctx->layout, tk::get_main_window(), 0, 0);
-  tk::ui::put(ctx->button, ctx->layout, 50, 50);
+  tk::ui::put(&ctx->button, ctx->layout, 50, 50);
 }
 
 void tk_iterate()

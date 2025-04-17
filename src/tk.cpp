@@ -3,7 +3,7 @@
 // wrapper callback system of sdl3 callback system
 //
 // HACK:
-// 1. while, use log in internal callback functions is storage...
+// 1. while, use log in internal callback functions is strange...
 //
 
 #include "tk/tk.hpp"
@@ -64,9 +64,9 @@ auto tk::get_user_data() -> void*
   return tk_ctx->user_data;
 }
 
-auto tk::get_main_window() -> Window&
+auto tk::get_main_window() -> Window*
 {
-  return tk_ctx->window;
+  return &tk_ctx->window;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -115,7 +115,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
       tk_ctx->paused = false;
       break;
     case SDL_EVENT_WINDOW_RESIZED:
-      // ctx->engine.resize_swapchain();
+      tk_ctx->engine.resize_swapchain();
       break;
     case SDL_EVENT_KEY_DOWN:
       if (event->key.key == SDLK_Q)

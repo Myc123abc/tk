@@ -98,6 +98,6 @@ auto Painter::get_quard_matrix(QuardInfo const& info, Window const& window, uint
   model = glm::translate(model, glm::vec3(translate_x, translate_y, 0.f));
   model = glm::scale(model, glm::vec3(scale_x, scale_y, 1.f));
   return model;
-};
+}
 
 }}

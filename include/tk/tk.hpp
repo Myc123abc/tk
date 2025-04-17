@@ -24,6 +24,6 @@ namespace tk
 
   auto get_user_data() -> void*;
 
-  auto get_main_window() -> class tk::Window&;
+  auto get_main_window() -> class tk::Window*;
 
 }
