@@ -1,32 +1,32 @@
 #include "tk/ui.hpp"
 
-namespace tk { namespace ui {
+namespace tk {
 
-auto create_layout() -> Layout
+auto ui::create_layout() -> Layout
 {
-  Layout layout;
-  return std::move(layout);
+  return Layout();
 }
 
-auto create_button(uint32_t width, uint32_t height) -> Button
+auto ui::create_button(uint32_t width, uint32_t height) -> Button
 {
-  Button button;
-  return std::move(button);
+  return Button(width, height);
 }
 
-void put(Layout& layout, tk::Window& window, uint32_t x, uint32_t y)
+void ui::put(Layout& layout, tk::Window& window, uint32_t x, uint32_t y)
 {
-
+  layout.window = &window;
+  layout.x      = x;
+  layout.y      = y;
 }
 
-void put(UIWidget& widget, Layout& layout, uint32_t x, uint32_t y)
+void ui::put(UIWidget& widget, Layout& layout, uint32_t x, uint32_t y)
 {
-
+  layout.widget_infos.emplace_back(&widget, x, y);
 }
 
-void render()
+void ui::render()
 {
-
+  _engine->draw();
 }
 
 // void UI::init(tk_context& ctx)
@@ -73,4 +73,4 @@ void render()
   // _painter.use_canvas("background")
   //         .redraw_quard(_background_id, 0, 0, width, height, Color::OneDark);
   // _painter.generate_shape_matrix_info_of_all_canvases();
-}}
+}

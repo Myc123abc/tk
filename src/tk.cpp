@@ -10,6 +10,7 @@
 #include "tk/Window.hpp"
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
 #include "tk/log.hpp"
+#include "tk/ui.hpp"
 
 #define SDL_MAIN_USE_CALLBACKS
 #include <SDL3/SDL_main.h>
@@ -55,6 +56,7 @@ void tk::init_tk_context(std::string_view title, uint32_t width, uint32_t height
   tk_ctx->user_data = user_data;
   tk_ctx->window.init(title, width, height);
   tk_ctx->engine.init(tk_ctx->window);
+  ui::init(&tk_ctx->engine);
 }
 
 auto tk::get_user_data() -> void*
