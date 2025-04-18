@@ -12,7 +12,7 @@
 struct Context
 {
   tk::ui::Layout* layout;
-  tk::ui::Button  button;
+  tk::ui::Button* button;
 };
 
 void tk_init(int argc, char** argv)
@@ -21,17 +21,17 @@ void tk_init(int argc, char** argv)
   tk::init_tk_context("tk", 1000, 1000, ctx);
 
   ctx->layout = tk::ui::create_layout();
-  ctx->button = tk::ui::create_button(100, 100);
+  ctx->button = tk::ui::create_button(100, 100, tk::Color::Blue);
 
   // TODO: try dynamic change
   tk::ui::put(ctx->layout, tk::get_main_window(), 0, 0);
-  tk::ui::put(&ctx->button, ctx->layout, 50, 50);
+  tk::ui::put(ctx->button, ctx->layout, 50, 50);
 }
 
 void tk_iterate()
 {
   auto ctx = (Context*)tk::get_user_data();
-  if (ctx->button.is_clicked())
+  if (ctx->button->is_clicked())
   {
     tk::log::info("button is clicked!");
   }

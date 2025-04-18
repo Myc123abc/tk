@@ -1,16 +1,25 @@
 //
-// type system
+// common type library
 //
-// use for runtime type identify 
-//
+
+#pragma once
 
 namespace tk
 {
 
-  enum class type
+  enum class ShapeType
   {
-    unknow,
-    ui_button,
+    Unknow,
+    Quard,
+  };
+
+  enum class Color
+  {
+    Red,
+    Green,
+    Blue,
+    Yellow,
+    OneDark,
   };
 
 }

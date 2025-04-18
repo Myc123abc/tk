@@ -110,6 +110,8 @@ auto MaterialLibrary::get_meshs() -> std::vector<Mesh>
       for (auto color : colors)
         shape_meshs.emplace_back(create_quard(color));
       break;
+    case ShapeType::Unknow:
+      throw_if(true, "unknow shape type");
     }
   }
 

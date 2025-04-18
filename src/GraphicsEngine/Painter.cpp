@@ -1,6 +1,8 @@
 #include "tk/GraphicsEngine/Painter.hpp"
 #include "tk/ErrorHandling.hpp"
 #include "tk/Window.hpp"
+#include "tk/log.hpp"
+#include "tk/type.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -78,6 +80,8 @@ auto Painter::generate_shape_matrix_info_of_all_canvases() -> Painter&
       case ShapeType::Quard:
         shape_matrixs.emplace_back(info->type, info->color, get_quard_matrix(dynamic_cast<QuardInfo const&>(*info), *canvas.window, canvas.x, canvas.y));
         break;
+      case ShapeType::Unknow:
+        throw_if(true, "unknow shape type");
       }
     }
       _canvas_shape_matrix_infos[name] = std::move(shape_matrixs);

@@ -99,6 +99,8 @@ void GraphicsEngine::render_begin()
     .extent = _draw_extent,
   };
   vkCmdSetScissor(frame.command_buffer, 0, 1, &scissor);
+
+  vkCmdBindPipeline(frame.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _2D_pipeline);
 }
 
 void GraphicsEngine::render_end()

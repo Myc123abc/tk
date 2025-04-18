@@ -12,6 +12,7 @@
 #pragma once
 
 #include "MemoryAllocator.hpp"
+#include "../type.hpp"
 
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
@@ -21,20 +22,6 @@
 #include <map>
 
 namespace tk { namespace graphics_engine {
-
-  enum class ShapeType
-  {
-    Quard,
-  };
-
-  enum class Color
-  {
-    Red,
-    Green,
-    Blue,
-    Yellow,
-    OneDark,
-  };
 
   // only transform object from local to world
   struct PushConstant 

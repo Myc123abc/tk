@@ -1,15 +1,8 @@
 #include "tk/ui.hpp"
 #include "tk/ErrorHandling.hpp"
-#include "tk/GraphicsEngine/MaterialLibrary.hpp"
 
 // HACK: use for background
 #include "tk/tk.hpp"
-#include "tk/log.hpp"
-
-// HACK: code hierarchy need to change
-
-// use for MaterialLibrary
-using namespace tk::graphics_engine;
 
 #include <algorithm>
 
@@ -17,7 +10,7 @@ namespace tk {
 
 // HACK: tmp way
 ui::Layout* background_layout;
-ui::Button background_picuture; // it not a button, just good way
+ui::Button* background_picuture; // it not a button, just good way
 void ui::init(graphics_engine::GraphicsEngine* engine)
 {
   _engine = engine;
@@ -25,22 +18,19 @@ void ui::init(graphics_engine::GraphicsEngine* engine)
   background_layout = create_layout();
   uint32_t w, h;
   tk::get_main_window()->get_framebuffer_size(w, h);
-  background_picuture = create_button(w, h);
+  background_picuture = create_button(w, h, Color::OneDark);
   put(background_layout, tk::get_main_window(), 0, 0);
-  put(&background_picuture, background_layout, 0, 0);
+  put(background_picuture, background_layout, 0, 0);
 }
-
-// FIX: how to set draw sequence?
 
 auto ui::create_layout() -> Layout*
 {
-  _layouts.emplace_back(Layout());
-  return &_layouts[_layouts.size() - 1];
+  return _layouts.emplace_back(std::make_unique<Layout>()).get();
 }
 
-auto ui::create_button(uint32_t width, uint32_t height) -> Button
+auto ui::create_button(uint32_t width, uint32_t height, Color color) -> Button*
 {
-  return Button(width, height);
+  return dynamic_cast<Button*>(_widgets.emplace_back(std::make_unique<Button>(width, height, color)).get());
 }
 
 void ui::put(Layout* layout, tk::Window* window, uint32_t x, uint32_t y)
@@ -52,19 +42,19 @@ void ui::put(Layout* layout, tk::Window* window, uint32_t x, uint32_t y)
 
 void ui::put(UIWidget* widget, Layout* layout, uint32_t x, uint32_t y)
 {
-  auto it = std::ranges::find_if(layout->widget_infos, [&](auto const& widget_info)
+  auto it = std::ranges::find_if(layout->widgets, [widget](auto w)
   {
-    return widget_info.widget == widget;
+    return w == widget;
   });
-  if (it != layout->widget_infos.end())
+  if (it != layout->widgets.end())
   {
-    it->x = x;
-    it->y = y;
+    (*it)->set_position(x, y);
   }
   else
   {
-    layout->widget_infos.emplace_back(widget, x, y);
+    layout->widgets.push_back(widget);
     widget->set_layout(layout);
+    widget->set_position(x, y);
   }
 }
 
@@ -72,31 +62,29 @@ void ui::render()
 {
   _engine->render_begin();
 
+  uint32_t width, height;
+  tk::get_main_window()->get_framebuffer_size(width, height);
+  background_picuture->set_width_height(width, height);
+
   for (auto const& layout : _layouts)
   {
-    for (auto const& widget_info : layout.widget_infos)
+    for (auto widget : layout->widgets)
     {
-      ShapeType type;
-      Color     color;
       glm::mat4 model;
 
-      switch (widget_info.widget->type)
+      switch (widget->type)
       {
-      case type::unknow:
-        throw_if(true, "unknow type of ui widget");
+      case ShapeType::Unknow:
+        throw_if(true, "unknow shape type of ui widget");
         break;
 
-      case type::ui_button:
-        type  = ShapeType::Quard;
-        color = Color::Blue;
-        auto button = dynamic_cast<Button*>(widget_info.widget);
-  log::info("win: {}", (void*)tk::get_main_window());
-  log::info("win: {}", (void*)button->_layout->window);
+      case ShapeType::Quard:
+        auto button = dynamic_cast<Button*>(widget);
         model = button->make_model_matrix();
         break;
       }
 
-      _engine->render_shape(type, color, model);
+      _engine->render_shape(widget->type, widget->get_color(), model);
     }
   }
 
