@@ -45,7 +45,7 @@ auto UIWidget::set_depth(float depth)               -> UIWidget&
 //                               Button
 ////////////////////////////////////////////////////////////////////////////////
 
-bool Button::is_clicked()
+bool Button::is_mouse_over()
 { 
   float x, y;
   SDL_GetMouseState(&x, &y);

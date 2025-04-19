@@ -49,6 +49,19 @@ namespace tk { namespace ui {
     auto get_color() const noexcept { return _color; }
     auto get_depth() const noexcept { return _depth; }
 
+    // HACK: should be as interface class for expand
+    virtual bool is_mouse_over() { return false; }
+    void set_is_clicked() { _is_clicked = true; }
+    bool is_clicked()
+    {
+      auto res = _is_clicked;
+      if (res)
+      {
+        _is_clicked = false;
+      }
+      return res;
+    }
+
   protected:
     ShapeType _type   = ShapeType::Unknow;
     Layout*   _layout = nullptr;
@@ -56,6 +69,8 @@ namespace tk { namespace ui {
     uint32_t  _y      = 0;
     Color     _color  = Color::Unknow;
     float     _depth  = 0.f;
+
+    bool _is_clicked  = false;
   };
 
   /**
@@ -68,7 +83,7 @@ namespace tk { namespace ui {
   class Button : public UIWidget
   {
   public:
-    bool is_clicked(); 
+    bool is_mouse_over() override;
 
     auto make_model_matrix() -> glm::mat4;
 

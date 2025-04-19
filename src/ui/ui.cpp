@@ -1,8 +1,11 @@
 #include "tk/ui/ui.hpp"
 #include "tk/ErrorHandling.hpp"
+#include "internal.hpp"
 
 // HACK: use for background
 #include "tk/tk.hpp"
+// HACK: tmp
+#include "tk/log.hpp"
 
 #include <algorithm>
 #include <memory>
@@ -11,16 +14,14 @@ namespace tk { namespace ui {
 
 // HACK:
 // use like in ui class
-static graphics_engine::GraphicsEngine*       _engine;
-static std::vector<std::unique_ptr<Layout>>   _layouts;
-static std::vector<std::unique_ptr<UIWidget>> _widgets;
 
 // HACK: tmp way
 Layout* background_layout;
 Button* background_picuture; // it not a button, just good way
 void init(graphics_engine::GraphicsEngine* engine)
 {
-  _engine = engine;
+  auto ctx = get_ctx();
+  ctx.engine = engine;
   // default use onedark background
   background_layout = create_layout();
   uint32_t w, h;
@@ -33,12 +34,14 @@ void init(graphics_engine::GraphicsEngine* engine)
 
 auto create_layout() -> Layout*
 {
-  return _layouts.emplace_back(std::make_unique<Layout>()).get();
+  auto ctx = get_ctx();
+  return ctx.layouts.emplace_back(std::make_unique<Layout>()).get();
 }
 
 auto create_button(uint32_t width, uint32_t height, Color color) -> Button*
 {
-  auto btn = dynamic_cast<Button*>(_widgets.emplace_back(std::make_unique<Button>()).get());
+  auto ctx = get_ctx();
+  auto btn = dynamic_cast<Button*>(ctx.widgets.emplace_back(std::make_unique<Button>()).get());
   btn->set_width_height(width, height);
   btn->set_color(color);
   btn->set_type(ShapeType::Quard);
@@ -72,13 +75,14 @@ void put(UIWidget* widget, Layout* layout, uint32_t x, uint32_t y)
 
 void render()
 {
-  _engine->render_begin();
+  auto ctx = get_ctx();
+  ctx.engine->render_begin();
 
   uint32_t width, height;
   tk::get_main_window()->get_framebuffer_size(width, height);
   background_picuture->set_width_height(width, height);
 
-  for (auto const& layout : _layouts)
+  for (auto const& layout : ctx.layouts)
   {
     for (auto widget : layout->widgets)
     {
@@ -96,11 +100,11 @@ void render()
         break;
       }
 
-      _engine->render_shape(widget->get_type(), widget->get_color(), model, widget->get_depth());
+      ctx.engine->render_shape(widget->get_type(), widget->get_color(), model, widget->get_depth());
     }
   }
 
-  _engine->render_end();
+  ctx.engine->render_end();
 }
 
 } }
