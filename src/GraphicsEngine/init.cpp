@@ -28,13 +28,13 @@ void GraphicsEngine::init(Window const& window)
   select_physical_device();
   create_device_and_get_queues();
   init_memory_allocator();
+  init_command_pool();
+  create_frame_resources();
   create_swapchain_and_rendering_image();
   create_descriptor_set_layout();
   create_graphics_pipeline();
-  init_command_pool();
   create_descriptor_pool();
   create_descriptor_sets();
-  create_frame_resources();
   use_single_time_command_init_something();
 }
 
@@ -283,42 +283,49 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
            "failed to create image view");
 
   // create depth image
-  _depth_image.format = VK_FORMAT_D32_SFLOAT;
-  _depth_image.extent = _image.extent;
-  VkImageCreateInfo depth_info
+  for (auto& frame : _frames)
   {
-    .sType       = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-    .imageType   = VK_IMAGE_TYPE_2D,
-    .format      = _depth_image.format,
-    .extent      = _depth_image.extent,
-    .mipLevels   = 1,
-    .arrayLayers = 1,
-    .samples     = VK_SAMPLE_COUNT_1_BIT,
-    .tiling      = VK_IMAGE_TILING_OPTIMAL,
-    .usage       = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-  };
-  throw_if(vmaCreateImage(_mem_alloc.get(), &depth_info, &alloc_info, &_depth_image.image, &_depth_image.allocation, nullptr) != VK_SUCCESS,
-           "failed to create depth image");
-  VkImageViewCreateInfo depth_view_info
-  {
-    .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-    .image    = _depth_image.image,
-    .viewType = VK_IMAGE_VIEW_TYPE_2D,
-    .format   = _depth_image.format,
-    .subresourceRange =
+    auto& depth_image  = frame.depth_image;
+    depth_image.format = Depth_Format;
+    depth_image.extent = _image.extent;
+    VkImageCreateInfo depth_info
     {
-      .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
-      .levelCount = 1,
-      .layerCount = 1,
-    },
-  };
-  throw_if(vkCreateImageView(_device, &depth_view_info, nullptr, &_depth_image.view) != VK_SUCCESS,
-           "failed to create depth image view");
+      .sType       = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+      .imageType   = VK_IMAGE_TYPE_2D,
+      .format      = depth_image.format,
+      .extent      = depth_image.extent,
+      .mipLevels   = 1,
+      .arrayLayers = 1,
+      .samples     = VK_SAMPLE_COUNT_1_BIT,
+      .tiling      = VK_IMAGE_TILING_OPTIMAL,
+      .usage       = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+    };
+    throw_if(vmaCreateImage(_mem_alloc.get(), &depth_info, &alloc_info, &depth_image.image, &depth_image.allocation, nullptr) != VK_SUCCESS,
+             "failed to create depth image");
+    VkImageViewCreateInfo depth_view_info
+    {
+      .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+      .image    = depth_image.image,
+      .viewType = VK_IMAGE_VIEW_TYPE_2D,
+      .format   = depth_image.format,
+      .subresourceRange =
+      {
+        .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+        .levelCount = 1,
+        .layerCount = 1,
+      },
+    };
+    throw_if(vkCreateImageView(_device, &depth_view_info, nullptr, &depth_image.view) != VK_SUCCESS,
+             "failed to create depth image view");
+  }
 
   _destructors.push([this]
   {
-    vkDestroyImageView(_device, _depth_image.view, nullptr);
-    vmaDestroyImage(_mem_alloc.get(), _depth_image.image, _depth_image.allocation);
+    for (auto& frame : _frames)
+    {
+      vkDestroyImageView(_device, frame.depth_image.view, nullptr);
+      vmaDestroyImage(_mem_alloc.get(), frame.depth_image.image, frame.depth_image.allocation);
+    }
     vkDestroyImageView(_device, _image.view, nullptr);
     vmaDestroyImage(_mem_alloc.get(), _image.image, _image.allocation);
     vkDestroySwapchainKHR(_device, _swapchain, nullptr);
@@ -431,7 +438,7 @@ void GraphicsEngine::create_graphics_pipeline()
                  .set_shaders(shader_vertex2D.shader, shader_fragment2D.shader)
                  .set_cull_mode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE)
                  .set_color_attachment_format(_image.format)
-                 .enable_depth_test(_depth_image.format)
+                 .enable_depth_test(Depth_Format)
                  .build(_device, _2D_pipeline_layout);
 
   // set destructors

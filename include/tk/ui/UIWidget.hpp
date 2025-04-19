@@ -14,6 +14,11 @@
 namespace tk { namespace ui {
 
   struct UIWidget;
+
+  /**
+   * layout contains multiple ui widgets can be rendered
+   * it also be related with position of which window
+   */
   struct Layout
   {
     tk::Window*            window = nullptr;
@@ -22,6 +27,13 @@ namespace tk { namespace ui {
     std::vector<UIWidget*> widgets;
   };
 
+  /**
+   * UIWidget base class
+   * be related position of which layout
+   * have shape type to specific use which shape mesh
+   * and shape color
+   * and depth
+   */
   class UIWidget
   {
   public:
@@ -60,6 +72,13 @@ namespace tk { namespace ui {
     float    _depth  = 0.f;
   };
 
+  /**
+   * Button have width and height
+   * and a clicked judget which is click down in button then release in button
+   * and make model matrix from width and height with layout properties
+   * HACK: button should inhert from Quard which have make_model_matrix
+   *       and IClicked which have is_clicked
+   */
   class Button : public UIWidget
   {
   public:

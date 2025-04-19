@@ -61,7 +61,7 @@ void GraphicsEngine::render_begin()
 
   // transition image layout to writeable
   transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  transition_image_layout(frame.command_buffer, _depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+  transition_image_layout(frame.command_buffer, frame.depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
   //
   // dynamic rendering
@@ -77,7 +77,7 @@ void GraphicsEngine::render_begin()
   VkRenderingAttachmentInfo depth_attachment
   {
     .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-    .imageView   = _depth_image.view,
+    .imageView   = frame.depth_image.view,
     .imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
     .loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD,
     .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,

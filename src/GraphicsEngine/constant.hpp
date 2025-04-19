@@ -15,4 +15,6 @@ inline const std::vector<const char*> Device_Extensions =
 
 inline constexpr uint32_t Max_Frame_Number = 2;
 
+inline constexpr VkFormat Depth_Format = VK_FORMAT_D32_SFLOAT;
+
 }}

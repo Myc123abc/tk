@@ -23,13 +23,6 @@
 
 namespace tk { namespace graphics_engine {
 
-  // HACK: discard because of painter
-  struct ShapeInfo
-  {
-    uint32_t     indices_offset;
-    uint32_t     indices_count;
-  };
-
   // TODO: graphics engine only initialize.
   // you need add vertices, indices, uniform, and shaders to run it.
   class GraphicsEngine
@@ -125,7 +118,6 @@ namespace tk { namespace graphics_engine {
     std::vector<VkImage>         _swapchain_images;
     VkExtent2D                   _swapchain_image_extent   = {};
     Image                        _image                    = {};
-    Image                        _depth_image              = {};
     VkExtent2D                   _draw_extent              = {};
 
     VkPipeline                   _2D_pipeline              = VK_NULL_HANDLE;
@@ -143,6 +135,9 @@ namespace tk { namespace graphics_engine {
       VkFence         fence               = VK_NULL_HANDLE;
       VkSemaphore     image_available_sem = VK_NULL_HANDLE; 
       VkSemaphore     render_finished_sem = VK_NULL_HANDLE; 
+      // INFO: use multiple depth images because
+      //       https://stackoverflow.com/questions/62371266/why-is-a-single-depth-buffer-sufficient-for-this-vulkan-swapchain-render-loop
+      Image           depth_image;
     };
 
     std::vector<FrameResource>   _frames;
