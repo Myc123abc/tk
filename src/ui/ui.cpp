@@ -1,4 +1,4 @@
-#include "tk/ui.hpp"
+#include "tk/ui/ui.hpp"
 #include "tk/ErrorHandling.hpp"
 
 // HACK: use for background
@@ -21,6 +21,7 @@ void ui::init(graphics_engine::GraphicsEngine* engine)
   background_picuture = create_button(w, h, Color::OneDark);
   put(background_layout, tk::get_main_window(), 0, 0);
   put(background_picuture, background_layout, 0, 0);
+  background_picuture->set_depth(0.f);
 }
 
 auto ui::create_layout() -> Layout*
@@ -84,7 +85,9 @@ void ui::render()
         break;
       }
 
-      _engine->render_shape(widget->type, widget->get_color(), model);
+      // model = glm::ortho(-1.f, 1.f, 1.f, -1.f, -1.f, 100.f) * model;
+      // model = glm::perspective(45.f, (float)width / height, 10000.f, 0.1f) * model;
+      _engine->render_shape(widget->type, widget->get_color(), model, widget->get_depth());
     }
   }
 

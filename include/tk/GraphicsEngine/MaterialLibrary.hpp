@@ -28,6 +28,7 @@ namespace tk { namespace graphics_engine {
   {
     glm::mat4       model;
     VkDeviceAddress vertices = {};
+    float           depth    = {};
   };
   
   // for easy, we only have 2D position and color

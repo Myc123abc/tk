@@ -61,7 +61,7 @@ namespace tk { namespace graphics_engine {
 
     void render_begin();
     void render_end();
-    void render_shape(ShapeType type, Color color, glm::mat4 model);
+    void render_shape(ShapeType type, Color color, glm::mat4 model, float depth);
 
   private:
     //

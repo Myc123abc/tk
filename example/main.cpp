@@ -22,6 +22,7 @@ void tk_init(int argc, char** argv)
 
   ctx->layout = tk::ui::create_layout();
   ctx->button = tk::ui::create_button(100, 100, tk::Color::Blue);
+  ctx->button->set_depth(.1f);
 
   // TODO: try dynamic change
   tk::ui::put(ctx->layout, tk::get_main_window(), 0, 0);

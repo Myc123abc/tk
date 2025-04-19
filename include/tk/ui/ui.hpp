@@ -9,9 +9,9 @@
 
 #pragma once
 
-#include "Window.hpp"
-#include "GraphicsEngine/GraphicsEngine.hpp"
-#include "type.hpp"
+#include "../Window.hpp"
+#include "../GraphicsEngine/GraphicsEngine.hpp"
+#include "../type.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -70,7 +70,15 @@ namespace tk {
         return *this;
       }
 
+      auto set_depth(float depth)               -> UIWidget&
+      {
+        assert(depth >= 0.f && depth <= 1.f);
+        _depth = depth;
+        return *this;
+      }
+
       auto get_color() { return _color; }
+      auto get_depth() { return _depth; }
 
     public:
       const ShapeType type = ShapeType::Unknow;
@@ -80,6 +88,7 @@ namespace tk {
       uint32_t _x      = 0;
       uint32_t _y      = 0;
       Color    _color;
+      float    _depth  = 0.f;
     };
 
     class Button : public UIWidget

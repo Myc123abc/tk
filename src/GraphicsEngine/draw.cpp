@@ -66,11 +66,19 @@ void GraphicsEngine::render_begin()
   //
   // dynamic rendering
   //
-  VkRenderingAttachmentInfo attachment
+  VkRenderingAttachmentInfo color_attachment
   {
     .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
     .imageView   = _image.view,
     .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    .loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD,
+    .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
+  };
+  VkRenderingAttachmentInfo depth_attachment
+  {
+    .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+    .imageView   = _depth_image.view,
+    .imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
     .loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD,
     .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
   };
@@ -83,7 +91,8 @@ void GraphicsEngine::render_begin()
     },
     .layerCount           = 1,
     .colorAttachmentCount = 1,
-    .pColorAttachments    = &attachment,
+    .pColorAttachments    = &color_attachment,
+    .pDepthAttachment     = &depth_attachment,
   };
   vkCmdBeginRendering(frame.command_buffer, &rendering);
 
@@ -178,7 +187,7 @@ void GraphicsEngine::render_end()
   _current_frame = ++_current_frame % Max_Frame_Number;
 }
 
-void GraphicsEngine::render_shape(ShapeType type, Color color, glm::mat4 model)
+void GraphicsEngine::render_shape(ShapeType type, Color color, glm::mat4 model,  float depth)
 {
   auto mesh_info   = MaterialLibrary::get_mesh_infos()[type][color];
   auto mesh_buffer = MaterialLibrary::get_mesh_buffer();
@@ -186,6 +195,7 @@ void GraphicsEngine::render_shape(ShapeType type, Color color, glm::mat4 model)
   {
     .model    = model,
     .vertices = mesh_buffer.address + mesh_info.vertices_offset,
+    .depth    = depth,
   };
 
   auto cmd = _frames[_current_frame].command_buffer;

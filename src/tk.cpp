@@ -10,7 +10,7 @@
 #include "tk/Window.hpp"
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
 #include "tk/log.hpp"
-#include "tk/ui.hpp"
+#include "tk/ui/ui.hpp"
 
 #define SDL_MAIN_USE_CALLBACKS
 #include <SDL3/SDL_main.h>
