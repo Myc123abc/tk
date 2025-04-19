@@ -5,13 +5,18 @@
 #include "tk/tk.hpp"
 
 #include <algorithm>
+#include <memory>
 
-namespace tk {
+namespace tk { namespace ui {
+
+static graphics_engine::GraphicsEngine*       _engine;
+static std::vector<std::unique_ptr<Layout>>   _layouts;
+static std::vector<std::unique_ptr<UIWidget>> _widgets;
 
 // HACK: tmp way
-ui::Layout* background_layout;
-ui::Button* background_picuture; // it not a button, just good way
-void ui::init(graphics_engine::GraphicsEngine* engine)
+Layout* background_layout;
+Button* background_picuture; // it not a button, just good way
+void init(graphics_engine::GraphicsEngine* engine)
 {
   _engine = engine;
   // default use onedark background
@@ -24,24 +29,24 @@ void ui::init(graphics_engine::GraphicsEngine* engine)
   background_picuture->set_depth(0.f);
 }
 
-auto ui::create_layout() -> Layout*
+auto create_layout() -> Layout*
 {
   return _layouts.emplace_back(std::make_unique<Layout>()).get();
 }
 
-auto ui::create_button(uint32_t width, uint32_t height, Color color) -> Button*
+auto create_button(uint32_t width, uint32_t height, Color color) -> Button*
 {
   return dynamic_cast<Button*>(_widgets.emplace_back(std::make_unique<Button>(width, height, color)).get());
 }
 
-void ui::put(Layout* layout, tk::Window* window, uint32_t x, uint32_t y)
+void put(Layout* layout, tk::Window* window, uint32_t x, uint32_t y)
 {
   layout->window = window;
   layout->x      = x;
   layout->y      = y;
 }
 
-void ui::put(UIWidget* widget, Layout* layout, uint32_t x, uint32_t y)
+void put(UIWidget* widget, Layout* layout, uint32_t x, uint32_t y)
 {
   auto it = std::ranges::find_if(layout->widgets, [widget](auto w)
   {
@@ -59,7 +64,7 @@ void ui::put(UIWidget* widget, Layout* layout, uint32_t x, uint32_t y)
   }
 }
 
-void ui::render()
+void render()
 {
   _engine->render_begin();
 
@@ -138,4 +143,4 @@ void ui::render()
   // _painter.use_canvas("background")
   //         .redraw_quard(_background_id, 0, 0, width, height, Color::OneDark);
   // _painter.generate_shape_matrix_info_of_all_canvases();
-}
+} }
