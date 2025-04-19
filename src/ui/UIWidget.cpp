@@ -47,10 +47,12 @@ auto UIWidget::set_depth(float depth)               -> UIWidget&
 
 bool Button::is_mouse_over()
 { 
+  if (_layout == nullptr)
+    return false;
   float x, y;
   SDL_GetMouseState(&x, &y);
-  if (x - _x + _layout->x < _width &&
-      y - _y + _layout->y < _height)
+  if (x > _x + _layout->x && x < _x + _layout->x + _width &&
+      y > _y + _layout->y && y < _y + _layout->y + _height)
     return true;
   return false;
 }

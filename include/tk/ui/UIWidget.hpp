@@ -11,6 +11,9 @@
 
 #include <vector>
 
+//FIX: tmp
+#include "tk/log.hpp"
+
 namespace tk { namespace ui {
 
   struct UIWidget;
@@ -62,7 +65,8 @@ namespace tk { namespace ui {
       return res;
     }
 
-  protected:
+  // FIX: tmp
+  // protected:
     ShapeType _type   = ShapeType::Unknow;
     Layout*   _layout = nullptr;
     uint32_t  _x      = 0;
@@ -88,8 +92,9 @@ namespace tk { namespace ui {
     auto make_model_matrix() -> glm::mat4;
 
     void set_width_height(uint32_t width, uint32_t height);
-    
-  private:
+
+  // FIX: tmp
+  // private:
     uint32_t _width = 0, _height = 0;
   };
 

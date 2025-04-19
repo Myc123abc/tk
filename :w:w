@@ -1,6 +1,7 @@
 #include "internal.hpp"
 
-#include <algorithm>
+#include "tk/log.hpp"
+
 #include <ranges>
 
 namespace tk { namespace ui {
@@ -28,8 +29,14 @@ auto get_mouse_over_widget() -> UIWidget*
 void set_widget_is_clicked()
 {
   auto ctx = get_ctx();
+
   if (ctx.mouse_down_widget == nullptr)
+  {
+    log::info("invalid widget for mouse down");
     return;
+  }
+
+  log::info("be clicked");
   ctx.mouse_down_widget->set_is_clicked();
   ctx.mouse_down_widget = nullptr;
 }
@@ -41,10 +48,12 @@ void event_process(SDL_Event* event)
   auto ctx = get_ctx();
   if (ctx.mouse_down_widget)
   {
+    log::info("have mouse down");
     auto widget = get_mouse_over_widget();
     // when mouse is not on the mouse down widget
     if (widget != ctx.mouse_down_widget)
     {
+      log::info("mouse leave");
       // clear mouse down widget
       ctx.mouse_down_widget = nullptr;
     }
@@ -53,9 +62,12 @@ void event_process(SDL_Event* event)
   switch (event->type)
   {
   case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    log::info("mouse down");
     ctx.mouse_down_widget = get_mouse_over_widget();
+    log::info("mouse down widget {}", (void*)ctx.mouse_down_widget);
     break;
   case SDL_EVENT_MOUSE_BUTTON_UP:
+    log::info("mouse up");
     set_widget_is_clicked();
     break;
   }

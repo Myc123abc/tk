@@ -24,4 +24,5 @@ namespace tk { namespace ui {
   // HACK: use _layouts update matrix every frame, maybe performance suck 
   void render();
 
+  void remove(UIWidget* widget, Layout* layout);
 } }
