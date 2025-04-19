@@ -15,6 +15,7 @@ namespace tk
 
   enum class Color
   {
+    Unknow,
     Red,
     Green,
     Blue,

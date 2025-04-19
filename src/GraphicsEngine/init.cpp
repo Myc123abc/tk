@@ -2,7 +2,6 @@
 #include "init-util.hpp"
 #include "constant.hpp"
 #include "tk/GraphicsEngine/PipelineBuilder.hpp"
-#include "tk/GraphicsEngine/Painter.hpp"
 #include "tk/GraphicsEngine/MaterialLibrary.hpp"
 
 #include <ranges>

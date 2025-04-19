@@ -1,10 +1,18 @@
 #include "tk/ui/UIWidget.hpp"
 
+#include <SDL3/SDL_mouse.h>
+
 namespace tk { namespace  ui {
 
 ////////////////////////////////////////////////////////////////////////////////
 //                              UIWidget
 ////////////////////////////////////////////////////////////////////////////////
+
+auto UIWidget::set_type(ShapeType type)             -> UIWidget&
+{
+  _type = type;
+  return *this;
+}
 
 auto UIWidget::set_layout(Layout* layout)           -> UIWidget&
 {
@@ -37,7 +45,15 @@ auto UIWidget::set_depth(float depth)               -> UIWidget&
 //                               Button
 ////////////////////////////////////////////////////////////////////////////////
 
-bool Button::is_clicked() { return false; }
+bool Button::is_clicked()
+{ 
+  float x, y;
+  SDL_GetMouseState(&x, &y);
+  if (x - _x + _layout->x < _width &&
+      y - _y + _layout->y < _height)
+    return true;
+  return false;
+}
 
 auto Button::make_model_matrix() -> glm::mat4
 {

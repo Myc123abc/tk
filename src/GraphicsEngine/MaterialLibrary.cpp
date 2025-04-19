@@ -23,9 +23,11 @@ auto to_vec3(Color color) -> glm::vec3
     return { 1.f, 1.f, 0.f };
   case Color::OneDark:
     return { (float)40/255, (float)44/255, (float)52/255,};
-  default:
-    throw_if(true, "unsupported color");
-  }
+  case Color::Unknow:
+    throw_if(true, "unknow color");
+    return {};
+  };
+  return {};
 }
 
 Mesh create_quard(Color color)
