@@ -23,13 +23,13 @@ void init(graphics_engine::GraphicsEngine* engine)
   auto ctx = get_ctx();
   ctx.engine = engine;
   // default use onedark background
-  // background_layout = create_layout();
-  // uint32_t w, h;
-  // tk::get_main_window()->get_framebuffer_size(w, h);
-  // background_picuture = create_button(w, h, Color::OneDark);
-  // put(background_layout, tk::get_main_window(), 0, 0);
-  // put(background_picuture, background_layout, 0, 0);
-  // background_picuture->set_depth(0.f);
+  background_layout = create_layout();
+  uint32_t w, h;
+  tk::get_main_window()->get_framebuffer_size(w, h);
+  background_picuture = create_button(w, h, Color::OneDark);
+  put(background_layout, tk::get_main_window(), 0, 0);
+  put(background_picuture, background_layout, 0, 0);
+  background_picuture->set_depth(0.f);
 }
 
 auto create_layout() -> Layout*
@@ -76,11 +76,13 @@ void put(UIWidget* widget, Layout* layout, uint32_t x, uint32_t y)
 void render()
 {
   auto ctx = get_ctx();
+
+  uint32_t width, height;
+  tk::get_main_window()->get_framebuffer_size(width, height);
+  background_picuture->set_width_height(width, height);
+
   ctx.engine->render_begin();
 
-  // uint32_t width, height;
-  // tk::get_main_window()->get_framebuffer_size(width, height);
-  // background_picuture->set_width_height(width, height);
   for (auto const& layout : ctx.layouts)
   {
     for (auto widget : layout->widgets)
@@ -114,6 +116,7 @@ void remove(UIWidget* widget, Layout* layout)
   });
   if (it != layout->widgets.end())
   {
+    widget->remove_from_layout();
     layout->widgets.erase(it);
   }
 }

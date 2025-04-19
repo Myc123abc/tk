@@ -11,9 +11,6 @@
 
 #include <vector>
 
-//FIX: tmp
-#include "tk/log.hpp"
-
 namespace tk { namespace ui {
 
   struct UIWidget;
@@ -65,8 +62,14 @@ namespace tk { namespace ui {
       return res;
     }
 
-  // FIX: tmp
-  // protected:
+    void remove_from_layout()
+    {
+      _layout = nullptr;
+      _x      = 0;
+      _y      = 0;
+    }
+
+  protected:
     ShapeType _type   = ShapeType::Unknow;
     Layout*   _layout = nullptr;
     uint32_t  _x      = 0;
@@ -93,8 +96,7 @@ namespace tk { namespace ui {
 
     void set_width_height(uint32_t width, uint32_t height);
 
-  // FIX: tmp
-  // private:
+  private:
     uint32_t _width = 0, _height = 0;
   };
 

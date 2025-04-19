@@ -9,11 +9,8 @@
 #include "tk/tk.hpp"
 #include "tk/log.hpp"
 
-// FIX: cannot remove
-//      cannot change buttons in same place
-//      cannot move button not have old button when clicked
-//      cannot right mouse button trige
-// TODO:move button
+// TODO:
+//      same place same depth widget cannot
 
 struct Context
 {
@@ -33,7 +30,9 @@ void tk_init(int argc, char** argv)
 
   tk::ui::put(ctx->layout, tk::get_main_window(), 0, 0);
   tk::ui::put(ctx->button0, ctx->layout, 100, 100);
+  ctx->button0->set_depth(0.1f);
   // tk::ui::put(ctx->button1, ctx->layout, 100, 100);
+  ctx->button1->set_depth(0.01f);
 }
 
 static uint32_t x, y;
@@ -42,43 +41,24 @@ void tk_iterate()
 {
   auto ctx = (Context*)tk::get_user_data();
 
-  bool removed = false;
+  static bool removed = false;
   if (ctx->button0->is_clicked())
   {
-    tk::ui::remove(ctx->button0, ctx->layout);
-    // x += 50;
-    // y += 50;
-    // tk::ui::put(ctx->button, ctx->layout, x, y);
+    // tk::ui::remove(ctx->button0, ctx->layout);
+    x += 50;
+    y += 50;
+    tk::ui::put(ctx->button0, ctx->layout, x, y);
     // if (removed)
     // {
     //   tk::ui::put(ctx->button, ctx->layout, 0, 0);
     // }
     // else
     // tk::ui::remove(ctx->button, ctx->layout);
-    tk::log::info("button0 is removed!");
-
-    tk::log::info("\n"
-                  "x:          {}\n"
-                  "y:          {}\n"
-                  "width:      {}\n"
-                  "height:     {}\n"
-                  "window x:   {}\n"
-                  "window y:   {}\n"
-                  , 
-                  ctx->button0->_x, 
-                  ctx->button0->_y, 
-                  ctx->button0->_width, 
-                  ctx->button0->_height,
-
-            ctx->button0->_layout->x,ctx->button0->_layout->x);
-
   }
 
-  // if (ctx->button1->is_clicked())
-  // {
-  //   tk::ui::remove(ctx->button1, ctx->layout);
-  //   tk::log::info("button1 is removed!");
-  // }
+  if (ctx->button1->is_clicked())
+  {
+  }
 }
 
 void tk_event(SDL_Event* event)

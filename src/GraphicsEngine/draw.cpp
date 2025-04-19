@@ -71,7 +71,7 @@ void GraphicsEngine::render_begin()
     .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
     .imageView   = _image.view,
     .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    .loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD,
+    .loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR,
     .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
   };
   VkRenderingAttachmentInfo depth_attachment
@@ -79,7 +79,7 @@ void GraphicsEngine::render_begin()
     .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
     .imageView   = frame.depth_image.view,
     .imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-    .loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD,
+    .loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR,
     .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
   };
   VkRenderingInfo rendering
