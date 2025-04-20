@@ -8,8 +8,11 @@
 // 2. how to handle ui in same place and same depth.
 // 3. use tree manage ui
 // 4. use quadtree handle widgets search
-// 5. test circle for extend shape type
-// 6. seperate click with widget
+// 5. for circle, how many segments should be set
+//
+// TODO: >[ today todo ]<
+// seperate click with widget
+// multi sample rendering
 //
 // INFO:
 // 1. Default ui have a layout with single quard background use OneDark.
@@ -19,6 +22,7 @@
 // HACK:
 // 1. Don't set depth value equal 0.f, it will conflict with background,
 //    we no handle same place same depth value case.
+// 2. for materials, static load all shapes colors combination maybe too big
 //
 
 #pragma once

@@ -76,7 +76,15 @@ auto tk::get_main_window() -> Window*
 
 SDL_AppResult SDL_AppInit(void**, int argc, char** argv)
 {
-  tk_init(argc, argv);
+  try
+  {
+    tk_init(argc, argv);
+  }
+  catch (const std::exception& e)
+  {
+    log::error(e.what());
+    return SDL_APP_FAILURE;
+  }
   return SDL_APP_CONTINUE;
 }
 
@@ -136,9 +144,17 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 
 void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
-  tk_quit();
+  try
+  {
+    tk_quit();
 
-  delete tk_ctx;
+    delete tk_ctx;
+  }
+  catch (const std::exception& e)
+  {
+    log::error(e.what());
+    exit(EXIT_FAILURE);
+  }
 
   if (result == SDL_APP_SUCCESS)
     exit(EXIT_SUCCESS);

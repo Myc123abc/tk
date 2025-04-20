@@ -53,8 +53,15 @@ namespace tk { namespace ui {
 
     void check_property_values();
 
+    auto generate_model_matrix()        -> glm::mat4;
+    auto generate_quard_model_matrix()  -> glm::mat4;
+    auto generate_circle_model_matrix() -> glm::mat4;
+
+    bool is_mouse_over();
+    bool mouse_over_quard();
+    bool mouse_over_circle();
+
     // HACK: should be as interface class for expand
-    virtual bool is_mouse_over() { return false; }
     void set_is_clicked() { _is_clicked = true; }
     bool is_clicked()
     {
@@ -97,9 +104,6 @@ namespace tk { namespace ui {
   class Button : public UIWidget
   {
   public:
-    bool is_mouse_over() override;
-
-    auto make_model_matrix() -> glm::mat4;
 
   private:
   };

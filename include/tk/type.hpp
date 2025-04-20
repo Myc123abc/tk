@@ -11,6 +11,7 @@ namespace tk
   {
     Unknow,
     Quard,
+    Circle,
   };
 
   enum class Color

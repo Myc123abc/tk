@@ -3,6 +3,8 @@
 #include "tk/DestructorStack.hpp"
 #include "tk/GraphicsEngine/CommandPool.hpp"
 
+#include <numbers>
+
 namespace tk { namespace graphics_engine {
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -32,13 +34,14 @@ auto to_vec3(Color color) -> glm::vec3
 
 Mesh create_quard(Color color)
 {
+  auto col = to_vec3(color);
   return Mesh
   { 
     {
-      { { -1.f, -1.f }, to_vec3(color) },
-      { {  1.f, -1.f }, to_vec3(color) },
-      { {  1.f,  1.f }, to_vec3(color) },
-      { { -1.f,  1.f }, to_vec3(color) },
+      { { -1.f, -1.f }, col },
+      { {  1.f, -1.f }, col },
+      { {  1.f,  1.f }, col },
+      { { -1.f,  1.f }, col },
     },
     {
       0, 1, 2,
@@ -46,6 +49,45 @@ Mesh create_quard(Color color)
     },
   };
 };
+
+Mesh create_circle(Color color)
+{
+  auto vertices = std::vector<Vertex>();
+  auto indices  = std::vector<uint16_t>();
+  auto col      = to_vec3(color);
+
+  constexpr auto radius   = 1.f;
+  constexpr auto segments = 16;
+
+  vertices.reserve(segments + 1);
+  indices.reserve(segments * 3);
+
+  // set center vertex
+  vertices.emplace_back(Vertex{{ 0.f, 0.f }, col});
+  uint16_t center_index = 0;
+
+  // set other vertices
+  for (uint32_t i = 0; i < segments; ++i)
+  {
+    float angle = 2.f * std::numbers::pi * (float)i / segments;
+    float x     = radius * std::cos(angle);
+    float y     = radius * std::sin(angle);
+    vertices.emplace_back(Vertex{{ x, y }, col});
+  }
+
+  // set indices
+  for (uint16_t i = 1; i < segments; ++i)
+  {
+    indices.push_back(center_index);
+    indices.push_back(i);
+    indices.push_back(i + 1);
+  }
+  indices.push_back(center_index);
+  indices.push_back(segments);
+  indices.push_back(1);
+
+  return { vertices, indices };
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //                           Material Library 
@@ -56,7 +98,7 @@ void MaterialLibrary::init(MemoryAllocator& mem_alloc, Command& cmd, DestructorS
   _mem_alloc = &mem_alloc;
 
   // get shape meshs
-  auto meshs      = MaterialLibrary::get_meshs();
+  auto meshs = MaterialLibrary::get_meshs();
 
   // create mesh buffer
   auto mesh_infos = std::vector<MeshInfo>();
@@ -81,6 +123,7 @@ void MaterialLibrary::generate_materials()
   auto shape_types = std::vector<ShapeType>
   {
     ShapeType::Quard,
+    ShapeType::Circle,
   };
 
   auto colors = std::vector<Color>
@@ -108,12 +151,18 @@ auto MaterialLibrary::get_meshs() -> std::vector<Mesh>
   {
     switch (type)
     {
+    case ShapeType::Unknow:
+      throw_if(true, "unknow shape type");
+
     case ShapeType::Quard:
       for (auto color : colors)
         shape_meshs.emplace_back(create_quard(color));
       break;
-    case ShapeType::Unknow:
-      throw_if(true, "unknow shape type");
+
+    case ShapeType::Circle:
+      for (auto color : colors)
+        shape_meshs.emplace_back(create_circle(color));
+      break;
     }
   }
 

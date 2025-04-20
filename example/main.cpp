@@ -17,6 +17,10 @@ struct Context
   tk::ui::Layout* layout;
   tk::ui::Button* button0;
   tk::ui::Button* button1;
+
+  // HACK: tmp coordinate
+  tk::ui::Button* layout_x;
+  tk::ui::Button* layout_y;
 };
 
 void tk_init(int argc, char** argv)
@@ -26,11 +30,15 @@ void tk_init(int argc, char** argv)
 
   ctx->layout = tk::ui::create_layout();
   ctx->button0 = tk::ui::create_button(tk::ShapeType::Quard, tk::Color::Blue, {100, 100});
-  ctx->button1 = tk::ui::create_button(tk::ShapeType::Quard, tk::Color::Red, {100, 100});
+  ctx->button1 = tk::ui::create_button(tk::ShapeType::Circle, tk::Color::Red, {100});
+  ctx->layout_x = tk::ui::create_button(tk::ShapeType::Quard, tk::Color::Green, {1, 1000});
+  ctx->layout_y = tk::ui::create_button(tk::ShapeType::Quard, tk::Color::Green, {1000, 1});
 
   tk::ui::put(ctx->layout, tk::get_main_window(), 0, 0);
-  tk::ui::put(ctx->button0, ctx->layout, 100, 100);
+  tk::ui::put(ctx->button0, ctx->layout, 500, 500);
   tk::ui::put(ctx->button1, ctx->layout, 100, 100);
+  tk::ui::put(ctx->layout_x, ctx->layout, 0, 0);
+  tk::ui::put(ctx->layout_y, ctx->layout, 0, 0);
   ctx->button0->set_depth(0.2f);
 }
 
@@ -44,19 +52,21 @@ void tk_iterate()
   if (ctx->button0->is_clicked())
   {
     // tk::ui::remove(ctx->button0, ctx->layout);
-    x += 50;
-    y += 50;
-    tk::ui::put(ctx->button0, ctx->layout, x, y);
+    // x += 50;
+    // y += 50;
+    // tk::ui::put(ctx->button0, ctx->layout, x, y);
     // if (removed)
     // {
     //   tk::ui::put(ctx->button, ctx->layout, 0, 0);
     // }
     // else
     // tk::ui::remove(ctx->button, ctx->layout);
+    tk::log::info("quard is clicked");
   }
 
   if (ctx->button1->is_clicked())
   {
+    tk::log::info("circle is clicked");
   }
 }
 

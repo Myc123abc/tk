@@ -39,7 +39,7 @@ auto create_layout() -> Layout*
 auto create_button(ShapeType shape, Color color, std::initializer_list<uint32_t> values) -> Button*
 {
   auto btn = dynamic_cast<Button*>(get_ctx().widgets.emplace_back(std::make_unique<Button>()).get());
-  btn->set_type(ShapeType::Quard);
+  btn->set_type(shape);
   btn->set_shape_properties(values);
   btn->set_color(color);
   return btn;
@@ -52,6 +52,7 @@ void put(Layout* layout, tk::Window* window, uint32_t x, uint32_t y)
   layout->y      = y;
 }
 
+// FIX: if one widget put on multiple layout will be what?
 void put(UIWidget* widget, Layout* layout, uint32_t x, uint32_t y)
 {
   auto it = std::ranges::find_if(layout->widgets, [widget](auto w)
@@ -84,21 +85,7 @@ void render()
   {
     for (auto widget : layout->widgets)
     {
-      glm::mat4 model;
-
-      switch (widget->get_type())
-      {
-      case ShapeType::Unknow:
-        throw_if(true, "unknow shape type of ui widget");
-        break;
-
-      case ShapeType::Quard:
-        auto button = dynamic_cast<Button*>(widget);
-        model = button->make_model_matrix();
-        break;
-      }
-
-      ctx.engine->render_shape(widget->get_type(), widget->get_color(), model, widget->get_depth());
+      ctx.engine->render_shape(widget->get_type(), widget->get_color(), widget->generate_model_matrix(), widget->get_depth());
     }
   }
 
