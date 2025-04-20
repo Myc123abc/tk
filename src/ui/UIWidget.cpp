@@ -4,9 +4,6 @@
 
 #include <SDL3/SDL_mouse.h>
 
-#include <algorithm>
-#include "tk/log.hpp"
-
 using namespace tk; 
 
 namespace tk { namespace  ui {
@@ -166,17 +163,6 @@ bool UIWidget::mouse_over_circle()
   float subtracted_y = y - center_y;
 
   auto d = std::sqrt(subtracted_x * subtracted_x + subtracted_y * subtracted_y);
-  
-  auto fmt = std::format(
-      "\nradius:   {}\n"
-      "center:   {},{}\n"
-      "distance: {}\n"
-      "sub:      {},{}\n"
-      "mouse:    {},{}\n"
-      , radius, center_x, center_y, d, subtracted_x, subtracted_y, x, y
-      );
-  log::info(fmt);
-
   if (d < radius)
     return true;
   return false;

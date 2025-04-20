@@ -22,7 +22,8 @@
 // HACK:
 // 1. Don't set depth value equal 0.f, it will conflict with background,
 //    we no handle same place same depth value case.
-// 2. for materials, static load all shapes colors combination maybe too big
+// 2. for materials, static load all shapes colors combination maybe too big,
+//    or, how to dynamic load materials
 //
 
 #pragma once
