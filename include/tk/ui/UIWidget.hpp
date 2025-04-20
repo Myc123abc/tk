@@ -42,7 +42,7 @@ namespace tk { namespace ui {
     auto set_type(ShapeType type)             -> UIWidget&;
     auto set_layout(Layout* layout)           -> UIWidget&;
     auto set_position(uint32_t x, uint32_t y) -> UIWidget&;
-    auto set_color(Color color)               -> UIWidget&;
+    auto set_color(glm::vec3 const& color)    -> UIWidget&;
     auto set_depth(float depth)               -> UIWidget&;
 
     auto set_shape_properties(std::initializer_list<uint32_t> values) -> UIWidget&;
@@ -85,7 +85,7 @@ namespace tk { namespace ui {
     Layout*   _layout = nullptr;
     uint32_t  _x      = 0;
     uint32_t  _y      = 0;
-    Color     _color  = Color::Unknow;
+    glm::vec3 _color;
     // INFO: default depth value is .1f, is to convience set background depth is 0.f
     float     _depth  = .1f;
 

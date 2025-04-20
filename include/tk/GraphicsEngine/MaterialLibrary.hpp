@@ -23,25 +23,18 @@
 
 namespace tk { namespace graphics_engine {
 
-  // only transform object from local to world
   struct PushConstant 
   {
     glm::mat4       model;
+    glm::vec4       color_depth;
     VkDeviceAddress vertices = {};
-    float           depth    = {};
   };
   
-  // for easy, we only have 2D position and color
-  // maybe expand to texture in future
   struct Vertex
   {
-    alignas(16) glm::vec2 position;
-    alignas(16) glm::vec3 color;
+    glm::vec2 position;
   };
 
-  // mesh have vertices and indices
-  // indices use uint8_t for minimize byte necessary
-  // simply 2D shape not need so many indices
   struct Mesh
   {
     std::vector<Vertex>   vertices;
@@ -77,7 +70,6 @@ namespace tk { namespace graphics_engine {
     struct Material
     {
       ShapeType          type;
-      std::vector<Color> colors;
     };
 
     inline static MemoryAllocator* _mem_alloc = nullptr;
@@ -85,7 +77,7 @@ namespace tk { namespace graphics_engine {
     // HACK: only single mesh data and single mesh buffer, how to use on dynamic( and also materials and mesh infos)
     inline static MeshBuffer _mesh_buffer;
     inline static std::vector<Material> _materials;
-    inline static std::map<ShapeType, std::map<Color, MeshInfo>> _mesh_infos;
+    inline static std::map<ShapeType, MeshInfo> _mesh_infos;
   };
 
 }}

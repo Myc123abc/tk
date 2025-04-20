@@ -25,6 +25,12 @@
 // 2. for materials, static load all shapes colors combination maybe too big,
 //    or, how to dynamic load materials
 //
+// INFO: How to dynamic mesh
+// When dynamic mesh, in rendering main thread, record create new mesh buffer commands.
+// Use vulkan synchornous mechanism to promise no conflict.
+// Create new mesh buffer, size if old size plus new objects' size.
+// After create finished, replace old buffer and detele old buffer.
+//
 
 #pragma once
 
@@ -35,7 +41,7 @@ namespace tk { namespace ui {
 
   void init(graphics_engine::GraphicsEngine* engine);
   auto create_layout() -> Layout*;
-  auto create_button(ShapeType shape, Color color, std::initializer_list<uint32_t> values) -> Button*;
+  auto create_button(ShapeType shape, glm::vec3 const& color, std::initializer_list<uint32_t> values) -> Button*;
 
   void put(Layout* layout, tk::Window* window, uint32_t x, uint32_t y);
   void put(UIWidget* widget, Layout* layout, uint32_t x, uint32_t y);
@@ -44,4 +50,5 @@ namespace tk { namespace ui {
   void render();
 
   void remove(UIWidget* widget, Layout* layout);
+
 } }

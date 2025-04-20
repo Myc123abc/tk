@@ -26,4 +26,6 @@ namespace tk
 
   auto get_main_window() -> class tk::Window*;
 
+  auto to_vec3(Color color) -> glm::vec3;
+
 }

@@ -187,15 +187,15 @@ void GraphicsEngine::render_end()
   _current_frame = ++_current_frame % Max_Frame_Number;
 }
 
-void GraphicsEngine::render_shape(ShapeType type, Color color, glm::mat4 model,  float depth)
+void GraphicsEngine::render_shape(ShapeType type, glm::vec3 const& color, glm::mat4 const& model,  float depth)
 {
-  auto mesh_info   = MaterialLibrary::get_mesh_infos()[type][color];
+  auto mesh_info   = MaterialLibrary::get_mesh_infos()[type];
   auto mesh_buffer = MaterialLibrary::get_mesh_buffer();
   PushConstant pc
   {
-    .model    = model,
-    .vertices = mesh_buffer.address + mesh_info.vertices_offset,
-    .depth    = depth,
+    .model       = model,
+    .color_depth = { color, depth },
+    .vertices    = mesh_buffer.address + mesh_info.vertices_offset,
   };
 
   auto cmd = _frames[_current_frame].command_buffer;

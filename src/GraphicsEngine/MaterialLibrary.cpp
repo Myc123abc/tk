@@ -11,37 +11,15 @@ namespace tk { namespace graphics_engine {
 //                           Mesh Generate Functions
 ////////////////////////////////////////////////////////////////////////////////
 
-auto to_vec3(Color color) -> glm::vec3
+Mesh create_quard()
 {
-  switch (color)
-  {
-  case Color::Red:
-    return { 1.f, 0.f, 0.f };
-  case Color::Green:
-    return { 0.f, 1.f, 0.f };
-  case Color::Blue:
-    return { 0.f, 0.f, 1.f };
-  case Color::Yellow:
-    return { 1.f, 1.f, 0.f };
-  case Color::OneDark:
-    return { (float)40/255, (float)44/255, (float)52/255,};
-  case Color::Unknow:
-    throw_if(true, "unknow color");
-    return {};
-  };
-  return {};
-}
-
-Mesh create_quard(Color color)
-{
-  auto col = to_vec3(color);
   return Mesh
   { 
     {
-      { { -1.f, -1.f }, col },
-      { {  1.f, -1.f }, col },
-      { {  1.f,  1.f }, col },
-      { { -1.f,  1.f }, col },
+      { { -1.f, -1.f } },
+      { {  1.f, -1.f } },
+      { {  1.f,  1.f } },
+      { { -1.f,  1.f } },
     },
     {
       0, 1, 2,
@@ -50,11 +28,10 @@ Mesh create_quard(Color color)
   };
 };
 
-Mesh create_circle(Color color)
+Mesh create_circle()
 {
   auto vertices = std::vector<Vertex>();
   auto indices  = std::vector<uint16_t>();
-  auto col      = to_vec3(color);
 
   constexpr auto radius   = 1.f;
   constexpr auto segments = 16;
@@ -63,7 +40,7 @@ Mesh create_circle(Color color)
   indices.reserve(segments * 3);
 
   // set center vertex
-  vertices.emplace_back(Vertex{{ 0.f, 0.f }, col});
+  vertices.emplace_back(Vertex{{ 0.f, 0.f }});
   uint16_t center_index = 0;
 
   // set other vertices
@@ -72,7 +49,7 @@ Mesh create_circle(Color color)
     float angle = 2.f * std::numbers::pi * (float)i / segments;
     float x     = radius * std::cos(angle);
     float y     = radius * std::sin(angle);
-    vertices.emplace_back(Vertex{{ x, y }, col});
+    vertices.emplace_back(Vertex{{ x, y }});
   }
 
   // set indices
@@ -126,18 +103,9 @@ void MaterialLibrary::generate_materials()
     ShapeType::Circle,
   };
 
-  auto colors = std::vector<Color>
-  {
-    Color::Red,
-    Color::Green,
-    Color::Blue,
-    Color::Yellow,
-    Color::OneDark,
-  };
-
   // save all material combination
   for (auto shape_type : shape_types)
-    _materials.emplace_back(shape_type, colors);
+    _materials.emplace_back(shape_type);
 }
 
 auto MaterialLibrary::get_meshs() -> std::vector<Mesh>
@@ -147,21 +115,19 @@ auto MaterialLibrary::get_meshs() -> std::vector<Mesh>
 
   // get meshs
   auto shape_meshs = std::vector<Mesh>();
-  for (auto const& [type, colors] : _materials)  
+  for (auto const& material : _materials)  
   {
-    switch (type)
+    switch (material.type)
     {
     case ShapeType::Unknow:
       throw_if(true, "unknow shape type");
 
     case ShapeType::Quard:
-      for (auto color : colors)
-        shape_meshs.emplace_back(create_quard(color));
+      shape_meshs.emplace_back(create_quard());
       break;
 
     case ShapeType::Circle:
-      for (auto color : colors)
-        shape_meshs.emplace_back(create_circle(color));
+      shape_meshs.emplace_back(create_circle());
       break;
     }
   }
@@ -172,13 +138,10 @@ auto MaterialLibrary::get_meshs() -> std::vector<Mesh>
 void MaterialLibrary::build_mesh_infos(std::span<MeshInfo> mesh_infos)
 {
   uint32_t i = 0;
-  for (auto const& [type, colors] : _materials)
+  for (auto const& material : _materials)
   {
-    for (auto color : colors)
-    {
-      _mesh_infos[type][color] = mesh_infos[i];
-      ++i;
-    }
+    _mesh_infos[material.type] = mesh_infos[i];
+    ++i;
   }
 }
 

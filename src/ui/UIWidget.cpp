@@ -31,7 +31,7 @@ auto UIWidget::set_position(uint32_t x, uint32_t y) -> UIWidget&
   return *this;
 }
 
-auto UIWidget::set_color(Color color)               -> UIWidget&
+auto UIWidget::set_color(glm::vec3 const& color)    -> UIWidget&
 {
   _color = color;
   return *this;
