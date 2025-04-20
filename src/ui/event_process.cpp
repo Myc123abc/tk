@@ -11,13 +11,14 @@ namespace tk { namespace ui {
 // 
 // HACK: should not have multi uis in same place have same depth value
 
-auto get_mouse_over_widget() -> UIWidget*
+auto get_mouse_over_widget() -> ClickableWidget*
 {
   auto& widgets = get_ctx().widgets;
   auto hovered_widgets = widgets |
     std::views::filter([](auto const& widget)
     {
-      return widget->is_mouse_over(); 
+      return (uint32_t)widget->get_type() & (uint32_t)UIType::ClickableWidget &&
+             dynamic_cast<ClickableWidget*>(widget.get())->is_mouse_over(); 
     });
 
   auto it = std::ranges::max_element(hovered_widgets, 
@@ -41,7 +42,7 @@ auto get_mouse_over_widget() -> UIWidget*
     });
   throw_if(std::ranges::distance(max_depth_widgets) > 1, "multiple ui widgets have same depth value");
 
-  return it->get();
+  return dynamic_cast<ClickableWidget*>(it->get());
 }
 
 void set_widget_is_clicked()

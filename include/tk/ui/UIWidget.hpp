@@ -39,7 +39,7 @@ namespace tk { namespace ui {
   public:
     virtual ~UIWidget() = default;
 
-    auto set_type(ShapeType type)             -> UIWidget&;
+    auto set_shape_type(ShapeType shape_type) -> UIWidget&;
     auto set_layout(Layout* layout)           -> UIWidget&;
     auto set_position(uint32_t x, uint32_t y) -> UIWidget&;
     auto set_color(glm::vec3 const& color)    -> UIWidget&;
@@ -47,23 +47,49 @@ namespace tk { namespace ui {
 
     auto set_shape_properties(std::initializer_list<uint32_t> values) -> UIWidget&;
 
-    auto get_type()  const noexcept { return _type;  }
-    auto get_color() const noexcept { return _color; }
-    auto get_depth() const noexcept { return _depth; }
+    auto get_type()       const noexcept { return _type; }
+    auto get_shape_type() const noexcept { return _shape_type; }
+    auto get_color()      const noexcept { return _color; }
+    auto get_depth()      const noexcept { return _depth; }
 
     void check_property_values();
 
+    void remove_from_layout()
+    {
+      _layout = nullptr;
+      _x      = 0;
+      _y      = 0;
+    }
+
     auto generate_model_matrix()        -> glm::mat4;
+
+  private:
     auto generate_quard_model_matrix()  -> glm::mat4;
     auto generate_circle_model_matrix() -> glm::mat4;
 
-    bool is_mouse_over();
-    bool mouse_over_quard();
-    bool mouse_over_circle();
+  protected:
+    UIType    _type       = UIType::UIWidget;
+    ShapeType _shape_type = ShapeType::Unknow;
+    Layout*   _layout     = nullptr;
+    uint32_t  _x          = 0;
+    uint32_t  _y          = 0;
+    glm::vec3 _color;
+    // INFO: default depth value is .1f, is to convience set background depth is 0.f
+    float     _depth      = .1f;
 
-    // HACK: should be as interface class for expand
-    void set_is_clicked() { _is_clicked = true; }
-    bool is_clicked()
+    std::vector<uint32_t> _property_values;
+  };
+
+  class ClickableWidget : public UIWidget
+  {
+  public:
+    ClickableWidget() { _type = UIType::ClickableWidget; }
+    virtual ~ClickableWidget() = default;
+
+    bool is_mouse_over();
+
+    void set_is_clicked() noexcept { _is_clicked = true; }
+    bool is_clicked()     noexcept
     {
       auto res = _is_clicked;
       if (res)
@@ -73,39 +99,18 @@ namespace tk { namespace ui {
       return res;
     }
 
-    void remove_from_layout()
-    {
-      _layout = nullptr;
-      _x      = 0;
-      _y      = 0;
-    }
-
-  protected:
-    ShapeType _type   = ShapeType::Unknow;
-    Layout*   _layout = nullptr;
-    uint32_t  _x      = 0;
-    uint32_t  _y      = 0;
-    glm::vec3 _color;
-    // INFO: default depth value is .1f, is to convience set background depth is 0.f
-    float     _depth  = .1f;
-
-    bool _is_clicked  = false;
-
-    std::vector<uint32_t> _property_values;
-  };
-
-  /**
-   * Button have width and height
-   * and a clicked judget which is click down in button then release in button
-   * and make model matrix from width and height with layout properties
-   * HACK: button should inhert from Quard which have make_model_matrix
-   *       and IClicked which have is_clicked
-   */
-  class Button : public UIWidget
-  {
-  public:
+  private:
+    bool mouse_over_quard();
+    bool mouse_over_circle();
 
   private:
+    bool _is_clicked  = false;
+  };
+
+  class Button: public ClickableWidget
+  {
+  public:
+    Button() { _type = UIType::Button; }
   };
 
 }}

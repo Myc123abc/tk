@@ -18,7 +18,11 @@ namespace tk { namespace ui {
     inline static std::vector<std::unique_ptr<Layout>>   layouts;
     inline static std::vector<std::unique_ptr<UIWidget>> widgets;
 
-    inline static UIWidget* mouse_down_widget = nullptr;
+    // background in layouts[0]
+    // default use onedark background
+    inline static UIWidget* background = nullptr;
+
+    inline static ClickableWidget* mouse_down_widget = nullptr;
   };
 
   inline auto& get_ctx()

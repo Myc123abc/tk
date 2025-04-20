@@ -11,7 +11,6 @@
 // 5. for circle, how many segments should be set
 //
 // TODO: >[ today todo ]<
-// seperate click with widget
 // multi sample rendering
 //
 // INFO:

@@ -12,9 +12,9 @@ namespace tk { namespace  ui {
 //                              UIWidget
 ////////////////////////////////////////////////////////////////////////////////
 
-auto UIWidget::set_type(ShapeType type)             -> UIWidget&
+auto UIWidget::set_shape_type(ShapeType shape_type) -> UIWidget&
 {
-  _type = type;
+  _shape_type = shape_type;
   return *this;
 }
 
@@ -46,7 +46,7 @@ auto UIWidget::set_depth(float depth)               -> UIWidget&
 
 void UIWidget::check_property_values()
 {
-  switch (_type) 
+  switch (_shape_type) 
   {
   case ShapeType::Unknow:
     throw_if(true, "input unknow shape type");
@@ -70,7 +70,7 @@ auto UIWidget::set_shape_properties(std::initializer_list<uint32_t> values) -> U
 
 auto UIWidget::generate_model_matrix() -> glm::mat4
 {
-  switch (_type)
+  switch (_shape_type)
   {
   case ShapeType::Unknow:
     throw_if(true, "unknow shape type to generate model matrix");
@@ -118,12 +118,17 @@ auto UIWidget::generate_circle_model_matrix() -> glm::mat4
   return model;
 }
 
-bool UIWidget::is_mouse_over()
+
+////////////////////////////////////////////////////////////////////////////////
+//                              IClickable
+////////////////////////////////////////////////////////////////////////////////
+
+bool ClickableWidget::is_mouse_over()
 {
   if (_layout == nullptr)
     return false;
 
-  switch (_type)
+  switch (_shape_type)
   {
   case ShapeType::Unknow:
     throw_if(true, "unknow type of mouse over dectection");
@@ -136,7 +141,7 @@ bool UIWidget::is_mouse_over()
   }
 }
 
-bool UIWidget::mouse_over_quard()
+bool ClickableWidget::mouse_over_quard()
 { 
   float x, y;
   SDL_GetMouseState(&x, &y);
@@ -150,7 +155,7 @@ bool UIWidget::mouse_over_quard()
   return false;
 }
 
-bool UIWidget::mouse_over_circle()
+bool ClickableWidget::mouse_over_circle()
 {
   float x, y;
   SDL_GetMouseState(&x, &y);
