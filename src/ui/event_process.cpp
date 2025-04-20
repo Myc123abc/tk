@@ -1,4 +1,5 @@
 #include "internal.hpp"
+#include "tk/ErrorHandling.hpp"
 
 #include <algorithm>
 #include <ranges>
@@ -12,17 +13,35 @@ namespace tk { namespace ui {
 
 auto get_mouse_over_widget() -> UIWidget*
 {
-  auto res = get_ctx().widgets |
+  auto& widgets = get_ctx().widgets;
+  auto hovered_widgets = widgets |
     std::views::filter([](auto const& widget)
     {
       return widget->is_mouse_over(); 
     });
-  auto it = std::ranges::max_element(res, 
+
+  auto it = std::ranges::max_element(hovered_widgets, 
     [](auto const& l, auto const& r)
     {
       return l->get_depth() < r->get_depth();
     });
-  return it != res.end() ? it->get() : nullptr;
+
+  // INFO: test whether multi-widgets have same depth value
+  //       if yes, throw exception, now we not to handle this case
+  float depth;
+  if (it != hovered_widgets.end())
+    depth = it->get()->get_depth();
+  else
+    return {};
+
+  auto max_depth_widgets = hovered_widgets |
+    std::views::filter([depth](auto const& widget)
+    {
+      return widget->get_depth() == depth;
+    });
+  throw_if(std::ranges::distance(max_depth_widgets) > 1, "multiple ui widgets have same depth value");
+
+  return it->get();
 }
 
 void set_widget_is_clicked()

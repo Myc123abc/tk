@@ -75,7 +75,8 @@ namespace tk { namespace ui {
     uint32_t  _x      = 0;
     uint32_t  _y      = 0;
     Color     _color  = Color::Unknow;
-    float     _depth  = 0.f;
+    // INFO: default depth value is .1f, is to convience set background depth is 0.f
+    float     _depth  = .1f;
 
     bool _is_clicked  = false;
   };

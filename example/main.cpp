@@ -10,7 +10,7 @@
 #include "tk/log.hpp"
 
 // TODO:
-//      same place same depth widget cannot
+//1.same place same depth widget cannot
 
 struct Context
 {
@@ -30,9 +30,8 @@ void tk_init(int argc, char** argv)
 
   tk::ui::put(ctx->layout, tk::get_main_window(), 0, 0);
   tk::ui::put(ctx->button0, ctx->layout, 100, 100);
-  ctx->button0->set_depth(0.1f);
-  // tk::ui::put(ctx->button1, ctx->layout, 100, 100);
-  ctx->button1->set_depth(0.01f);
+  tk::ui::put(ctx->button1, ctx->layout, 100, 100);
+  ctx->button0->set_depth(0.2f);
 }
 
 static uint32_t x, y;

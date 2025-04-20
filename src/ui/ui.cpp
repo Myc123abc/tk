@@ -4,16 +4,11 @@
 
 // HACK: use for background
 #include "tk/tk.hpp"
-// HACK: tmp
-#include "tk/log.hpp"
 
 #include <algorithm>
 #include <memory>
 
 namespace tk { namespace ui {
-
-// HACK:
-// use like in ui class
 
 // HACK: tmp way
 Layout* background_layout;
@@ -29,6 +24,7 @@ void init(graphics_engine::GraphicsEngine* engine)
   background_picuture = create_button(w, h, Color::OneDark);
   put(background_layout, tk::get_main_window(), 0, 0);
   put(background_picuture, background_layout, 0, 0);
+  // INFO: promise background in min depth value
   background_picuture->set_depth(0.f);
 }
 

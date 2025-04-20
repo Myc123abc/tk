@@ -3,8 +3,19 @@
 //
 // implement by graphics engine
 //
+// TODO:
+// 1. no delete, so created ui will be storage forever.
+// 2. how to handle ui in same place and same depth.
+// 3. use tree manage ui
+//
+// INFO:
+// 1. Default ui have a layout with single quard background use OneDark.
+//    It's depth value is 0.f. And other ui widgets you create default 
+//    depth start with 0.1f.
+//
 // HACK:
-// 1. layout managed by ui, but button managed by user
+// 1. Don't set depth value equal 0.f, it will conflict with background,
+//    we no handle same place same depth value case.
 //
 
 #pragma once
