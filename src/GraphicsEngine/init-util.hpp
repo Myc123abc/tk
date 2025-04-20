@@ -187,6 +187,7 @@ inline auto get_physical_devices_score(std::vector<VkPhysicalDevice> const& devi
     .pNext = &features13
   };
   features2.pNext = &features13;
+
   for (const auto& device : devices)
   {
     int score = 0;
@@ -253,6 +254,33 @@ inline auto check_device_extensions_support(VkPhysicalDevice device, std::vector
   return true;
 }
 
+inline auto get_max_multisample_count(VkPhysicalDevice device) -> VkSampleCountFlagBits
+{
+  VkPhysicalDeviceProperties properties;
+  vkGetPhysicalDeviceProperties(device, &properties);
+  auto count = properties.limits.framebufferColorSampleCounts &
+               properties.limits.framebufferDepthSampleCounts;
+  if (count & VK_SAMPLE_COUNT_64_BIT) return VK_SAMPLE_COUNT_64_BIT;
+  if (count & VK_SAMPLE_COUNT_32_BIT) return VK_SAMPLE_COUNT_32_BIT;
+  if (count & VK_SAMPLE_COUNT_16_BIT) return VK_SAMPLE_COUNT_16_BIT;
+  if (count & VK_SAMPLE_COUNT_8_BIT)  return VK_SAMPLE_COUNT_8_BIT;
+  if (count & VK_SAMPLE_COUNT_4_BIT)  return VK_SAMPLE_COUNT_4_BIT;
+  if (count & VK_SAMPLE_COUNT_2_BIT)  return VK_SAMPLE_COUNT_2_BIT;
+                                      return VK_SAMPLE_COUNT_1_BIT;
+}
+
+inline void print_supported_max_msaa_sample_count(VkSampleCountFlagBits count)
+{
+  std::string str = "max msaa sample count: ";
+  if (count & VK_SAMPLE_COUNT_64_BIT) str += "64";
+  if (count & VK_SAMPLE_COUNT_32_BIT) str += "32";
+  if (count & VK_SAMPLE_COUNT_16_BIT) str += "16";
+  if (count & VK_SAMPLE_COUNT_8_BIT)  str += "8";
+  if (count & VK_SAMPLE_COUNT_4_BIT)  str += "4";
+  if (count & VK_SAMPLE_COUNT_2_BIT)  str += "2";
+  if (count & VK_SAMPLE_COUNT_1_BIT)  str += "1";                                    
+  std::println("{}\n", str);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //                                Queue Families 

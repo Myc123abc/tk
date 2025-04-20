@@ -31,14 +31,6 @@ auto PipelineBuilder::build(VkDevice device, VkPipelineLayout layout) -> VkPipel
   _rasterization_state.polygonMode = VK_POLYGON_MODE_FILL;
   _rasterization_state.lineWidth   = 1.f; 
 
-  // TODO: use it in feature and it can be dynamic rendering, default multisample option
-  VkPipelineMultisampleStateCreateInfo multisample_state
-  { 
-    .sType                = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-    .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
-    .minSampleShading     = 1.f,
-  };
-
   // HACK: can be nullptr for dynamic rendering, see spec
   VkPipelineColorBlendStateCreateInfo color_blend_state
   { 
@@ -81,7 +73,7 @@ auto PipelineBuilder::build(VkDevice device, VkPipelineLayout layout) -> VkPipel
     // HACK: can be nullptr for dynamic rendering, see spec
     .pRasterizationState = &_rasterization_state,
     // HACK: can be nullptr for dynamic rendering, see spec
-    .pMultisampleState   = &multisample_state,
+    .pMultisampleState   = &_multisample_state,
     // HACK: can be dynamic rendering
     .pDepthStencilState  = &_depth_stencil_state,
     // HACK: can be nullptr for dynamic rendering, see spec
@@ -97,6 +89,7 @@ auto PipelineBuilder::build(VkDevice device, VkPipelineLayout layout) -> VkPipel
 auto PipelineBuilder::clear() -> PipelineBuilder&
 {
   _shader_stages.clear();
+  _multisample_state      = { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO   };
   _rendering_info         = { VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO           };
   _rasterization_state    = { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
   _depth_stencil_state    = { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
@@ -108,6 +101,13 @@ auto PipelineBuilder::clear() -> PipelineBuilder&
                       VK_COLOR_COMPONENT_B_BIT |
                       VK_COLOR_COMPONENT_A_BIT,
   };
+  return *this;
+}
+
+auto PipelineBuilder::set_msaa(VkSampleCountFlagBits msaa) -> PipelineBuilder&
+{
+  _multisample_state.rasterizationSamples = msaa;
+  _multisample_state.minSampleShading     = 1.f;
   return *this;
 }
 

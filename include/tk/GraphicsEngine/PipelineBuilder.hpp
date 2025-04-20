@@ -33,7 +33,7 @@ namespace tk { namespace graphics_engine {
     auto build(VkDevice device, VkPipelineLayout layout)                           -> VkPipeline;
     auto clear()                                                                   -> PipelineBuilder&;
 
-    // TODO: expand to multiple attachments
+    auto set_msaa(VkSampleCountFlagBits msaa)                                      -> PipelineBuilder&;
     auto set_color_attachment_format(VkFormat format)                              -> PipelineBuilder&;
     // TODO: expand for compute shader
     //       and default use "main" as enter point of shader
@@ -46,8 +46,9 @@ namespace tk { namespace graphics_engine {
 
   private:
     std::vector<VkPipelineShaderStageCreateInfo> _shader_stages;
-    VkPipelineRenderingCreateInfo                _rendering_info        { VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO            };
-    VkPipelineRasterizationStateCreateInfo       _rasterization_state   { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO  };
+    VkPipelineMultisampleStateCreateInfo         _multisample_state     { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO   };
+    VkPipelineRenderingCreateInfo                _rendering_info        { VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO           };
+    VkPipelineRasterizationStateCreateInfo       _rasterization_state   { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
     VkPipelineDepthStencilStateCreateInfo        _depth_stencil_state   { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
     VkFormat                                     _rendering_info_format { VK_FORMAT_UNDEFINED };
     VkPipelineColorBlendAttachmentState          _color_blend_attachment

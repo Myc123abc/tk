@@ -131,9 +131,12 @@ void GraphicsEngine::select_physical_device()
 
   throw_if(_physical_device == VK_NULL_HANDLE, "failed to find a suitable GPU");
 
+  _msaa_sample_count = get_max_multisample_count(_physical_device);
+
 #ifndef NDEBUG
   print_supported_physical_devices(_instance);
   print_supported_device_extensions(_physical_device);
+  print_supported_max_msaa_sample_count(_msaa_sample_count);
 #endif
 }
 
@@ -179,18 +182,18 @@ void GraphicsEngine::create_device_and_get_queues()
   };
   VkPhysicalDeviceFeatures2 features2
   {
-    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-    .pNext = &features12
+    .sType    = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+    .pNext    = &features12,
   };
 
   // device info 
   VkDeviceCreateInfo create_info
   {
-    .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-    .pNext = &features2,
-    .queueCreateInfoCount = (uint32_t)queue_infos.size(),
-    .pQueueCreateInfos = queue_infos.data(),
-    .enabledExtensionCount = (uint32_t)Device_Extensions.size(),
+    .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+    .pNext                   = &features2,
+    .queueCreateInfoCount    = (uint32_t)queue_infos.size(),
+    .pQueueCreateInfos       = queue_infos.data(),
+    .enabledExtensionCount   = (uint32_t)Device_Extensions.size(),
     .ppEnabledExtensionNames = Device_Extensions.data(),
   };
 #ifndef NDEBUG
@@ -249,11 +252,9 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
     .extent      = _image.extent,
     .mipLevels   = 1,
     .arrayLayers = 1,
-    .samples     = VK_SAMPLE_COUNT_1_BIT,
+    .samples     = _msaa_sample_count,
     .tiling      = VK_IMAGE_TILING_OPTIMAL,
     .usage       = VK_IMAGE_USAGE_TRANSFER_SRC_BIT     |
-                   VK_IMAGE_USAGE_TRANSFER_DST_BIT     | 
-                   VK_IMAGE_USAGE_STORAGE_BIT          |
                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
   };
 
@@ -295,7 +296,7 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
       .extent      = depth_image.extent,
       .mipLevels   = 1,
       .arrayLayers = 1,
-      .samples     = VK_SAMPLE_COUNT_1_BIT,
+      .samples     = _msaa_sample_count,
       .tiling      = VK_IMAGE_TILING_OPTIMAL,
       .usage       = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
     };
@@ -391,25 +392,25 @@ void GraphicsEngine::create_swapchain(VkSwapchainKHR old_swapchain)
 
 void GraphicsEngine::create_descriptor_set_layout()
 {
-  std::vector<VkDescriptorSetLayoutBinding> layouts
-  {
-    {
-      .binding         = 0,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-      .descriptorCount = 1,
-      .stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT,
-    },
-  };
-  VkDescriptorSetLayoutCreateInfo info
-  {
-    .sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-    .bindingCount = (uint32_t)layouts.size(),
-    .pBindings    = layouts.data(),
-  };
-  throw_if(vkCreateDescriptorSetLayout(_device, &info, nullptr, &_descriptor_set_layout) != VK_SUCCESS,
-           "failed to create descriptor set layout");
-
-  _destructors.push([this] { vkDestroyDescriptorSetLayout(_device, _descriptor_set_layout, nullptr); });
+  // std::vector<VkDescriptorSetLayoutBinding> layouts
+  // {
+  //   {
+  //     .binding         = 0,
+  //     .descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+  //     .descriptorCount = 1,
+  //     .stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT,
+  //   },
+  // };
+  // VkDescriptorSetLayoutCreateInfo info
+  // {
+  //   .sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+  //   .bindingCount = (uint32_t)layouts.size(),
+  //   .pBindings    = layouts.data(),
+  // };
+  // throw_if(vkCreateDescriptorSetLayout(_device, &info, nullptr, &_descriptor_set_layout) != VK_SUCCESS,
+  //          "failed to create descriptor set layout");
+  //
+  // _destructors.push([this] { vkDestroyDescriptorSetLayout(_device, _descriptor_set_layout, nullptr); });
 }
 
 void GraphicsEngine::create_graphics_pipeline()
@@ -438,6 +439,7 @@ void GraphicsEngine::create_graphics_pipeline()
                  .set_cull_mode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE)
                  .set_color_attachment_format(_image.format)
                  .enable_depth_test(Depth_Format)
+                 .set_msaa(_msaa_sample_count)
                  .build(_device, _2D_pipeline_layout);
 
   // set destructors
@@ -458,55 +460,55 @@ void GraphicsEngine::init_command_pool()
 
 void GraphicsEngine::create_descriptor_pool()
 {
-  std::vector<VkDescriptorPoolSize> sizes
-  {
-    {
-      .type            = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-      .descriptorCount = 1,
-    },
-  };
-  VkDescriptorPoolCreateInfo info
-  {
-    .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-    .maxSets       = 1,
-    .poolSizeCount = (uint32_t)sizes.size(),
-    .pPoolSizes    = sizes.data(),
-  };
-  throw_if(vkCreateDescriptorPool(_device, &info, nullptr, &_descriptor_pool) != VK_SUCCESS,
-           "failed to create descriptor pool");
-  
-  _destructors.push([this] { vkDestroyDescriptorPool(_device, _descriptor_pool, nullptr); });
+  // std::vector<VkDescriptorPoolSize> sizes
+  // {
+  //   {
+  //     .type            = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+  //     .descriptorCount = 1,
+  //   },
+  // };
+  // VkDescriptorPoolCreateInfo info
+  // {
+  //   .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+  //   .maxSets       = 1,
+  //   .poolSizeCount = (uint32_t)sizes.size(),
+  //   .pPoolSizes    = sizes.data(),
+  // };
+  // throw_if(vkCreateDescriptorPool(_device, &info, nullptr, &_descriptor_pool) != VK_SUCCESS,
+  //          "failed to create descriptor pool");
+  // 
+  // _destructors.push([this] { vkDestroyDescriptorPool(_device, _descriptor_pool, nullptr); });
 }
 
 void GraphicsEngine::create_descriptor_sets()
 {
-  VkDescriptorSetAllocateInfo info
-  {
-    .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-    .descriptorPool     = _descriptor_pool,
-    .descriptorSetCount = 1,
-    .pSetLayouts        = &_descriptor_set_layout,
-  };
-  throw_if(vkAllocateDescriptorSets(_device, &info, &_descriptor_set) != VK_SUCCESS,
-           "failed to create descriptor set");
-
-  VkDescriptorImageInfo img_info
-  {
-    .imageView   = _image.view,
-    .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
-  };
-
-  VkWriteDescriptorSet write
-  {
-    .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-    .dstSet          = _descriptor_set,
-    .dstBinding      = 0,
-    .descriptorCount = 1,
-    .descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-    .pImageInfo     = &img_info,
-  };
-
-  vkUpdateDescriptorSets(_device, 1, &write, 0, nullptr);
+  // VkDescriptorSetAllocateInfo info
+  // {
+  //   .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+  //   .descriptorPool     = _descriptor_pool,
+  //   .descriptorSetCount = 1,
+  //   .pSetLayouts        = &_descriptor_set_layout,
+  // };
+  // throw_if(vkAllocateDescriptorSets(_device, &info, &_descriptor_set) != VK_SUCCESS,
+  //          "failed to create descriptor set");
+  //
+  // VkDescriptorImageInfo img_info
+  // {
+  //   .imageView   = _image.view,
+  //   .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+  // };
+  //
+  // VkWriteDescriptorSet write
+  // {
+  //   .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+  //   .dstSet          = _descriptor_set,
+  //   .dstBinding      = 0,
+  //   .descriptorCount = 1,
+  //   .descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+  //   .pImageInfo     = &img_info,
+  // };
+  //
+  // vkUpdateDescriptorSets(_device, 1, &write, 0, nullptr);
 }
 
 void GraphicsEngine::create_frame_resources()

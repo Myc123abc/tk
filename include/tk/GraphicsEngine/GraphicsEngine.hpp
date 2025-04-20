@@ -56,6 +56,8 @@ namespace tk { namespace graphics_engine {
     void render_end();
     void render_shape(ShapeType type, glm::vec3 const& color, glm::mat4 const& model, float depth);
 
+    friend void set_msaa(bool use);
+
   private:
     //
     // initialize resources
@@ -146,9 +148,20 @@ namespace tk { namespace graphics_engine {
     
     DestructorStack              _destructors;
 
+    // HACK: currently not use these
     VkDescriptorPool             _descriptor_pool          = VK_NULL_HANDLE;
     VkDescriptorSetLayout        _descriptor_set_layout    = VK_NULL_HANDLE;
     VkDescriptorSet              _descriptor_set           = VK_NULL_HANDLE;
+
+    inline static VkSampleCountFlagBits _msaa_sample_count = {};
   };
+
+  // HACK: default use max supported sample count, maybe lead performance problem
+  inline void set_msaa(bool use)
+  {
+    static auto msaa = GraphicsEngine::_msaa_sample_count;
+    if (use) GraphicsEngine::_msaa_sample_count = msaa;
+    else     GraphicsEngine::_msaa_sample_count = VK_SAMPLE_COUNT_1_BIT;
+  }
 
 } }

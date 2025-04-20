@@ -25,21 +25,24 @@ struct Context
 
 void tk_init(int argc, char** argv)
 {
+  // INFO: default use supported max sample count
+  // tk::graphics_engine::set_msaa(true);
+
   auto ctx = new Context();
   tk::init_tk_context("tk", 1000, 1000, ctx);
 
   ctx->layout = tk::ui::create_layout();
   ctx->button0 = tk::ui::create_button(tk::ShapeType::Quard,  to_vec3(tk::Color::Blue), {100, 100});
-  ctx->button1 = tk::ui::create_button(tk::ShapeType::Circle, to_vec3(tk::Color::Red), {100});
+  ctx->button1 = tk::ui::create_button(tk::ShapeType::Circle, to_vec3(tk::Color::Green), {500});
   ctx->layout_x = tk::ui::create_button(tk::ShapeType::Quard, to_vec3(tk::Color::Green), {1, 1000});
   ctx->layout_y = tk::ui::create_button(tk::ShapeType::Quard, to_vec3(tk::Color::Green), {1000, 1});
 
   tk::ui::put(ctx->layout, tk::get_main_window(), 0, 0);
   tk::ui::put(ctx->button0, ctx->layout, 500, 500);
-  tk::ui::put(ctx->button1, ctx->layout, 100, 100);
+  tk::ui::put(ctx->button1, ctx->layout, 0, 0);
   tk::ui::put(ctx->layout_x, ctx->layout, 0, 0);
   tk::ui::put(ctx->layout_y, ctx->layout, 0, 0);
-  ctx->button0->set_depth(0.2f);
+  ctx->button1->set_depth(0.2f);
 }
 
 static uint32_t x, y;
