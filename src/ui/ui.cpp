@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <memory>
 
+using namespace tk;
+
 namespace tk { namespace ui {
 
 // HACK: tmp way
@@ -21,7 +23,7 @@ void init(graphics_engine::GraphicsEngine* engine)
   background_layout = create_layout();
   uint32_t w, h;
   tk::get_main_window()->get_framebuffer_size(w, h);
-  background_picuture = create_button(w, h, Color::OneDark);
+  background_picuture = create_button(ShapeType::Quard, Color::OneDark, {w, h});
   put(background_layout, tk::get_main_window(), 0, 0);
   put(background_picuture, background_layout, 0, 0);
   // INFO: promise background in min depth value
@@ -34,13 +36,12 @@ auto create_layout() -> Layout*
   return ctx.layouts.emplace_back(std::make_unique<Layout>()).get();
 }
 
-auto create_button(uint32_t width, uint32_t height, Color color) -> Button*
+auto create_button(ShapeType shape, Color color, std::initializer_list<uint32_t> values) -> Button*
 {
-  auto ctx = get_ctx();
-  auto btn = dynamic_cast<Button*>(ctx.widgets.emplace_back(std::make_unique<Button>()).get());
-  btn->set_width_height(width, height);
-  btn->set_color(color);
+  auto btn = dynamic_cast<Button*>(get_ctx().widgets.emplace_back(std::make_unique<Button>()).get());
   btn->set_type(ShapeType::Quard);
+  btn->set_shape_properties(values);
+  btn->set_color(color);
   return btn;
 }
 
@@ -75,7 +76,7 @@ void render()
 
   uint32_t width, height;
   tk::get_main_window()->get_framebuffer_size(width, height);
-  background_picuture->set_width_height(width, height);
+  background_picuture->set_shape_properties({width, height});
 
   ctx.engine->render_begin();
 

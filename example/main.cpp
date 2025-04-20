@@ -25,8 +25,8 @@ void tk_init(int argc, char** argv)
   tk::init_tk_context("tk", 1000, 1000, ctx);
 
   ctx->layout = tk::ui::create_layout();
-  ctx->button0 = tk::ui::create_button(100, 100, tk::Color::Blue);
-  ctx->button1 = tk::ui::create_button(100, 100, tk::Color::Red);
+  ctx->button0 = tk::ui::create_button(tk::ShapeType::Quard, tk::Color::Blue, {100, 100});
+  ctx->button1 = tk::ui::create_button(tk::ShapeType::Quard, tk::Color::Red, {100, 100});
 
   tk::ui::put(ctx->layout, tk::get_main_window(), 0, 0);
   tk::ui::put(ctx->button0, ctx->layout, 100, 100);

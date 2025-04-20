@@ -45,9 +45,13 @@ namespace tk { namespace ui {
     auto set_color(Color color)               -> UIWidget&;
     auto set_depth(float depth)               -> UIWidget&;
 
+    auto set_shape_properties(std::initializer_list<uint32_t> values) -> UIWidget&;
+
     auto get_type()  const noexcept { return _type;  }
     auto get_color() const noexcept { return _color; }
     auto get_depth() const noexcept { return _depth; }
+
+    void check_property_values();
 
     // HACK: should be as interface class for expand
     virtual bool is_mouse_over() { return false; }
@@ -79,6 +83,8 @@ namespace tk { namespace ui {
     float     _depth  = .1f;
 
     bool _is_clicked  = false;
+
+    std::vector<uint32_t> _property_values;
   };
 
   /**
@@ -95,10 +101,7 @@ namespace tk { namespace ui {
 
     auto make_model_matrix() -> glm::mat4;
 
-    void set_width_height(uint32_t width, uint32_t height);
-
   private:
-    uint32_t _width = 0, _height = 0;
   };
 
 }}
