@@ -1,5 +1,6 @@
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
 #include "tk/ErrorHandling.hpp"
+#include "tk/log.hpp"
 
 namespace tk { namespace graphics_engine {
 
@@ -87,6 +88,26 @@ void GraphicsEngine::copy_image(VkCommandBuffer cmd, VkImage src, VkImage dst, V
   };
 
   vkCmdBlitImage2(cmd, &info);
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+//                               MSAA
+////////////////////////////////////////////////////////////////////////////////
+
+void set_msaa(VkSampleCountFlagBits count)
+{
+  if (count > GraphicsEngine::_max_msaa_sample_count)
+  {
+    count = GraphicsEngine::_max_msaa_sample_count;
+    log::warn("unsupported msaa sample count, change to max supported count.");
+  }
+  else
+    GraphicsEngine::_msaa_sample_count = count;
+
+  // TODO: other handling
+  //       use dynamic multisample pipeline configuration
+  //       create new msaa image, after created delete old one
 }
 
 } }

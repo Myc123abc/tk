@@ -25,11 +25,10 @@ struct Context
 
 void tk_init(int argc, char** argv)
 {
-  // INFO: default use supported max sample count
-  // tk::graphics_engine::set_msaa(true);
-
   auto ctx = new Context();
   tk::init_tk_context("tk", 1000, 1000, ctx);
+
+  tk::graphics_engine::set_msaa(VK_SAMPLE_COUNT_4_BIT);
 
   ctx->layout = tk::ui::create_layout();
   ctx->button0 = tk::ui::create_button(tk::ShapeType::Quard,  to_vec3(tk::Color::Blue), {100, 100});

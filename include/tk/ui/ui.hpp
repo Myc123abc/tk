@@ -10,7 +10,8 @@
 // 4. use quadtree handle widgets search
 // 5. for circle, how many segments should be set
 //
-  // TODO: use it in feature and it can be dynamic rendering, default multisample option
+// TODO:
+// 1. use dynamic set msaa 
 //
 // INFO:
 // 1. Default ui have a layout with single quard background use OneDark.

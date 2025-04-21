@@ -35,6 +35,7 @@ namespace tk
       {
         error,
         info,
+        warn,
       };
 
       template <typename T>
@@ -44,6 +45,8 @@ namespace tk
           spdlog::error(msg);
         else if (level == Level::info)
           spdlog::info(msg);
+        else if (level == Level::warn)
+          spdlog::warn(msg);
         else
           assert(false);
       }
@@ -55,6 +58,8 @@ namespace tk
           spdlog::error(fmt, std::forward<Args>(args)...);
         else if (level == Level::info)
           spdlog::info(fmt, std::forward<Args>(args)...);
+        else if (level == Level::warn)
+          spdlog::warn(fmt, std::forward<Args>(args)...);
         else
           assert(false);
       }
@@ -67,6 +72,10 @@ namespace tk
       friend void info(T const& msg);
       template <typename... Args>
       friend void info(std::format_string<Args...> fmt, Args&&... args);
+      template <typename T>
+      friend void warn(T const& msg);
+      template <typename... Args>
+      friend void warn(std::format_string<Args...> fmt, Args&&... args);
     };
 
     template <typename T>
@@ -91,6 +100,18 @@ namespace tk
     inline void info(std::format_string<Args...> fmt, Args&&... args)
     {
       Log::instance().log(Log::Level::info, std::format(fmt, std::forward<Args>(args)...));
+    }
+
+    template <typename T>
+    inline void warn(T const& msg)
+    {
+      Log::instance().log(Log::Level::warn, msg);
+    }
+
+    template <typename... Args>
+    inline void warn(std::format_string<Args...> fmt, Args&&... args)
+    {
+      Log::instance().log(Log::Level::warn, std::format(fmt, std::forward<Args>(args)...));
     }
 
   }

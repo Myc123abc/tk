@@ -56,7 +56,7 @@ namespace tk { namespace graphics_engine {
     void render_end();
     void render_shape(ShapeType type, glm::vec3 const& color, glm::mat4 const& model, float depth);
 
-    friend void set_msaa(bool use);
+    friend void set_msaa(VkSampleCountFlagBits count);
 
   private:
     //
@@ -87,6 +87,8 @@ namespace tk { namespace graphics_engine {
     static void transition_image_layout(VkCommandBuffer cmd, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout);
     static auto get_image_subresource_range(VkImageAspectFlags aspect) -> VkImageSubresourceRange;
     static void copy_image(VkCommandBuffer cmd, VkImage src, VkImage dst, VkExtent2D src_extent, VkExtent2D dst_extent);
+
+    inline static bool enable_msaa() noexcept { return _msaa_sample_count != VK_SAMPLE_COUNT_1_BIT; }
 
   private:
     //
@@ -120,6 +122,7 @@ namespace tk { namespace graphics_engine {
     std::vector<VkImage>         _swapchain_images;
     VkExtent2D                   _swapchain_image_extent   = {};
     Image                        _image                    = {};
+    Image                        _msaa_image               = {};
     VkExtent2D                   _draw_extent              = {};
 
     VkPipeline                   _2D_pipeline              = VK_NULL_HANDLE;
@@ -153,15 +156,18 @@ namespace tk { namespace graphics_engine {
     VkDescriptorSetLayout        _descriptor_set_layout    = VK_NULL_HANDLE;
     VkDescriptorSet              _descriptor_set           = VK_NULL_HANDLE;
 
-    inline static VkSampleCountFlagBits _msaa_sample_count = {};
+    inline static VkSampleCountFlagBits _max_msaa_sample_count = {};
+    // FIX: tmp
+    inline static VkSampleCountFlagBits _msaa_sample_count     = VK_SAMPLE_COUNT_4_BIT;
   };
 
-  // HACK: default use max supported sample count, maybe lead performance problem
-  inline void set_msaa(bool use)
-  {
-    static auto msaa = GraphicsEngine::_msaa_sample_count;
-    if (use) GraphicsEngine::_msaa_sample_count = msaa;
-    else     GraphicsEngine::_msaa_sample_count = VK_SAMPLE_COUNT_1_BIT;
-  }
+  /**
+   * set msaa sample count
+   * if set 1bit, is not use msaa
+   * default set by 4bit
+   *
+   * FIX: only set begin of program, it can't be change when rendering
+   */
+  void set_msaa(VkSampleCountFlagBits count);
 
 } }

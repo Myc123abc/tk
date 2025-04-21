@@ -60,27 +60,43 @@ void GraphicsEngine::render_begin()
   vkBeginCommandBuffer(frame.command_buffer, &beg_info);
 
   // transition image layout to writeable
-  transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  transition_image_layout(frame.command_buffer, _msaa_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   transition_image_layout(frame.command_buffer, frame.depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
   //
   // dynamic rendering
   //
+  transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   VkRenderingAttachmentInfo color_attachment
   {
     .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-    .imageView   = _image.view,
+    .imageView   = _msaa_image.view,
     .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    .loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR,
-    .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
+
+    // TODO: try directly use sawpchain image view with different sample count and format
+    .resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT,
+    .resolveImageView = _image.view,
+    .resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+
+    .loadOp      = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+    .storeOp     = VK_ATTACHMENT_STORE_OP_DONT_CARE,
   };
+  // VkRenderingAttachmentInfo color_attachment
+  // {
+  //   .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+  //   .imageView   = _msaa_image.view,
+  //   .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+  //   .loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR,
+  //   .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
+  // };
   VkRenderingAttachmentInfo depth_attachment
   {
+    // TODO: how to do depth msaa resolve
     .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
     .imageView   = frame.depth_image.view,
     .imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
     .loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR,
-    .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
+    .storeOp     = VK_ATTACHMENT_STORE_OP_DONT_CARE,
   };
   VkRenderingInfo rendering
   {
@@ -122,6 +138,12 @@ void GraphicsEngine::render_end()
   vkCmdEndRendering(frame.command_buffer);
 
   // copy image to swapchain image
+  // transition_image_layout(frame.command_buffer, _msaa_image.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  // transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  //
+  // resolve_image(frame.command_buffer, _msaa_image.image, _image.image, _draw_extent);
+  //
+  // transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   transition_image_layout(frame.command_buffer, _image.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   transition_image_layout(frame.command_buffer, _swapchain_images[image_index], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 

@@ -131,12 +131,12 @@ void GraphicsEngine::select_physical_device()
 
   throw_if(_physical_device == VK_NULL_HANDLE, "failed to find a suitable GPU");
 
-  _msaa_sample_count = get_max_multisample_count(_physical_device);
+  _max_msaa_sample_count = get_max_multisample_count(_physical_device);
 
 #ifndef NDEBUG
   print_supported_physical_devices(_instance);
   print_supported_device_extensions(_physical_device);
-  print_supported_max_msaa_sample_count(_msaa_sample_count);
+  print_supported_max_msaa_sample_count(_max_msaa_sample_count);
 #endif
 }
 
@@ -243,6 +243,8 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
   //
   _image.extent = { extent.width, extent.height, 1 };
   _image.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+  _msaa_image.extent = _image.extent;
+  _msaa_image.format = _image.format;
   
   VkImageCreateInfo image_info
   {
@@ -252,11 +254,16 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
     .extent      = _image.extent,
     .mipLevels   = 1,
     .arrayLayers = 1,
-    .samples     = _msaa_sample_count,
+    .samples     = VK_SAMPLE_COUNT_1_BIT,
     .tiling      = VK_IMAGE_TILING_OPTIMAL,
     .usage       = VK_IMAGE_USAGE_TRANSFER_SRC_BIT     |
+                   VK_IMAGE_USAGE_TRANSFER_DST_BIT     |
                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
   };
+  auto msaa_image_info = image_info;
+  msaa_image_info.samples = _msaa_sample_count;
+  msaa_image_info.usage   = VK_IMAGE_USAGE_TRANSFER_SRC_BIT     |
+                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
   VmaAllocationCreateInfo alloc_info
   {
@@ -265,6 +272,10 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
   };
   throw_if(vmaCreateImage(_mem_alloc.get(), &image_info, &alloc_info, &_image.image, &_image.allocation, nullptr) != VK_SUCCESS,
            "failed to create image");
+  auto msaa_alloc_info = alloc_info;
+  msaa_alloc_info.usage = VMA_MEMORY_USAGE_GPU_LAZILY_ALLOCATED;
+  throw_if(vmaCreateImage(_mem_alloc.get(), &msaa_image_info, &alloc_info, &_msaa_image.image, &_msaa_image.allocation, nullptr) != VK_SUCCESS,
+           "failed to create msaa image");
 
   VkImageViewCreateInfo image_view_info
   {
@@ -279,8 +290,12 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
       .layerCount = 1,
     },
   };
+  auto msaa_image_view_info  = image_view_info;
+  msaa_image_view_info.image = _msaa_image.image;
   throw_if(vkCreateImageView(_device, &image_view_info, nullptr, &_image.view) != VK_SUCCESS,
            "failed to create image view");
+  throw_if(vkCreateImageView(_device, &msaa_image_view_info, nullptr, &_msaa_image.view) != VK_SUCCESS,
+           "failed to create msaa image view");
 
   // create depth image
   for (auto& frame : _frames)
@@ -326,6 +341,8 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
       vkDestroyImageView(_device, frame.depth_image.view, nullptr);
       vmaDestroyImage(_mem_alloc.get(), frame.depth_image.image, frame.depth_image.allocation);
     }
+    vkDestroyImageView(_device, _msaa_image.view, nullptr);
+    vmaDestroyImage(_mem_alloc.get(), _msaa_image.image, _msaa_image.allocation);
     vkDestroyImageView(_device, _image.view, nullptr);
     vmaDestroyImage(_mem_alloc.get(), _image.image, _image.allocation);
     vkDestroySwapchainKHR(_device, _swapchain, nullptr);
