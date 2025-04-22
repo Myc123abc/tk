@@ -90,24 +90,66 @@ void GraphicsEngine::copy_image(VkCommandBuffer cmd, VkImage src, VkImage dst, V
   vkCmdBlitImage2(cmd, &info);
 }
 
-
-////////////////////////////////////////////////////////////////////////////////
-//                               MSAA
-////////////////////////////////////////////////////////////////////////////////
-
-void set_msaa(VkSampleCountFlagBits count)
+void GraphicsEngine::depth_image_barrier_begin(VkCommandBuffer cmd)
 {
-  if (count > GraphicsEngine::_max_msaa_sample_count)
+  VkImageMemoryBarrier2 barrier
   {
-    count = GraphicsEngine::_max_msaa_sample_count;
-    log::warn("unsupported msaa sample count, change to max supported count.");
-  }
-  else
-    GraphicsEngine::_msaa_sample_count = count;
+    .sType            = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+    .srcStageMask     = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT  | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+    .srcAccessMask    = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+    .dstStageMask     = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT  | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+    .dstAccessMask    = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+    .oldLayout        = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+    .newLayout        = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+    // HACK: currently, not use
+    // .image            = _depth_image.image,
+    .subresourceRange = 
+    {
+      .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+      .levelCount = 1,
+      .layerCount = 1,
+    },
+  };
 
-  // TODO: other handling
-  //       use dynamic multisample pipeline configuration
-  //       create new msaa image, after created delete old one
+  VkDependencyInfo dep_info
+  {
+    .sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+    .imageMemoryBarrierCount = 1,
+    .pImageMemoryBarriers    = &barrier,
+  };
+
+  vkCmdPipelineBarrier2(cmd, &dep_info);
+}
+
+void GraphicsEngine::depth_image_barrier_end(VkCommandBuffer cmd)
+{
+  VkImageMemoryBarrier2 barrier
+  {
+    .sType            = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+    .srcStageMask     = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+    .srcAccessMask    = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+    .dstStageMask     = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+    .dstAccessMask    = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT, 
+    .oldLayout        = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+    .newLayout        = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+    // HACK: currently, not use
+    // .image            = _depth_image.image,
+    .subresourceRange = 
+    {
+      .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+      .levelCount = 1,
+      .layerCount = 1,
+    },
+  };
+
+  VkDependencyInfo dep_info
+  {
+    .sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+    .imageMemoryBarrierCount = 1,
+    .pImageMemoryBarriers    = &barrier,
+  };
+
+  vkCmdPipelineBarrier2(cmd, &dep_info);
 }
 
 } }

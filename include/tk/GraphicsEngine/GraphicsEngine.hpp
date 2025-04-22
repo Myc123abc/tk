@@ -56,8 +56,6 @@ namespace tk { namespace graphics_engine {
     void render_end();
     void render_shape(ShapeType type, glm::vec3 const& color, glm::mat4 const& model, float depth);
 
-    friend void set_msaa(VkSampleCountFlagBits count);
-
   private:
     //
     // initialize resources
@@ -88,7 +86,12 @@ namespace tk { namespace graphics_engine {
     static auto get_image_subresource_range(VkImageAspectFlags aspect) -> VkImageSubresourceRange;
     static void copy_image(VkCommandBuffer cmd, VkImage src, VkImage dst, VkExtent2D src_extent, VkExtent2D dst_extent);
 
-    inline static bool enable_msaa() noexcept { return _msaa_sample_count != VK_SAMPLE_COUNT_1_BIT; }
+    // INFO: 
+    // this is depth image memory barrier, depend on this link
+    // https://stackoverflow.com/questions/62371266/why-is-a-single-depth-buffer-sufficient-for-this-vulkan-swapchain-render-loop
+    // it's difficult for me now, so I just use multi depth images
+    void depth_image_barrier_begin(VkCommandBuffer cmd);
+    void depth_image_barrier_end(VkCommandBuffer cmd);
 
   private:
     //
@@ -125,6 +128,8 @@ namespace tk { namespace graphics_engine {
     Image                        _msaa_image               = {};
     VkExtent2D                   _draw_extent              = {};
 
+    Image                        _msaa_depth_image;
+
     VkPipeline                   _2D_pipeline              = VK_NULL_HANDLE;
     VkPipelineLayout             _2D_pipeline_layout       = VK_NULL_HANDLE;
 
@@ -140,8 +145,6 @@ namespace tk { namespace graphics_engine {
       VkFence         fence               = VK_NULL_HANDLE;
       VkSemaphore     image_available_sem = VK_NULL_HANDLE; 
       VkSemaphore     render_finished_sem = VK_NULL_HANDLE; 
-      // INFO: use multiple depth images because
-      //       https://stackoverflow.com/questions/62371266/why-is-a-single-depth-buffer-sufficient-for-this-vulkan-swapchain-render-loop
       Image           depth_image;
     };
 
@@ -156,18 +159,9 @@ namespace tk { namespace graphics_engine {
     VkDescriptorSetLayout        _descriptor_set_layout    = VK_NULL_HANDLE;
     VkDescriptorSet              _descriptor_set           = VK_NULL_HANDLE;
 
-    inline static VkSampleCountFlagBits _max_msaa_sample_count = {};
-    // FIX: tmp
-    inline static VkSampleCountFlagBits _msaa_sample_count     = VK_SAMPLE_COUNT_4_BIT;
+    // INFO: because some device unsupport dynamic msaa feature in pipeline
+    //       so we just fixed use 4bit msaa
+    static constexpr VkSampleCountFlagBits _msaa_sample_count = VK_SAMPLE_COUNT_4_BIT;
   };
-
-  /**
-   * set msaa sample count
-   * if set 1bit, is not use msaa
-   * default set by 4bit
-   *
-   * FIX: only set begin of program, it can't be change when rendering
-   */
-  void set_msaa(VkSampleCountFlagBits count);
 
 } }

@@ -131,12 +131,13 @@ void GraphicsEngine::select_physical_device()
 
   throw_if(_physical_device == VK_NULL_HANDLE, "failed to find a suitable GPU");
 
-  _max_msaa_sample_count = get_max_multisample_count(_physical_device);
+  auto max_msaa_sample_count = get_max_multisample_count(_physical_device);
+  throw_if(_msaa_sample_count > max_msaa_sample_count, "unsupported 4xmsaa");
 
 #ifndef NDEBUG
   print_supported_physical_devices(_instance);
   print_supported_device_extensions(_physical_device);
-  print_supported_max_msaa_sample_count(_max_msaa_sample_count);
+  print_supported_max_msaa_sample_count(max_msaa_sample_count);
 #endif
 }
 
@@ -246,6 +247,8 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
   _msaa_image.extent = _image.extent;
   _msaa_image.format = _image.format;
   
+  // INFO: image as copy src to swapchain image
+  //       and resolved image from msaa image
   VkImageCreateInfo image_info
   {
     .sType       = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -257,23 +260,22 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
     .samples     = VK_SAMPLE_COUNT_1_BIT,
     .tiling      = VK_IMAGE_TILING_OPTIMAL,
     .usage       = VK_IMAGE_USAGE_TRANSFER_SRC_BIT     |
-                   VK_IMAGE_USAGE_TRANSFER_DST_BIT     |
                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
   };
+
   auto msaa_image_info = image_info;
   msaa_image_info.samples = _msaa_sample_count;
-  msaa_image_info.usage   = VK_IMAGE_USAGE_TRANSFER_SRC_BIT     |
+  msaa_image_info.usage   = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
                             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
   VmaAllocationCreateInfo alloc_info
   {
+    .flags         = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
     .usage         = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
     .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
   };
   throw_if(vmaCreateImage(_mem_alloc.get(), &image_info, &alloc_info, &_image.image, &_image.allocation, nullptr) != VK_SUCCESS,
            "failed to create image");
-  auto msaa_alloc_info = alloc_info;
-  msaa_alloc_info.usage = VMA_MEMORY_USAGE_GPU_LAZILY_ALLOCATED;
   throw_if(vmaCreateImage(_mem_alloc.get(), &msaa_image_info, &alloc_info, &_msaa_image.image, &_msaa_image.allocation, nullptr) != VK_SUCCESS,
            "failed to create msaa image");
 
@@ -297,50 +299,62 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
   throw_if(vkCreateImageView(_device, &msaa_image_view_info, nullptr, &_msaa_image.view) != VK_SUCCESS,
            "failed to create msaa image view");
 
-  // create depth image
-  for (auto& frame : _frames)
+  // create msaa depth image and depth image
+  _msaa_depth_image.format = Depth_Format;
+  _msaa_depth_image.extent = _image.extent;
+  VkImageCreateInfo msaa_depth_info
   {
-    auto& depth_image  = frame.depth_image;
-    depth_image.format = Depth_Format;
-    depth_image.extent = _image.extent;
-    VkImageCreateInfo depth_info
-    {
-      .sType       = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-      .imageType   = VK_IMAGE_TYPE_2D,
-      .format      = depth_image.format,
-      .extent      = depth_image.extent,
-      .mipLevels   = 1,
-      .arrayLayers = 1,
-      .samples     = _msaa_sample_count,
-      .tiling      = VK_IMAGE_TILING_OPTIMAL,
-      .usage       = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-    };
-    throw_if(vmaCreateImage(_mem_alloc.get(), &depth_info, &alloc_info, &depth_image.image, &depth_image.allocation, nullptr) != VK_SUCCESS,
+    .sType       = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+    .imageType   = VK_IMAGE_TYPE_2D,
+    .format      = _msaa_depth_image.format,
+    .extent      = _msaa_depth_image.extent,
+    .mipLevels   = 1,
+    .arrayLayers = 1,
+    .samples     = _msaa_sample_count,
+    .tiling      = VK_IMAGE_TILING_OPTIMAL,
+    .usage       = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
+                   VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
+  };
+  throw_if(vmaCreateImage(_mem_alloc.get(), &msaa_depth_info, &alloc_info, &_msaa_depth_image.image, &_msaa_depth_image.allocation, nullptr) != VK_SUCCESS,
+           "failed to create msaa depth image");
+  auto depth_info = msaa_depth_info;
+  depth_info.samples = VK_SAMPLE_COUNT_1_BIT;
+  for (auto i = 0; i < _frames.size(); ++i)
+    throw_if(vmaCreateImage(_mem_alloc.get(), &depth_info, &alloc_info, &_frames[i].depth_image.image, &_frames[i].depth_image.allocation, nullptr) != VK_SUCCESS,
              "failed to create depth image");
-    VkImageViewCreateInfo depth_view_info
+
+  VkImageViewCreateInfo msaa_depth_view_info
+  {
+    .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+    .image    = _msaa_depth_image.image,
+    .viewType = VK_IMAGE_VIEW_TYPE_2D,
+    .format   = _msaa_depth_image.format,
+    .subresourceRange =
     {
-      .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-      .image    = depth_image.image,
-      .viewType = VK_IMAGE_VIEW_TYPE_2D,
-      .format   = depth_image.format,
-      .subresourceRange =
-      {
-        .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
-        .levelCount = 1,
-        .layerCount = 1,
-      },
-    };
-    throw_if(vkCreateImageView(_device, &depth_view_info, nullptr, &depth_image.view) != VK_SUCCESS,
+      .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+      .levelCount = 1,
+      .layerCount = 1,
+    },
+  };
+  throw_if(vkCreateImageView(_device, &msaa_depth_view_info, nullptr, &_msaa_depth_image.view) != VK_SUCCESS,
+           "failed to create msaa depth image view");
+  auto depth_view_info = msaa_depth_view_info;
+  for (auto i = 0; i < _frames.size(); ++i)
+  {
+    depth_view_info.image = _frames[i].depth_image.image;
+    throw_if(vkCreateImageView(_device, &depth_view_info, nullptr, &_frames[i].depth_image.view) != VK_SUCCESS,
              "failed to create depth image view");
   }
 
   _destructors.push([this]
   {
-    for (auto& frame : _frames)
+    for (auto i = 0; i < _frames.size(); ++i)
     {
-      vkDestroyImageView(_device, frame.depth_image.view, nullptr);
-      vmaDestroyImage(_mem_alloc.get(), frame.depth_image.image, frame.depth_image.allocation);
+      vkDestroyImageView(_device, _frames[i].depth_image.view, nullptr);
+      vmaDestroyImage(_mem_alloc.get(), _frames[i].depth_image.image, _frames[i].depth_image.allocation);
     }
+    vkDestroyImageView(_device, _msaa_depth_image.view, nullptr);
+    vmaDestroyImage(_mem_alloc.get(), _msaa_depth_image.image, _msaa_depth_image.allocation);
     vkDestroyImageView(_device, _msaa_image.view, nullptr);
     vmaDestroyImage(_mem_alloc.get(), _msaa_image.image, _msaa_image.allocation);
     vkDestroyImageView(_device, _image.view, nullptr);
