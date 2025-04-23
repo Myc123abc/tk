@@ -5,7 +5,8 @@
 #pragma once
 
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
-#include "tk/ui/UIWidget.hpp"
+#include "tk/ui/widgets/UIWidget.hpp"
+#include "tk/ui/widgets/ClickableWidget.hpp"
 
 #include <SDL3/SDL_events.h>
 
@@ -19,7 +20,6 @@ namespace tk { namespace ui {
     inline static std::vector<std::unique_ptr<UIWidget>> widgets;
 
     // background in layouts[0]
-    // default use onedark background
     inline static UIWidget* background = nullptr;
 
     inline static ClickableWidget* mouse_down_widget = nullptr;

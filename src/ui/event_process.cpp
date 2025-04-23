@@ -17,7 +17,7 @@ auto get_mouse_over_widget() -> ClickableWidget*
   auto hovered_widgets = widgets |
     std::views::filter([](auto const& widget)
     {
-      return (uint32_t)widget->get_type() & (uint32_t)UIType::ClickableWidget &&
+      return widget->clickable() &&
              dynamic_cast<ClickableWidget*>(widget.get())->is_mouse_over(); 
     });
 
@@ -80,6 +80,5 @@ void event_process(SDL_Event* event)
     break;
   }
 }
-
 
 }}

@@ -9,64 +9,62 @@
 #include "tk/tk.hpp"
 #include "tk/log.hpp"
 
-struct Context
-{
-  tk::ui::Layout* layout;
-  tk::ui::Button* button0;
-  tk::ui::Button* button1;
+#include <chrono>
 
-  // HACK: tmp coordinate
-  tk::ui::Button* layout_x;
-  tk::ui::Button* layout_y;
+using namespace tk;
+using namespace tk::ui;
+
+class AudioPlayer
+{
+public:
+  AudioPlayer()
+  {
+    // init tk context
+    // and set title and extent of main window
+    // and set user data
+    init_tk_context("tk", 120, 30, this);
+
+    // init background color
+    init_background(Color::OneDark);
+
+    // create layout and ui widgets
+    _layout     = create_layout();
+    _front_line = create_line(20, 3, 0.f, Color::Blue);
+    _back_line  = create_line(100, 3, 0.f, Color::Grey);
+
+    // set layout and ui widgets' position
+    _layout->bind(get_main_window()).set_position(0, 0);
+    _front_line->bind(_layout).set_position(10, 15).set_depth(0.11f);
+    _back_line->bind(_layout).set_position(10, 15);
+  }
+
+  void set_playback_progress(uint32_t progress)
+  {
+    _front_line->set_length(progress);
+  }
+
+private:
+  Layout* _layout;
+  Line*   _front_line;
+  Line*   _back_line;
 };
 
 void tk_init(int argc, char** argv)
 {
-  auto ctx = new Context();
-  tk::init_tk_context("tk", 1000, 1000, ctx);
-
-  ctx->layout = tk::ui::create_layout();
-  ctx->button0 = tk::ui::create_button(tk::ShapeType::Quard,  to_vec3(tk::Color::Blue), {100, 100});
-  ctx->button1 = tk::ui::create_button(tk::ShapeType::Circle, to_vec3(tk::Color::Green), {10});
-  ctx->layout_x = tk::ui::create_button(tk::ShapeType::Quard, to_vec3(tk::Color::Green), {1, 1000});
-  ctx->layout_y = tk::ui::create_button(tk::ShapeType::Quard, to_vec3(tk::Color::Green), {1000, 1});
-
-  tk::ui::put(ctx->layout, tk::get_main_window(), 0, 0);
-  tk::ui::put(ctx->button0, ctx->layout, 100, 100);
-  tk::ui::put(ctx->button1, ctx->layout, 10, 10);
-  tk::ui::put(ctx->layout_x, ctx->layout, 0, 0);
-  tk::ui::put(ctx->layout_y, ctx->layout, 0, 0);
-  ctx->button1->set_depth(0.2f);
-
-  ctx->button0->set_rotation_angle(375.f);
+  new AudioPlayer;
 }
-
-static uint32_t x, y;
 
 void tk_iterate()
 {
-  auto ctx = (Context*)tk::get_user_data();
+  static auto start_time = std::chrono::high_resolution_clock::now();
+  auto now = std::chrono::high_resolution_clock::now();
+  auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
+  auto progress = milliseconds % 10000 / 100;
 
-  static bool removed = false;
-  if (ctx->button0->is_clicked())
-  {
-    // tk::ui::remove(ctx->button0, ctx->layout);
-    // x += 50;
-    // y += 50;
-    // tk::ui::put(ctx->button0, ctx->layout, x, y);
-    // if (removed)
-    // {
-    //   tk::ui::put(ctx->button, ctx->layout, 0, 0);
-    // }
-    // else
-    // tk::ui::remove(ctx->button, ctx->layout);
-    tk::log::info("quard is clicked");
-  }
-
-  if (ctx->button1->is_clicked())
-  {
-    tk::log::info("circle is clicked");
-  }
+  log::info("progress {}%", progress);
+  
+  auto audio_player = reinterpret_cast<AudioPlayer*>(get_user_data());
+  audio_player->set_playback_progress(progress);
 }
 
 void tk_event(SDL_Event* event)
@@ -75,5 +73,5 @@ void tk_event(SDL_Event* event)
 
 void tk_quit()
 {
-  delete (Context*)tk::get_user_data();
+  delete reinterpret_cast<AudioPlayer*>(get_user_data());
 }

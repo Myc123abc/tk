@@ -32,20 +32,36 @@
 #pragma once
 
 #include "../GraphicsEngine/GraphicsEngine.hpp"
-#include "UIWidget.hpp"
+#include "Layout.hpp"
+#include "widgets/UIWidget.hpp"
+#include "widgets/ClickableWidget.hpp"
+#include "widgets/Line.hpp"
 
 namespace tk { namespace ui {
 
-  void init(graphics_engine::GraphicsEngine* engine);
-  auto create_layout() -> Layout*;
-  auto create_button(ShapeType shape, glm::vec3 const& color, std::initializer_list<uint32_t> values) -> Button*;
+  using Button = ClickableWidget;
 
-  void put(Layout* layout, tk::Window* window, uint32_t x, uint32_t y);
-  void put(UIWidget* widget, Layout* layout, uint32_t x, uint32_t y);
+  void init(graphics_engine::GraphicsEngine* engine);
+  void init_background(glm::vec3 color);
+
+  auto create_layout() -> Layout*;
+  auto create_line(uint32_t length, uint32_t width, float angle, glm::vec3 const& color) -> Line*;
+  auto create_button(ShapeType shape, glm::vec3 const& color, std::initializer_list<uint32_t> values) -> Button*;
 
   // HACK: use _layouts update matrix every frame, maybe performance suck 
   void render();
 
   void remove(UIWidget* widget, Layout* layout);
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//                          functions use internal Color
+////////////////////////////////////////////////////////////////////////////////
+
+  auto to_vec3(Color color) -> glm::vec3;
+
+  inline void init_background(Color color) { init_background(to_vec3(color)); }
+  inline auto create_line(uint32_t length, uint32_t width, float angle, Color color) { return create_line(length, width, angle, to_vec3(color)); }
 
 } }

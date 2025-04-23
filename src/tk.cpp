@@ -5,6 +5,9 @@
 // HACK:
 // 1. while, use log in internal callback functions is strange...
 //
+// FIX:
+// 1. should not use try catch in internal callback system!
+//
 
 #include "tk/tk.hpp"
 #include "tk/Window.hpp"
@@ -12,7 +15,6 @@
 #include "tk/log.hpp"
 #include "tk/ui/ui.hpp"
 #include "ui/internal.hpp"
-#include "tk/ErrorHandling.hpp"
 
 #define SDL_MAIN_USE_CALLBACKS
 #include <SDL3/SDL_main.h>
@@ -161,27 +163,4 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     exit(EXIT_SUCCESS);
   if (result == SDL_APP_FAILURE)
     exit(EXIT_FAILURE);
-}
-
-
-
-auto tk::to_vec3(Color color) -> glm::vec3
-{
-  switch (color)
-  {
-  case Color::Red:
-    return { 1.f, 0.f, 0.f };
-  case Color::Green:
-    return { 0.f, 1.f, 0.f };
-  case Color::Blue:
-    return { 0.f, 0.f, 1.f };
-  case Color::Yellow:
-    return { 1.f, 1.f, 0.f };
-  case Color::OneDark:
-    return { (float)40/255, (float)44/255, (float)52/255,};
-  case Color::Unknow:
-    throw_if(true, "unknow color");
-    return {};
-  };
-  return {};
 }
