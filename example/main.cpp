@@ -9,9 +9,6 @@
 #include "tk/tk.hpp"
 #include "tk/log.hpp"
 
-// TODO:
-//1.same place same depth widget cannot
-
 struct Context
 {
   tk::ui::Layout* layout;
@@ -30,16 +27,18 @@ void tk_init(int argc, char** argv)
 
   ctx->layout = tk::ui::create_layout();
   ctx->button0 = tk::ui::create_button(tk::ShapeType::Quard,  to_vec3(tk::Color::Blue), {100, 100});
-  ctx->button1 = tk::ui::create_button(tk::ShapeType::Circle, to_vec3(tk::Color::Green), {100});
+  ctx->button1 = tk::ui::create_button(tk::ShapeType::Circle, to_vec3(tk::Color::Green), {10});
   ctx->layout_x = tk::ui::create_button(tk::ShapeType::Quard, to_vec3(tk::Color::Green), {1, 1000});
   ctx->layout_y = tk::ui::create_button(tk::ShapeType::Quard, to_vec3(tk::Color::Green), {1000, 1});
 
   tk::ui::put(ctx->layout, tk::get_main_window(), 0, 0);
   tk::ui::put(ctx->button0, ctx->layout, 100, 100);
-  tk::ui::put(ctx->button1, ctx->layout, 0, 0);
+  tk::ui::put(ctx->button1, ctx->layout, 10, 10);
   tk::ui::put(ctx->layout_x, ctx->layout, 0, 0);
   tk::ui::put(ctx->layout_y, ctx->layout, 0, 0);
   ctx->button1->set_depth(0.2f);
+
+  ctx->button0->set_rotation_angle(375.f);
 }
 
 static uint32_t x, y;

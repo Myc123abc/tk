@@ -44,6 +44,12 @@ auto UIWidget::set_depth(float depth)               -> UIWidget&
   return *this;
 }
 
+auto UIWidget::set_rotation_angle(float angle)      -> UIWidget&
+{
+  _rotation_angle = angle;
+  return *this;
+}
+
 void UIWidget::check_property_values()
 {
   switch (_shape_type) 
@@ -95,10 +101,10 @@ auto UIWidget::generate_quard_model_matrix() -> glm::mat4
   auto scale_y = (float)height / window_height;
   auto translate_x = (_layout->x + (float)width  / 2 + _x) / ((float)window_width  / 2) - 1.f;
   auto translate_y = (_layout->y + (float)height / 2 + _y) / ((float)window_height / 2) - 1.f;
-  auto model = glm::mat4(1.f);
-  model = glm::translate(model, glm::vec3(translate_x, translate_y, 0.f));
-  model = glm::scale(model, glm::vec3(scale_x, scale_y, 1.f));
-  return model;
+  auto translate = glm::translate(glm::mat4(1.f), glm::vec3(translate_x, translate_y, 0.f));
+  auto scale     = glm::scale(glm::mat4(1.f), glm::vec3(scale_x, scale_y, 1.f));
+  auto rotate    = glm::rotate(glm::mat4(1.f), _rotation_angle, glm::vec3(0.f, 0.f, 1.f));
+  return translate * scale *rotate;
 }
 
 auto UIWidget::generate_circle_model_matrix() -> glm::mat4

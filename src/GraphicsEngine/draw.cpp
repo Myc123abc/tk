@@ -86,6 +86,7 @@ void GraphicsEngine::render_begin()
     .sType              = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
     .imageView          = _msaa_depth_image.view,
     .imageLayout        = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+    // HACK: when I test this on renderdoc, it not do resolve depth image...
     .resolveMode        = VK_RESOLVE_MODE_AVERAGE_BIT,
     .resolveImageView   = frame.depth_image.view,
     .resolveImageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
