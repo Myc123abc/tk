@@ -155,8 +155,17 @@ bool ClickableWidget::mouse_over_quard()
   auto width  = _property_values[0];
   auto height = _property_values[1];
 
-  if (x > _x + _layout->x && x < _x + _layout->x + width &&
-      y > _y + _layout->y && y < _y + _layout->y + height)
+  auto center         = glm::vec2(_x + _layout->x + width / 2.f, _y + _layout->y + height / 2.f);
+  auto relative_mouse = glm::vec2(x, y) - center;
+
+  auto rotate = glm::rotate(glm::mat4(1.f), _rotation_angle, glm::vec3(0.f, 0.f, 1.f));
+  auto inverse_rotate = glm::inverse(rotate);
+  auto inverse_rotate_relative_mouse = inverse_rotate * glm::vec4(relative_mouse, 0.f, 0.f);
+
+  if (inverse_rotate_relative_mouse.x > -(float)width  / 2.f &&
+      inverse_rotate_relative_mouse.x <  (float)width  / 2.f &&
+      inverse_rotate_relative_mouse.y > -(float)height / 2.f &&
+      inverse_rotate_relative_mouse.y <  (float)height / 2.f)
     return true;
   return false;
 }
