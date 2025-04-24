@@ -15,7 +15,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 ################################################################################
 
 add_definitions(-DSPDLOG_USE_STD_FORMAT)
+if(WIN32)
+add_subdirectory(lib/spdlog)
+elseif(UNIX)
 find_package(spdlog CONFIG REQUIRED)
+endif()
 
 set(SDL_SHARED OFF)
 set(SDL_STATIC ON)
@@ -35,6 +39,10 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(VMA)
 
+if(WIN32)
+find_package(Vulkan REQUIRED)
+endif()
+
 ################################################################################
 #                               Build Static Library 
 ################################################################################
@@ -42,20 +50,35 @@ FetchContent_MakeAvailable(VMA)
 set(INCLUDE
   include
 )
+
 file(GLOB_RECURSE SOURCE src/*.cpp)
-set(LIBS
-  vulkan
-  dl
-  pthread
-  X11
-  Xxf86vm
-  Xrandr
-  Xi
-  SDL3::SDL3-static
-  GPUOpen::VulkanMemoryAllocator
-)
+
+if(WIN32)
+  set(LIBS
+    vulkan-1
+    SDL3::SDL3-static
+    GPUOpen::VulkanMemoryAllocator
+    spdlog::spdlog
+  )
+elseif(UNIX)
+  set(LIBS
+    vulkan
+    dl
+    pthread
+    X11
+    Xxf86vm
+    Xrandr
+    Xi
+    SDL3::SDL3-static
+    GPUOpen::VulkanMemoryAllocator
+  )
+endif()
 
 add_library(tk STATIC ${SOURCE})
+
+if(WIN32)
+target_link_directories(tk PUBLIC "C:\\VulkanSDK\\1.4.309.0\\Lib")
+endif()
 
 target_include_directories(tk PUBLIC ${INCLUDE})
 
@@ -65,6 +88,13 @@ target_compile_definitions(tk PUBLIC
   GLM_FORCE_DEPTH_ZERO_TO_ONE
   GLM_FORCE_RADIANS
 )
+
+if(WIN32)
+
+target_include_directories(tk PUBLIC ${Vulkan_INCLUDE_DIRS})
+target_link_libraries(tk PUBLIC ${Vulkan_LIBRARIES})
+
+endif()
 
 ################################################################################
 #                              Example 
