@@ -35,8 +35,10 @@ namespace tk {
     Window& operator=(Window const&) = delete;
     Window& operator=(Window&&)      = delete;
 
-    void init(std::string_view title, uint32_t width, uint32_t height);
+    auto init(std::string_view title, uint32_t width, uint32_t height) -> Window&;
     void destroy() const;
+
+    auto show() -> Window&;
 
     auto create_surface(VkInstance instance)                     const -> VkSurfaceKHR;
     void get_framebuffer_size(uint32_t& width, uint32_t& height) const;

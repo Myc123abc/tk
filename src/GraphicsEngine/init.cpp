@@ -10,7 +10,7 @@
 
 namespace tk { namespace graphics_engine { 
 
-void GraphicsEngine::init(Window const& window)
+void GraphicsEngine::init(Window& window)
 {
   // only have single graphics engine
   static bool first = true;
@@ -35,6 +35,8 @@ void GraphicsEngine::init(Window const& window)
   create_descriptor_pool();
   create_descriptor_sets();
   use_single_time_command_init_something();
+
+  _window->show();
 }
 
 void GraphicsEngine::destroy()

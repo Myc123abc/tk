@@ -43,7 +43,7 @@ namespace tk { namespace graphics_engine {
      * @param window main window
      * @throw std::runtime_error failed to init
      */
-    void init(Window const& window);
+    void init(Window& window);
 
     void destroy();
 
@@ -98,7 +98,7 @@ namespace tk { namespace graphics_engine {
     // common resources
     //
     // HACK: expand to multi-windows manage, use WindowManager in future.
-    Window const*                _window                   = nullptr;
+    Window*                      _window                   = nullptr;
     VkInstance                   _instance                 = VK_NULL_HANDLE;
     VkDebugUtilsMessengerEXT     _debug_messenger          = VK_NULL_HANDLE;
     VkSurfaceKHR                 _surface                  = VK_NULL_HANDLE;
