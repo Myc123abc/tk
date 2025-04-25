@@ -3,6 +3,7 @@
 
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_vulkan.h>
+#include <SDL3/SDL_hints.h>
 
 #include <cassert>
 
@@ -16,6 +17,19 @@ auto Window::init(std::string_view title, uint32_t width, uint32_t height) -> Wi
   if (first)  first = false;
 
   SDL_Init(SDL_INIT_VIDEO);
+
+  // Set SDL hint to receive mouse click events on window focus, otherwise SDL doesn't emit the event.
+  // Without this, when clicking to gain focus, our widgets wouldn't activate even though they showed as hovered.
+  // (This is unfortunately a global SDL setting, so enabling it might have a side-effect on your application.
+  // It is unlikely to make a difference, but if your app absolutely needs to ignore the initial on-focus click:
+  // you can ignore SDL_EVENT_MOUSE_BUTTON_DOWN events coming right after a SDL_EVENT_WINDOW_FOCUS_GAINED)
+  SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
+  
+  // Disable auto-capture, this is preventing drag and drop across multiple windows
+  SDL_SetHint(SDL_HINT_MOUSE_AUTO_CAPTURE, "0");
+
+  // see https://github.com/libsdl-org/SDL/issues/6659
+  SDL_SetHint("SDL_BORDERLESS_WINDOWED_STYLE", "0");
 
   auto flags = SDL_WINDOW_VULKAN             |
                SDL_WINDOW_RESIZABLE          |

@@ -25,14 +25,16 @@ namespace tk { namespace graphics_engine {
 
   struct PushConstant 
   {
-    glm::mat4       model;
-    glm::vec4       color_depth;
     VkDeviceAddress vertices = {};
+    glm::vec2       scale;
+    glm::vec2       translate;
   };
   
   struct Vertex
   {
-    glm::vec2 position;
+    glm::vec2 pos;
+    glm::vec2 uv;
+    glm::vec4 col;  // TODO: imgui use uint32_t col
   };
 
   struct Mesh

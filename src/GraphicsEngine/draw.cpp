@@ -1,6 +1,7 @@
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
 #include "tk/ErrorHandling.hpp"
 #include "constant.hpp"
+#include "tk/GraphicsEngine/MaterialLibrary.hpp"
 
 #include <SDL3/SDL_events.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -206,9 +207,9 @@ void GraphicsEngine::render_shape(ShapeType type, glm::vec3 const& color, glm::m
   auto mesh_buffer = MaterialLibrary::get_mesh_buffer();
   PushConstant pc
   {
-    .model       = model,
-    .color_depth = { color, depth },
     .vertices    = mesh_buffer.address + mesh_info.vertices_offset,
+    .scale       = {},
+    .translate   = {},
   };
 
   auto cmd = _frames[_current_frame].command_buffer;

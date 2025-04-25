@@ -6,6 +6,7 @@ namespace tk { namespace graphics_engine {
 auto PipelineBuilder::build(VkDevice device, VkPipelineLayout layout) -> VkPipeline
 {
   // HACK: can be nullptr for dynamic rendering, see spec
+  // HACK: I can't understand why imgui use this structure, can I just use device address?
   VkPipelineVertexInputStateCreateInfo vertex_input_state
   {
     .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
@@ -35,7 +36,6 @@ auto PipelineBuilder::build(VkDevice device, VkPipelineLayout layout) -> VkPipel
   VkPipelineColorBlendStateCreateInfo color_blend_state
   { 
     .sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-    .logicOp         = VK_LOGIC_OP_COPY,
     .attachmentCount = 1,
     .pAttachments    = &_color_blend_attachment,
   };
@@ -175,7 +175,7 @@ auto PipelineBuilder::enable_alpha_blending() -> PipelineBuilder&
   _color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
   _color_blend_attachment.colorBlendOp        = VK_BLEND_OP_ADD;
   _color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-  _color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+  _color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
   _color_blend_attachment.alphaBlendOp        = VK_BLEND_OP_ADD;
   return *this;
 }

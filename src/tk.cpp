@@ -18,6 +18,7 @@
 
 #define SDL_MAIN_USE_CALLBACKS
 #include <SDL3/SDL_main.h>
+#include <SDL3/SDL_timer.h>
 
 using namespace tk;
 using namespace tk::graphics_engine;
@@ -101,6 +102,8 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     {
       ui::render();
     }
+    else
+      SDL_Delay(10);
   }
   catch (const std::exception& e)
   {
@@ -120,6 +123,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     {
     case SDL_EVENT_QUIT:
       return SDL_APP_SUCCESS;
+    case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+      if (event->window.windowID == SDL_GetWindowID(tk_ctx->window.get()))
+        return SDL_APP_SUCCESS;
     case SDL_EVENT_WINDOW_MINIMIZED:
       tk_ctx->paused = true;
       break;

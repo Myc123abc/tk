@@ -1,10 +1,16 @@
 #version 460
 
-layout(location = 0) in  vec3 color;
+layout(location = 0) in struct
+{
+  vec4 col;
+  vec2 uv;
+} In;
 
-layout(location = 0) out vec4 out_color;
+layout(location = 0) out vec4 col;
+
+// TODO: should add image sampler
 
 void main()
 {
-  out_color = vec4(color, 1.f);
+  col = In.col;
 }

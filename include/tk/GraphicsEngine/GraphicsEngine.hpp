@@ -6,6 +6,9 @@
 // TODO:
 // 1. use offscreen rendering, but when window size bigger than image size, it will be stretch,
 //    maybe need to recreate image in this case.
+// 2. use VkSampler as image sampler, like imgui_impl_vulkan.cpp:1031
+// 3. embed spv
+// 4. currently, not see mouse handling, just graphics handling
 //
 
 #pragma once
@@ -14,8 +17,9 @@
 #include "../DestructorStack.hpp"
 #include "MemoryAllocator.hpp"
 #include "CommandPool.hpp"
-#include "MaterialLibrary.hpp"
+#include "../type.hpp"
 
+#include <glm/glm.hpp>
 #include <vk_mem_alloc.h>
 #include <SDL3/SDL_events.h>
 

@@ -372,13 +372,13 @@ struct SwapChainSupportDetails
   
   auto get_present_mode()
   {
-    auto it = std::find_if(present_modes.begin(), present_modes.end(),
-                           [](const auto& mode)
-                           {
-                             return mode == VK_PRESENT_MODE_MAILBOX_KHR;
-                           });
-    if (it != present_modes.end())
-      return *it;
+    //auto it = std::find_if(present_modes.begin(), present_modes.end(),
+    //                       [](const auto& mode)
+    //                       {
+    //                         return mode == VK_PRESENT_MODE_MAILBOX_KHR;
+    //                       });
+    //if (it != present_modes.end())
+    //  return *it;
     return VK_PRESENT_MODE_FIFO_KHR;
   }
   

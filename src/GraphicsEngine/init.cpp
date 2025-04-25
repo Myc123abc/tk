@@ -469,9 +469,12 @@ void GraphicsEngine::create_graphics_pipeline()
   _2D_pipeline = PipelineBuilder()
                  .clear()
                  .set_shaders(shader_vertex2D.shader, shader_fragment2D.shader)
+                 // TODO: imgui use counter clockwise
                  .set_cull_mode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE)
                  .set_color_attachment_format(_image.format)
-                 .enable_depth_test(Depth_Format)
+                 // TODO: imgui not enable depth test
+                 //.enable_depth_test(Depth_Format)
+                 // TODO: imgui not use msaa
                  .set_msaa(_msaa_sample_count)
                  .build(_device, _2D_pipeline_layout);
 
