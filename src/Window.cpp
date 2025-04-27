@@ -62,6 +62,18 @@ auto Window::create_surface(VkInstance instance) const -> VkSurfaceKHR
   return surface;
 }
 
+// TODO:
+// io.DisplayFramebufferScale = ImVec2((float)display_w / w, (float)display_h / h);
+// imgui use "window size" / "pixel size" get scale
+
+/*
+TODO:
+// Update monitors
+#ifdef WIN32
+    bd->WantUpdateMonitors = true; // Keep polling under Windows to handle changes of work area when resizing task-bar (#8415)
+#endif
+*/
+
 void Window::get_framebuffer_size(uint32_t& width, uint32_t& height) const
 {
   SDL_GetWindowSizeInPixels(_window, (int*)&width, (int*)&height);

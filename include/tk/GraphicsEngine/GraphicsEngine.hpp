@@ -9,6 +9,7 @@
 // 2. use VkSampler as image sampler, like imgui_impl_vulkan.cpp:1031
 // 3. embed spv
 // 4. currently, not see mouse handling, just graphics handling
+// 5. not handle font now
 //
 
 #pragma once
