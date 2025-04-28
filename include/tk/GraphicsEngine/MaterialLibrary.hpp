@@ -34,7 +34,7 @@ namespace tk { namespace graphics_engine {
   {
     glm::vec2 pos;
     glm::vec2 uv;
-    glm::vec4 col;  // TODO: imgui use uint32_t col
+    glm::vec4 col;  // TODO: imgui use uint32_t col. imgui.cpp:7143
   };
 
   struct Mesh
