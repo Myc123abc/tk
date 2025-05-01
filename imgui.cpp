@@ -61,10 +61,11 @@ public:
       {   lower_right,                   {}, color },
       { { upper_left.x, lower_right.y }, {}, color },
     });
+    auto idx = _indices.size();
     _indices.append_range(std::vector<uint16_t>
     {
-      0, 1, 2,
-      0, 2, 3,
+      static_cast<uint16_t>(idx), static_cast<uint16_t>(idx + 1), static_cast<uint16_t>(idx + 2),
+      static_cast<uint16_t>(idx), static_cast<uint16_t>(idx + 2), static_cast<uint16_t>(idx + 3),
     });
   }
   
@@ -105,6 +106,25 @@ public:
     }
   }
 
+  inline constexpr auto normalize(glm::vec2& point)
+  {
+    if (auto d2 = point.x * point.x + point.y * point.y > 0.f)
+      point /= std::sqrt(d2);
+  }
+
+  inline constexpr auto approximate_normalize(glm::vec2& point)
+  {
+    if (auto d2 = point.x * point.x + point.y * point.y > 0.000001f)
+    {
+      auto inverse_len2 = 1.f / d2;
+      // INFO: max best value 500.0f. (see imgui #4053, #3366)
+      static constexpr auto Max_Inverse_Length_Squared = 100.f; 
+      if (inverse_len2 > Max_Inverse_Length_Squared)
+        inverse_len2 = Max_Inverse_Length_Squared;
+      point *= inverse_len2;
+    }
+  }
+
   // TODO: Thickness anti-aliased lines cap are missing their AA fringe
   // TODO: how to draw thickness > 1.f
   auto add_ployline(uint32_t color, float thickness, bool is_closed)
@@ -125,6 +145,50 @@ public:
     std::vector<glm::vec2> buf(point_count * 3);
     glm::vec2* normals = buf.data();
     glm::vec2* points  = normals + point_count;
+
+    // calculate normals (tangents) for each line segment
+    auto count = line_count - 1;
+    for (auto i = 0, j = 1; i < count; ++i, ++j)
+    {
+      normals[i] = { _path[j].y - _path[i].y, _path[i].x - _path[j].x };
+      normalize(normals[i]);
+    }
+    if (is_closed)
+    {
+      normals[count] = { _path[0].y - _path[count].y, _path[count].x - _path[0].x };
+      normalize(normals[count]);
+    }
+
+    auto half_draw_size = thickness / 2 + 1;
+
+    // TODO: if line is not closed, the first and last points need to be generated differently as there are no normals to blend
+    if (!is_closed)
+    {
+
+    }
+
+    auto idx_beg = _indices.size();
+    for (auto i = 0, j = 1; i < count; ++i, ++j)
+    {
+      // average normal
+      auto average_normal = glm::vec2((normals[i].x + normals[j].x) / 2, (normals[i].y + normals[j].y) / 2);
+      approximate_normalize(average_normal);
+      average_normal *= half_draw_size;
+
+      // add normals for the outer edges
+      auto* outs = &buf[j * 2];
+      outs[0] = _path[j] + average_normal;
+      outs[1] = _path[j] - average_normal;
+
+      // set indices
+      auto idx_end = idx_beg + 2;
+      _indices.append_range(std::vector<uint16_t>
+      {
+        static_cast<uint16_t>(idx_end)    , static_cast<uint16_t>(idx_beg)    , static_cast<uint16_t>(idx_beg + 1),
+        static_cast<uint16_t>(idx_end + 1), static_cast<uint16_t>(idx_beg + 1), static_cast<uint16_t>(idx_end)    ,
+      });
+      idx_beg = idx_end;
+    }
   }
 
   auto path_stroke(uint32_t color, float thickness)
@@ -134,9 +198,10 @@ public:
   }
 
   // FIXME: I not use +0.5f, I will try 1 pixels sized rectangle
-  auto add_rectangle(glm::vec2 const& upper_left, glm::vec3 const& lower_right, uint32_t color, float rounding, float thinkness)
+  auto add_rectangle(glm::vec2 const& upper_left, glm::vec2 const& lower_right, uint32_t color, float rounding, float thinkness)
   {
-    path_rectangle(upper_left, lower_right, color, rounding);
+    // use the center of pixel
+    path_rectangle(upper_left + .5f, lower_right - .5f, color, rounding);
     path_stroke(color, thinkness);
   }
 };
