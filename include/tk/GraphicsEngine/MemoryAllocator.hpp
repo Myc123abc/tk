@@ -7,6 +7,7 @@
 #pragma once
 
 #include "../DestructorStack.hpp"
+#include "Shader.hpp"
 
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
@@ -18,6 +19,21 @@ namespace tk { namespace graphics_engine {
   { 
     VkBuffer      handle     = VK_NULL_HANDLE;
     VmaAllocation allocation = VK_NULL_HANDLE;
+  };
+
+  struct Image
+  {
+    VkImage       image      = VK_NULL_HANDLE;
+    VkImageView   view       = VK_NULL_HANDLE;
+    VmaAllocation allocation = VK_NULL_HANDLE;
+    VkExtent3D    extent     = {};
+    VkFormat      format     = VK_FORMAT_UNDEFINED;
+  };
+
+  struct Mesh
+  {
+    std::vector<Vertex> vertices;
+    std::vector<uint16_t> indices;
   };
 
   struct MeshBuffer

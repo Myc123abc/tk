@@ -11,6 +11,11 @@
 // 4. currently, not see mouse handling, just graphics handling
 // 5. not handle font now
 //
+// INFO:
+// use MSAA and FXAA for AA
+// about 2D pipeline, not use depth test, and vertex only store vec2 pos, uv, col
+//
+
 
 #pragma once
 
@@ -18,7 +23,6 @@
 #include "../DestructorStack.hpp"
 #include "MemoryAllocator.hpp"
 #include "CommandPool.hpp"
-#include "../type.hpp"
 
 #include <glm/glm.hpp>
 #include <vk_mem_alloc.h>
@@ -59,7 +63,6 @@ namespace tk { namespace graphics_engine {
 
     void render_begin();
     void render_end();
-    void render_shape(ShapeType type, glm::vec3 const& color, glm::mat4 const& model, float depth);
 
   private:
     //
@@ -81,8 +84,6 @@ namespace tk { namespace graphics_engine {
     void create_descriptor_sets();
     void create_sync_objects();
     void create_frame_resources();
-    // HACK: subtle naming...
-    void use_single_time_command_init_something();
 
     //
     // util 
@@ -117,23 +118,14 @@ namespace tk { namespace graphics_engine {
     //
     // use dynamic rendering
     //
-    struct Image
-    {
-      VkImage       image      = VK_NULL_HANDLE;
-      VkImageView   view       = VK_NULL_HANDLE;
-      VmaAllocation allocation = VK_NULL_HANDLE;
-      VkExtent3D    extent     = {};
-      VkFormat      format     = VK_FORMAT_UNDEFINED;
-    };
-
     VkSwapchainKHR               _swapchain                = VK_NULL_HANDLE;
-    std::vector<VkImage>         _swapchain_images;
-    VkExtent2D                   _swapchain_image_extent   = {};
-    Image                        _image                    = {};
-    Image                        _msaa_image               = {};
-    VkExtent2D                   _draw_extent              = {};
+    std::vector<Image>           _swapchain_images;
 
-    Image                        _msaa_depth_image;
+    // INFO: because some device unsupport dynamic msaa feature in pipeline
+    //       so we just fixed use 4bit msaa
+    static constexpr VkSampleCountFlagBits _msaa_sample_count = VK_SAMPLE_COUNT_4_BIT;
+    Image                        _msaa_image;
+    // Image                        _msaa_depth_image;
 
     VkPipeline                   _2D_pipeline              = VK_NULL_HANDLE;
     VkPipelineLayout             _2D_pipeline_layout       = VK_NULL_HANDLE;
@@ -146,11 +138,11 @@ namespace tk { namespace graphics_engine {
     struct FrameResource
     {
       // HACK: will I want to use command not command_buffer, but adjust them it's so terrible... after day
-      Command         command_buffer;
+      Command         cmd;
       VkFence         fence               = VK_NULL_HANDLE;
       VkSemaphore     image_available_sem = VK_NULL_HANDLE; 
       VkSemaphore     render_finished_sem = VK_NULL_HANDLE; 
-      Image           depth_image;
+      //Image           depth_image;
     };
 
     std::vector<FrameResource>   _frames;
@@ -163,10 +155,6 @@ namespace tk { namespace graphics_engine {
     VkDescriptorPool             _descriptor_pool          = VK_NULL_HANDLE;
     VkDescriptorSetLayout        _descriptor_set_layout    = VK_NULL_HANDLE;
     VkDescriptorSet              _descriptor_set           = VK_NULL_HANDLE;
-
-    // INFO: because some device unsupport dynamic msaa feature in pipeline
-    //       so we just fixed use 4bit msaa
-    static constexpr VkSampleCountFlagBits _msaa_sample_count = VK_SAMPLE_COUNT_4_BIT;
   };
 
 } }

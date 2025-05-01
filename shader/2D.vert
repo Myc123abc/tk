@@ -7,19 +7,19 @@ struct Vertex
 {
   vec2  pos;
   vec2  uv;
-  vec4  col;
+  uint  col;
 };
 
-layout(std430, buffer_reference, buffer_reference_align = 32) readonly buffer Vertices 
+layout(std430, buffer_reference) readonly buffer Vertices 
 {
   Vertex data[];
 };
 
 layout(push_constant) uniform PushConstant
 {
+  Vertices vertices;
   vec2     scale;
   vec2     translate;
-  Vertices vertices;
 } pc;
 
 layout(location = 0) out struct
@@ -30,8 +30,19 @@ layout(location = 0) out struct
 
 void main()
 {
+  // get vertex
   Vertex vertex = pc.vertices.data[gl_VertexIndex];
+  
+  // set vertex position
   gl_Position   = vec4(vertex.pos * pc.scale + pc.translate, 0, 1);
-  Out.col       = vertex.col;
-  Out.uv        = vertex.uv;
+
+  // get color
+  float r = vertex.col >> 16 & 0xFF / 255;
+  float g = vertex.col >> 8  & 0xFF / 255;
+  float b = vertex.col       & 0xFF / 255;
+  float a = vertex.col >> 24 & 0xFF / 255;
+  Out.col = vec4(r, g, b, a);
+  
+  // set uv
+  Out.uv  = vertex.uv;
 }

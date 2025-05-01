@@ -2,7 +2,7 @@
 #include "init-util.hpp"
 #include "constant.hpp"
 #include "tk/GraphicsEngine/PipelineBuilder.hpp"
-#include "tk/GraphicsEngine/MaterialLibrary.hpp"
+#include "tk/GraphicsEngine/Shader.hpp"
 
 #include <ranges>
 #include <set>
@@ -34,7 +34,6 @@ void GraphicsEngine::init(Window& window)
   create_graphics_pipeline();
   create_descriptor_pool();
   create_descriptor_sets();
-  use_single_time_command_init_something();
 
   _window->show();
 }
@@ -244,31 +243,22 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
   //
   // dynamic rendering use image
   //
-  _image.extent = { extent.width, extent.height, 1 };
-  _image.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-  _msaa_image.extent = _image.extent;
-  _msaa_image.format = _image.format;
+  _msaa_image.format = _swapchain_images[0].format;
+  _msaa_image.extent = _swapchain_images[0].extent;
   
-  // INFO: image as copy src to swapchain image
-  //       and resolved image from msaa image
   VkImageCreateInfo image_info
   {
     .sType       = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
     .imageType   = VK_IMAGE_TYPE_2D,
-    .format      = _image.format,
-    .extent      = _image.extent,
+    .format      = _msaa_image.format,
+    .extent      = _msaa_image.extent,
     .mipLevels   = 1,
     .arrayLayers = 1,
-    .samples     = VK_SAMPLE_COUNT_1_BIT,
+    .samples     = _msaa_sample_count,
     .tiling      = VK_IMAGE_TILING_OPTIMAL,
-    .usage       = VK_IMAGE_USAGE_TRANSFER_SRC_BIT     |
+    .usage       = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
   };
-
-  auto msaa_image_info = image_info;
-  msaa_image_info.samples = _msaa_sample_count;
-  msaa_image_info.usage   = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
-                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
   VmaAllocationCreateInfo alloc_info
   {
@@ -276,17 +266,15 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
     .usage         = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
     .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
   };
-  throw_if(vmaCreateImage(_mem_alloc.get(), &image_info, &alloc_info, &_image.image, &_image.allocation, nullptr) != VK_SUCCESS,
-           "failed to create image");
-  throw_if(vmaCreateImage(_mem_alloc.get(), &msaa_image_info, &alloc_info, &_msaa_image.image, &_msaa_image.allocation, nullptr) != VK_SUCCESS,
+  throw_if(vmaCreateImage(_mem_alloc.get(), &image_info, &alloc_info, &_msaa_image.image, &_msaa_image.allocation, nullptr) != VK_SUCCESS,
            "failed to create msaa image");
 
   VkImageViewCreateInfo image_view_info
   {
     .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-    .image    = _image.image,
+    .image    = _msaa_image.image,
     .viewType = VK_IMAGE_VIEW_TYPE_2D,
-    .format   = _image.format,
+    .format   = _msaa_image.format,
     .subresourceRange =
     {
       .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -294,74 +282,70 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
       .layerCount = 1,
     },
   };
-  auto msaa_image_view_info  = image_view_info;
-  msaa_image_view_info.image = _msaa_image.image;
-  throw_if(vkCreateImageView(_device, &image_view_info, nullptr, &_image.view) != VK_SUCCESS,
-           "failed to create image view");
-  throw_if(vkCreateImageView(_device, &msaa_image_view_info, nullptr, &_msaa_image.view) != VK_SUCCESS,
+  throw_if(vkCreateImageView(_device, &image_view_info, nullptr, &_msaa_image.view) != VK_SUCCESS,
            "failed to create msaa image view");
 
   // create msaa depth image and depth image
-  _msaa_depth_image.format = Depth_Format;
-  _msaa_depth_image.extent = _image.extent;
-  VkImageCreateInfo msaa_depth_info
-  {
-    .sType       = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-    .imageType   = VK_IMAGE_TYPE_2D,
-    .format      = _msaa_depth_image.format,
-    .extent      = _msaa_depth_image.extent,
-    .mipLevels   = 1,
-    .arrayLayers = 1,
-    .samples     = _msaa_sample_count,
-    .tiling      = VK_IMAGE_TILING_OPTIMAL,
-    .usage       = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
-                   VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
-  };
-  throw_if(vmaCreateImage(_mem_alloc.get(), &msaa_depth_info, &alloc_info, &_msaa_depth_image.image, &_msaa_depth_image.allocation, nullptr) != VK_SUCCESS,
-           "failed to create msaa depth image");
-  auto depth_info = msaa_depth_info;
-  depth_info.samples = VK_SAMPLE_COUNT_1_BIT;
-  for (auto i = 0; i < _frames.size(); ++i)
-    throw_if(vmaCreateImage(_mem_alloc.get(), &depth_info, &alloc_info, &_frames[i].depth_image.image, &_frames[i].depth_image.allocation, nullptr) != VK_SUCCESS,
-             "failed to create depth image");
+  // _msaa_depth_image.format = Depth_Format;
+  // _msaa_depth_image.extent = _image.extent;
+  // VkImageCreateInfo msaa_depth_info
+  // {
+  //   .sType       = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+  //   .imageType   = VK_IMAGE_TYPE_2D,
+  //   .format      = _msaa_depth_image.format,
+  //   .extent      = _msaa_depth_image.extent,
+  //   .mipLevels   = 1,
+  //   .arrayLayers = 1,
+  //   .samples     = _msaa_sample_count,
+  //   .tiling      = VK_IMAGE_TILING_OPTIMAL,
+  //   .usage       = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
+  //                  VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
+  // };
+  // throw_if(vmaCreateImage(_mem_alloc.get(), &msaa_depth_info, &alloc_info, &_msaa_depth_image.image, &_msaa_depth_image.allocation, nullptr) != VK_SUCCESS,
+  //          "failed to create msaa depth image");
+  // auto depth_info = msaa_depth_info;
+  // depth_info.samples = VK_SAMPLE_COUNT_1_BIT;
+  // for (auto i = 0; i < _frames.size(); ++i)
+  //   throw_if(vmaCreateImage(_mem_alloc.get(), &depth_info, &alloc_info, &_frames[i].depth_image.image, &_frames[i].depth_image.allocation, nullptr) != VK_SUCCESS,
+  //            "failed to create depth image");
 
-  VkImageViewCreateInfo msaa_depth_view_info
-  {
-    .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-    .image    = _msaa_depth_image.image,
-    .viewType = VK_IMAGE_VIEW_TYPE_2D,
-    .format   = _msaa_depth_image.format,
-    .subresourceRange =
-    {
-      .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
-      .levelCount = 1,
-      .layerCount = 1,
-    },
-  };
-  throw_if(vkCreateImageView(_device, &msaa_depth_view_info, nullptr, &_msaa_depth_image.view) != VK_SUCCESS,
-           "failed to create msaa depth image view");
-  auto depth_view_info = msaa_depth_view_info;
-  for (auto i = 0; i < _frames.size(); ++i)
-  {
-    depth_view_info.image = _frames[i].depth_image.image;
-    throw_if(vkCreateImageView(_device, &depth_view_info, nullptr, &_frames[i].depth_image.view) != VK_SUCCESS,
-             "failed to create depth image view");
-  }
+  // VkImageViewCreateInfo msaa_depth_view_info
+  // {
+  //   .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+  //   .image    = _msaa_depth_image.image,
+  //   .viewType = VK_IMAGE_VIEW_TYPE_2D,
+  //   .format   = _msaa_depth_image.format,
+  //   .subresourceRange =
+  //   {
+  //     .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+  //     .levelCount = 1,
+  //     .layerCount = 1,
+  //   },
+  // };
+  // throw_if(vkCreateImageView(_device, &msaa_depth_view_info, nullptr, &_msaa_depth_image.view) != VK_SUCCESS,
+  //          "failed to create msaa depth image view");
+  // auto depth_view_info = msaa_depth_view_info;
+  // for (auto i = 0; i < _frames.size(); ++i)
+  // {
+  //   depth_view_info.image = _frames[i].depth_image.image;
+  //   throw_if(vkCreateImageView(_device, &depth_view_info, nullptr, &_frames[i].depth_image.view) != VK_SUCCESS,
+  //            "failed to create depth image view");
+  // }
 
   _destructors.push([this]
   {
-    for (auto i = 0; i < _frames.size(); ++i)
-    {
-      vkDestroyImageView(_device, _frames[i].depth_image.view, nullptr);
-      vmaDestroyImage(_mem_alloc.get(), _frames[i].depth_image.image, _frames[i].depth_image.allocation);
-    }
-    vkDestroyImageView(_device, _msaa_depth_image.view, nullptr);
-    vmaDestroyImage(_mem_alloc.get(), _msaa_depth_image.image, _msaa_depth_image.allocation);
+    // for (auto i = 0; i < _frames.size(); ++i)
+    // {
+    //   vkDestroyImageView(_device, _frames[i].depth_image.view, nullptr);
+    //   vmaDestroyImage(_mem_alloc.get(), _frames[i].depth_image.image, _frames[i].depth_image.allocation);
+    // }
+    // vkDestroyImageView(_device, _msaa_depth_image.view, nullptr);
+    // vmaDestroyImage(_mem_alloc.get(), _msaa_depth_image.image, _msaa_depth_image.allocation);
     vkDestroyImageView(_device, _msaa_image.view, nullptr);
     vmaDestroyImage(_mem_alloc.get(), _msaa_image.image, _msaa_image.allocation);
-    vkDestroyImageView(_device, _image.view, nullptr);
-    vmaDestroyImage(_mem_alloc.get(), _image.image, _image.allocation);
     vkDestroySwapchainKHR(_device, _swapchain, nullptr);
+    for (auto const& image : _swapchain_images)
+      vkDestroyImageView(_device, image.view, nullptr);
   });
 }
 
@@ -417,10 +401,54 @@ void GraphicsEngine::create_swapchain(VkSwapchainKHR old_swapchain)
   //
   // get swapchain images info
   //
+
+  // clear old image infos
+  if (!_swapchain_images.empty())
+  {
+    for (auto const& image : _swapchain_images)
+      vkDestroyImageView(_device, image.view, nullptr);
+    _swapchain_images.clear();
+  }
+
+  // get image count
   vkGetSwapchainImagesKHR(_device, _swapchain, &image_count, nullptr);
-  _swapchain_images.resize(image_count);
-  vkGetSwapchainImagesKHR(_device, _swapchain, &image_count, _swapchain_images.data());
-  _swapchain_image_extent = extent;
+
+  // get swapchain images
+  auto images = std::vector<VkImage>(image_count);
+  vkGetSwapchainImagesKHR(_device, _swapchain, &image_count, images.data());
+
+  // create image views
+  auto image_views = std::vector<VkImageView>(image_count);
+  for (auto i = 0; i < image_count; ++i)
+  {
+    VkImageViewCreateInfo info
+    {
+      .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+      .image    = images[i],
+      .viewType = VK_IMAGE_VIEW_TYPE_2D,
+      .format   = surface_format.format,
+      .subresourceRange =
+      {
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .levelCount = 1,
+        .layerCount = 1,
+      },
+    };
+    vkCreateImageView(_device, &info, nullptr, &image_views[i]);
+  }
+
+  // set image info to _swapchain_images
+  _swapchain_images.reserve(image_count);
+  for (auto i = 0; i < image_count; ++i)
+  {
+    _swapchain_images.emplace_back(Image
+    {
+      .image  = images[i],
+      .view   = image_views[i],
+      .extent = { extent.width, extent.height, 1 },
+      .format = surface_format.format,
+    });
+  }
 }
 
 void GraphicsEngine::create_descriptor_set_layout()
@@ -464,17 +492,16 @@ void GraphicsEngine::create_graphics_pipeline()
            "failed to create graphics pipeline layout");
 
   // create pipeline
-  auto shader_vertex2D   = Shader(_device, "build/2D_vert.spv");
-  auto shader_fragment2D = Shader(_device, "build/2D_frag.spv");
+  auto shader_vertex2D   = Shader(_device, "shader/2D_vert.spv");
+  auto shader_fragment2D = Shader(_device, "shader/2D_frag.spv");
   _2D_pipeline = PipelineBuilder()
                  .clear()
                  .set_shaders(shader_vertex2D.shader, shader_fragment2D.shader)
                  // TODO: imgui use counter clockwise
                  .set_cull_mode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE)
-                 .set_color_attachment_format(_image.format)
+                 .set_color_attachment_format(_msaa_image.format)
                  // TODO: imgui not enable depth test
                  //.enable_depth_test(Depth_Format)
-                 // TODO: imgui not use msaa
                  .set_msaa(_msaa_sample_count)
                  .build(_device, _2D_pipeline_layout);
 
@@ -554,7 +581,7 @@ void GraphicsEngine::create_frame_resources()
   // create command buffers
   auto cmd_bufs = _command_pool.create_commands(Max_Frame_Number);
   for (uint32_t i = 0; i < _frames.size(); ++i)
-    _frames[i].command_buffer = std::move(cmd_bufs[i]);
+    _frames[i].cmd = std::move(cmd_bufs[i]);
 
   // async objects 
   VkFenceCreateInfo fence_info
@@ -591,23 +618,23 @@ void GraphicsEngine::resize_swapchain()
   vkDestroySwapchainKHR(_device, old_swapchain, nullptr);
 }
 
-void GraphicsEngine::use_single_time_command_init_something()
-{
-  // start single time command and destructor use for destruct stage buffer, etc.
-  auto cmd        = _command_pool.create_command().begin();
-  auto destructor = DestructorStack();
-
-  // use command
-  MaterialLibrary::init(_mem_alloc, cmd, destructor);
-
-  // end command
-  cmd.end().submit_wait_free(_command_pool, _graphics_queue);
-
-  // destroy stage buffer and others
-  destructor.clear();
-
-  // add material library destructor
-  _destructors.push([&] { MaterialLibrary::destroy(); });
-}
+//void GraphicsEngine::use_single_time_command_init_something()
+//{
+//  // start single time command and destructor use for destruct stage buffer, etc.
+//  auto cmd        = _command_pool.create_command().begin();
+//  auto destructor = DestructorStack();
+//
+//  // use command
+//  MaterialLibrary::init(_mem_alloc, cmd, destructor);
+//
+//  // end command
+//  cmd.end().submit_wait_free(_command_pool, _graphics_queue);
+//
+//  // destroy stage buffer and others
+//  destructor.clear();
+//
+//  // add material library destructor
+//  _destructors.push([&] { MaterialLibrary::destroy(); });
+//}
 
 } }

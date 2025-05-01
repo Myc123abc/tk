@@ -13,8 +13,6 @@
 #include "tk/Window.hpp"
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
 #include "tk/log.hpp"
-#include "tk/ui/ui.hpp"
-#include "ui/internal.hpp"
 
 #define SDL_MAIN_USE_CALLBACKS
 #include <SDL3/SDL_main.h>
@@ -22,6 +20,7 @@
 
 #include <algorithm>
 #include <numbers>
+#include <span>
 
 using namespace tk;
 using namespace tk::graphics_engine;
@@ -64,7 +63,6 @@ void tk::init_tk_context(std::string_view title, uint32_t width, uint32_t height
   tk_ctx->user_data = user_data;
   tk_ctx->window.init(title, width, height);
   tk_ctx->engine.init(tk_ctx->window);
-  ui::init(&tk_ctx->engine);
 }
 
 auto tk::get_user_data() -> void*
@@ -72,24 +70,10 @@ auto tk::get_user_data() -> void*
   return tk_ctx->user_data;
 }
 
-auto tk::get_main_window() -> Window*
-{
-  return &tk_ctx->window;
-}
-
-
 ////////////////////////////////////////////////////////////////////////////////
 //                                From imgui
 ////////////////////////////////////////////////////////////////////////////////
 
-static double global_time = {};
-
-// record framestate
-static float framestates[60] = {};
-static int   frame_index     = {};
-static float frame_accum     = {};
-static int   frame_count     = {};
-static float framestate      = {};
 
 static float dpi_scale = {};
 
@@ -176,45 +160,20 @@ SDL_AppResult SDL_AppIterate(void *appstate)
   try
   {
     //
-    // record time
-    //
-    static uint64_t time = {};
-    // Setup time step (we don't use SDL_GetTicks() because it is using millisecond resolution)
-    // (Accept SDL_GetPerformanceCounter() not returning a monotonically increasing value. Happens in VMs and Emscripten, see #6189, #6114, #3644)
-    static auto frequency = SDL_GetPerformanceFrequency();
-    auto current_time = SDL_GetPerformanceCounter();
-    if (current_time <= time)
-        current_time = time + 1;
-    static auto delta_time = time > 0 ? (float)((double)(current_time - time) / frequency) : (float)(1.0f / 60.0f);
-    time = current_time;
-
-    log::info("time: {}", time);
-
-    //
-    // record framestate
-    //
-    frame_accum += delta_time - framestates[frame_index];
-    framestates[frame_index] = delta_time;
-    frame_index = ++frame_index % sizeof(framestates);
-    frame_count = std::min((uint64_t)frame_count + 1, sizeof(framestates));
-    framestate = frame_accum > 0.f ? 1.f / (frame_accum / frame_count) : FLT_MAX;
-
-    log::info("framestate: {}", framestate);
-
-    //
     // update dpi
     //
     update_dpi_scale();
 
     tk_iterate();
 
-    if (!tk_ctx->paused)
+    if (tk_ctx->paused)
     {
-      ui::render();
-      global_time += delta_time;
-    }
-    else
       SDL_Delay(10);
+      return SDL_APP_CONTINUE;
+    }
+
+    tk_ctx->engine.render_begin();
+    tk_ctx->engine.render_end();
   }
   catch (const std::exception& e)
   {
@@ -251,8 +210,6 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         return SDL_APP_SUCCESS;
       break;
     }
-
-    ui::event_process(event);
   }
   catch (const std::exception& e)
   {
