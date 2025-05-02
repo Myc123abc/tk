@@ -173,6 +173,29 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     }
 
     tk_ctx->engine.render_begin();
+
+    // tmp data
+    auto vertices = std::vector<Vertex>
+    {
+      { { 0.5, 0 }, {}, 0xFFFF0000 },
+      { { 1, 1 }, {}, 0xFF00FF00 },
+      { { 0, 1 }, {}, 0xFF0000FF },
+    };
+    auto indices = std::vector<uint16_t>
+    {
+      0, 1, 2,
+    };
+    tk_ctx->engine.update(vertices, indices);
+
+    // tmp render
+    auto index_infos = std::vector<GraphicsEngine::IndexInfo>
+    {
+      { 0, 3 },
+    };
+    auto display_size = glm::vec2(200, 200);
+    auto display_pos  = glm::vec2(0, 0);
+    tk_ctx->engine.render(index_infos, display_size, display_pos);
+
     tk_ctx->engine.render_end();
   }
   catch (const std::exception& e)

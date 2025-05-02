@@ -11,6 +11,9 @@
 // 4. currently, not see mouse handling, just graphics handling
 // 5. not handle font now
 //
+// TODO: today
+// 1. the way to copy date t buffer and test a simple quard
+//
 // INFO:
 // use MSAA and FXAA for AA
 // about 2D pipeline, not use depth test, and vertex only store vec2 pos, uv, col
@@ -29,6 +32,7 @@
 #include <SDL3/SDL_events.h>
 
 #include <vector>
+#include <span>
 
 namespace tk { namespace graphics_engine {
 
@@ -62,7 +66,17 @@ namespace tk { namespace graphics_engine {
     void resize_swapchain();
 
     void render_begin();
+
+    struct IndexInfo
+    {
+      uint32_t offset  = {};
+      uint32_t count   = {};
+    };
+    void render(std::span<IndexInfo> index_infos, glm::vec2 const& display_size, glm::vec2 const& display_pos);
+
     void render_end();
+
+    void update(std::span<Vertex> vertices, std::span<uint16_t> indices);
 
   private:
     //
@@ -84,6 +98,7 @@ namespace tk { namespace graphics_engine {
     void create_descriptor_sets();
     void create_sync_objects();
     void create_frame_resources();
+    void create_buffer();
 
     //
     // util 
@@ -155,6 +170,11 @@ namespace tk { namespace graphics_engine {
     VkDescriptorPool             _descriptor_pool          = VK_NULL_HANDLE;
     VkDescriptorSetLayout        _descriptor_set_layout    = VK_NULL_HANDLE;
     VkDescriptorSet              _descriptor_set           = VK_NULL_HANDLE;
+
+    // INFO:
+    // allocate a big buffer.
+    // should I recreate a bigger buffer when current buffer unenough?
+    Buffer                       _buffer;
   };
 
 } }

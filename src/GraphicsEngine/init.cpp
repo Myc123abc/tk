@@ -34,6 +34,7 @@ void GraphicsEngine::init(Window& window)
   create_graphics_pipeline();
   create_descriptor_pool();
   create_descriptor_sets();
+  create_buffer();
 
   _window->show();
 }
@@ -636,5 +637,14 @@ void GraphicsEngine::resize_swapchain()
 //  // add material library destructor
 //  _destructors.push([&] { MaterialLibrary::destroy(); });
 //}
+
+void GraphicsEngine::create_buffer()
+{
+  _buffer = _mem_alloc.create_buffer(2 * 1024 * 1024, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT        |
+                                                      VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+                                                      VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                                                      VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+  _destructors.push([this] { _mem_alloc.destroy_buffer(_buffer); });
+}
 
 } }

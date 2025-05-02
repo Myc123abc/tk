@@ -21,7 +21,7 @@ public:
     // init tk context
     // and set title and extent of main window
     // and set user data
-    init_tk_context("tk", 120, 30, this);
+    init_tk_context("tk", 200, 200, this);
   }
 
   void set_playback_progress(uint32_t progress)

@@ -44,6 +44,18 @@ auto MemoryAllocator::create_buffer(uint32_t size, VkBufferUsageFlags usages, Vm
   };
   throw_if(vmaCreateBuffer(_allocator, &buf_info, &alloc_info, &buffer.handle, &buffer.allocation, nullptr) != VK_SUCCESS,
            "failed to create buffer");
+
+  if (usages & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
+  {
+    // get address
+    VkBufferDeviceAddressInfo info
+    {
+      .sType  = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+      .buffer = buffer.handle,
+    };
+    buffer.address = vkGetBufferDeviceAddress(_device, &info);
+  }
+
   return buffer;
 }
 
@@ -54,76 +66,76 @@ void MemoryAllocator::destroy_buffer(Buffer& buffer)
   buffer = {};
 }
 
-auto MemoryAllocator::create_mesh_buffer(Command& command, std::vector<Mesh>& meshs, DestructorStack& destructor, std::vector<MeshInfo>& mesh_infos) -> MeshBuffer
-{
-  MeshBuffer buffer;
-
-  // get mesh infos
-  mesh_infos.reserve(meshs.size());
-  uint32_t vertices_offset = 0, indices_offset = 0;
-  auto vertices      = std::vector<Vertex>();
-  auto indices       = std::vector<uint16_t>();
-  for (auto const& mesh : meshs)
-  {
-    uint32_t vertices_byte_size = sizeof(Vertex)  * mesh.vertices.size();
-    uint32_t indices_byte_size  = sizeof(uint8_t) * mesh.indices.size();
-    mesh_infos.emplace_back(MeshInfo
-    {
-      .vertices_offset = vertices_offset,
-      .indices_offset  = indices_offset,
-      .indices_count   = (uint32_t)mesh.indices.size(),
-    });
-    vertices_offset += vertices_byte_size;
-    indices_offset  += indices_byte_size;
-    vertices.append_range(mesh.vertices);
-    indices.append_range(mesh.indices);
-  }
-
-  // create mesh buffer 
-  uint32_t vertices_byte_size = sizeof(Vertex)   * vertices.size();
-  int32_t  indices_byte_size  = sizeof(uint16_t) * indices.size();
-  buffer.vertices = create_buffer(vertices_byte_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT        |
-                                                      VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-                                                      VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-  buffer.indices  = create_buffer(indices_byte_size,  VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-                                                      VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-  // get address
-  VkBufferDeviceAddressInfo info
-  {
-    .sType  = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-    .buffer = buffer.vertices.handle,
-  };
-  buffer.address = vkGetBufferDeviceAddress(_device, &info);
-    
-  // create stage buffer
-  auto stage = create_buffer(vertices_byte_size + indices_byte_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
-
-  // copy mesh data to stage buffer
-  throw_if(vmaCopyMemoryToAllocation(_allocator, vertices.data(), stage.allocation, 0, vertices_byte_size) != VK_SUCCESS,
-           "failed to copy vertices data to stage buffer");
-  throw_if(vmaCopyMemoryToAllocation(_allocator, indices.data(), stage.allocation, vertices_byte_size, indices_byte_size) != VK_SUCCESS,
-           "failed to copy indices data to stage buffer");
-
-  // transform data from stage to mesh buffer
-  VkBufferCopy copy
-  {
-    .size = vertices_byte_size,
-  };
-  vkCmdCopyBuffer(command, stage.handle, buffer.vertices.handle, 1, &copy);
-  copy.size      = indices_byte_size;
-  copy.srcOffset = vertices_byte_size;
-  vkCmdCopyBuffer(command, stage.handle, buffer.indices.handle, 1, &copy);
-
-  destructor.push([stage, this] mutable { destroy_buffer(stage); });
-
-  return buffer;
-}
-
-void MemoryAllocator::destroy_mesh_buffer(MeshBuffer& buffer)
-{
-  destroy_buffer(buffer.vertices);
-  destroy_buffer(buffer.indices);
-  buffer = {};
-}
+// auto MemoryAllocator::create_mesh_buffer(Command& command, std::vector<Mesh>& meshs, DestructorStack& destructor, std::vector<MeshInfo>& mesh_infos) -> MeshBuffer
+// {
+//   MeshBuffer buffer;
+//
+//   // get mesh infos
+//   mesh_infos.reserve(meshs.size());
+//   uint32_t vertices_offset = 0, indices_offset = 0;
+//   auto vertices      = std::vector<Vertex>();
+//   auto indices       = std::vector<uint16_t>();
+//   for (auto const& mesh : meshs)
+//   {
+//     uint32_t vertices_byte_size = sizeof(Vertex)  * mesh.vertices.size();
+//     uint32_t indices_byte_size  = sizeof(uint8_t) * mesh.indices.size();
+//     mesh_infos.emplace_back(MeshInfo
+//     {
+//       .vertices_offset = vertices_offset,
+//       .indices_offset  = indices_offset,
+//       .indices_count   = (uint32_t)mesh.indices.size(),
+//     });
+//     vertices_offset += vertices_byte_size;
+//     indices_offset  += indices_byte_size;
+//     vertices.append_range(mesh.vertices);
+//     indices.append_range(mesh.indices);
+//   }
+//
+//   // create mesh buffer 
+//   uint32_t vertices_byte_size = sizeof(Vertex)   * vertices.size();
+//   int32_t  indices_byte_size  = sizeof(uint16_t) * indices.size();
+//   buffer.vertices = create_buffer(vertices_byte_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT        |
+//                                                       VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+//                                                       VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+//   buffer.indices  = create_buffer(indices_byte_size,  VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+//                                                       VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+//   // get address
+//   VkBufferDeviceAddressInfo info
+//   {
+//     .sType  = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+//     .buffer = buffer.vertices.handle,
+//   };
+//   buffer.address = vkGetBufferDeviceAddress(_device, &info);
+//     
+//   // create stage buffer
+//   auto stage = create_buffer(vertices_byte_size + indices_byte_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+//
+//   // copy mesh data to stage buffer
+//   throw_if(vmaCopyMemoryToAllocation(_allocator, vertices.data(), stage.allocation, 0, vertices_byte_size) != VK_SUCCESS,
+//            "failed to copy vertices data to stage buffer");
+//   throw_if(vmaCopyMemoryToAllocation(_allocator, indices.data(), stage.allocation, vertices_byte_size, indices_byte_size) != VK_SUCCESS,
+//            "failed to copy indices data to stage buffer");
+//
+//   // transform data from stage to mesh buffer
+//   VkBufferCopy copy
+//   {
+//     .size = vertices_byte_size,
+//   };
+//   vkCmdCopyBuffer(command, stage.handle, buffer.vertices.handle, 1, &copy);
+//   copy.size      = indices_byte_size;
+//   copy.srcOffset = vertices_byte_size;
+//   vkCmdCopyBuffer(command, stage.handle, buffer.indices.handle, 1, &copy);
+//
+//   destructor.push([stage, this] mutable { destroy_buffer(stage); });
+//
+//   return buffer;
+// }
+//
+// void MemoryAllocator::destroy_mesh_buffer(MeshBuffer& buffer)
+// {
+//   destroy_buffer(buffer.vertices);
+//   destroy_buffer(buffer.indices);
+//   buffer = {};
+// }
 
 }}

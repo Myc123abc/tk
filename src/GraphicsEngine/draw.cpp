@@ -119,6 +119,9 @@ void GraphicsEngine::render_begin()
   vkCmdSetScissor(frame.cmd, 0, 1, &scissor);
 
   vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _2D_pipeline);
+
+  vkCmdBindIndexBuffer(frame.cmd, _buffer.handle, 0, VK_INDEX_TYPE_UINT16);
+  
 }
 
 void GraphicsEngine::render_end()
@@ -198,21 +201,37 @@ void GraphicsEngine::render_end()
   _current_frame = ++_current_frame % Max_Frame_Number;
 }
 
-// void GraphicsEngine::render_shape(ShapeType type, glm::vec3 const& color, glm::mat4 const& model,  float depth)
-// {
-//   auto mesh_info   = MaterialLibrary::get_mesh_infos()[type];
-//   auto mesh_buffer = MaterialLibrary::get_mesh_buffer();
-//   PushConstant pc
-//   {
-//     .vertices    = mesh_buffer.address + mesh_info.vertices_offset,
-//     .scale       = {},
-//     .translate   = {},
-//   };
+/*
+ * buffer storage
+ * | vertices | indices |
+ */
+void GraphicsEngine::render(std::span<IndexInfo> index_infos, glm::vec2 const& display_size, glm::vec2 const& display_pos)
+{
+  auto cmd = _frames[_current_frame].cmd;
 
-//   auto cmd = _frames[_current_frame].command_buffer;
-//   vkCmdPushConstants(cmd, _2D_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pc), &pc);
-//   vkCmdBindIndexBuffer(cmd, mesh_buffer.indices.handle, 0, VK_INDEX_TYPE_UINT16);
-//   vkCmdDrawIndexed(cmd, mesh_info.indices_count, 1, mesh_info.indices_offset, 0, 0);
-// }
+  auto scale     = glm::vec2{ 2.f / display_size.x, 2.f / display_size.y };
+  auto translate = glm::vec2{ -1.f - display_pos.x * scale.x, -1.f - display_pos.y * scale.y };
+  PushConstant pc
+  {
+    .vertices  = _buffer.address,
+    .scale     = {1, 1},
+    .translate = {},
+  };
+  vkCmdPushConstants(cmd, _2D_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pc), &pc);
+
+  for (auto const& index_info : index_infos)
+    vkCmdDrawIndexed(cmd, index_info.count, 1, index_info.offset, 0, 0);
+}
+
+void GraphicsEngine::update(std::span<Vertex> vertices, std::span<uint16_t> indices)
+{
+  auto vertices_size = sizeof(Vertex)   * vertices.size();
+  auto indices_size  = sizeof(uint16_t) * indices.size();
+  throw_if(vertices_size + indices_size > 2 * 1024 * 1024, "too big vertices indices data!(bigger than 2MB)");
+  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), vertices.data(), _buffer.allocation, 0, vertices_size) != VK_SUCCESS,
+           "failed to copy vertices data to buffer");
+  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), indices.data(), _buffer.allocation, vertices_size, indices_size) != VK_SUCCESS,
+           "failed to copy indices data to buffer");
+}
     
 } }

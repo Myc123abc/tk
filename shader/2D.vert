@@ -1,8 +1,6 @@
 #version 460
 #extension GL_EXT_buffer_reference : require
 
-// TODO: check memory align problem if no image
-
 struct Vertex
 {
   vec2  pos;
