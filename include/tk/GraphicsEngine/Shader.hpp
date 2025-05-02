@@ -14,15 +14,15 @@ namespace tk { namespace graphics_engine {
   struct PushConstant 
   {
     VkDeviceAddress vertices = {};
-    glm::vec2       scale;
-    glm::vec2       translate;
+    glm::vec2       window_extent;
+    glm::vec2       display_pos;
   };
   
   struct Vertex
   {
     glm::vec2 pos;
     glm::vec2 uv;
-    uint32_t  col; // 0xAARRGGBB
+    alignas(8) uint32_t  col; // 0xAARRGGBB
   };
 
 }}

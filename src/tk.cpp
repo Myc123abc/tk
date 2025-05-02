@@ -177,9 +177,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     // tmp data
     auto vertices = std::vector<Vertex>
     {
-      { { 0.5, 0 }, {}, 0xFFFF0000 },
-      { { 1, 1 }, {}, 0xFF00FF00 },
-      { { 0, 1 }, {}, 0xFF0000FF },
+      { { 50, 0 }, {}, 0xFFFF0000 },
+      { { 100, 100 }, {}, 0xFF00FF00 },
+      { { 0, 100 }, {}, 0xFF0000FF },
     };
     auto indices = std::vector<uint16_t>
     {
@@ -190,11 +190,11 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     // tmp render
     auto index_infos = std::vector<GraphicsEngine::IndexInfo>
     {
-      { 0, 3 },
+      { 0, (uint32_t)indices.size() },
     };
-    auto display_size = glm::vec2(200, 200);
-    auto display_pos  = glm::vec2(0, 0);
-    tk_ctx->engine.render(index_infos, display_size, display_pos);
+    auto window_extent = glm::vec2(200, 200);
+    auto display_pos   = glm::vec2(100, 100);
+    tk_ctx->engine.render(sizeof(Vertex) * vertices.size(), index_infos, window_extent, display_pos);
 
     tk_ctx->engine.render_end();
   }

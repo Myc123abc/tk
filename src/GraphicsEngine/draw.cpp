@@ -59,8 +59,8 @@ void GraphicsEngine::render_begin()
   // depth_image_barrier_begin(frame.cmd);
 
   // transition image layout to writeable
-  transition_image_layout(frame.cmd, _msaa_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  transition_image_layout(frame.cmd, _swapchain_images[image_index].image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  transition_image_layout(frame.cmd, _msaa_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   // transition_image_layout(frame.cmd, _image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   // transition_image_layout(frame.cmd, _msaa_depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
   // transition_image_layout(frame.cmd, frame.depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
@@ -76,8 +76,8 @@ void GraphicsEngine::render_begin()
     .resolveMode        = VK_RESOLVE_MODE_AVERAGE_BIT,
     .resolveImageView   = _swapchain_images[image_index].view,
     .resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    .loadOp             = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-    .storeOp            = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+    .loadOp             = VK_ATTACHMENT_LOAD_OP_CLEAR,
+    .storeOp            = VK_ATTACHMENT_STORE_OP_STORE,
   };
   // VkRenderingAttachmentInfo depth_attachment
   // {
@@ -119,9 +119,6 @@ void GraphicsEngine::render_begin()
   vkCmdSetScissor(frame.cmd, 0, 1, &scissor);
 
   vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _2D_pipeline);
-
-  vkCmdBindIndexBuffer(frame.cmd, _buffer.handle, 0, VK_INDEX_TYPE_UINT16);
-  
 }
 
 void GraphicsEngine::render_end()
@@ -140,7 +137,7 @@ void GraphicsEngine::render_end()
   // copy_image(frame.cmd, _image.image, _swapchain_images[image_index], _draw_extent, _swapchain_image_extent);
 
   // transition image layout to presentable
-  transition_image_layout(frame.cmd, _swapchain_images[image_index].image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+  transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
   // depth_image_barrier_end(frame.cmd);
 
@@ -205,17 +202,17 @@ void GraphicsEngine::render_end()
  * buffer storage
  * | vertices | indices |
  */
-void GraphicsEngine::render(std::span<IndexInfo> index_infos, glm::vec2 const& display_size, glm::vec2 const& display_pos)
+void GraphicsEngine::render(uint32_t indices_offset, std::span<IndexInfo> index_infos, glm::vec2 const& window_extent, glm::vec2 const& display_pos)
 {
   auto cmd = _frames[_current_frame].cmd;
 
-  auto scale     = glm::vec2{ 2.f / display_size.x, 2.f / display_size.y };
-  auto translate = glm::vec2{ -1.f - display_pos.x * scale.x, -1.f - display_pos.y * scale.y };
+  vkCmdBindIndexBuffer(cmd, _buffer.handle, indices_offset, VK_INDEX_TYPE_UINT16);
+
   PushConstant pc
   {
-    .vertices  = _buffer.address,
-    .scale     = {1, 1},
-    .translate = {},
+    .vertices      = _buffer.address,
+    .window_extent = window_extent,
+    .display_pos   = display_pos,
   };
   vkCmdPushConstants(cmd, _2D_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pc), &pc);
 

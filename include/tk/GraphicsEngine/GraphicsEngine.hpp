@@ -26,6 +26,7 @@
 #include "../DestructorStack.hpp"
 #include "MemoryAllocator.hpp"
 #include "CommandPool.hpp"
+#include "Shader.hpp"
 
 #include <glm/glm.hpp>
 #include <vk_mem_alloc.h>
@@ -72,7 +73,7 @@ namespace tk { namespace graphics_engine {
       uint32_t offset  = {};
       uint32_t count   = {};
     };
-    void render(std::span<IndexInfo> index_infos, glm::vec2 const& display_size, glm::vec2 const& display_pos);
+    void render(uint32_t indices_offset, std::span<IndexInfo> index_infos, glm::vec2 const& window_extent, glm::vec2 const& display_pos);
 
     void render_end();
 

@@ -1,6 +1,5 @@
 #include "tk/GraphicsEngine/MemoryAllocator.hpp"
 #include "tk/ErrorHandling.hpp"
-#include "tk/GraphicsEngine/CommandPool.hpp"
 
 namespace tk { namespace graphics_engine {
 
@@ -137,5 +136,65 @@ void MemoryAllocator::destroy_buffer(Buffer& buffer)
 //   destroy_buffer(buffer.indices);
 //   buffer = {};
 // }
+
+auto MemoryAllocator::create_image(VkFormat format, VkExtent3D extent, VkSampleCountFlagBits sample_count) -> Image
+{
+  Image image
+  {
+    .extent = extent,
+    .format = format,
+  };
+
+  VkImageCreateInfo image_info
+  {
+    .sType       = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+    .imageType   = VK_IMAGE_TYPE_2D,
+    .format      = image.format,
+    .extent      = image.extent,
+    .mipLevels   = 1,
+    .arrayLayers = 1,
+    .samples     = sample_count,
+    .tiling      = VK_IMAGE_TILING_OPTIMAL,
+    .usage       = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+                   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+  };
+
+  VmaAllocationCreateInfo alloc_info
+  {
+    .flags         = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
+    .usage         = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+    .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+  };
+  throw_if(vmaCreateImage(_allocator, &image_info, &alloc_info, &image.handle, &image.allocation, nullptr) != VK_SUCCESS,
+           "failed to create image");
+
+  VkImageViewCreateInfo image_view_info
+  {
+    .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+    .image    = image.handle,
+    .viewType = VK_IMAGE_VIEW_TYPE_2D,
+    .format   = image.format,
+    .subresourceRange =
+    {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .levelCount = 1,
+      .layerCount = 1,
+    },
+  };
+  throw_if(vkCreateImageView(_device, &image_view_info, nullptr, &image.view) != VK_SUCCESS,
+           "failed to create image view");
+
+  return image;
+}
+
+void MemoryAllocator::destroy_image(Image& image)
+{
+  if (image.handle != VK_NULL_HANDLE && image.allocation != VK_NULL_HANDLE)
+  {
+    vkDestroyImageView(_device, image.view, nullptr);
+    vmaDestroyImage(_allocator, image.handle, image.allocation);
+  }
+  image = {};
+}
 
 }}
