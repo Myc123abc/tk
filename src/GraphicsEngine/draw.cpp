@@ -76,8 +76,8 @@ void GraphicsEngine::render_begin()
     .resolveMode        = VK_RESOLVE_MODE_AVERAGE_BIT,
     .resolveImageView   = _swapchain_images[image_index].view,
     .resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    .loadOp             = VK_ATTACHMENT_LOAD_OP_CLEAR,
-    .storeOp            = VK_ATTACHMENT_STORE_OP_STORE,
+    .loadOp             = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+    .storeOp            = VK_ATTACHMENT_STORE_OP_DONT_CARE,
   };
   // VkRenderingAttachmentInfo depth_attachment
   // {
@@ -202,11 +202,9 @@ void GraphicsEngine::render_end()
  * buffer storage
  * | vertices | indices |
  */
-void GraphicsEngine::render(uint32_t indices_offset, std::span<IndexInfo> index_infos, glm::vec2 const& window_extent, glm::vec2 const& display_pos)
+void GraphicsEngine::render(std::span<IndexInfo> index_infos, glm::vec2 const& window_extent, glm::vec2 const& display_pos)
 {
   auto cmd = _frames[_current_frame].cmd;
-
-  vkCmdBindIndexBuffer(cmd, _buffer.handle, indices_offset, VK_INDEX_TYPE_UINT16);
 
   PushConstant pc
   {
@@ -224,11 +222,15 @@ void GraphicsEngine::update(std::span<Vertex> vertices, std::span<uint16_t> indi
 {
   auto vertices_size = sizeof(Vertex)   * vertices.size();
   auto indices_size  = sizeof(uint16_t) * indices.size();
+
   throw_if(vertices_size + indices_size > 2 * 1024 * 1024, "too big vertices indices data!(bigger than 2MB)");
+
   throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), vertices.data(), _buffer.allocation, 0, vertices_size) != VK_SUCCESS,
            "failed to copy vertices data to buffer");
   throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), indices.data(), _buffer.allocation, vertices_size, indices_size) != VK_SUCCESS,
            "failed to copy indices data to buffer");
+           
+  vkCmdBindIndexBuffer(_frames[_current_frame].cmd, _buffer.handle, vertices_size, VK_INDEX_TYPE_UINT16);
 }
     
 } }

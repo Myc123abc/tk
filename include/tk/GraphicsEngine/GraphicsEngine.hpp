@@ -73,7 +73,7 @@ namespace tk { namespace graphics_engine {
       uint32_t offset  = {};
       uint32_t count   = {};
     };
-    void render(uint32_t indices_offset, std::span<IndexInfo> index_infos, glm::vec2 const& window_extent, glm::vec2 const& display_pos);
+    void render(std::span<IndexInfo> index_infos, glm::vec2 const& window_extent, glm::vec2 const& display_pos);
 
     void render_end();
 

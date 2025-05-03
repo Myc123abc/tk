@@ -7,6 +7,7 @@
 //
 
 #include "tk/tk.hpp"
+#include "tk/ui/ui.hpp"
 #include "tk/log.hpp"
 
 #include <chrono>
@@ -45,6 +46,15 @@ void tk_iterate()
   
   auto audio_player = reinterpret_cast<AudioPlayer*>(get_user_data());
   audio_player->set_playback_progress(progress);
+
+  // test ui
+  ui::begin(0, 0);
+  ui::rectangle({ 0, 0 }, tk::get_main_window_extent(), 0xFF282C34);
+  ui::rectangle({ 0, 0 }, { 100, 100 }, 0xFFFF0000);
+  ui::rectangle({ 100, 0 }, { 100, 100 }, 0xFF00FF00);
+  ui::rectangle({ 100, 100 }, { 100, 100 }, 0xFF0000FF);
+  ui::rectangle({ 0, 100 }, { 100, 100 }, 0xFFFFFF00);
+  ui::end();
 }
 
 void tk_event(SDL_Event* event)

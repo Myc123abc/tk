@@ -13,6 +13,7 @@
 #include "tk/Window.hpp"
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
 #include "tk/log.hpp"
+#include "ui/internal.hpp"
 
 #define SDL_MAIN_USE_CALLBACKS
 #include <SDL3/SDL_main.h>
@@ -55,6 +56,7 @@ struct tk_context
 };
 
 static tk_context* tk_ctx;
+extern struct ui_context ui_ctx;
 
 void tk::init_tk_context(std::string_view title, uint32_t width, uint32_t height, void* user_data)
 {
@@ -63,11 +65,23 @@ void tk::init_tk_context(std::string_view title, uint32_t width, uint32_t height
   tk_ctx->user_data = user_data;
   tk_ctx->window.init(title, width, height);
   tk_ctx->engine.init(tk_ctx->window);
+
+  // init ui context
+  // TODO: currently only use main window for entire ui
+  ui::get_ctx().window_extent = { width, height };
+  ui::get_ctx().engine        = &tk_ctx->engine;
 }
 
 auto tk::get_user_data() -> void*
 {
   return tk_ctx->user_data;
+}
+
+auto tk::get_main_window_extent() -> glm::vec2
+{
+  uint32_t width, height;
+  tk_ctx->window.get_framebuffer_size(width, height);
+  return { width, height };
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -172,30 +186,14 @@ SDL_AppResult SDL_AppIterate(void *appstate)
       return SDL_APP_CONTINUE;
     }
 
+    // update window size
+    uint32_t width, height;
+    tk_ctx->window.get_framebuffer_size(width, height);
+    ui::get_ctx().window_extent = { width, height };
+
+    // render ui
     tk_ctx->engine.render_begin();
-
-    // tmp data
-    auto vertices = std::vector<Vertex>
-    {
-      { { 50, 0 }, {}, 0xFFFF0000 },
-      { { 100, 100 }, {}, 0xFF00FF00 },
-      { { 0, 100 }, {}, 0xFF0000FF },
-    };
-    auto indices = std::vector<uint16_t>
-    {
-      0, 1, 2,
-    };
-    tk_ctx->engine.update(vertices, indices);
-
-    // tmp render
-    auto index_infos = std::vector<GraphicsEngine::IndexInfo>
-    {
-      { 0, (uint32_t)indices.size() },
-    };
-    auto window_extent = glm::vec2(200, 200);
-    auto display_pos   = glm::vec2(100, 100);
-    tk_ctx->engine.render(sizeof(Vertex) * vertices.size(), index_infos, window_extent, display_pos);
-
+    ui::render();
     tk_ctx->engine.render_end();
   }
   catch (const std::exception& e)

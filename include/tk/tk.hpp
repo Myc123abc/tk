@@ -7,6 +7,7 @@
 #include <string_view>
 
 #include <SDL3/SDL_init.h>
+#include <glm/glm.hpp>
 
 namespace tk
 {
@@ -22,4 +23,5 @@ namespace tk
 
   auto get_user_data() -> void*;
 
+  auto get_main_window_extent() -> glm::vec2;
 }
