@@ -244,7 +244,7 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
   //
   // dynamic rendering use image
   //
-  //_msaa_image = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, _msaa_sample_count);
+  _msaa_image = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, _msaa_sample_count);
 
   // create msaa depth image and depth image
   // _msaa_depth_image.format = Depth_Format;
@@ -302,7 +302,7 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
     // }
     // vkDestroyImageView(_device, _msaa_depth_image.view, nullptr);
     // vmaDestroyImage(_mem_alloc.get(), _msaa_depth_image.image, _msaa_depth_image.allocation);
-    //_mem_alloc.destroy_image(_msaa_image);
+    _mem_alloc.destroy_image(_msaa_image);
     vkDestroySwapchainKHR(_device, _swapchain, nullptr);
     for (auto const& image : _swapchain_images)
       vkDestroyImageView(_device, image.view, nullptr);
@@ -462,7 +462,7 @@ void GraphicsEngine::create_graphics_pipeline()
                  .set_color_attachment_format(_swapchain_images[0].format)
                  // TODO: imgui not enable depth test
                  //.enable_depth_test(Depth_Format)
-                 .set_msaa(VK_SAMPLE_COUNT_1_BIT)
+                 .set_msaa(_msaa_sample_count)
                  .build(_device, _2D_pipeline_layout);
 
   // set destructors
@@ -576,8 +576,8 @@ void GraphicsEngine::resize_swapchain()
   auto old_swapchain = _swapchain;
   create_swapchain(old_swapchain);
   vkDestroySwapchainKHR(_device, old_swapchain, nullptr);
-  //_mem_alloc.destroy_image(_msaa_image);
-  //_msaa_image = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, _msaa_sample_count);
+  _mem_alloc.destroy_image(_msaa_image);
+  _msaa_image = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, _msaa_sample_count);
 }
 
 //void GraphicsEngine::use_single_time_command_init_something()

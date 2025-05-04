@@ -59,7 +59,7 @@ void GraphicsEngine::render_begin()
   // depth_image_barrier_begin(frame.cmd);
 
   // transition image layout to writeable
-  //transition_image_layout(frame.cmd, _msaa_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  transition_image_layout(frame.cmd, _msaa_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   // transition_image_layout(frame.cmd, _image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   // transition_image_layout(frame.cmd, _msaa_depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
@@ -71,13 +71,13 @@ void GraphicsEngine::render_begin()
   VkRenderingAttachmentInfo color_attachment
   {
     .sType              = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-    .imageView          = _swapchain_images[image_index].view,
+    .imageView          = _msaa_image.view,
     .imageLayout        = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    //.resolveMode        = VK_RESOLVE_MODE_AVERAGE_BIT,
-    //.resolveImageView   = _swapchain_images[image_index].view,
-    //.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    .resolveMode        = VK_RESOLVE_MODE_AVERAGE_BIT,
+    .resolveImageView   = _swapchain_images[image_index].view,
+    .resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
     .loadOp             = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-    .storeOp            = VK_ATTACHMENT_STORE_OP_STORE,
+    .storeOp            = VK_ATTACHMENT_STORE_OP_DONT_CARE,
   };
   // VkRenderingAttachmentInfo depth_attachment
   // {
