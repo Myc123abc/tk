@@ -20,9 +20,9 @@ namespace tk { namespace graphics_engine {
   
   struct Vertex
   {
-    glm::vec2 pos;
-    glm::vec2 uv;
-    alignas(8) uint32_t  col; // 0xAARRGGBB
+    alignas(8) glm::vec2 pos;
+    alignas(8) glm::vec2 uv;
+    alignas(8) uint32_t  col; // 0xRRGGBBAA
   };
 
 }}

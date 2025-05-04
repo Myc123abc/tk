@@ -14,25 +14,9 @@
 
 using namespace tk;
 
-class AudioPlayer
-{
-public:
-  AudioPlayer()
-  {
-    // init tk context
-    // and set title and extent of main window
-    // and set user data
-    init_tk_context("tk", 200, 200, this);
-  }
-
-  void set_playback_progress(uint32_t progress)
-  {
-  }
-};
-
 void tk_init(int argc, char** argv)
 {
-  new AudioPlayer;
+  init_tk_context("tk", 200, 200, nullptr);
 }
 
 void tk_iterate()
@@ -42,19 +26,24 @@ void tk_iterate()
   auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
   auto progress = milliseconds % 10000 / 100;
 
-  // log::info("progress {}%", progress);
-  
-  auto audio_player = reinterpret_cast<AudioPlayer*>(get_user_data());
-  audio_player->set_playback_progress(progress);
+  log::info("progress {}%", progress);
 
-  // test ui
-  ui::begin(0, 0);
-  ui::rectangle({ 0, 0 }, tk::get_main_window_extent(), 0xFF282C34);
-  ui::rectangle({ 0, 0 }, { 100, 100 }, 0xFFFF0000);
-  ui::rectangle({ 100, 0 }, { 100, 100 }, 0xFF00FF00);
-  ui::rectangle({ 100, 100 }, { 100, 100 }, 0xFF0000FF);
-  ui::rectangle({ 0, 100 }, { 100, 100 }, 0xFFFFFF00);
-  ui::end();
+  {
+    ui::begin(0, 0);
+
+    // background
+    //ui::rectangle({ 0, 0 }, tk::get_main_window_extent(), 0x282C34FF);
+
+    // playback button
+    auto playback_right_point = glm::vec2{ 5 + 12.5 * 1.414, 17.5 };
+    ui::triangle({ 5, 5 }, playback_right_point, { 5, 30 }, 0xFFFFFFFF, 1.f);
+
+    // playback progress
+    //ui::rectangle({ playback_right_point.x + 5, playback_right_point.y }, { 100, 3 }, 0x808080FF );
+    //ui::rectangle({ playback_right_point.x + 5, playback_right_point.y }, { progress, 3 }, 0x0000FFFF );
+
+    ui::end();
+  }
 }
 
 void tk_event(SDL_Event* event)
@@ -63,5 +52,4 @@ void tk_event(SDL_Event* event)
 
 void tk_quit()
 {
-  delete reinterpret_cast<AudioPlayer*>(get_user_data());
 }

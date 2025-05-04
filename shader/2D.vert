@@ -37,10 +37,10 @@ void main()
   gl_Position    = vec4((vertex.pos + pc.display_pos) * scale + translate, 0, 1);
 
   // get color
-  float r = float((vertex.col >> 16) & 0xFF) / 255;
-  float g = float((vertex.col >> 8 ) & 0xFF) / 255;
-  float b = float((vertex.col      ) & 0xFF) / 255;
-  float a = float((vertex.col >> 24) & 0xFF) / 255;
+  float r = float((vertex.col >> 24) & 0xFF) / 255;
+  float g = float((vertex.col >> 16) & 0xFF) / 255;
+  float b = float((vertex.col >> 8 ) & 0xFF) / 255;
+  float a = float((vertex.col      ) & 0xFF) / 255;
   Out.col = vec4(r, g, b, a);
 
   // set uv

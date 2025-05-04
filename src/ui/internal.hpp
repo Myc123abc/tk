@@ -25,6 +25,8 @@ struct ui_context
   graphics_engine::GraphicsEngine*     engine = nullptr;
   std::vector<graphics_engine::Vertex> vertices;
   std::vector<uint16_t>                indices;
+
+  std::vector<glm::vec2> points;
 };
 
 inline auto& get_ctx()
