@@ -134,7 +134,7 @@ void GraphicsEngine::select_physical_device()
   throw_if(_physical_device == VK_NULL_HANDLE, "failed to find a suitable GPU");
 
   auto max_msaa_sample_count = get_max_multisample_count(_physical_device);
-  throw_if(_msaa_sample_count > max_msaa_sample_count, "unsupported 4xmsaa");
+  //throw_if(_msaa_sample_count > max_msaa_sample_count, "unsupported 4xmsaa");
 
 #ifndef NDEBUG
   print_supported_physical_devices(_instance);
@@ -244,7 +244,7 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
   //
   // dynamic rendering use image
   //
-  _msaa_image = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, _msaa_sample_count);
+  //_msaa_image = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, _msaa_sample_count);
 
   // create msaa depth image and depth image
   // _msaa_depth_image.format = Depth_Format;
@@ -302,7 +302,7 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
     // }
     // vkDestroyImageView(_device, _msaa_depth_image.view, nullptr);
     // vmaDestroyImage(_mem_alloc.get(), _msaa_depth_image.image, _msaa_depth_image.allocation);
-    _mem_alloc.destroy_image(_msaa_image);
+    //_mem_alloc.destroy_image(_msaa_image);
     vkDestroySwapchainKHR(_device, _swapchain, nullptr);
     for (auto const& image : _swapchain_images)
       vkDestroyImageView(_device, image.view, nullptr);
@@ -459,10 +459,10 @@ void GraphicsEngine::create_graphics_pipeline()
                  .set_shaders(shader_vertex2D.shader, shader_fragment2D.shader)
                  // TODO: imgui use counter clockwise
                  .set_cull_mode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE)
-                 .set_color_attachment_format(_msaa_image.format)
+                 .set_color_attachment_format(_swapchain_images[0].format)
                  // TODO: imgui not enable depth test
                  //.enable_depth_test(Depth_Format)
-                 .set_msaa(_msaa_sample_count)
+                 .set_msaa(VK_SAMPLE_COUNT_1_BIT)
                  .build(_device, _2D_pipeline_layout);
 
   // set destructors
@@ -576,8 +576,8 @@ void GraphicsEngine::resize_swapchain()
   auto old_swapchain = _swapchain;
   create_swapchain(old_swapchain);
   vkDestroySwapchainKHR(_device, old_swapchain, nullptr);
-  _mem_alloc.destroy_image(_msaa_image);
-  _msaa_image = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, _msaa_sample_count);
+  //_mem_alloc.destroy_image(_msaa_image);
+  //_msaa_image = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, _msaa_sample_count);
 }
 
 //void GraphicsEngine::use_single_time_command_init_something()

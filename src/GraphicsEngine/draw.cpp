@@ -59,7 +59,7 @@ void GraphicsEngine::render_begin()
   // depth_image_barrier_begin(frame.cmd);
 
   // transition image layout to writeable
-  transition_image_layout(frame.cmd, _msaa_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  //transition_image_layout(frame.cmd, _msaa_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   // transition_image_layout(frame.cmd, _image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   // transition_image_layout(frame.cmd, _msaa_depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
@@ -71,13 +71,13 @@ void GraphicsEngine::render_begin()
   VkRenderingAttachmentInfo color_attachment
   {
     .sType              = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-    .imageView          = _msaa_image.view,
+    .imageView          = _swapchain_images[image_index].view,
     .imageLayout        = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    .resolveMode        = VK_RESOLVE_MODE_AVERAGE_BIT,
-    .resolveImageView   = _swapchain_images[image_index].view,
-    .resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    //.resolveMode        = VK_RESOLVE_MODE_AVERAGE_BIT,
+    //.resolveImageView   = _swapchain_images[image_index].view,
+    //.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
     .loadOp             = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-    .storeOp            = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+    .storeOp            = VK_ATTACHMENT_STORE_OP_STORE,
   };
   // VkRenderingAttachmentInfo depth_attachment
   // {
@@ -91,12 +91,15 @@ void GraphicsEngine::render_begin()
   //   .loadOp             = VK_ATTACHMENT_LOAD_OP_CLEAR,
   //   .storeOp            = VK_ATTACHMENT_STORE_OP_DONT_CARE,
   // };
+
+  VkExtent2D extent = { _swapchain_images[image_index].extent.width, _swapchain_images[image_index].extent.height };
+
   VkRenderingInfo rendering
   {
     .sType                = VK_STRUCTURE_TYPE_RENDERING_INFO,
     .renderArea           =
     {
-      .extent = { _msaa_image.extent.width, _msaa_image.extent.height },
+      .extent = extent,
     },
     .layerCount           = 1,
     .colorAttachmentCount = 1,
@@ -107,14 +110,14 @@ void GraphicsEngine::render_begin()
 
   VkViewport viewport
   {
-    .width  = (float)_msaa_image.extent.width,
-    .height = (float)_msaa_image.extent.height, 
+    .width  = (float)extent.width,
+    .height = (float)extent.height, 
     .maxDepth = 1.f,
   };
   vkCmdSetViewport(frame.cmd, 0, 1, &viewport);
   VkRect2D scissor 
   {
-    .extent = { _msaa_image.extent.width, _msaa_image.extent.height },
+    .extent = extent,
   };
   vkCmdSetScissor(frame.cmd, 0, 1, &scissor);
 

@@ -139,8 +139,8 @@ namespace tk { namespace graphics_engine {
 
     // INFO: because some device unsupport dynamic msaa feature in pipeline
     //       so we just fixed use 4bit msaa
-    static constexpr VkSampleCountFlagBits _msaa_sample_count = VK_SAMPLE_COUNT_4_BIT;
-    Image                        _msaa_image;
+    //static constexpr VkSampleCountFlagBits _msaa_sample_count = VK_SAMPLE_COUNT_4_BIT;
+    //Image                        _msaa_image;
     // Image                        _msaa_depth_image;
 
     VkPipeline                   _2D_pipeline              = VK_NULL_HANDLE;
