@@ -137,7 +137,7 @@ void MemoryAllocator::destroy_buffer(Buffer& buffer)
 //   buffer = {};
 // }
 
-auto MemoryAllocator::create_image(VkFormat format, VkExtent3D extent, VkSampleCountFlagBits sample_count) -> Image
+auto MemoryAllocator::create_image(VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkSampleCountFlagBits sample_count) -> Image
 {
   Image image
   {
@@ -155,15 +155,15 @@ auto MemoryAllocator::create_image(VkFormat format, VkExtent3D extent, VkSampleC
     .arrayLayers = 1,
     .samples     = sample_count,
     .tiling      = VK_IMAGE_TILING_OPTIMAL,
-    .usage       = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
-                   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+    .usage       = usage,
   };
 
   VmaAllocationCreateInfo alloc_info
   {
     .flags         = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
-    .usage         = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-    .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    .usage         = VMA_MEMORY_USAGE_AUTO,
+    //.usage         = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+    //.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
   };
   throw_if(vmaCreateImage(_allocator, &image_info, &alloc_info, &image.handle, &image.allocation, nullptr) != VK_SUCCESS,
            "failed to create image");

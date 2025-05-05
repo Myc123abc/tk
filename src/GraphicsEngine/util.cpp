@@ -90,6 +90,36 @@ void GraphicsEngine::copy_image(VkCommandBuffer cmd, VkImage src, VkImage dst, V
   vkCmdBlitImage2(cmd, &info);
 }
 
+void GraphicsEngine::copy_image(Command const& cmd, Image const& src, Image const& dst)
+{
+  VkImageCopy2 region
+  {
+    .sType = VK_STRUCTURE_TYPE_IMAGE_COPY_2,
+    .srcSubresource =
+    {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .layerCount = 1,
+    },
+    .dstSubresource =
+    {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .layerCount = 1,
+    },
+    .extent = src.extent,
+  };
+  VkCopyImageInfo2 info
+  {
+    .sType          = VK_STRUCTURE_TYPE_COPY_IMAGE_INFO_2,
+    .srcImage       = src.handle,
+    .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    .dstImage       = dst.handle,
+    .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    .regionCount    = 1,
+    .pRegions       = &region,
+  };
+  vkCmdCopyImage2(cmd, &info);
+}
+
 void GraphicsEngine::depth_image_barrier_begin(VkCommandBuffer cmd)
 {
   VkImageMemoryBarrier2 barrier

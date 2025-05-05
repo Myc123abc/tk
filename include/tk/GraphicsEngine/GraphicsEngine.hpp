@@ -107,6 +107,7 @@ namespace tk { namespace graphics_engine {
     static void transition_image_layout(VkCommandBuffer cmd, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout);
     static auto get_image_subresource_range(VkImageAspectFlags aspect) -> VkImageSubresourceRange;
     static void copy_image(VkCommandBuffer cmd, VkImage src, VkImage dst, VkExtent2D src_extent, VkExtent2D dst_extent);
+    static void copy_image(Command const& cmd, Image const& src, Image const& dst);
 
     // INFO: 
     // this is depth image memory barrier, depend on this link
@@ -114,6 +115,11 @@ namespace tk { namespace graphics_engine {
     // it's difficult for me now, so I just use multi depth images
     void depth_image_barrier_begin(VkCommandBuffer cmd);
     void depth_image_barrier_end(VkCommandBuffer cmd);
+
+    //
+    // SMAA
+    //
+    void load_precalculated_textures();
 
   private:
     //
@@ -136,12 +142,6 @@ namespace tk { namespace graphics_engine {
     //
     VkSwapchainKHR               _swapchain                = VK_NULL_HANDLE;
     std::vector<Image>           _swapchain_images;
-
-    // INFO: because some device unsupport dynamic msaa feature in pipeline
-    //       so we just fixed use 4bit msaa
-    static constexpr VkSampleCountFlagBits _msaa_sample_count = VK_SAMPLE_COUNT_4_BIT;
-    Image                        _msaa_image;
-    // Image                        _msaa_depth_image;
 
     VkPipeline                   _2D_pipeline              = VK_NULL_HANDLE;
     VkPipelineLayout             _2D_pipeline_layout       = VK_NULL_HANDLE;
@@ -176,6 +176,25 @@ namespace tk { namespace graphics_engine {
     // allocate a big buffer.
     // should I recreate a bigger buffer when current buffer unenough?
     Buffer                       _buffer;
+
+
+    //
+    // MSAA + SMAA
+    //
+
+    // INFO: because some device unsupport dynamic msaa feature in pipeline
+    //       so we just fixed use 4bit msaa
+    static constexpr VkSampleCountFlagBits _msaa_sample_count = VK_SAMPLE_COUNT_4_BIT;
+    Image                        _msaa_image;
+    // Image                        _msaa_depth_image;
+    Image                        _resolved_image;
+
+    // SMAA
+    Image     _edges_image;
+    Image     _blend_image;
+    Image     _area_texture;
+    Image     _search_texture;
+    VkSampler _smaa_sampler;
   };
 
 } }

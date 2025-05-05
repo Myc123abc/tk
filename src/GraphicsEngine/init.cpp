@@ -4,6 +4,9 @@
 #include "tk/GraphicsEngine/PipelineBuilder.hpp"
 #include "tk/GraphicsEngine/Shader.hpp"
 
+#include <SMAA/AreaTex.h>
+#include <SMAA/SearchTex.h>
+
 #include <ranges>
 #include <set>
 #include <print>
@@ -35,6 +38,7 @@ void GraphicsEngine::init(Window& window)
   create_descriptor_pool();
   create_descriptor_sets();
   create_buffer();
+  load_precalculated_textures();
 
   _window->show();
 }
@@ -242,9 +246,12 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
   create_swapchain();
 
   //
-  // dynamic rendering use image
+  // MSAA + SMAA
   //
-  _msaa_image = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, _msaa_sample_count);
+  _msaa_image     = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, _msaa_sample_count);
+  _resolved_image = _mem_alloc.create_image(_msaa_image.format, _msaa_image.extent, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+  _edges_image    = _mem_alloc.create_image(VK_FORMAT_R8G8_UNORM, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+  _blend_image    = _mem_alloc.create_image(VK_FORMAT_R8G8_UNORM, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
 
   // create msaa depth image and depth image
   // _msaa_depth_image.format = Depth_Format;
@@ -302,6 +309,9 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
     // }
     // vkDestroyImageView(_device, _msaa_depth_image.view, nullptr);
     // vmaDestroyImage(_mem_alloc.get(), _msaa_depth_image.image, _msaa_depth_image.allocation);
+    _mem_alloc.destroy_image(_blend_image);
+    _mem_alloc.destroy_image(_edges_image);
+    _mem_alloc.destroy_image(_resolved_image);
     _mem_alloc.destroy_image(_msaa_image);
     vkDestroySwapchainKHR(_device, _swapchain, nullptr);
     for (auto const& image : _swapchain_images)
@@ -573,11 +583,22 @@ void GraphicsEngine::create_frame_resources()
 void GraphicsEngine::resize_swapchain()
 {
   vkDeviceWaitIdle(_device);
+  
   auto old_swapchain = _swapchain;
+
   create_swapchain(old_swapchain);
+
   vkDestroySwapchainKHR(_device, old_swapchain, nullptr);
+
   _mem_alloc.destroy_image(_msaa_image);
-  _msaa_image = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, _msaa_sample_count);
+  _mem_alloc.destroy_image(_resolved_image);
+  _mem_alloc.destroy_image(_blend_image);
+  _mem_alloc.destroy_image(_edges_image);
+
+  _msaa_image     = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, _msaa_sample_count);
+  _resolved_image = _mem_alloc.create_image(_msaa_image.format, _msaa_image.extent, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+  _edges_image    = _mem_alloc.create_image(VK_FORMAT_R8G8_UNORM, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+  _blend_image    = _mem_alloc.create_image(VK_FORMAT_R8G8_UNORM, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
 }
 
 //void GraphicsEngine::use_single_time_command_init_something()
@@ -606,6 +627,104 @@ void GraphicsEngine::create_buffer()
                                                       VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                                                       VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
   _destructors.push([this] { _mem_alloc.destroy_buffer(_buffer); });
+}
+
+// TODO: abstract load array data to image as a method function of Image
+void GraphicsEngine::load_precalculated_textures()
+{
+  // area texture and search texture (for SMAA)
+  _area_texture   = _mem_alloc.create_image(VK_FORMAT_R8G8_UNORM, { AREATEX_WIDTH, AREATEX_HEIGHT, 1 }, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+  _search_texture = _mem_alloc.create_image(VK_FORMAT_R8_UNORM, { SEARCHTEX_WIDTH, SEARCHTEX_HEIGHT, 1 }, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+  
+  // upload buffer
+  auto buf = _mem_alloc.create_buffer(AREATEX_SIZE + SEARCHTEX_SIZE, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+  
+  // copy texture data
+  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), areaTexBytes, buf.allocation, 0, AREATEX_SIZE) != VK_SUCCESS,
+           "failed to copy area texture data to buffer");
+  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), searchTexBytes, buf.allocation, AREATEX_SIZE, SEARCHTEX_SIZE) != VK_SUCCESS,
+           "failed to copy search texture data to buffer");
+  
+  // upload data to textures
+  auto cmd = _command_pool.create_command().begin();
+
+  transition_image_layout(cmd, _area_texture.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  transition_image_layout(cmd, _search_texture.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+  VkBufferImageCopy2 region
+  {
+    .sType            = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
+    .bufferOffset     = 0,
+    .imageSubresource =
+    {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .layerCount = 1,
+    },
+    .imageExtent = 
+    {
+      .width  = AREATEX_WIDTH,
+      .height = AREATEX_HEIGHT,
+      .depth  = 1,
+    },
+  };
+
+  VkCopyBufferToImageInfo2 info
+  {
+    .sType          = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2,
+    .srcBuffer      = buf.handle,
+    .dstImage       = _area_texture.handle,
+    .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    .regionCount    = 1,
+    .pRegions       = &region,
+  };
+
+  vkCmdCopyBufferToImage2(cmd, &info);
+
+  region =
+  {
+    .sType            = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
+    .bufferOffset     = AREATEX_SIZE,
+    .imageSubresource =
+    {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .layerCount = 1,
+    },
+    .imageExtent = 
+    {
+      .width  = SEARCHTEX_WIDTH,
+      .height = SEARCHTEX_HEIGHT,
+      .depth  = 1,
+    },
+  };
+  info.dstImage = _search_texture.handle;
+  vkCmdCopyBufferToImage2(cmd, &info);
+
+  cmd.end().submit_wait_free(_command_pool, _graphics_queue);
+
+  // destroy upload buffer
+  _mem_alloc.destroy_buffer(buf);
+
+  // sampler
+  VkSamplerCreateInfo sampler_info
+  {
+    .sType        = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+    .magFilter    = VK_FILTER_LINEAR,
+    .minFilter    = VK_FILTER_LINEAR,
+    .mipmapMode   = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+    .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+    .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+    .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+  };
+  throw_if(vkCreateSampler(_device, &sampler_info, nullptr, &_smaa_sampler) != VK_SUCCESS,
+           "failed to create smaa sampler");
+
+  // record destructors
+  _destructors.push([this]
+  {
+    vkDestroySampler(_device, _smaa_sampler, nullptr);
+    _mem_alloc.destroy_image(_area_texture);
+    _mem_alloc.destroy_image(_search_texture);
+  });
 }
 
 } }

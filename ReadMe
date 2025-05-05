@@ -1,4 +1,4 @@
 A game engine for make galgame, currently I need to learn many things.
 Some techniques reference as follow:
-* 2D shape draw way -- imgui
-* anti aliasing -- 4xMSAA + SMAA
+* 2D shape draw way -- imgui, link: https://github.com/ocornut/imgui
+* anti aliasing -- 4xMSAA + SMAA, link: https://github.com/turol/smaaDemo

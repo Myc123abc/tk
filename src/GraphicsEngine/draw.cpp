@@ -60,10 +60,12 @@ void GraphicsEngine::render_begin()
 
   // transition image layout to writeable
   transition_image_layout(frame.cmd, _msaa_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  // transition_image_layout(frame.cmd, _image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  // transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   // transition_image_layout(frame.cmd, _msaa_depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
   // transition_image_layout(frame.cmd, frame.depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+
+  // TODO: clear edges and blend images
 
   //
   // dynamic rendering
@@ -74,7 +76,7 @@ void GraphicsEngine::render_begin()
     .imageView          = _msaa_image.view,
     .imageLayout        = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
     .resolveMode        = VK_RESOLVE_MODE_AVERAGE_BIT,
-    .resolveImageView   = _swapchain_images[image_index].view,
+    .resolveImageView   = _resolved_image.view,
     .resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
     .loadOp             = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
     .storeOp            = VK_ATTACHMENT_STORE_OP_DONT_CARE,
@@ -133,14 +135,16 @@ void GraphicsEngine::render_end()
 
   vkCmdEndRendering(frame.cmd);
 
-  // // copy resolved image to swapchain image
-  // transition_image_layout(frame.cmd, _image.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-  // transition_image_layout(frame.cmd, _swapchain_images[image_index], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  VkExtent2D extent = { _swapchain_images[image_index].extent.width, _swapchain_images[image_index].extent.height };
 
-  // copy_image(frame.cmd, _image.image, _swapchain_images[image_index], _draw_extent, _swapchain_image_extent);
+  // copy resolved image to swapchain image
+  transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+  copy_image(frame.cmd, _resolved_image, _swapchain_images[image_index]);
 
   // transition image layout to presentable
-  transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+  transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
   // depth_image_barrier_end(frame.cmd);
 

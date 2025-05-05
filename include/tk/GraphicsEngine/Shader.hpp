@@ -18,11 +18,11 @@ namespace tk { namespace graphics_engine {
     glm::vec2       display_pos;
   };
   
-  struct Vertex
+  struct alignas(8) Vertex
   {
-    alignas(8) glm::vec2 pos;
-    alignas(8) glm::vec2 uv;
-    alignas(8) uint32_t  col; // 0xRRGGBBAA
+    glm::vec2 pos;
+    glm::vec2 uv;
+    uint32_t  col; // 0xRRGGBBAA
   };
 
 }}

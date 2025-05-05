@@ -47,7 +47,7 @@ namespace tk { namespace graphics_engine {
     auto create_buffer(uint32_t size, VkBufferUsageFlags usages, VmaAllocationCreateFlags flags = 0) -> Buffer;
     void destroy_buffer(Buffer& buffer);
 
-    auto create_image(VkFormat format, VkExtent3D extent, VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_1_BIT) -> Image;
+    auto create_image(VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_1_BIT) -> Image;
     void destroy_image(Image& image);
 
     // auto create_mesh_buffer(class Command& command, std::vector<class Mesh>& meshs, DestructorStack& destructor, std::vector<MeshInfo>& mesh_infos) -> MeshBuffer;
