@@ -11,9 +11,6 @@
 // 4. currently, not see mouse handling, just graphics handling
 // 5. not handle font now
 //
-// TODO: today
-// 1. the way to copy date t buffer and test a simple quard
-//
 // INFO:
 // use MSAA and FXAA for AA
 // about 2D pipeline, not use depth test, and vertex only store vec2 pos, uv, col
@@ -78,6 +75,9 @@ namespace tk { namespace graphics_engine {
     void render_end();
 
     void update(std::span<Vertex> vertices, std::span<uint16_t> indices);
+
+  private:
+    void post_process();
 
   private:
     //
@@ -189,12 +189,18 @@ namespace tk { namespace graphics_engine {
     // Image                        _msaa_depth_image;
     Image                        _resolved_image;
 
+    //
     // SMAA
+    //
     Image     _edges_image;
     Image     _blend_image;
     Image     _area_texture;
     Image     _search_texture;
     VkSampler _smaa_sampler;
+
+    // edge detection, 
+    VkPipeline       _smaa_pipelines[3];
+    VkPipelineLayout _smaa_pipeline_layouts[3];
   };
 
 } }

@@ -135,10 +135,14 @@ void GraphicsEngine::render_end()
 
   vkCmdEndRendering(frame.cmd);
 
+  post_process();
+
   VkExtent2D extent = { _swapchain_images[image_index].extent.width, _swapchain_images[image_index].extent.height };
 
+  // TODO: need resolved_image? directly use smaa to swapchain image is ok so...
+
   // copy resolved image to swapchain image
-  transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
   copy_image(frame.cmd, _resolved_image, _swapchain_images[image_index]);
@@ -238,6 +242,61 @@ void GraphicsEngine::update(std::span<Vertex> vertices, std::span<uint16_t> indi
            "failed to copy indices data to buffer");
            
   vkCmdBindIndexBuffer(_frames[_current_frame].cmd, _buffer.handle, vertices_size, VK_INDEX_TYPE_UINT16);
+}
+
+void GraphicsEngine::post_process()
+{
+  auto frame = get_current_frame();
+
+  // TODO: should clear last edge image?
+  transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+  // SMAA edge detection
+  VkRenderingAttachmentInfo color_attachment
+  {
+    .sType              = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+    .imageView          = _edges_image.view,
+    .imageLayout        = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    .loadOp             = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+    // TODO: maybe need to set store
+    .storeOp            = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+  };
+
+  VkExtent2D extent = { _swapchain_images[image_index].extent.width, _swapchain_images[image_index].extent.height };
+
+  VkRenderingInfo rendering
+  {
+    .sType                = VK_STRUCTURE_TYPE_RENDERING_INFO,
+    .renderArea           =
+    {
+      .extent = extent,
+    },
+    .layerCount           = 1,
+    .colorAttachmentCount = 1,
+    .pColorAttachments    = &color_attachment,
+  };
+  vkCmdBeginRendering(frame.cmd, &rendering);
+
+  vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _smaa_pipelines[0]);
+
+  // TODO: currently, only use main window, so multi-window case should need window_extent parameter
+  uint32_t width, height;
+  _window->get_framebuffer_size(width, height);
+
+  PushConstant_SMAA pc
+  {
+    .smaa_rt_metrics = glm::vec4(1.f / width, 1.f / height, width, height),
+  };
+  vkCmdPushConstants(frame.cmd, _smaa_pipeline_layouts[0], VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+
+  // TODO: try use VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT? descriptor buffer extensions?
+  // can use this extension not need to update every recreate?
+  vkCmdBindDescriptorSets(frame.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _smaa_pipeline_layouts[0], 0, 1, &_descriptor_set, 0, nullptr);
+
+  vkCmdDraw(frame.cmd, 3, 1, 0, 0);
+
+  vkCmdEndRendering(frame.cmd);
 }
     
 } }

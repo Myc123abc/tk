@@ -35,10 +35,10 @@ void GraphicsEngine::init(Window& window)
   create_swapchain_and_rendering_image();
   create_descriptor_set_layout();
   create_graphics_pipeline();
-  create_descriptor_pool();
-  create_descriptor_sets();
   create_buffer();
   load_precalculated_textures();
+  create_descriptor_pool();
+  create_descriptor_sets();
 
   _window->show();
 }
@@ -249,7 +249,7 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
   // MSAA + SMAA
   //
   _msaa_image     = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, _msaa_sample_count);
-  _resolved_image = _mem_alloc.create_image(_msaa_image.format, _msaa_image.extent, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+  _resolved_image = _mem_alloc.create_image(_msaa_image.format, _msaa_image.extent, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
   _edges_image    = _mem_alloc.create_image(VK_FORMAT_R8G8_UNORM, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
   _blend_image    = _mem_alloc.create_image(VK_FORMAT_R8G8_UNORM, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
 
@@ -423,25 +423,25 @@ void GraphicsEngine::create_swapchain(VkSwapchainKHR old_swapchain)
 
 void GraphicsEngine::create_descriptor_set_layout()
 {
-  // std::vector<VkDescriptorSetLayoutBinding> layouts
-  // {
-  //   {
-  //     .binding         = 0,
-  //     .descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-  //     .descriptorCount = 1,
-  //     .stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT,
-  //   },
-  // };
-  // VkDescriptorSetLayoutCreateInfo info
-  // {
-  //   .sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-  //   .bindingCount = (uint32_t)layouts.size(),
-  //   .pBindings    = layouts.data(),
-  // };
-  // throw_if(vkCreateDescriptorSetLayout(_device, &info, nullptr, &_descriptor_set_layout) != VK_SUCCESS,
-  //          "failed to create descriptor set layout");
-  //
-  // _destructors.push([this] { vkDestroyDescriptorSetLayout(_device, _descriptor_set_layout, nullptr); });
+  std::vector<VkDescriptorSetLayoutBinding> layouts
+  {
+    {
+      .binding         = 0,
+      .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+      .descriptorCount = 1,
+      .stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT,
+    },
+  };
+  VkDescriptorSetLayoutCreateInfo info
+  {
+    .sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+    .bindingCount = (uint32_t)layouts.size(),
+    .pBindings    = layouts.data(),
+  };
+  throw_if(vkCreateDescriptorSetLayout(_device, &info, nullptr, &_descriptor_set_layout) != VK_SUCCESS,
+           "failed to create descriptor set layout");
+  
+  _destructors.push([this] { vkDestroyDescriptorSetLayout(_device, _descriptor_set_layout, nullptr); });
 }
 
 void GraphicsEngine::create_graphics_pipeline()
@@ -461,10 +461,19 @@ void GraphicsEngine::create_graphics_pipeline()
   throw_if(vkCreatePipelineLayout(_device, &layout_info, nullptr, &_2D_pipeline_layout) != VK_SUCCESS,
            "failed to create graphics pipeline layout");
 
+  push_constant_range.stageFlags |= VK_SHADER_STAGE_FRAGMENT_BIT;
+  push_constant_range.size = sizeof(PushConstant_SMAA);
+  layout_info.setLayoutCount = 1;
+  layout_info.pSetLayouts = &_descriptor_set_layout;
+  throw_if(vkCreatePipelineLayout(_device, &layout_info, nullptr, &_smaa_pipeline_layouts[0]) != VK_SUCCESS,
+           "failed to create smaa edge detection pipeline layout");
+
+  auto builder = PipelineBuilder();
+
   // create pipeline
   auto shader_vertex2D   = Shader(_device, "shader/2D_vert.spv");
   auto shader_fragment2D = Shader(_device, "shader/2D_frag.spv");
-  _2D_pipeline = PipelineBuilder()
+  _2D_pipeline = builder
                  .clear()
                  .set_shaders(shader_vertex2D.shader, shader_fragment2D.shader)
                  // TODO: imgui use counter clockwise
@@ -475,9 +484,22 @@ void GraphicsEngine::create_graphics_pipeline()
                  .set_msaa(_msaa_sample_count)
                  .build(_device, _2D_pipeline_layout);
 
+  // smaa pipelines
+  auto edge_detection_vert = Shader(_device, "shader/SMAA_edge_detection_vert.spv");
+  auto edge_detection_frag = Shader(_device, "shader/SMAA_edge_detection_frag.spv");
+  _smaa_pipelines[0] =  builder
+                        .clear()
+                        .set_shaders(edge_detection_vert.shader, edge_detection_frag.shader)
+                        .set_cull_mode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE)
+                        .set_color_attachment_format(_edges_image.format)
+                        .set_msaa(VK_SAMPLE_COUNT_1_BIT)
+                        .build(_device, _smaa_pipeline_layouts[0]);
+
   // set destructors
   _destructors.push([this]
   { 
+    vkDestroyPipeline(_device, _smaa_pipelines[0], nullptr);
+    vkDestroyPipelineLayout(_device, _smaa_pipeline_layouts[0], nullptr);
     vkDestroyPipeline(_device, _2D_pipeline, nullptr);
     vkDestroyPipelineLayout(_device, _2D_pipeline_layout, nullptr);
   });
@@ -493,55 +515,56 @@ void GraphicsEngine::init_command_pool()
 
 void GraphicsEngine::create_descriptor_pool()
 {
-  // std::vector<VkDescriptorPoolSize> sizes
-  // {
-  //   {
-  //     .type            = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-  //     .descriptorCount = 1,
-  //   },
-  // };
-  // VkDescriptorPoolCreateInfo info
-  // {
-  //   .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-  //   .maxSets       = 1,
-  //   .poolSizeCount = (uint32_t)sizes.size(),
-  //   .pPoolSizes    = sizes.data(),
-  // };
-  // throw_if(vkCreateDescriptorPool(_device, &info, nullptr, &_descriptor_pool) != VK_SUCCESS,
-  //          "failed to create descriptor pool");
-  // 
-  // _destructors.push([this] { vkDestroyDescriptorPool(_device, _descriptor_pool, nullptr); });
+  std::vector<VkDescriptorPoolSize> sizes
+  {
+    {
+      .type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+      .descriptorCount = 1,
+    },
+  };
+  VkDescriptorPoolCreateInfo info
+  {
+    .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+    .maxSets       = 1,
+    .poolSizeCount = (uint32_t)sizes.size(),
+    .pPoolSizes    = sizes.data(),
+  };
+  throw_if(vkCreateDescriptorPool(_device, &info, nullptr, &_descriptor_pool) != VK_SUCCESS,
+           "failed to create descriptor pool");
+  
+  _destructors.push([this] { vkDestroyDescriptorPool(_device, _descriptor_pool, nullptr); });
 }
 
 void GraphicsEngine::create_descriptor_sets()
 {
-  // VkDescriptorSetAllocateInfo info
-  // {
-  //   .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-  //   .descriptorPool     = _descriptor_pool,
-  //   .descriptorSetCount = 1,
-  //   .pSetLayouts        = &_descriptor_set_layout,
-  // };
-  // throw_if(vkAllocateDescriptorSets(_device, &info, &_descriptor_set) != VK_SUCCESS,
-  //          "failed to create descriptor set");
-  //
-  // VkDescriptorImageInfo img_info
-  // {
-  //   .imageView   = _image.view,
-  //   .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
-  // };
-  //
-  // VkWriteDescriptorSet write
-  // {
-  //   .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-  //   .dstSet          = _descriptor_set,
-  //   .dstBinding      = 0,
-  //   .descriptorCount = 1,
-  //   .descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-  //   .pImageInfo     = &img_info,
-  // };
-  //
-  // vkUpdateDescriptorSets(_device, 1, &write, 0, nullptr);
+  VkDescriptorSetAllocateInfo info
+  {
+    .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+    .descriptorPool     = _descriptor_pool,
+    .descriptorSetCount = 1,
+    .pSetLayouts        = &_descriptor_set_layout,
+  };
+  throw_if(vkAllocateDescriptorSets(_device, &info, &_descriptor_set) != VK_SUCCESS,
+           "failed to create descriptor set");
+
+  VkDescriptorImageInfo img_info
+  {
+    .sampler     = _smaa_sampler,
+    .imageView   = _resolved_image.view,
+    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+  };
+
+  VkWriteDescriptorSet write
+  {
+    .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+    .dstSet          = _descriptor_set,
+    .dstBinding      = 0,
+    .descriptorCount = 1,
+    .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+    .pImageInfo      = &img_info,
+  };
+
+  vkUpdateDescriptorSets(_device, 1, &write, 0, nullptr);
 }
 
 void GraphicsEngine::create_frame_resources()
@@ -596,9 +619,28 @@ void GraphicsEngine::resize_swapchain()
   _mem_alloc.destroy_image(_edges_image);
 
   _msaa_image     = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, _msaa_sample_count);
-  _resolved_image = _mem_alloc.create_image(_msaa_image.format, _msaa_image.extent, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+  _resolved_image = _mem_alloc.create_image(_msaa_image.format, _msaa_image.extent, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
   _edges_image    = _mem_alloc.create_image(VK_FORMAT_R8G8_UNORM, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
   _blend_image    = _mem_alloc.create_image(VK_FORMAT_R8G8_UNORM, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+
+  VkDescriptorImageInfo img_info
+  {
+    .sampler     = _smaa_sampler,
+    .imageView   = _resolved_image.view,
+    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+  };
+
+  VkWriteDescriptorSet write
+  {
+    .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+    .dstSet          = _descriptor_set,
+    .dstBinding      = 0,
+    .descriptorCount = 1,
+    .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+    .pImageInfo      = &img_info,
+  };
+
+  vkUpdateDescriptorSets(_device, 1, &write, 0, nullptr);
 }
 
 //void GraphicsEngine::use_single_time_command_init_something()

@@ -1,24 +1,19 @@
 // SMAA Edge Detection Shaders (First Pass)
 
-layout(push_constant) uniform Push {
-	vec4 SourceSize;
+layout(push_constant) uniform PushConstant
+{
 	vec4 OriginalSize;
 	vec4 OutputSize;
+	vec4 smaa_rt_metrics;
 	uint FrameCount;
-	float SMAA_EDT;
+	float SMAA_EDT; // edge detection type
 	float SMAA_THRESHOLD;
 	float SMAA_MAX_SEARCH_STEPS;
 	float SMAA_MAX_SEARCH_STEPS_DIAG;
 	float SMAA_LOCAL_CONTRAST_ADAPTATION_FACTOR;
-}
-params;
+} pc;
 
-layout(std140, set = 0, binding = 0) uniform UBO {
-	mat4 MVP;
-}
-global;
-
-#define SMAA_RT_METRICS vec4(params.SourceSize.z, params.SourceSize.w, params.SourceSize.x, params.SourceSize.y)
+#define SMAA_RT_METRICS pc.smaa_rt_metrics
 #define SMAA_GLSL_4
 
 float THRESHOLD = 0.05; // #pragma parameter SMAA_THRESHOLD "SMAA Threshold" 0.05 0.01 0.5 0.01

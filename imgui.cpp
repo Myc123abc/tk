@@ -109,6 +109,7 @@ public:
   inline constexpr auto normalize(glm::vec2& point)
   {
     if (auto d2 = point.x * point.x + point.y * point.y > 0.f)
+    // TODO: sqrt expensive
       point /= std::sqrt(d2);
   }
 
