@@ -30,15 +30,8 @@ namespace tk { namespace graphics_engine {
   // 
   struct PushConstant_SMAA
   {
-    glm::vec4 OriginalSize;
-    glm::vec4 OutputSize;
+    // TODO: maybe i can only transform vec2 and calculate tr_metrics in shader
     glm::vec4 smaa_rt_metrics;
-    uint32_t  FrameCount;
-    float     SMAA_EDT; // edge detection type
-    float     SMAA_THRESHOLD;
-    float     SMAA_MAX_SEARCH_STEPS;
-    float     SMAA_MAX_SEARCH_STEPS_DIAG;
-    float     SMAA_LOCAL_CONTRAST_ADAPTATION_FACTOR;
   };
 
 }}

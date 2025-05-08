@@ -3,7 +3,8 @@
 #include "SMAA.h"
 
 layout(location = 0) out vec2 tex_coord;
-layout(location = 1) out vec4 offset[3];
+layout(location = 1) out vec2 pix_coord;
+layout(location = 2) out vec4 offset[3];
 
 #define SMAA_INCLUDE_PS 0
 #include "SMAA.hlsl"
@@ -31,5 +32,5 @@ void main()
 
 	tex_coord = tex_coords[gl_VertexIndex];
 
-	SMAAEdgeDetectionVS(tex_coord, offset);
+	SMAABlendingWeightCalculationVS(tex_coord, pix_coord, offset);
 }

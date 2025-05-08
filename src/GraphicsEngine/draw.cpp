@@ -248,11 +248,13 @@ void GraphicsEngine::post_process()
 {
   auto frame = get_current_frame();
 
+  //
+  // SMAA edge detection
+  //
   // TODO: should clear last edge image?
   transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-  // SMAA edge detection
   VkRenderingAttachmentInfo color_attachment
   {
     .sType              = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
@@ -296,6 +298,24 @@ void GraphicsEngine::post_process()
 
   vkCmdDraw(frame.cmd, 3, 1, 0, 0);
 
+  vkCmdEndRendering(frame.cmd);
+
+
+  // 
+  // SMAA blend weight
+  //
+  // TODO: should clear last edge image?
+  transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  transition_image_layout(frame.cmd, _area_texture.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  transition_image_layout(frame.cmd, _search_texture.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  color_attachment.imageView = _blend_image.view,
+  vkCmdBeginRendering(frame.cmd, &rendering);
+  vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _smaa_pipelines[1]);
+  // TODO: can repeat last pc?
+  //vkCmdPushConstants(frame.cmd, _smaa_pipeline_layouts[0], VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+  //vkCmdBindDescriptorSets(frame.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _smaa_pipeline_layouts[0], 0, 1, &_descriptor_set, 0, nullptr);
+  vkCmdDraw(frame.cmd, 3, 1, 0, 0);
   vkCmdEndRendering(frame.cmd);
 }
     

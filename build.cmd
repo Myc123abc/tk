@@ -12,3 +12,8 @@ glslc -fshader-stage=vertex   shader/SMAA_edge_detection.vert -o shader/SMAA_edg
 glslc -fshader-stage=fragment shader/SMAA_edge_detection.frag -o shader/SMAA_edge_detection_frag.spv
 copy .\shader\SMAA_edge_detection_vert.spv .\build\example\shader\SMAA_edge_detection_vert.spv
 copy .\shader\SMAA_edge_detection_frag.spv .\build\example\shader\SMAA_edge_detection_frag.spv
+
+glslc -fshader-stage=vertex   shader/SMAA_blend_weight.vert -o shader/SMAA_blend_weight_vert.spv
+glslc -fshader-stage=fragment shader/SMAA_blend_weight.frag -o shader/SMAA_blend_weight_frag.spv
+copy .\shader\SMAA_blend_weight_vert.spv .\build\example\shader\SMAA_blend_weight_vert.spv
+copy .\shader\SMAA_blend_weight_frag.spv .\build\example\shader\SMAA_blend_weight_frag.spv
