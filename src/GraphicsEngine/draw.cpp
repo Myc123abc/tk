@@ -142,10 +142,13 @@ void GraphicsEngine::render_end()
   // TODO: need resolved_image? directly use smaa to swapchain image is ok so...
 
   // copy resolved image to swapchain image
-  transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  // FIXME: can del
+  //transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-  copy_image(frame.cmd, _resolved_image, _swapchain_images[image_index]);
+  //copy_image(frame.cmd, _resolved_image, _swapchain_images[image_index]);
+  copy_image(frame.cmd, _edges_image, _swapchain_images[image_index]);
 
   // transition image layout to presentable
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
@@ -260,9 +263,10 @@ void GraphicsEngine::post_process()
     .sType              = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
     .imageView          = _edges_image.view,
     .imageLayout        = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    .loadOp             = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-    // TODO: maybe need to set store
-    .storeOp            = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+    // TODO: can don't care?
+    .loadOp             = VK_ATTACHMENT_LOAD_OP_CLEAR,
+    .storeOp            = VK_ATTACHMENT_STORE_OP_STORE,
+    .clearValue = {.color = {0, 0, 0, 0}},
   };
 
   VkExtent2D extent = { _swapchain_images[image_index].extent.width, _swapchain_images[image_index].extent.height };
@@ -280,6 +284,19 @@ void GraphicsEngine::post_process()
   };
   vkCmdBeginRendering(frame.cmd, &rendering);
 
+  VkViewport viewport
+  {
+    .width  = (float)extent.width,
+    .height = (float)extent.height, 
+    .maxDepth = 1.f,
+  };
+  vkCmdSetViewport(frame.cmd, 0, 1, &viewport);
+  VkRect2D scissor 
+  {
+    .extent = extent,
+  };
+  vkCmdSetScissor(frame.cmd, 0, 1, &scissor);
+
   vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _smaa_pipelines[0]);
 
   // TODO: currently, only use main window, so multi-window case should need window_extent parameter
@@ -290,16 +307,15 @@ void GraphicsEngine::post_process()
   {
     .smaa_rt_metrics = glm::vec4(1.f / width, 1.f / height, width, height),
   };
-  vkCmdPushConstants(frame.cmd, _smaa_pipeline_layouts[0], VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+  vkCmdPushConstants(frame.cmd, _smaa_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
 
   // TODO: try use VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT? descriptor buffer extensions?
   // can use this extension not need to update every recreate?
-  vkCmdBindDescriptorSets(frame.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _smaa_pipeline_layouts[0], 0, 1, &_descriptor_set, 0, nullptr);
-
+  vkCmdBindDescriptorSets(frame.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _smaa_pipeline_layout, 0, 1, &_descriptor_set, 0, nullptr);
   vkCmdDraw(frame.cmd, 3, 1, 0, 0);
 
   vkCmdEndRendering(frame.cmd);
-
+  return;
 
   // 
   // SMAA blend weight
@@ -311,10 +327,27 @@ void GraphicsEngine::post_process()
   transition_image_layout(frame.cmd, _search_texture.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   color_attachment.imageView = _blend_image.view,
   vkCmdBeginRendering(frame.cmd, &rendering);
+  vkCmdSetViewport(frame.cmd, 0, 1, &viewport);
+  vkCmdSetScissor(frame.cmd, 0, 1, &scissor);
   vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _smaa_pipelines[1]);
   // TODO: can repeat last pc?
-  //vkCmdPushConstants(frame.cmd, _smaa_pipeline_layouts[0], VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
-  //vkCmdBindDescriptorSets(frame.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _smaa_pipeline_layouts[0], 0, 1, &_descriptor_set, 0, nullptr);
+  vkCmdPushConstants(frame.cmd, _smaa_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+  vkCmdBindDescriptorSets(frame.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _smaa_pipeline_layout, 0, 1, &_descriptor_set, 0, nullptr);
+  vkCmdDraw(frame.cmd, 3, 1, 0, 0);
+  vkCmdEndRendering(frame.cmd);
+
+  //
+  // SMAA neighbor
+  //
+  transition_image_layout(frame.cmd, _smaa_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  color_attachment.imageView = _smaa_image.view,
+  vkCmdBeginRendering(frame.cmd, &rendering);
+  vkCmdSetViewport(frame.cmd, 0, 1, &viewport);
+  vkCmdSetScissor(frame.cmd, 0, 1, &scissor);
+  vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _smaa_pipelines[2]);
+  vkCmdPushConstants(frame.cmd, _smaa_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+  vkCmdBindDescriptorSets(frame.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _smaa_pipeline_layout, 0, 1, &_descriptor_set, 0, nullptr);
   vkCmdDraw(frame.cmd, 3, 1, 0, 0);
   vkCmdEndRendering(frame.cmd);
 }

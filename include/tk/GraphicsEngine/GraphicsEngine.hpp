@@ -197,10 +197,14 @@ namespace tk { namespace graphics_engine {
     Image     _area_texture;
     Image     _search_texture;
     VkSampler _smaa_sampler;
+    Image     _smaa_image;
 
-    // edge detection, 
+    // TODO: try engine only single pipeline use dynamic pipeline
     VkPipeline       _smaa_pipelines[3];
-    VkPipelineLayout _smaa_pipeline_layouts[3];
+    VkPipelineLayout _smaa_pipeline_layout;
+
+    // FIXME: tmp
+    void update_smaa_descriptors();
   };
 
 } }

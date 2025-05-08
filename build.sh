@@ -22,3 +22,10 @@ glslc -fshader-stage=vertex   shader/SMAA_blend_weight.vert -o shader/SMAA_blend
 glslc -fshader-stage=fragment shader/SMAA_blend_weight.frag -o shader/SMAA_blend_weight_frag.spv
 cp shader/SMAA_blend_weight_vert.spv build/example/shader/SMAA_blend_weight_vert.spv
 cp shader/SMAA_blend_weight_frag.spv build/example/shader/SMAA_blend_weight_frag.spv
+
+glslc -fshader-stage=vertex   shader/SMAA_neighbor.vert -o shader/SMAA_neighbor_vert.spv
+glslc -fshader-stage=fragment shader/SMAA_neighbor.frag -o shader/SMAA_neighbor_frag.spv
+cp shader/SMAA_neighbor_vert.spv build/example/shader/SMAA_neighbor_vert.spv
+cp shader/SMAA_neighbor_frag.spv build/example/shader/SMAA_neighbor_frag.spv
+
+SMAA_neighbor
