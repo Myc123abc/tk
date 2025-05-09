@@ -24,10 +24,7 @@ vec2 tex_coords[] =
 
 void main()
 {
-	// set vertex position
-  vec2 scale     = 2 / pc.smaa_rt_metrics.zw;
-  vec2 translate = vec2(-1, -1);
-  gl_Position    = vec4((vertices[gl_VertexIndex] * scale + translate), 0, 1);
+  gl_Position = vec4(vertices[gl_VertexIndex], 0, 1);
 
 	tex_coord = tex_coords[gl_VertexIndex];
 

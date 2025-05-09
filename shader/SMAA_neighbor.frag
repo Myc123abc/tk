@@ -16,5 +16,4 @@ layout(binding = 4) uniform sampler2D blend_image;
 void main()
 {
 	color = SMAANeighborhoodBlendingPS(tex_coord, offset, image, blend_image);
-  color = vec4(0,1,0,1);
 }

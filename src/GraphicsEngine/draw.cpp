@@ -73,11 +73,11 @@ void GraphicsEngine::render_begin()
   VkRenderingAttachmentInfo color_attachment
   {
     .sType              = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-    .imageView          = _resolved_image.view,
+    .imageView          = _msaa_image.view,
     .imageLayout        = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    //.resolveMode        = VK_RESOLVE_MODE_AVERAGE_BIT,
-    //.resolveImageView   = _resolved_image.view,
-    //.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    .resolveMode        = VK_RESOLVE_MODE_AVERAGE_BIT,
+    .resolveImageView   = _resolved_image.view,
+    .resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
     .loadOp             = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
     .storeOp            = VK_ATTACHMENT_STORE_OP_STORE,
   };
@@ -143,12 +143,11 @@ void GraphicsEngine::render_end()
 
   // copy resolved image to swapchain image
   // FIXME: can del
-  transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-  //transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  //transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  transition_image_layout(frame.cmd, _smaa_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-  copy_image(frame.cmd, _resolved_image, _swapchain_images[image_index]);
-  //copy_image(frame.cmd, _edges_image, _swapchain_images[image_index]);
+  copy_image(frame.cmd, _smaa_image, _swapchain_images[image_index]);
 
   // transition image layout to presentable
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
@@ -315,7 +314,6 @@ void GraphicsEngine::post_process()
   vkCmdDraw(frame.cmd, 3, 1, 0, 0);
 
   vkCmdEndRendering(frame.cmd);
-  return;
 
   // 
   // SMAA blend weight
