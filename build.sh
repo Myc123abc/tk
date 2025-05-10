@@ -28,4 +28,5 @@ glslc -fshader-stage=fragment shader/SMAA_neighbor.frag -o shader/SMAA_neighbor_
 cp shader/SMAA_neighbor_vert.spv build/example/shader/SMAA_neighbor_vert.spv
 cp shader/SMAA_neighbor_frag.spv build/example/shader/SMAA_neighbor_frag.spv
 
-SMAA_neighbor
+glslc -fshader-stage=compute  shader/SMAA_edge_detection.comp -o shader/SMAA_edge_detection_comp.spv
+copy shader/SMAA_edge_detection_comp.spv build/example/shader/SMAA_edge_detection_comp.spv

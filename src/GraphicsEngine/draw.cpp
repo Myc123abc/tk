@@ -250,6 +250,17 @@ void GraphicsEngine::post_process()
 {
   auto frame = get_current_frame();
 
+  VkRenderingAttachmentInfo color_attachment
+  {
+    .sType              = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+    .imageView          = _edges_image.view,
+    .imageLayout        = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    // TODO: can don't care?
+    .loadOp             = VK_ATTACHMENT_LOAD_OP_CLEAR,
+    .storeOp            = VK_ATTACHMENT_STORE_OP_STORE,
+    .clearValue = {.color = {0, 0, 0, 0}},
+  };
+
 #if 0
   //
   // SMAA edge detection
