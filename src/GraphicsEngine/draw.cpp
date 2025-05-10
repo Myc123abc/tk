@@ -143,11 +143,11 @@ void GraphicsEngine::render_end()
 
   // copy resolved image to swapchain image
   // FIXME: can del
-  transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-  transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  transition_image_layout(frame.cmd, _smaa_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  //transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-  copy_image(frame.cmd, _blend_image.handle, _swapchain_images[image_index].handle, extent, extent);
+  copy_image(frame.cmd, _smaa_image.handle, _swapchain_images[image_index].handle, extent, extent);
 
   // transition image layout to presentable
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
@@ -293,6 +293,15 @@ void GraphicsEngine::post_process()
   transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   transition_image_layout(frame.cmd, _area_texture.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   transition_image_layout(frame.cmd, _search_texture.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  vkCmdDispatch(frame.cmd, std::ceil((extent.width + 15) / 16), std::ceil((extent.height + 15) / 16), 1);
+
+  //
+  // end
+  //
+  vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline[2]);
+  transition_image_layout(frame.cmd, _smaa_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+  //clear(frame.cmd, _blend_image);
+  transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   vkCmdDispatch(frame.cmd, std::ceil((extent.width + 15) / 16), std::ceil((extent.height + 15) / 16), 1);
 #if 0
   //

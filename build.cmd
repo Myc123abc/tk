@@ -10,5 +10,7 @@ copy .\shader\2D_frag.spv .\build\example\shader\2D_frag.spv
 
 glslc -fshader-stage=compute  shader/SMAA_edge_detection.comp -o shader/SMAA_edge_detection_comp.spv
 glslc -fshader-stage=compute  shader/SMAA_blend_weight.comp   -o shader/SMAA_blend_weight_comp.spv
+glslc -fshader-stage=compute  shader/SMAA_neighbor.comp       -o shader/SMAA_neighbor_comp.spv
 copy .\shader\SMAA_edge_detection_comp.spv .\build\example\shader\SMAA_edge_detection_comp.spv
 copy .\shader\SMAA_blend_weight_comp.spv   .\build\example\shader\SMAA_blend_weight_comp.spv
+copy .\shader\SMAA_neighbor_comp.spv       .\build\example\shader\SMAA_neighbor_comp.spv

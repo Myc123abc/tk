@@ -1333,3 +1333,68 @@ void SMAABlendingWeightCalculationCS(int2 coord, SMAAWriteImage2D(blendTex)
         SMAAImageStore(blendTex, coord, weights);
     }
 }
+
+//-----------------------------------------------------------------------------
+// Neighborhood Blending Compute Shader (Third Pass)
+
+
+float4 SMAANeighborhoodBlendingCS(int2 coord, SMAATexture2D(colorTex)
+                                  , SMAATexture2D(blendTex)
+#if SMAA_REPROJECTION
+                                  , SMAATexture2D(velocityTex)
+#endif  // SMAA_REPROJECTION
+                                  ) {
+    float2 texcoord = coord.xy;
+    // account for pixel center
+    texcoord += float2(0.5, 0.5);
+    texcoord *= SMAA_RT_METRICS.xy;
+
+    // Fetch the blending weights for current pixel:
+    float4 a;
+    a.x = SMAALoad_comp(blendTex, coord + int2(1, 0)).a; // Right
+    a.y = SMAALoad_comp(blendTex, coord + int2(0, API_V_DIR(1))).g; // Top
+    a.wz = SMAALoad_comp(blendTex, coord).xz; // Bottom / Left
+
+    // Is there any blending weight with a value greater than 0.0?
+    SMAA_BRANCH
+    if (dot(a, float4(1.0, 1.0, 1.0, 1.0)) < 1e-5) {
+        float4 color = SMAASampleLevelZero(colorTex, texcoord);
+
+#if SMAA_REPROJECTION
+        float2 velocity = SMAA_DECODE_VELOCITY(SMAASampleLevelZero(velocityTex, texcoord));
+
+        // Pack velocity into the alpha channel:
+        color.a = sqrt(5.0 * length(velocity));
+#endif  // SMAA_REPROJECTION
+
+        return color;
+    } else {
+        bool h = max(a.x, a.z) > max(a.y, a.w); // max(horizontal) > max(vertical)
+
+        // Calculate the blending offsets:
+        float4 blendingOffset = float4(0.0, API_V_DIR(a.y), 0.0, API_V_DIR(a.w));
+        float2 blendingWeight = a.yw;
+        SMAAMovc(bool4(h, h, h, h), blendingOffset, float4(a.x, 0.0, a.z, 0.0));
+        SMAAMovc(bool2(h, h), blendingWeight, a.xz);
+        blendingWeight /= dot(blendingWeight, float2(1.0, 1.0));
+
+        // Calculate the texture coordinates:
+        float4 blendingCoord = mad(blendingOffset, float4(SMAA_RT_METRICS.xy, -SMAA_RT_METRICS.xy), texcoord.xyxy);
+
+        // We exploit bilinear filtering to mix current pixel with the chosen
+        // neighbor:
+        float4 color = blendingWeight.x * SMAASampleLevelZero(colorTex, blendingCoord.xy);
+        color += blendingWeight.y * SMAASampleLevelZero(colorTex, blendingCoord.zw);
+
+#if SMAA_REPROJECTION
+        // Antialias velocity for proper reprojection in a later stage:
+        float2 velocity = blendingWeight.x * SMAA_DECODE_VELOCITY(SMAASampleLevelZero(velocityTex, blendingCoord.xy));
+        velocity += blendingWeight.y * SMAA_DECODE_VELOCITY(SMAASampleLevelZero(velocityTex, blendingCoord.zw));
+
+        // Pack velocity into the alpha channel:
+        color.a = sqrt(5.0 * length(velocity));
+#endif  // SMAA_REPROJECTION
+
+        return color;
+    }
+}
