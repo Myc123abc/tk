@@ -34,14 +34,22 @@ void tk_iterate()
     // background
     ui::rectangle({ 0, 0 }, tk::get_main_window_extent(), 0x282C34FF);
 
-    // playback button
-    auto playback_right_point = glm::vec2{ 5 + 12.5 * 1.414, 17.5 };
-    ui::triangle({ 5, 5 }, playback_right_point, { 5, 30 }, 0xFFFFFFFF, 1.f);
+    //// playback button
+    //auto playback_right_point = glm::vec2{ 5 + 12.5 * 1.414, 17.5 };
+    //ui::triangle({ 5, 5 }, playback_right_point, { 5, 30 }, 0xFFFFFFFF, 1.f);
 
-    // playback progress
-    ui::rectangle({ playback_right_point.x + 5, playback_right_point.y }, { 100, 3 }, 0x808080FF );
-    ui::rectangle({ playback_right_point.x + 5, playback_right_point.y }, { progress, 3 }, 0x0000FFFF );
+    //// playback progress
+    //ui::rectangle({ playback_right_point.x + 5, playback_right_point.y }, { 100, 3 }, 0x808080FF );
+    //ui::rectangle({ playback_right_point.x + 5, playback_right_point.y }, { progress, 3 }, 0x0000FFFF );
 
+    ui::path_line_to({ 20, 20 });
+    ui::path_line_to({ 70, 20 });
+    ui::path_line_to({ 150, 70 });
+    ui::path_line_to({ 150, 150 });
+    ui::path_line_to({ 80, 180 });
+    ui::path_line_to({ 20, 50 });
+    ui::path_stroke(0x0000FFFF, 20.f, true);
+    
     ui::end();
   }
 }

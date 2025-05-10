@@ -1,12 +1,6 @@
 #version 460
 
-#include "SMAA_common.h"
-
-#define SMAA_INCLUDE_PS 0
-#define SMAA_INCLUDE_VS 0
-#include "SMAA.hlsl"
-
-layout(local_size_x = 16, local_size_y = 16) in;
+#include "SMAA.h"
 
 layout(binding = 0) uniform SMAATexture2D(resolved_image);
 

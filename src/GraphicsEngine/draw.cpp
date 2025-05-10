@@ -143,11 +143,11 @@ void GraphicsEngine::render_end()
 
   // copy resolved image to swapchain image
   // FIXME: can del
-  //transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-  transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-  copy_image(frame.cmd, _edges_image.handle, _swapchain_images[image_index].handle, extent, extent);
+  copy_image(frame.cmd, _blend_image.handle, _swapchain_images[image_index].handle, extent, extent);
 
   // transition image layout to presentable
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
@@ -268,7 +268,7 @@ void GraphicsEngine::post_process()
   clear(frame.cmd, _edges_image);
   transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   
-  vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline);
+  vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline[0]);
 
   uint32_t width, height;
   _window->get_framebuffer_size(width, height);
@@ -277,12 +277,23 @@ void GraphicsEngine::post_process()
   {
     .smaa_rt_metrics = glm::vec4(1.f / width, 1.f / height, width, height),
   };
-  vkCmdPushConstants(frame.cmd, _smaa_pipeline.get_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
+  vkCmdPushConstants(frame.cmd, _smaa_pipeline[0].get_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
 
-  vkCmdBindDescriptorSets(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline.get_layout(), 0, 1, &_smaa_descriptors, 0, nullptr);
+  // HACK: all pass use same pipeline layout, but pipeline layout will be discard?
+  vkCmdBindDescriptorSets(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline[0].get_layout(), 0, 1, &_smaa_descriptors, 0, nullptr);
 
   vkCmdDispatch(frame.cmd, std::ceil((extent.width + 15) / 16), std::ceil((extent.height + 15) / 16), 1);
 
+  //
+  // blend
+  //
+  vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline[1]);
+  transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+  clear(frame.cmd, _blend_image);
+  transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  transition_image_layout(frame.cmd, _area_texture.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  transition_image_layout(frame.cmd, _search_texture.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  vkCmdDispatch(frame.cmd, std::ceil((extent.width + 15) / 16), std::ceil((extent.height + 15) / 16), 1);
 #if 0
   //
   // SMAA edge detection
