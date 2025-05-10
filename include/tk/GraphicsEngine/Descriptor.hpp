@@ -13,6 +13,7 @@ namespace tk { namespace graphics_engine {
     ~DescriptorLayout() = default;
 
     operator VkDescriptorSetLayout() const noexcept { return _layout; }
+    auto get_address() const { return &_layout; }
 
     void destroy() noexcept;
 

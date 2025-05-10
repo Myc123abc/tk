@@ -144,10 +144,10 @@ void GraphicsEngine::render_end()
   // copy resolved image to swapchain image
   // FIXME: can del
   //transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-  transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-  copy_image(frame.cmd, _resolved_image, _swapchain_images[image_index]);
+  copy_image(frame.cmd, _edges_image.handle, _swapchain_images[image_index].handle, extent, extent);
 
   // transition image layout to presentable
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
@@ -246,20 +246,42 @@ void GraphicsEngine::update(std::span<Vertex> vertices, std::span<uint16_t> indi
   vkCmdBindIndexBuffer(_frames[_current_frame].cmd, _buffer.handle, vertices_size, VK_INDEX_TYPE_UINT16);
 }
 
+void clear(Command const& cmd, Image const& img)
+{
+  VkImageSubresourceRange range
+  {
+    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+    .levelCount = VK_REMAINING_MIP_LEVELS,
+    .layerCount = VK_REMAINING_ARRAY_LAYERS,
+  };
+  VkClearColorValue value{};
+  vkCmdClearColorImage(cmd, img.handle, VK_IMAGE_LAYOUT_GENERAL, &value, 1, &range);
+}
+
 void GraphicsEngine::post_process()
 {
   auto frame = get_current_frame();
 
-  VkRenderingAttachmentInfo color_attachment
+  VkExtent2D extent = { _swapchain_images[image_index].extent.width, _swapchain_images[image_index].extent.height };
+
+  transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+  clear(frame.cmd, _edges_image);
+  transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  
+  vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline);
+
+  uint32_t width, height;
+  _window->get_framebuffer_size(width, height);
+
+  PushConstant_SMAA pc
   {
-    .sType              = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-    .imageView          = _edges_image.view,
-    .imageLayout        = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    // TODO: can don't care?
-    .loadOp             = VK_ATTACHMENT_LOAD_OP_CLEAR,
-    .storeOp            = VK_ATTACHMENT_STORE_OP_STORE,
-    .clearValue = {.color = {0, 0, 0, 0}},
+    .smaa_rt_metrics = glm::vec4(1.f / width, 1.f / height, width, height),
   };
+  vkCmdPushConstants(frame.cmd, _smaa_pipeline.get_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
+
+  vkCmdBindDescriptorSets(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline.get_layout(), 0, 1, &_smaa_descriptors, 0, nullptr);
+
+  vkCmdDispatch(frame.cmd, std::ceil((extent.width + 15) / 16), std::ceil((extent.height + 15) / 16), 1);
 
 #if 0
   //

@@ -25,6 +25,8 @@ namespace tk { namespace graphics_engine {
     Pipeline()  = default;
     ~Pipeline() = default;
 
+    auto get_layout() const noexcept { return _layout; }
+
   private:
 
     friend class Device;

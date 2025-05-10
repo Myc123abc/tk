@@ -207,7 +207,9 @@ namespace tk { namespace graphics_engine {
     VkPipelineLayout _smaa_pipeline_layout;
 
     Pipeline         _smaa_pipeline;
+    // FIXME: discard, use descriptor buffer and descriptor index? we not use these structure
     DescriptorLayout _smaa_descriptor_layout;
+    VkDescriptorSet  _smaa_descriptors = VK_NULL_HANDLE;
 
     // FIXME: tmp
     void update_smaa_descriptors();

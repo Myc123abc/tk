@@ -79,6 +79,8 @@ Pipeline::Pipeline(VkDevice device, std::string_view shader, std::vector<VkDescr
   };
 
   // TODO: use pipeline cache can quickly recreate pipeline which have same states
+  // but now we have VK_EXT_pipeline_library / VK_KHR_pipeline_executable_properties to replace pipelinec ache
+  //
   // TODO: can create multiple pipeline single time
   throw_if(vkCreateComputePipelines(_device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &_pipeline) != VK_SUCCESS,
            "failed to create compute pipeline");
