@@ -808,6 +808,9 @@ void GraphicsEngine::load_precalculated_textures()
   info.dstImage = _search_texture.handle;
   vkCmdCopyBufferToImage2(cmd, &info);
 
+  transition_image_layout(cmd, _area_texture.handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  transition_image_layout(cmd, _search_texture.handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
   cmd.end().submit_wait_free(_command_pool, _graphics_queue);
 
   // destroy upload buffer
@@ -958,25 +961,6 @@ void GraphicsEngine::update_smaa_descriptors()
       .pImageInfo      = &smaa_info[8],
     },
   };
-
-  writes.emplace_back(VkWriteDescriptorSet
-  {
-    .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-    .dstSet          = _smaa_descriptors,
-    .dstBinding      = 0,
-    .descriptorCount = 1,
-    .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-    .pImageInfo      = &smaa_info[0],
-  });
-  writes.emplace_back(VkWriteDescriptorSet
-  {
-    .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-    .dstSet          = _smaa_descriptors,
-    .dstBinding      = 1,
-    .descriptorCount = 1,
-    .descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-    .pImageInfo      = &smaa_info[1],
-  });
 
   vkUpdateDescriptorSets(_device, writes.size(), writes.data(), 0, nullptr);
 }

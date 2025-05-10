@@ -13,6 +13,6 @@ void main(void)
 {
   ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
 
-  if (coord.x < pc.smaa_rt_metrics.z && coord.y < pc.smaa_rt_metrics.w)  
+  if (coord.x < pc.smaa_rt_metrics.z && coord.y < pc.smaa_rt_metrics.w)
     SMAABlendingWeightCalculationCS(coord, blend_texture, edges_texture, area_texture, search_texture, vec4(0.f));
 }
