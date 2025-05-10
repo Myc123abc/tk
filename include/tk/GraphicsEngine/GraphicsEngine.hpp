@@ -24,6 +24,9 @@
 #include "MemoryAllocator.hpp"
 #include "CommandPool.hpp"
 #include "Shader.hpp"
+#include "Pipeline.hpp"
+#include "Device.hpp"
+#include "Descriptor.hpp"
 
 #include <glm/glm.hpp>
 #include <vk_mem_alloc.h>
@@ -131,7 +134,7 @@ namespace tk { namespace graphics_engine {
     VkDebugUtilsMessengerEXT     _debug_messenger          = VK_NULL_HANDLE;
     VkSurfaceKHR                 _surface                  = VK_NULL_HANDLE;
     VkPhysicalDevice             _physical_device          = VK_NULL_HANDLE;
-    VkDevice                     _device                   = VK_NULL_HANDLE;
+    Device                       _device;
     VkQueue                      _graphics_queue           = VK_NULL_HANDLE;
     VkQueue                      _present_queue            = VK_NULL_HANDLE;
 
@@ -202,6 +205,9 @@ namespace tk { namespace graphics_engine {
     // TODO: try engine only single pipeline use dynamic pipeline
     VkPipeline       _smaa_pipelines[3];
     VkPipelineLayout _smaa_pipeline_layout;
+
+    Pipeline         _smaa_pipeline;
+    DescriptorLayout _smaa_descriptor_layout;
 
     // FIXME: tmp
     void update_smaa_descriptors();

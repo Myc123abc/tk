@@ -1,0 +1,21 @@
+#version 460
+
+#include "SMAA_common.h"
+
+#define SMAA_INCLUDE_PS 0
+#define SMAA_INCLUDE_VS 0
+#include "SMAA.hlsl"
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(binding = 0) uniform SMAATexture2D(resolved_image);
+
+layout(binding = 1) uniform writeonly image2D edges_texture;
+
+void main(void)
+{
+  ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+
+  if (coord.x < pc.smaa_rt_metrics.z && coord.y < pc.smaa_rt_metrics.w)
+    SMAAColorEdgeDetectionCS(coord, edges_texture, resolved_image);
+}

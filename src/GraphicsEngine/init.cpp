@@ -1,7 +1,6 @@
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
 #include "init-util.hpp"
 #include "constant.hpp"
-#include "tk/GraphicsEngine/PipelineBuilder.hpp"
 #include "tk/GraphicsEngine/Shader.hpp"
 
 #include <SMAA/AreaTex.h>
@@ -208,10 +207,9 @@ void GraphicsEngine::create_device_and_get_queues()
 #endif
 
   // create logical device
-  throw_if(vkCreateDevice(_physical_device, &create_info, nullptr, &_device) != VK_SUCCESS,
-           "failed to create logical device");
+  _device.init(_physical_device, create_info);
 
-  _destructors.push([this] { vkDestroyDevice(_device, nullptr); });
+  _destructors.push([this] { _device.destroy(); });
 
   //
   // get queues
@@ -488,7 +486,7 @@ void GraphicsEngine::create_graphics_pipeline()
   throw_if(vkCreatePipelineLayout(_device, &layout_info, nullptr, &_2D_pipeline_layout) != VK_SUCCESS,
            "failed to create graphics pipeline layout");
 
-  auto builder = PipelineBuilder();
+  auto builder = Pipeline();
 
   auto shader_vertex2D   = Shader(_device, "shader/2D_vert.spv");
   auto shader_fragment2D = Shader(_device, "shader/2D_frag.spv");
@@ -500,7 +498,7 @@ void GraphicsEngine::create_graphics_pipeline()
                  .set_color_attachment_format(_swapchain_images[0].format)
                  // TODO: imgui not enable depth test
                  //.enable_depth_test(Depth_Format)
-                 .set_msaa(_msaa_sample_count)
+                 .set_msaa(VK_SAMPLE_COUNT_1_BIT)
                  .build(_device, _2D_pipeline_layout);
 
   // smaa pipelines
@@ -543,9 +541,35 @@ void GraphicsEngine::create_graphics_pipeline()
                         .set_msaa(VK_SAMPLE_COUNT_1_BIT)
                         .build(_device, _smaa_pipeline_layout);
 
+  auto smaa_push_constant = VkPushConstantRange
+  {
+    .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+    .size       = sizeof(PushConstant_SMAA),
+  };
+  _smaa_descriptor_layout = _device.create_descriptor_layout(
+  {
+    // resolved image
+    {
+      .binding         = 0,
+      .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+      .descriptorCount = 1,
+      .stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT,
+    },
+    // edges texture
+    {
+      .binding         = 1,
+      .descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+      .descriptorCount = 1,
+      .stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT,
+    },
+  });
+  _smaa_pipeline = _device.create_pipeline(type::pipeline::compute, { "shader/SMAA_edge_detection_comp.spv" }, { _smaa_descriptor_layout }, { smaa_push_constant });
+
   // set destructors
   _destructors.push([this]
   { 
+    _smaa_descriptor_layout.destroy();
+    _smaa_pipeline.destroy();
     vkDestroyPipeline(_device, _smaa_pipelines[2], nullptr);
     vkDestroyPipeline(_device, _smaa_pipelines[1], nullptr);
     vkDestroyPipeline(_device, _smaa_pipelines[0], nullptr);

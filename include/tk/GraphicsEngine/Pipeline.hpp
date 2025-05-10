@@ -15,34 +15,51 @@
 #include <vulkan/vulkan.h>
 
 #include <vector>
+#include <string_view>
 
 namespace tk { namespace graphics_engine { 
-
-  class PipelineBuilder
+  
+  class Pipeline
   {
   public:
-    PipelineBuilder()  = default;
-    ~PipelineBuilder() = default;
+    Pipeline()  = default;
+    ~Pipeline() = default;
 
-    PipelineBuilder(PipelineBuilder const&)            = delete;
-    PipelineBuilder(PipelineBuilder&&)                 = delete;
-    PipelineBuilder& operator=(PipelineBuilder const&) = delete;
-    PipelineBuilder& operator=(PipelineBuilder&&)      = delete;
+  private:
+
+    friend class Device;
+
+    // TODO: single create use type decide compute or graphics
+    Pipeline(VkDevice device, std::string_view shader, std::vector<VkDescriptorSetLayout> const& descritptor_layouts, std::vector<VkPushConstantRange> const& push_constants);
+    Pipeline(VkDevice device, std::string_view vertex_shader, std::string_view fragment_shader, std::vector<VkDescriptorSetLayout> const& descritptor_layouts, std::vector<VkPushConstantRange> const& push_constants);
+
+  private:
+    auto create_shader_module(std::string_view shader) -> VkShaderModule;
+
+    // TODO: all device api should in a class Device
+    VkDevice         _device   = VK_NULL_HANDLE;
+    VkPipelineLayout _layout   = VK_NULL_HANDLE;
+    VkPipeline       _pipeline = VK_NULL_HANDLE;
+
+  public:
+    void destroy() noexcept;
+
+    operator VkPipeline() const { return _pipeline; }
 
     // TODO: when use dynamic rendering, can make return type is a class which can use in rendering process
     auto build(VkDevice device, VkPipelineLayout layout)                           -> VkPipeline;
-    auto clear()                                                                   -> PipelineBuilder&;
+    auto clear()                                                                   -> Pipeline&;
 
-    auto set_msaa(VkSampleCountFlagBits msaa)                                      -> PipelineBuilder&;
-    auto set_color_attachment_format(VkFormat format)                              -> PipelineBuilder&;
+    auto set_msaa(VkSampleCountFlagBits msaa)                                      -> Pipeline&;
+    auto set_color_attachment_format(VkFormat format)                              -> Pipeline&;
     // TODO: expand for compute shader
     //       and default use "main" as enter point of shader
-    auto set_shaders(VkShaderModule vertex_shader, VkShaderModule fragment_shader) -> PipelineBuilder&;
+    auto set_shaders(VkShaderModule vertex_shader, VkShaderModule fragment_shader) -> Pipeline&;
     // HACK: should be discard because of dynamic rendering, see spec
-    auto set_cull_mode(VkCullModeFlags cull_mode, VkFrontFace front_face)          -> PipelineBuilder&;
-    auto enable_depth_test(VkFormat format)                                        -> PipelineBuilder&;
-    auto enable_additive_blending()                                                -> PipelineBuilder&;
-    auto enable_alpha_blending()                                                   -> PipelineBuilder&;
+    auto set_cull_mode(VkCullModeFlags cull_mode, VkFrontFace front_face)          -> Pipeline&;
+    auto enable_depth_test(VkFormat format)                                        -> Pipeline&;
+    auto enable_additive_blending()                                                -> Pipeline&;
+    auto enable_alpha_blending()                                                   -> Pipeline&;
 
   private:
     std::vector<VkPipelineShaderStageCreateInfo> _shader_stages;

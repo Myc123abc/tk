@@ -1121,3 +1121,87 @@
  
  //-----------------------------------------------------------------------------
  #endif // SMAA_INCLUDE_PS
+
+#define SMAAWriteImage2D(tex) writeonly image2D tex
+#define SMAAImageStore(tex, pos, value) imageStore(tex, pos, value)
+
+ /**
+ * Color Edge Detection
+ *
+ * IMPORTANT NOTICE: color edge detection requires gamma-corrected colors, and
+ * thus 'colorTex' should be a non-sRGB texture.
+ */
+void SMAAColorEdgeDetectionCS(int2 coord
+                                , SMAAWriteImage2D(edgesTex)
+                                , SMAATexture2D(colorTex)
+#if SMAA_PREDICATION
+                                , SMAATexture2D(predicationTex)
+#endif  // SMAA_PREDICATION
+                                ) {
+    float2 texcoord = coord.xy;
+    // account for pixel center
+    texcoord += float2(0.5, 0.5);
+    texcoord *= SMAA_RT_METRICS.xy;
+
+    float4 offset[3];
+    offset[0] = mad(SMAA_RT_METRICS.xyxy, float4(-1.0, 0.0, 0.0, API_V_DIR(-1.0)), texcoord.xyxy);
+    offset[1] = mad(SMAA_RT_METRICS.xyxy, float4( 1.0, 0.0, 0.0, API_V_DIR(1.0)), texcoord.xyxy);
+    offset[2] = mad(SMAA_RT_METRICS.xyxy, float4(-2.0, 0.0, 0.0, API_V_DIR(-2.0)), texcoord.xyxy);
+
+    // Calculate the threshold:
+#if SMAA_PREDICATION
+    float2 threshold = SMAACalculatePredicatedThreshold(texcoord, offset[0], predicationTex);
+#else  // SMAA_PREDICATION
+    float2 threshold = float2(SMAA_THRESHOLD, SMAA_THRESHOLD);
+#endif  // SMAA_PREDICATION
+
+    // Calculate color deltas:
+    float4 delta;
+    float3 C = SMAASamplePoint(colorTex, texcoord).rgb;
+
+    float3 Cleft = SMAASamplePoint(colorTex, offset[0].xy).rgb;
+    float3 t = abs(C - Cleft);
+    delta.x = max(max(t.r, t.g), t.b);
+
+    float3 Ctop  = SMAASamplePoint(colorTex, offset[0].zw).rgb;
+    t = abs(C - Ctop);
+    delta.y = max(max(t.r, t.g), t.b);
+
+    // We do the usual threshold:
+    float2 edges = step(threshold, delta.xy);
+
+    // Then discard if there is no edge:
+    if (dot(edges, float2(1.0, 1.0)) == 0.0) {
+        return;
+    }
+
+    // Calculate right and bottom deltas:
+    float3 Cright = SMAASamplePoint(colorTex, offset[1].xy).rgb;
+    t = abs(C - Cright);
+    delta.z = max(max(t.r, t.g), t.b);
+
+    float3 Cbottom  = SMAASamplePoint(colorTex, offset[1].zw).rgb;
+    t = abs(C - Cbottom);
+    delta.w = max(max(t.r, t.g), t.b);
+
+    // Calculate the maximum delta in the direct neighborhood:
+    float2 maxDelta = max(delta.xy, delta.zw);
+
+    // Calculate left-left and top-top deltas:
+    float3 Cleftleft  = SMAASamplePoint(colorTex, offset[2].xy).rgb;
+    t = abs(C - Cleftleft);
+    delta.z = max(max(t.r, t.g), t.b);
+
+    float3 Ctoptop = SMAASamplePoint(colorTex, offset[2].zw).rgb;
+    t = abs(C - Ctoptop);
+    delta.w = max(max(t.r, t.g), t.b);
+
+    // Calculate the final maximum delta:
+    maxDelta = max(maxDelta.xy, delta.zw);
+    float finalDelta = max(maxDelta.x, maxDelta.y);
+
+    // Local contrast adaptation:
+    edges.xy *= step(finalDelta, SMAA_LOCAL_CONTRAST_ADAPTATION_FACTOR * delta.xy);
+
+    SMAAImageStore(edgesTex, coord, float4(edges.xy, 0.0, 0.0));
+}
