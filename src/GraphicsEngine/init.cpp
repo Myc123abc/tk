@@ -1,6 +1,5 @@
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
 #include "init-util.hpp"
-#include "constant.hpp"
 #include "tk/GraphicsEngine/Shader.hpp"
 
 #include <SMAA/AreaTex.h>
@@ -22,22 +21,26 @@ void GraphicsEngine::init(Window& window)
   _window = &window;
 
   create_instance();
+  load_instance_extension_funcs();
 #ifndef NDEBUG
   create_debug_messenger();
 #endif
   create_surface();
   select_physical_device();
   create_device_and_get_queues();
+  load_device_extension_funcs();
   init_memory_allocator();
   init_command_pool();
-  create_frame_resources();
   create_swapchain_and_rendering_image();
   create_descriptor_set_layout();
   create_graphics_pipeline();
   create_buffer();
+  create_frame_resources();
   load_precalculated_textures();
   create_descriptor_pool();
   create_descriptor_sets();
+  
+  test_descriptor_buffer();
 
   _window->show();
 }
@@ -103,10 +106,10 @@ void GraphicsEngine::create_instance()
 void GraphicsEngine::create_debug_messenger()
 {
   auto info = get_debug_messenger_create_info();
-  throw_if(graphics_engine::vkCreateDebugUtilsMessengerEXT(_instance, &info, nullptr, &_debug_messenger) != VK_SUCCESS,
+  throw_if(vkCreateDebugUtilsMessengerEXT(_instance, &info, nullptr, &_debug_messenger) != VK_SUCCESS,
           "failed to create debug utils messenger extension");
 
-  _destructors.push([this] { graphics_engine::vkDestroyDebugUtilsMessengerEXT(_instance, _debug_messenger, nullptr); });
+  _destructors.push([this] { vkDestroyDebugUtilsMessengerEXT(_instance, _debug_messenger, nullptr); });
 }
 
 void GraphicsEngine::create_surface()
@@ -172,10 +175,16 @@ void GraphicsEngine::create_device_and_get_queues()
     });
 
   // features
+  VkPhysicalDeviceDescriptorBufferFeaturesEXT descriptor_buffer_features
+  {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_FEATURES_EXT,
+    .pNext = nullptr,
+    .descriptorBuffer = true,
+  };
   VkPhysicalDeviceVulkan13Features features13
   { 
     .sType               = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
-    .pNext               = nullptr, 
+    .pNext               = &descriptor_buffer_features, 
     .synchronization2    = true,
     .dynamicRendering    = true,
   };
@@ -459,6 +468,7 @@ void GraphicsEngine::create_descriptor_set_layout()
   VkDescriptorSetLayoutCreateInfo info
   {
     .sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+    .flags        = VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT,
     .bindingCount = (uint32_t)layouts.size(),
     .pBindings    = layouts.data(),
   };
@@ -640,8 +650,6 @@ void GraphicsEngine::create_descriptor_sets()
     .descriptorSetCount = 1,
     .pSetLayouts        = &_descriptor_set_layout,
   };
-  throw_if(vkAllocateDescriptorSets(_device, &info, &_descriptor_set) != VK_SUCCESS,
-           "failed to create descriptor set");
   info.pSetLayouts = _smaa_descriptor_layout.get_address();
   throw_if(vkAllocateDescriptorSets(_device, &info, &_smaa_descriptors) != VK_SUCCESS,
          "failed to create descriptor set");
@@ -651,10 +659,10 @@ void GraphicsEngine::create_descriptor_sets()
 
 void GraphicsEngine::create_frame_resources()
 {
-  _frames.resize(Max_Frame_Number);
+  _frames.resize(_swapchain_images.size());
 
   // create command buffers
-  auto cmd_bufs = _command_pool.create_commands(Max_Frame_Number);
+  auto cmd_bufs = _command_pool.create_commands(_swapchain_images.size());
   for (uint32_t i = 0; i < _frames.size(); ++i)
     _frames[i].cmd = std::move(cmd_bufs[i]);
 
@@ -963,6 +971,24 @@ void GraphicsEngine::update_smaa_descriptors()
   };
 
   vkUpdateDescriptorSets(_device, writes.size(), writes.data(), 0, nullptr);
+}
+
+void GraphicsEngine::test_descriptor_buffer()
+{
+  // get descriptor buffer offset
+  VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_info{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_PROPERTIES_EXT };
+  VkPhysicalDeviceProperties2 device_properties
+  {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+    .pNext = &descriptor_buffer_info,
+  };
+  vkGetPhysicalDeviceProperties2(_physical_device, &device_properties);
+  auto descriptor_buffer_offset = descriptor_buffer_info.descriptorBufferOffsetAlignment;
+
+  // get descriptor layout size
+  VkDeviceSize size;
+  vkGetDescriptorSetLayoutSizeEXT(_device, _descriptor_set_layout, &size);
+  size = align_size(size, descriptor_buffer_offset);
 }
 
 } }

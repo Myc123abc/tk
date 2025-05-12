@@ -1,6 +1,5 @@
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
 #include "tk/ErrorHandling.hpp"
-#include "constant.hpp"
 
 #include <SDL3/SDL_events.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -147,7 +146,7 @@ void GraphicsEngine::render_end()
   transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-  copy_image(frame.cmd, _blend_image.handle, _swapchain_images[image_index].handle, extent, extent);
+  copy_image(frame.cmd, _smaa_image.handle, _swapchain_images[image_index].handle, extent, extent);
 
   // transition image layout to presentable
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
@@ -208,7 +207,7 @@ void GraphicsEngine::render_end()
     throw_if(true, "failed to present swapchain image");
 
   // update frame index
-  _current_frame = ++_current_frame % Max_Frame_Number;
+  _current_frame = ++_current_frame % _swapchain_images.size();
 }
 
 /*

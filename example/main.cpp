@@ -48,7 +48,7 @@ void tk_iterate()
     ui::path_line_to({ 150, 150 });
     ui::path_line_to({ 80, 180 });
     ui::path_line_to({ 20, 50 });
-    ui::path_stroke(0x0000FFFF, 20.f, true);
+    ui::path_stroke(0xFFFFFFFF, 20.f, true);
     
     ui::end();
   }

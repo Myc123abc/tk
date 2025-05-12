@@ -56,7 +56,6 @@ file(GLOB_RECURSE SOURCE src/*.cpp)
 
 if(WIN32)
   set(LIBS
-    vulkan-1
     SDL3::SDL3-static
     GPUOpen::VulkanMemoryAllocator
     spdlog::spdlog
@@ -76,10 +75,6 @@ elseif(UNIX)
 endif()
 
 add_library(tk STATIC ${SOURCE})
-
-if(WIN32)
-target_link_directories(tk PUBLIC "C:\\VulkanSDK\\1.4.309.0\\Lib")
-endif()
 
 target_include_directories(tk PUBLIC ${INCLUDE})
 

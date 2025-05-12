@@ -10,6 +10,11 @@
 #include <algorithm>
 
 namespace tk { namespace graphics_engine {
+  
+inline uint32_t align_size(uint32_t size, uint32_t alignment)
+{
+  return (size + alignment - 1) & ~(alignment - 1);
+}
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -40,29 +45,6 @@ inline auto get_debug_messenger_create_info()
     .pfnUserCallback = debug_messenger_callback,
   };
 }
-
-inline VkResult vkCreateDebugUtilsMessengerEXT(
-  VkInstance                                  instance,
-  VkDebugUtilsMessengerCreateInfoEXT const*   pCreateInfo,
-  VkAllocationCallbacks const*                pAllocator,
-  VkDebugUtilsMessengerEXT*                   pMessenger)
-{
-  auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance,"vkCreateDebugUtilsMessengerEXT");
-  if (func != nullptr) 
-    return func(instance, pCreateInfo, pAllocator, pMessenger);
-  return VK_ERROR_EXTENSION_NOT_PRESENT;
-}
-
-inline void vkDestroyDebugUtilsMessengerEXT(
-  VkInstance                                  instance,
-  VkDebugUtilsMessengerEXT                    messenger,
-  VkAllocationCallbacks const*                pAllocator)
-{
-  auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
-  if (func != nullptr)
-    func(instance, messenger, pAllocator);
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //                              Layers 
@@ -187,6 +169,11 @@ inline auto get_physical_devices_score(std::vector<VkPhysicalDevice> const& devi
     .pNext = &features13
   };
   features2.pNext = &features13;
+  VkPhysicalDeviceDescriptorBufferFeaturesEXT descriptor_buffer_features
+  {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_FEATURES_EXT,
+  };
+  features13.pNext = &descriptor_buffer_features;
 
   for (const auto& device : devices)
   {

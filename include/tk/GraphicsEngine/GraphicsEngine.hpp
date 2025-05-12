@@ -82,6 +82,8 @@ namespace tk { namespace graphics_engine {
   private:
     void post_process();
 
+    void test_descriptor_buffer();
+
   private:
     //
     // initialize resources
@@ -103,6 +105,20 @@ namespace tk { namespace graphics_engine {
     void create_sync_objects();
     void create_frame_resources();
     void create_buffer();
+
+    // vk extension funcs
+    void load_instance_extension_funcs();
+    void load_device_extension_funcs();
+    static constexpr auto          Vulkan_Version    = VK_API_VERSION_1_4;
+    static constexpr auto          Depth_Format      = VK_FORMAT_D32_SFLOAT;
+    const std::vector<const char*> Device_Extensions = 
+    {
+      VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+      VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
+    };
+    PFN_vkCreateDebugUtilsMessengerEXT  vkCreateDebugUtilsMessengerEXT{};
+    PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT{};
+    PFN_vkGetDescriptorSetLayoutSizeEXT vkGetDescriptorSetLayoutSizeEXT{};
 
     //
     // util 
@@ -173,7 +189,6 @@ namespace tk { namespace graphics_engine {
     // HACK: currently not use these
     VkDescriptorPool             _descriptor_pool          = VK_NULL_HANDLE;
     VkDescriptorSetLayout        _descriptor_set_layout    = VK_NULL_HANDLE;
-    VkDescriptorSet              _descriptor_set           = VK_NULL_HANDLE;
 
     // INFO:
     // allocate a big buffer.
