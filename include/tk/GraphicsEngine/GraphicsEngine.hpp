@@ -100,8 +100,6 @@ namespace tk { namespace graphics_engine {
     void create_compute_pipeline();
     void create_graphics_pipeline();
     void init_command_pool();
-    void create_descriptor_pool();
-    void create_descriptor_sets();
     void create_sync_objects();
     void create_frame_resources();
     void create_buffer();
@@ -116,9 +114,6 @@ namespace tk { namespace graphics_engine {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
       VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
     };
-    PFN_vkCreateDebugUtilsMessengerEXT  vkCreateDebugUtilsMessengerEXT{};
-    PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT{};
-    PFN_vkGetDescriptorSetLayoutSizeEXT vkGetDescriptorSetLayoutSizeEXT{};
 
     //
     // util 
@@ -186,10 +181,6 @@ namespace tk { namespace graphics_engine {
     
     DestructorStack              _destructors;
 
-    // HACK: currently not use these
-    VkDescriptorPool             _descriptor_pool          = VK_NULL_HANDLE;
-    VkDescriptorSetLayout        _descriptor_set_layout    = VK_NULL_HANDLE;
-
     // INFO:
     // allocate a big buffer.
     // should I recreate a bigger buffer when current buffer unenough?
@@ -224,10 +215,8 @@ namespace tk { namespace graphics_engine {
     Pipeline         _smaa_pipeline[3];
     // FIXME: discard, use descriptor buffer and descriptor index? we not use these structure
     DescriptorLayout _smaa_descriptor_layout;
-    VkDescriptorSet  _smaa_descriptors = VK_NULL_HANDLE;
-
-    // FIXME: tmp
-    void update_smaa_descriptors();
+    // FIXME: discard, use only one buffer
+    Buffer _descriptor_buffer;
   };
 
 } }

@@ -1,6 +1,7 @@
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
 #include "init-util.hpp"
 #include "tk/GraphicsEngine/Shader.hpp"
+#include "tk/GraphicsEngine/vk_extension.hpp"
 
 #include <SMAA/AreaTex.h>
 #include <SMAA/SearchTex.h>
@@ -32,13 +33,11 @@ void GraphicsEngine::init(Window& window)
   init_memory_allocator();
   init_command_pool();
   create_swapchain_and_rendering_image();
+  load_precalculated_textures();
   create_descriptor_set_layout();
   create_graphics_pipeline();
   create_buffer();
   create_frame_resources();
-  load_precalculated_textures();
-  create_descriptor_pool();
-  create_descriptor_sets();
   
   test_descriptor_buffer();
 
@@ -432,50 +431,20 @@ void GraphicsEngine::create_swapchain(VkSwapchainKHR old_swapchain)
 
 void GraphicsEngine::create_descriptor_set_layout()
 {
-  std::vector<VkDescriptorSetLayoutBinding> layouts
+  _smaa_descriptor_layout = _device.create_descriptor_layout(
   {
-    {
-      .binding         = 0,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .descriptorCount = 1,
-      .stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT,
-    },
-    {
-      .binding         = 1,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .descriptorCount = 1,
-      .stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT,
-    },
-    {
-      .binding         = 2,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .descriptorCount = 1,
-      .stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT,
-    },
-    {
-      .binding         = 3,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .descriptorCount = 1,
-      .stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT,
-    },
-    {
-      .binding         = 4,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .descriptorCount = 1,
-      .stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT,
-    },
-  };
-  VkDescriptorSetLayoutCreateInfo info
-  {
-    .sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-    .flags        = VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT,
-    .bindingCount = (uint32_t)layouts.size(),
-    .pBindings    = layouts.data(),
-  };
-  throw_if(vkCreateDescriptorSetLayout(_device, &info, nullptr, &_descriptor_set_layout) != VK_SUCCESS,
-           "failed to create descriptor set layout");
-  
-  _destructors.push([this] { vkDestroyDescriptorSetLayout(_device, _descriptor_set_layout, nullptr); });
+    // TODO: view need to update when image recreate
+    { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, _resolved_image.view, _smaa_sampler },
+    { 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          1, VK_SHADER_STAGE_COMPUTE_BIT, _edges_image.view                   },
+    { 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, _edges_image.view,    _smaa_sampler },
+    { 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, _area_texture.view,   _smaa_sampler },
+    { 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, _search_texture.view, _smaa_sampler },
+    { 5, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          1, VK_SHADER_STAGE_COMPUTE_BIT, _blend_image.view                   },
+    { 6, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, _blend_image.view,    _smaa_sampler },
+    { 7, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          1, VK_SHADER_STAGE_COMPUTE_BIT, _smaa_image.view                    },
+  });
+
+  _destructors.push([this] { _smaa_descriptor_layout.destroy(); });
 }
 
 void GraphicsEngine::create_graphics_pipeline()
@@ -514,7 +483,7 @@ void GraphicsEngine::create_graphics_pipeline()
   push_constant_range.stageFlags |= VK_SHADER_STAGE_FRAGMENT_BIT;
   push_constant_range.size = sizeof(PushConstant_SMAA);
   layout_info.setLayoutCount = 1;
-  layout_info.pSetLayouts = &_descriptor_set_layout;
+  layout_info.pSetLayouts = _smaa_descriptor_layout.get_address();
   throw_if(vkCreatePipelineLayout(_device, &layout_info, nullptr, &_smaa_pipeline_layout) != VK_SUCCESS,
            "failed to create smaa edge detection pipeline layout");
 
@@ -523,72 +492,6 @@ void GraphicsEngine::create_graphics_pipeline()
     .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
     .size       = sizeof(PushConstant_SMAA),
   };
-  _smaa_descriptor_layout = _device.create_descriptor_layout(
-  {
-    // resolved image
-    {
-      .binding         = 0,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .descriptorCount = 1,
-      .stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT,
-    },
-    // edges texture
-    {
-      .binding         = 1,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-      .descriptorCount = 1,
-      .stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT,
-    },
-    // edges texture (sampler)
-    {
-      .binding         = 2,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .descriptorCount = 1,
-      .stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT,
-    },
-    // area texture
-    {
-      .binding         = 3,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .descriptorCount = 1,
-      .stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT,
-    },
-    // search texture
-    {
-      .binding         = 4,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .descriptorCount = 1,
-      .stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT,
-    },
-    // blend image
-    {
-      .binding         = 5,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-      .descriptorCount = 1,
-      .stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT,
-    },
-    // resolved image
-    {
-      .binding         = 6,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .descriptorCount = 1,
-      .stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT,
-    },
-    // blend image
-    {
-      .binding         = 7,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .descriptorCount = 1,
-      .stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT,
-    },
-    // smaa image
-    {
-      .binding         = 8,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-      .descriptorCount = 1,
-      .stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT,
-    },
-  });
   // TODO: use graphics_pipeline_library can not create descriptor set layout
   _smaa_pipeline[0] = _device.create_pipeline(type::pipeline::compute, { "shader/SMAA_edge_detection_comp.spv" }, { _smaa_descriptor_layout }, { smaa_push_constant });
   _smaa_pipeline[1] = _device.create_pipeline(type::pipeline::compute, { "shader/SMAA_blend_weight_comp.spv" }, { _smaa_descriptor_layout }, { smaa_push_constant });
@@ -597,7 +500,6 @@ void GraphicsEngine::create_graphics_pipeline()
   // set destructors
   _destructors.push([this]
   { 
-    _smaa_descriptor_layout.destroy();
     _smaa_pipeline[2].destroy();
     _smaa_pipeline[1].destroy();
     _smaa_pipeline[0].destroy();
@@ -613,48 +515,6 @@ void GraphicsEngine::init_command_pool()
   auto queue_families = get_queue_family_indices(_physical_device, _surface);
   _command_pool.init(_device, queue_families.graphics_family.value());
   _destructors.push([this] { _command_pool.destroy(); });
-}
-
-void GraphicsEngine::create_descriptor_pool()
-{
-  std::vector<VkDescriptorPoolSize> sizes
-  {
-    {
-      .type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .descriptorCount = 5 + 1 + 3 + 2,
-    },
-    { 
-      .type            = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-      .descriptorCount = 1 + 1 + 1,
-    },
-  };
-  VkDescriptorPoolCreateInfo info
-  {
-    .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-    .maxSets       = 2,
-    .poolSizeCount = (uint32_t)sizes.size(),
-    .pPoolSizes    = sizes.data(),
-  };
-  throw_if(vkCreateDescriptorPool(_device, &info, nullptr, &_descriptor_pool) != VK_SUCCESS,
-           "failed to create descriptor pool");
-  
-  _destructors.push([this] { vkDestroyDescriptorPool(_device, _descriptor_pool, nullptr); });
-}
-
-void GraphicsEngine::create_descriptor_sets()
-{
-  VkDescriptorSetAllocateInfo info
-  {
-    .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-    .descriptorPool     = _descriptor_pool,
-    .descriptorSetCount = 1,
-    .pSetLayouts        = &_descriptor_set_layout,
-  };
-  info.pSetLayouts = _smaa_descriptor_layout.get_address();
-  throw_if(vkAllocateDescriptorSets(_device, &info, &_smaa_descriptors) != VK_SUCCESS,
-         "failed to create descriptor set");
-
-  update_smaa_descriptors();
 }
 
 void GraphicsEngine::create_frame_resources()
@@ -715,7 +575,11 @@ void GraphicsEngine::resize_swapchain()
   _blend_image    = _mem_alloc.create_image(VK_FORMAT_R8G8B8A8_UNORM, _swapchain_images[0].extent,    VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
   _smaa_image     = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
-  update_smaa_descriptors();
+  // TODO: update image view in descriptor buffer
+  // FIXME: should not be this!! find more better way!
+  //_smaa_descriptor_layout.destroy();
+  //_smaa_pipeline_layout = _device.create_descriptor_layout(const std::vector<DescriptorInfo> &infos);
+  //_smaa_descriptor_layout.put_descriptors(_descriptor_buffer);
 }
 
 //void GraphicsEngine::use_single_time_command_init_something()
@@ -743,7 +607,7 @@ void GraphicsEngine::create_buffer()
                                                       VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
                                                       VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                                                       VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
-  _destructors.push([this] { _mem_alloc.destroy_buffer(_buffer); });
+  _destructors.push([this] { _buffer.destroy(); });
 }
 
 // TODO: abstract load array data to image as a method function of Image
@@ -757,9 +621,9 @@ void GraphicsEngine::load_precalculated_textures()
   auto buf = _mem_alloc.create_buffer(AREATEX_SIZE + SEARCHTEX_SIZE, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
   
   // copy texture data
-  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), areaTexBytes, buf.allocation, 0, AREATEX_SIZE) != VK_SUCCESS,
+  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), areaTexBytes, buf.allocation(), 0, AREATEX_SIZE) != VK_SUCCESS,
            "failed to copy area texture data to buffer");
-  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), searchTexBytes, buf.allocation, AREATEX_SIZE, SEARCHTEX_SIZE) != VK_SUCCESS,
+  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), searchTexBytes, buf.allocation(), AREATEX_SIZE, SEARCHTEX_SIZE) != VK_SUCCESS,
            "failed to copy search texture data to buffer");
   
   // upload data to textures
@@ -788,7 +652,7 @@ void GraphicsEngine::load_precalculated_textures()
   VkCopyBufferToImageInfo2 info
   {
     .sType          = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2,
-    .srcBuffer      = buf.handle,
+    .srcBuffer      = buf.handle(),
     .dstImage       = _area_texture.handle,
     .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
     .regionCount    = 1,
@@ -822,7 +686,7 @@ void GraphicsEngine::load_precalculated_textures()
   cmd.end().submit_wait_free(_command_pool, _graphics_queue);
 
   // destroy upload buffer
-  _mem_alloc.destroy_buffer(buf);
+  buf.destroy();
 
   // sampler
   VkSamplerCreateInfo sampler_info
@@ -846,149 +710,13 @@ void GraphicsEngine::load_precalculated_textures()
   });
 }
 
-void GraphicsEngine::update_smaa_descriptors()
-{
-  auto smaa_info = std::vector<VkDescriptorImageInfo>
-  {
-    {
-      .sampler     = _smaa_sampler,
-      .imageView   = _resolved_image.view,
-      .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    },
-    {
-      .imageView   = _edges_image.view,
-      .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
-    },
-    {
-      .sampler     = _smaa_sampler,
-      .imageView   = _edges_image.view,
-      .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    },
-    {
-      .sampler     = _smaa_sampler,
-      .imageView   = _area_texture.view,
-      .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    },
-    {
-      .sampler     = _smaa_sampler,
-      .imageView   = _search_texture.view,
-      .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    },
-    {
-      .imageView   = _blend_image.view,
-      .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
-    },
-        {
-      .sampler     = _smaa_sampler,
-      .imageView   = _resolved_image.view,
-      .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    },
-        {
-      .sampler     = _smaa_sampler,
-      .imageView   = _blend_image.view,
-      .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    },
-        {
-      .imageView   = _smaa_image.view,
-      .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
-    },
-  };
-
-  std::vector<VkWriteDescriptorSet> writes
-  {
-    {
-      .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-      .dstSet          = _smaa_descriptors,
-      .dstBinding      = 0,
-      .descriptorCount = 1,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .pImageInfo      = &smaa_info[0],
-    },
-    {
-      .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-      .dstSet          = _smaa_descriptors,
-      .dstBinding      = 1,
-      .descriptorCount = 1,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-      .pImageInfo      = &smaa_info[1],
-    },
-    {
-      .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-      .dstSet          = _smaa_descriptors,
-      .dstBinding      = 2,
-      .descriptorCount = 1,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .pImageInfo      = &smaa_info[2],
-    },
-    {
-      .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-      .dstSet          = _smaa_descriptors,
-      .dstBinding      = 3,
-      .descriptorCount = 1,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .pImageInfo      = &smaa_info[3],
-    },
-    {
-      .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-      .dstSet          = _smaa_descriptors,
-      .dstBinding      = 4,
-      .descriptorCount = 1,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .pImageInfo      = &smaa_info[4],
-    },
-    {
-      .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-      .dstSet          = _smaa_descriptors,
-      .dstBinding      = 5,
-      .descriptorCount = 1,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-      .pImageInfo      = &smaa_info[5],
-    },
-    {
-      .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-      .dstSet          = _smaa_descriptors,
-      .dstBinding      = 6,
-      .descriptorCount = 1,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .pImageInfo      = &smaa_info[6],
-    },
-    {
-      .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-      .dstSet          = _smaa_descriptors,
-      .dstBinding      = 7,
-      .descriptorCount = 1,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .pImageInfo      = &smaa_info[7],
-    },
-    {
-      .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-      .dstSet          = _smaa_descriptors,
-      .dstBinding      = 8,
-      .descriptorCount = 1,
-      .descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-      .pImageInfo      = &smaa_info[8],
-    },
-  };
-
-  vkUpdateDescriptorSets(_device, writes.size(), writes.data(), 0, nullptr);
-}
-
 void GraphicsEngine::test_descriptor_buffer()
 {
-  // get descriptor buffer offset
-  VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_info{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_PROPERTIES_EXT };
-  VkPhysicalDeviceProperties2 device_properties
-  {
-    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
-    .pNext = &descriptor_buffer_info,
-  };
-  vkGetPhysicalDeviceProperties2(_physical_device, &device_properties);
-  auto descriptor_buffer_offset = descriptor_buffer_info.descriptorBufferOffsetAlignment;
+  _descriptor_buffer = _mem_alloc.create_buffer(_smaa_descriptor_layout.size(), VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT  | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT , VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 
-  // get descriptor layout size
-  VkDeviceSize size;
-  vkGetDescriptorSetLayoutSizeEXT(_device, _descriptor_set_layout, &size);
-  size = align_size(size, descriptor_buffer_offset);
+  _smaa_descriptor_layout.put_descriptors(_descriptor_buffer);
+  
+  _destructors.push([this] { _descriptor_buffer.destroy(); });
 }
 
 } }

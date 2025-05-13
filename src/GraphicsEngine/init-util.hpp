@@ -10,12 +10,6 @@
 #include <algorithm>
 
 namespace tk { namespace graphics_engine {
-  
-inline uint32_t align_size(uint32_t size, uint32_t alignment)
-{
-  return (size + alignment - 1) & ~(alignment - 1);
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //                              Debug Messenger 

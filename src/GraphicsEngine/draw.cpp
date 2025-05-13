@@ -1,5 +1,6 @@
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
 #include "tk/ErrorHandling.hpp"
+#include "tk/GraphicsEngine/vk_extension.hpp"
 
 #include <SDL3/SDL_events.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -220,7 +221,7 @@ void GraphicsEngine::render(std::span<IndexInfo> index_infos, glm::vec2 const& w
 
   PushConstant pc
   {
-    .vertices      = _buffer.address,
+    .vertices      = _buffer.address(),
     .window_extent = window_extent,
     .display_pos   = display_pos,
   };
@@ -237,12 +238,12 @@ void GraphicsEngine::update(std::span<Vertex> vertices, std::span<uint16_t> indi
 
   throw_if(vertices_size + indices_size > 2 * 1024 * 1024, "too big vertices indices data!(bigger than 2MB)");
 
-  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), vertices.data(), _buffer.allocation, 0, vertices_size) != VK_SUCCESS,
+  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), vertices.data(), _buffer.allocation(), 0, vertices_size) != VK_SUCCESS,
            "failed to copy vertices data to buffer");
-  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), indices.data(), _buffer.allocation, vertices_size, indices_size) != VK_SUCCESS,
+  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), indices.data(), _buffer.allocation(), vertices_size, indices_size) != VK_SUCCESS,
            "failed to copy indices data to buffer");
            
-  vkCmdBindIndexBuffer(_frames[_current_frame].cmd, _buffer.handle, vertices_size, VK_INDEX_TYPE_UINT16);
+  vkCmdBindIndexBuffer(_frames[_current_frame].cmd, _buffer.handle(), vertices_size, VK_INDEX_TYPE_UINT16);
 }
 
 void clear(Command const& cmd, Image const& img)
@@ -282,7 +283,22 @@ void GraphicsEngine::post_process()
   vkCmdPushConstants(frame.cmd, _smaa_pipeline[0].get_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
 
   // HACK: all pass use same pipeline layout, but pipeline layout will be discard?
-  vkCmdBindDescriptorSets(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline[0].get_layout(), 0, 1, &_smaa_descriptors, 0, nullptr);
+  //vkCmdBindDescriptorSets(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline[0].get_layout(), 0, 1, &_smaa_descriptors, 0, nullptr);
+  
+  // bind descriptor buffer
+  VkDescriptorBufferBindingInfoEXT descriptor_buffer_info
+  {
+    .sType   = VK_STRUCTURE_TYPE_DESCRIPTOR_BUFFER_BINDING_INFO_EXT,
+    .address = _descriptor_buffer.address(),
+    .usage   = VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT | VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT,
+  };
+  vkCmdBindDescriptorBuffersEXT(frame.cmd, 1, &descriptor_buffer_info);
+
+  // set descriptor buffer offset
+  VkDeviceSize offset = 0;
+  uint32_t     idx    = 0;
+  vkCmdSetDescriptorBufferOffsetsEXT(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline_layout, 0, 1, &idx, &offset);
+
 
   vkCmdDispatch(frame.cmd, std::ceil((extent.width + 15) / 16), std::ceil((extent.height + 15) / 16), 1);
 

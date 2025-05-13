@@ -2,10 +2,10 @@
 
 #include "SMAA.h"
 
-layout(binding = 6) uniform SMAATexture2D(resolved_image);
-layout(binding = 7) uniform SMAATexture2D(blend_texture);
+layout(binding = 0) uniform SMAATexture2D(resolved_image);
+layout(binding = 6) uniform SMAATexture2D(blend_texture);
 
-layout(binding = 8) uniform writeonly image2D smaa_image;
+layout(binding = 7) uniform writeonly image2D smaa_image;
 
 void main(void)
 {

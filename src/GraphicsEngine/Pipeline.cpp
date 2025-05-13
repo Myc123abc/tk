@@ -68,12 +68,13 @@ Pipeline::Pipeline(VkDevice device, std::string_view shader, std::vector<VkDescr
     .sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
     .stage  = VK_SHADER_STAGE_COMPUTE_BIT,
     .module = create_shader_module(shader),
-    .pName = "main",
+    .pName  = "main",
   };
 
   VkComputePipelineCreateInfo pipeline_info
   {
     .sType  = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+    .flags  = VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT,
     .stage  = shader_info,
     .layout = _layout,
   };

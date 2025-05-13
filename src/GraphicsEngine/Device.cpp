@@ -9,20 +9,30 @@ void Device::destroy() noexcept
 {
   assert(_device);
   vkDestroyDevice(_device, nullptr);
-  _device = VK_NULL_HANDLE;
+  _device                   = VK_NULL_HANDLE;
+  _descriptor_buffer_info   = {};
 }
 
 auto Device::init(VkPhysicalDevice device, VkDeviceCreateInfo const& info) -> Device&
 {
   assert(device);
+  
   throw_if(vkCreateDevice(device, &info, nullptr, &_device) != VK_SUCCESS,
            "failed to create device");
+
+  VkPhysicalDeviceProperties2 device_properties
+  {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+    .pNext = &_descriptor_buffer_info,
+  };
+  vkGetPhysicalDeviceProperties2(device, &device_properties);
+
   return *this;
 }
 
-auto Device::create_descriptor_layout(std::vector<VkDescriptorSetLayoutBinding> const& layouts) -> DescriptorLayout
+auto Device::create_descriptor_layout(std::vector<DescriptorInfo> const& infos) -> DescriptorLayout
 {
-  return DescriptorLayout(_device, layouts);
+  return DescriptorLayout(this, infos);
 }
 
 auto Device::create_pipeline(

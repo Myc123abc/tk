@@ -11,24 +11,45 @@
 
 namespace tk { namespace graphics_engine {
 
-  struct Buffer
+  class MemoryAllocator;
+
+  class Buffer
   { 
-    VkBuffer        handle     = VK_NULL_HANDLE;
-    VmaAllocation   allocation = VK_NULL_HANDLE;
-    VkDeviceAddress address    = {};
+  public:
+    Buffer() = default;
+    Buffer(MemoryAllocator* allocator, uint32_t size, VkBufferUsageFlags usages, VmaAllocationCreateFlags flags = 0);
+
+    void destroy();
+
+    auto handle()     const noexcept { return _handle;     }
+    auto allocation() const noexcept { return _allocation; }
+    auto address()    const noexcept { return _address;    }
+    auto data()       const noexcept { return _data;       }
+
+    // TODO: internal record every memory block type, offset and auto increase capacity
+
+  private:
+    VmaAllocator    _allocator  = {};
+    VkBuffer        _handle     = {};
+    VmaAllocation   _allocation = {};
+    VkDeviceAddress _address    = {};
+    void*           _data       = {};
+    uint32_t        _capacity   = {};
+    uint32_t        _size       = {};
   };
 
   struct Image
   {
-    VkImage       handle     = VK_NULL_HANDLE;
-    VkImageView   view       = VK_NULL_HANDLE;
-    VmaAllocation allocation = VK_NULL_HANDLE;
+    VkImage       handle     = {};
+    VkImageView   view       = {};
+    VmaAllocation allocation = {};
     VkExtent3D    extent     = {};
-    VkFormat      format     = VK_FORMAT_UNDEFINED;
+    VkFormat      format     = {};
   };
 
   class MemoryAllocator
   {
+    friend class Buffer;
   public:
     MemoryAllocator()  = default;
     ~MemoryAllocator() = default;
@@ -44,8 +65,7 @@ namespace tk { namespace graphics_engine {
     // HACK: tmp, use for old code, should be discard
     auto get() { return _allocator; }
 
-    auto create_buffer(uint32_t size, VkBufferUsageFlags usages, VmaAllocationCreateFlags flags = 0) -> Buffer;
-    void destroy_buffer(Buffer& buffer);
+    auto create_buffer(uint32_t size, VkBufferUsageFlags usages, VmaAllocationCreateFlags flags = 0) {  return Buffer(this, size, usages, flags); }
 
     auto create_image(VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_1_BIT) -> Image;
     void destroy_image(Image& image);

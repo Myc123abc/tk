@@ -1,7 +1,64 @@
 #include "tk/GraphicsEngine/MemoryAllocator.hpp"
 #include "tk/ErrorHandling.hpp"
 
+#include <cassert>
+
 namespace tk { namespace graphics_engine {
+
+////////////////////////////////////////////////////////////////////////////////
+//                                  Buffer
+////////////////////////////////////////////////////////////////////////////////
+
+void Buffer::destroy()
+{
+  assert(_allocator && _handle && _allocation);
+  vmaDestroyBuffer(_allocator, _handle, _allocation);
+  _allocator  = {};
+  _handle     = {};
+  _allocation = {};
+  _address    = {};
+  _data       = {};
+}
+
+
+Buffer::Buffer(MemoryAllocator* allocator, uint32_t size, VkBufferUsageFlags usages, VmaAllocationCreateFlags flags) 
+{
+  _allocator = allocator->get();
+  _capacity  = size;
+  
+  VkBufferCreateInfo buf_info
+  {
+    .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+    .size  = size,
+    .usage = usages,
+  };
+  VmaAllocationCreateInfo alloc_info
+  {
+    .flags = flags,
+    .usage = VMA_MEMORY_USAGE_AUTO,
+  };
+  VmaAllocationInfo info;
+  VmaAllocationInfo* p_info = flags & VMA_ALLOCATION_CREATE_MAPPED_BIT ? &info : nullptr;
+  throw_if(vmaCreateBuffer(_allocator, &buf_info, &alloc_info, &_handle, &_allocation, p_info) != VK_SUCCESS,
+           "failed to create buffer");
+
+  if (p_info) _data = info.pMappedData;
+
+  if (usages & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
+  {
+    // get address
+    VkBufferDeviceAddressInfo info
+    {
+      .sType  = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+      .buffer = _handle,
+    };
+    _address = vkGetBufferDeviceAddress(allocator->_device, &info);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//                              Memory Allocator
+////////////////////////////////////////////////////////////////////////////////
 
 void MemoryAllocator::init(VkPhysicalDevice physical_device, VkDevice device, VkInstance instance, uint32_t vulkan_version)
 {
@@ -25,44 +82,6 @@ void MemoryAllocator::destroy()
     vmaDestroyAllocator(_allocator);
   _device    = VK_NULL_HANDLE;
   _allocator = VK_NULL_HANDLE;
-}
-
-auto MemoryAllocator::create_buffer(uint32_t size, VkBufferUsageFlags usages, VmaAllocationCreateFlags flags) -> Buffer
-{
-  Buffer buffer;
-  VkBufferCreateInfo buf_info
-  {
-    .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-    .size  = size,
-    .usage = usages,
-  };
-  VmaAllocationCreateInfo alloc_info
-  {
-    .flags = flags,
-    .usage = VMA_MEMORY_USAGE_AUTO,
-  };
-  throw_if(vmaCreateBuffer(_allocator, &buf_info, &alloc_info, &buffer.handle, &buffer.allocation, nullptr) != VK_SUCCESS,
-           "failed to create buffer");
-
-  if (usages & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
-  {
-    // get address
-    VkBufferDeviceAddressInfo info
-    {
-      .sType  = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-      .buffer = buffer.handle,
-    };
-    buffer.address = vkGetBufferDeviceAddress(_device, &info);
-  }
-
-  return buffer;
-}
-
-void MemoryAllocator::destroy_buffer(Buffer& buffer)
-{
-  if (buffer.handle != VK_NULL_HANDLE && buffer.allocation != VK_NULL_HANDLE)
-    vmaDestroyBuffer(_allocator, buffer.handle, buffer.allocation);
-  buffer = {};
 }
 
 // auto MemoryAllocator::create_mesh_buffer(Command& command, std::vector<Mesh>& meshs, DestructorStack& destructor, std::vector<MeshInfo>& mesh_infos) -> MeshBuffer
