@@ -588,6 +588,7 @@ void GraphicsEngine::resize_swapchain()
     { 6, _blend_image.view    },
     { 7, _smaa_image.view     },
   });
+  _smaa_descriptor_layout.update_descriptors(_descriptor_buffer);
 }
 
 //void GraphicsEngine::use_single_time_command_init_something()
