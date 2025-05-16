@@ -209,14 +209,12 @@ namespace tk { namespace graphics_engine {
     Image     _smaa_image;
 
     // TODO: try engine only single pipeline use dynamic pipeline
-    VkPipeline       _smaa_pipelines[3];
     VkPipelineLayout _smaa_pipeline_layout;
-
     Pipeline         _smaa_pipeline[3];
     // FIXME: discard, use descriptor buffer and descriptor index? we not use these structure
     DescriptorLayout _smaa_descriptor_layout;
     // FIXME: discard, use only one buffer
-    Buffer _descriptor_buffer;
+    Buffer           _descriptor_buffer;
   };
 
 } }

@@ -171,6 +171,7 @@ auto Pipeline::build(VkDevice device, VkPipelineLayout layout) -> VkPipeline
     .sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
     // use dynamic rendering
     .pNext               = &_rendering_info,
+    .flags               = VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT,
     .stageCount          = (uint32_t)_shader_stages.size(),
     .pStages             = _shader_stages.data(),
     // HACK: can be nullptr for dynamic rendering, see spec

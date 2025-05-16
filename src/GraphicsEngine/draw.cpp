@@ -285,20 +285,7 @@ void GraphicsEngine::post_process()
   // HACK: all pass use same pipeline layout, but pipeline layout will be discard?
   //vkCmdBindDescriptorSets(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline[0].get_layout(), 0, 1, &_smaa_descriptors, 0, nullptr);
   
-  // bind descriptor buffer
-  VkDescriptorBufferBindingInfoEXT descriptor_buffer_info
-  {
-    .sType   = VK_STRUCTURE_TYPE_DESCRIPTOR_BUFFER_BINDING_INFO_EXT,
-    .address = _descriptor_buffer.address(),
-    .usage   = VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT | VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT,
-  };
-  vkCmdBindDescriptorBuffersEXT(frame.cmd, 1, &descriptor_buffer_info);
-
-  // set descriptor buffer offset
-  VkDeviceSize offset = 0;
-  uint32_t     idx    = 0;
-  vkCmdSetDescriptorBufferOffsetsEXT(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline_layout, 0, 1, &idx, &offset);
-
+  bind_descriptor_buffer(frame.cmd, _descriptor_buffer.address(), VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT, _smaa_pipeline_layout, VK_PIPELINE_BIND_POINT_COMPUTE);
 
   vkCmdDispatch(frame.cmd, std::ceil((extent.width + 15) / 16), std::ceil((extent.height + 15) / 16), 1);
 

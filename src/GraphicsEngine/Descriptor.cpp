@@ -90,21 +90,18 @@ auto get_storage_info(DescriptorInfo const& desc)
   };
 }
 
-void DescriptorLayout::put_descriptors(Buffer const& buffer)
+void DescriptorLayout::update_descriptors(Buffer const& buffer)
 {
-  // FIXME: no offset
-  auto data = (char*)buffer.data();
+  // TODO: single buffer need offset
+  auto ptr = reinterpret_cast<char*>(buffer.data());
 
   // put descriptors
   size_t       data_size;
   VkDeviceSize offset;
-  for (auto i = 0; i < _descriptors.size(); ++i)
+  for (auto const& desc : _descriptors)
   {
-    auto& desc = _descriptors[i];
-
     // get descriptor offset in layout
-    vkGetDescriptorSetLayoutBindingOffsetEXT(_device->get(), _layout, i, &offset);
-    data += offset;
+    vkGetDescriptorSetLayoutBindingOffsetEXT(_device->get(), _layout, desc.binding, &offset);
 
     VkDescriptorGetInfoEXT get_info
     {
@@ -133,7 +130,33 @@ void DescriptorLayout::put_descriptors(Buffer const& buffer)
         break;
     }
 
-    vkGetDescriptorEXT(_device->get(), &get_info, data_size, data);
+    vkGetDescriptorEXT(_device->get(), &get_info, data_size, ptr + offset);
+  }
+}
+
+void bind_descriptor_buffer(Command& cmd, VkDeviceAddress address, VkBufferUsageFlags usage, VkPipelineLayout layout, VkPipelineBindPoint point)
+{
+  // bind descriptor buffer
+  VkDescriptorBufferBindingInfoEXT info
+  {
+    .sType   = VK_STRUCTURE_TYPE_DESCRIPTOR_BUFFER_BINDING_INFO_EXT,
+    .address = address,
+    .usage   = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT | usage,
+  };
+  vkCmdBindDescriptorBuffersEXT(cmd, 1, &info);
+
+  // set offset in buffer
+  VkDeviceSize offset{};
+  uint32_t buffer_index{};
+  vkCmdSetDescriptorBufferOffsetsEXT(cmd, point, layout, 0, 1, &buffer_index, &offset);
+}
+
+void DescriptorLayout::update_descriptor_image_views(std::vector<std::pair<uint32_t, VkImageView>> const& views)
+{
+  for (auto const& view : views)
+  {
+    assert(view.first < _descriptors.size());
+    _descriptors[view.first].image_view = view.second;
   }
 }
 

@@ -433,15 +433,14 @@ void GraphicsEngine::create_descriptor_set_layout()
 {
   _smaa_descriptor_layout = _device.create_descriptor_layout(
   {
-    // TODO: view need to update when image recreate
-    { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, _resolved_image.view, _smaa_sampler },
-    { 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          1, VK_SHADER_STAGE_COMPUTE_BIT, _edges_image.view                   },
-    { 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, _edges_image.view,    _smaa_sampler },
-    { 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, _area_texture.view,   _smaa_sampler },
-    { 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, _search_texture.view, _smaa_sampler },
-    { 5, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          1, VK_SHADER_STAGE_COMPUTE_BIT, _blend_image.view                   },
-    { 6, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, _blend_image.view,    _smaa_sampler },
-    { 7, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          1, VK_SHADER_STAGE_COMPUTE_BIT, _smaa_image.view                    },
+    { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT, _resolved_image.view, _smaa_sampler },
+    { 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          VK_SHADER_STAGE_COMPUTE_BIT, _edges_image.view                   },
+    { 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT, _edges_image.view,    _smaa_sampler },
+    { 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT, _area_texture.view,   _smaa_sampler },
+    { 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT, _search_texture.view, _smaa_sampler },
+    { 5, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          VK_SHADER_STAGE_COMPUTE_BIT, _blend_image.view                   },
+    { 6, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT, _blend_image.view,    _smaa_sampler },
+    { 7, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          VK_SHADER_STAGE_COMPUTE_BIT, _smaa_image.view                    },
   });
 
   _destructors.push([this] { _smaa_descriptor_layout.destroy(); });
@@ -555,31 +554,40 @@ void GraphicsEngine::create_frame_resources()
 
 void GraphicsEngine::resize_swapchain()
 {
+  // wait GPU to handle finishing resource
   vkDeviceWaitIdle(_device);
   
+  // recreate swapchain
   auto old_swapchain = _swapchain;
-
   create_swapchain(old_swapchain);
-
   vkDestroySwapchainKHR(_device, old_swapchain, nullptr);
 
+  // destroy old images
   _mem_alloc.destroy_image(_msaa_image);
   _mem_alloc.destroy_image(_resolved_image);
   _mem_alloc.destroy_image(_blend_image);
   _mem_alloc.destroy_image(_edges_image);
   _mem_alloc.destroy_image(_smaa_image);
 
+  // recreate images
   _msaa_image     = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, _msaa_sample_count);
   _resolved_image = _mem_alloc.create_image(_msaa_image.format, _msaa_image.extent, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
   _edges_image    = _mem_alloc.create_image(VK_FORMAT_R8G8_UNORM, _swapchain_images[0].extent,        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
   _blend_image    = _mem_alloc.create_image(VK_FORMAT_R8G8B8A8_UNORM, _swapchain_images[0].extent,    VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
   _smaa_image     = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
-  // TODO: update image view in descriptor buffer
-  // FIXME: should not be this!! find more better way!
-  //_smaa_descriptor_layout.destroy();
-  //_smaa_pipeline_layout = _device.create_descriptor_layout(const std::vector<DescriptorInfo> &infos);
-  //_smaa_descriptor_layout.put_descriptors(_descriptor_buffer);
+  // update image views
+  _smaa_descriptor_layout.update_descriptor_image_views(
+  {
+    { 0, _resolved_image.view },
+    { 1, _edges_image.view    },
+    { 2, _edges_image.view    },
+    { 3, _area_texture.view   },
+    { 4, _search_texture.view },
+    { 5, _blend_image.view    },
+    { 6, _blend_image.view    },
+    { 7, _smaa_image.view     },
+  });
 }
 
 //void GraphicsEngine::use_single_time_command_init_something()
@@ -714,7 +722,7 @@ void GraphicsEngine::test_descriptor_buffer()
 {
   _descriptor_buffer = _mem_alloc.create_buffer(_smaa_descriptor_layout.size(), VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT  | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT , VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 
-  _smaa_descriptor_layout.put_descriptors(_descriptor_buffer);
+  _smaa_descriptor_layout.update_descriptors(_descriptor_buffer);
   
   _destructors.push([this] { _descriptor_buffer.destroy(); });
 }

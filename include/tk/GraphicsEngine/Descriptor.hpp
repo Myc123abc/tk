@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MemoryAllocator.hpp"
+#include "CommandPool.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -12,11 +13,13 @@ namespace tk { namespace graphics_engine {
   {
     int                 binding    = -1;
     VkDescriptorType    type       = VK_DESCRIPTOR_TYPE_MAX_ENUM;
-    uint32_t            count      = 0;
     VkShaderStageFlags  stages     = VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
     VkImageView         image_view = VK_NULL_HANDLE;
     VkSampler           sampler    = VK_NULL_HANDLE;
+    uint32_t            count      = 1;
   };
+
+  void bind_descriptor_buffer(Command& cmd, VkDeviceAddress address, VkBufferUsageFlags usage, VkPipelineLayout layout, VkPipelineBindPoint point);
 
   class DescriptorLayout
   {
@@ -24,6 +27,7 @@ namespace tk { namespace graphics_engine {
     DescriptorLayout()  = default;
     ~DescriptorLayout() = default;
 
+    // FIXME: discard, should integrate DescriptorLayout to other class
     operator VkDescriptorSetLayout() const noexcept { return _layout; }
     auto get_address() { return &_layout; }
 
@@ -31,7 +35,9 @@ namespace tk { namespace graphics_engine {
 
     auto size() const noexcept { return _size; }
 
-    void put_descriptors(Buffer const& buffer);
+    void update_descriptors(Buffer const& buffer);
+
+    void update_descriptor_image_views(std::vector<std::pair<uint32_t, VkImageView>> const& views);
 
   private:
     friend class Device;
