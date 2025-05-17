@@ -73,11 +73,11 @@ void GraphicsEngine::render_begin()
   VkRenderingAttachmentInfo color_attachment
   {
     .sType              = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-    .imageView          = _resolved_image.view,
+    .imageView          = _msaa_image.view,
     .imageLayout        = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    //.resolveMode        = VK_RESOLVE_MODE_AVERAGE_BIT,
-    //.resolveImageView   = _resolved_image.view,
-    //.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    .resolveMode        = VK_RESOLVE_MODE_AVERAGE_BIT,
+    .resolveImageView   = _resolved_image.view,
+    .resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
     .loadOp             = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
     .storeOp            = VK_ATTACHMENT_STORE_OP_STORE,
   };
@@ -143,11 +143,12 @@ void GraphicsEngine::render_end()
 
   // copy resolved image to swapchain image
   // FIXME: can del
-  transition_image_layout(frame.cmd, _smaa_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-  copy_image(frame.cmd, _smaa_image.handle, _swapchain_images[image_index].handle, extent, extent);
+  copy_image(frame.cmd, _resolved_image.handle, _swapchain_images[image_index].handle, extent, extent);
 
   // transition image layout to presentable
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
@@ -283,8 +284,6 @@ void GraphicsEngine::post_process()
   vkCmdPushConstants(frame.cmd, _smaa_pipeline[0].get_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
 
   // HACK: all pass use same pipeline layout, but pipeline layout will be discard?
-  //vkCmdBindDescriptorSets(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline[0].get_layout(), 0, 1, &_smaa_descriptors, 0, nullptr);
-  
   bind_descriptor_buffer(frame.cmd, _descriptor_buffer.address(), VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT, _smaa_pipeline_layout, VK_PIPELINE_BIND_POINT_COMPUTE);
 
   vkCmdDispatch(frame.cmd, std::ceil((extent.width + 15) / 16), std::ceil((extent.height + 15) / 16), 1);
@@ -303,109 +302,8 @@ void GraphicsEngine::post_process()
   //
   vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline[2]);
   transition_image_layout(frame.cmd, _smaa_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-  //clear(frame.cmd, _blend_image);
   transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   vkCmdDispatch(frame.cmd, std::ceil((extent.width + 15) / 16), std::ceil((extent.height + 15) / 16), 1);
-#if 0
-  //
-  // SMAA edge detection
-  //
-  // TODO: should clear last edge image?
-  transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-  VkRenderingAttachmentInfo color_attachment
-  {
-    .sType              = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-    .imageView          = _edges_image.view,
-    .imageLayout        = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    // TODO: can don't care?
-    .loadOp             = VK_ATTACHMENT_LOAD_OP_CLEAR,
-    .storeOp            = VK_ATTACHMENT_STORE_OP_STORE,
-    .clearValue = {.color = {0, 0, 0, 0}},
-  };
-
-  VkExtent2D extent = { _swapchain_images[image_index].extent.width, _swapchain_images[image_index].extent.height };
-
-  VkRenderingInfo rendering
-  {
-    .sType                = VK_STRUCTURE_TYPE_RENDERING_INFO,
-    .renderArea           =
-    {
-      .extent = extent,
-    },
-    .layerCount           = 1,
-    .colorAttachmentCount = 1,
-    .pColorAttachments    = &color_attachment,
-  };
-  vkCmdBeginRendering(frame.cmd, &rendering);
-
-  VkViewport viewport
-  {
-    .width  = (float)extent.width,
-    .height = (float)extent.height, 
-    .maxDepth = 1.f,
-  };
-  vkCmdSetViewport(frame.cmd, 0, 1, &viewport);
-  VkRect2D scissor 
-  {
-    .extent = extent,
-  };
-  vkCmdSetScissor(frame.cmd, 0, 1, &scissor);
-
-  vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _smaa_pipelines[0]);
-
-  // TODO: currently, only use main window, so multi-window case should need window_extent parameter
-  uint32_t width, height;
-  _window->get_framebuffer_size(width, height);
-
-  PushConstant_SMAA pc
-  {
-    .smaa_rt_metrics = glm::vec4(1.f / width, 1.f / height, width, height),
-  };
-  vkCmdPushConstants(frame.cmd, _smaa_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
-
-  // TODO: try use VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT? descriptor buffer extensions?
-  // can use this extension not need to update every recreate?
-  vkCmdBindDescriptorSets(frame.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _smaa_pipeline_layout, 0, 1, &_descriptor_set, 0, nullptr);
-  vkCmdDraw(frame.cmd, 3, 1, 0, 0);
-
-  vkCmdEndRendering(frame.cmd);
-
-  // 
-  // SMAA blend weight
-  //
-  // TODO: should clear last edge image?
-  transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  transition_image_layout(frame.cmd, _area_texture.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  transition_image_layout(frame.cmd, _search_texture.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  color_attachment.imageView = _blend_image.view,
-  vkCmdBeginRendering(frame.cmd, &rendering);
-  vkCmdSetViewport(frame.cmd, 0, 1, &viewport);
-  vkCmdSetScissor(frame.cmd, 0, 1, &scissor);
-  vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _smaa_pipelines[1]);
-  // TODO: can repeat last pc?
-  vkCmdPushConstants(frame.cmd, _smaa_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
-  vkCmdBindDescriptorSets(frame.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _smaa_pipeline_layout, 0, 1, &_descriptor_set, 0, nullptr);
-  vkCmdDraw(frame.cmd, 3, 1, 0, 0);
-  vkCmdEndRendering(frame.cmd);
-
-  //
-  // SMAA neighbor
-  //
-  transition_image_layout(frame.cmd, _smaa_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  color_attachment.imageView = _smaa_image.view,
-  vkCmdBeginRendering(frame.cmd, &rendering);
-  vkCmdSetViewport(frame.cmd, 0, 1, &viewport);
-  vkCmdSetScissor(frame.cmd, 0, 1, &scissor);
-  vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _smaa_pipelines[2]);
-  vkCmdPushConstants(frame.cmd, _smaa_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
-  vkCmdBindDescriptorSets(frame.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _smaa_pipeline_layout, 0, 1, &_descriptor_set, 0, nullptr);
-  vkCmdDraw(frame.cmd, 3, 1, 0, 0);
-  vkCmdEndRendering(frame.cmd);
-#endif
 }
     
 } }

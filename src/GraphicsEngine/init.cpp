@@ -475,7 +475,7 @@ void GraphicsEngine::create_graphics_pipeline()
                  .set_color_attachment_format(_swapchain_images[0].format)
                  // TODO: imgui not enable depth test
                  //.enable_depth_test(Depth_Format)
-                 .set_msaa(VK_SAMPLE_COUNT_1_BIT)
+                 .set_msaa(_msaa_sample_count)
                  .build(_device, _2D_pipeline_layout);
 
   // smaa pipelines

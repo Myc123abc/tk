@@ -7,6 +7,8 @@ layout(push_constant) uniform PushConstant
 #define SMAA_GLSL_4
 #define SMAA_PRESET_ULTRA
 
+#define SMAA_FLIP_Y 0
+
 #define SMAA_INCLUDE_PS 0
 #define SMAA_INCLUDE_VS 0
 #include "SMAA.hlsl"
