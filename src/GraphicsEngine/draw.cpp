@@ -56,12 +56,14 @@ void GraphicsEngine::render_begin()
   };
   vkBeginCommandBuffer(frame.cmd, &beg_info);
 
+  set_pipeline_state(frame.cmd);
+
   // depth_image_barrier_begin(frame.cmd);
 
   // transition image layout to writeable
-  transition_image_layout(frame.cmd, _msaa_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  //transition_image_layout(frame.cmd, _msaa_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  // transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  //transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   // transition_image_layout(frame.cmd, _msaa_depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
   // transition_image_layout(frame.cmd, frame.depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
@@ -73,11 +75,11 @@ void GraphicsEngine::render_begin()
   VkRenderingAttachmentInfo color_attachment
   {
     .sType              = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-    .imageView          = _msaa_image.view,
+    .imageView          = _resolved_image.view,
     .imageLayout        = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    .resolveMode        = VK_RESOLVE_MODE_AVERAGE_BIT,
-    .resolveImageView   = _resolved_image.view,
-    .resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    //.resolveMode        = VK_RESOLVE_MODE_AVERAGE_BIT,
+    //.resolveImageView   = _resolved_image.view,
+    //.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
     .loadOp             = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
     .storeOp            = VK_ATTACHMENT_STORE_OP_STORE,
   };
@@ -110,20 +112,54 @@ void GraphicsEngine::render_begin()
   };
   vkCmdBeginRendering(frame.cmd, &rendering);
 
+  //VkViewport viewport
+  //{
+  //  .width  = (float)extent.width,
+  //  .height = (float)extent.height, 
+  //  .maxDepth = 1.f,
+  //};
+  //vkCmdSetViewport(frame.cmd, 0, 1, &viewport);
+  //VkRect2D scissor 
+  //{
+  //  .extent = extent,
+  //};
+  //vkCmdSetScissor(frame.cmd, 0, 1, &scissor);
+}
+
+
+void GraphicsEngine::set_pipeline_state(Command const& cmd)
+{
+  graphics_engine::vkCmdSetCullModeEXT(cmd, VK_CULL_MODE_BACK_BIT);
+  graphics_engine::vkCmdSetDepthWriteEnableEXT(cmd, VK_FALSE);
+  vkCmdSetRasterizerDiscardEnable(cmd, VK_FALSE);
+  vkCmdSetDepthTestEnable(cmd, VK_FALSE);
+  vkCmdSetStencilTestEnable(cmd, VK_FALSE);
+  vkCmdSetDepthBiasEnable(cmd, VK_FALSE);
+  graphics_engine::vkCmdSetPolygonModeEXT(cmd, VK_POLYGON_MODE_FILL);
+  graphics_engine::vkCmdSetRasterizationSamplesEXT(cmd, VK_SAMPLE_COUNT_1_BIT);
+  VkSampleMask sampler_mask{ 0b1 };
+  graphics_engine::vkCmdSetSampleMaskEXT(cmd, VK_SAMPLE_COUNT_1_BIT, &sampler_mask);
+  vkCmdSetFrontFace(cmd, VK_FRONT_FACE_CLOCKWISE);
+  graphics_engine::vkCmdSetAlphaToCoverageEnableEXT(cmd, VK_FALSE);
   VkViewport viewport
   {
-    .width  = (float)extent.width,
-    .height = (float)extent.height, 
+    .width  = static_cast<float>(_resolved_image.extent.width),
+    .height = static_cast<float>(_resolved_image.extent.height), 
     .maxDepth = 1.f,
   };
-  vkCmdSetViewport(frame.cmd, 0, 1, &viewport);
   VkRect2D scissor 
   {
-    .extent = extent,
+    .extent = { _resolved_image.extent.width, _resolved_image.extent.height },
   };
-  vkCmdSetScissor(frame.cmd, 0, 1, &scissor);
-
-  vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _2D_pipeline);
+  vkCmdSetViewportWithCount(cmd, 1, &viewport);
+  vkCmdSetScissorWithCount(cmd, 1, &scissor);
+  vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+  vkCmdSetPrimitiveRestartEnable(cmd, VK_FALSE);
+  graphics_engine::vkCmdSetVertexInputEXT(cmd, 0, nullptr, 0, nullptr);
+  VkBool32 color_blend_enables{ VK_FALSE };
+  graphics_engine::vkCmdSetColorBlendEnableEXT(cmd, 0, 1, &color_blend_enables);
+  VkColorComponentFlags color_write_mask{ VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT };
+  graphics_engine::vkCmdSetColorWriteMaskEXT(cmd, 0, 1, &color_write_mask);
 }
 
 void GraphicsEngine::render_end()
@@ -135,7 +171,7 @@ void GraphicsEngine::render_end()
 
   vkCmdEndRendering(frame.cmd);
 
-  post_process();
+  //post_process();
 
   VkExtent2D extent = { _swapchain_images[image_index].extent.width, _swapchain_images[image_index].extent.height };
 
@@ -143,15 +179,18 @@ void GraphicsEngine::render_end()
 
   // copy resolved image to swapchain image
   // FIXME: can del
-  transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-  transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-  transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  //transition_image_layout(frame.cmd, _smaa_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  //transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  //transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-  copy_image(frame.cmd, _resolved_image.handle, _swapchain_images[image_index].handle, extent, extent);
+  copy_image(frame.cmd, _resolved_image, _swapchain_images[image_index]);
+  //copy_image(frame.cmd, _smaa_image, _swapchain_images[image_index]);
+  //copy_image(frame.cmd, _smaa_image.handle, _swapchain_images[image_index].handle, extent, extent);
 
   // transition image layout to presentable
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+  //transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
   // depth_image_barrier_end(frame.cmd);
 
@@ -226,10 +265,18 @@ void GraphicsEngine::render(std::span<IndexInfo> index_infos, glm::vec2 const& w
     .window_extent = window_extent,
     .display_pos   = display_pos,
   };
-  vkCmdPushConstants(cmd, _2D_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pc), &pc);
+  vkCmdPushConstants(cmd, _2D_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+
+  // INFO: not use pipeline, using shader objects
+  //vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _2D_pipeline);
+  auto stages  = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
+  auto shaders = std::vector<VkShaderEXT>{ _2D_vert, _2D_frag };
+  graphics_engine::vkCmdBindShadersEXT(cmd, 2, stages.data(), shaders.data());
 
   for (auto const& index_info : index_infos)
     vkCmdDrawIndexed(cmd, index_info.count, 1, index_info.offset, 0, 0);
+
+  graphics_engine::vkCmdBindShadersEXT(cmd, 2, stages.data(), nullptr);
 }
 
 void GraphicsEngine::update(std::span<Vertex> vertices, std::span<uint16_t> indices)

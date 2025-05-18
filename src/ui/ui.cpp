@@ -10,15 +10,15 @@ namespace tk { namespace ui {
 
 void begin(glm::vec2 const& pos)
 {
-  assert(get_ctx().using_layout == false);
-  get_ctx().using_layout = true;
+  assert(get_ctx().begining == false);
+  get_ctx().begining = true;
   get_ctx().layouts.push({ pos });
 }
 
 void end()
 {
-  assert(get_ctx().using_layout);
-  get_ctx().using_layout = false;
+  assert(get_ctx().begining);
+  get_ctx().begining = false;
 }
 
 void render()
@@ -43,7 +43,7 @@ void render()
 
 void rectangle(glm::vec2 const& pos, glm::vec2 const& extent, uint32_t color)
 {
-  assert(get_ctx().using_layout);
+  assert(get_ctx().begining);
 
   auto lower_down     = pos + extent;
   uint32_t idx_beg    = get_ctx().vertices.size();
@@ -71,7 +71,7 @@ void rectangle(glm::vec2 const& pos, glm::vec2 const& extent, uint32_t color)
 
 void triangle(glm::vec2 p1, glm::vec2 p2, glm::vec2 p3, uint32_t color, float thickness)
 {
-  assert(get_ctx().using_layout && thickness >= 0.f);
+  assert(get_ctx().begining && thickness >= 0.f);
   
   if (thickness > 0.f)
   {
@@ -134,16 +134,34 @@ inline auto get_inline_point_offset(float thickness, float theta) -> float
 
 void path_stroke(uint32_t color, float thickness, bool is_closed)
 {
-  assert(get_ctx().using_layout);
+  // promise is use ui::begin()
+  assert(get_ctx().begining          &&
+  // points at least have two
+         get_ctx().points.size() > 2 &&
+  // thickness at least 1.f
+         thickness >= 1.f);
 
+  // get points and point count
   auto& points = get_ctx().points;
   auto point_count = points.size();
 
+  // get vertices and indices
   auto& vertices = get_ctx().vertices;
   auto& indices  = get_ctx().indices;
+
+  // get begin of index and offset of index
+  // for current shape
   uint32_t idx_beg    = vertices.size();
   uint32_t idx_offset = indices.size();
 
+  // TODO: 
+  // 1. Tickness anti-aliased lines cap are missing their AA fringe.
+  // 2. For unclosed, line normals only have line_count number
+  // 3. If line is not closed, the first and last points need to be generated differently as there are no normals to blend
+  
+
+  // if is a closed shape, the line count equal the point count
+  // if is not a closed shape, lint count will be reduced one
   if (is_closed)
   {
     // get line normals
@@ -206,6 +224,7 @@ void path_stroke(uint32_t color, float thickness, bool is_closed)
       internal_points[i] += points[i];
 
     // add vertices
+    // every point need a extre point to contruct a line (have thickness rectangle)
     auto vertex_count = point_count * 2;
     vertices.reserve(idx_beg + vertex_count);
     for (auto i = 0; i < point_count; ++i)
@@ -218,6 +237,7 @@ void path_stroke(uint32_t color, float thickness, bool is_closed)
     }
 
     // add indices
+    // one line need 6 indices to draw a rectangle
     uint32_t index_count = line_count * 6;
     indices.reserve(idx_offset + index_count);
     auto beg = idx_beg;

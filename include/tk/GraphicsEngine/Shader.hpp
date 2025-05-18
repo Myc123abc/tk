@@ -34,4 +34,24 @@ namespace tk { namespace graphics_engine {
     glm::vec4 smaa_rt_metrics;
   };
 
+  class Shader final
+  {
+  public:
+    Shader()  = default;
+    ~Shader() = default;
+
+    operator VkShaderEXT() const noexcept { return _shader; }
+
+    void destroy();
+
+  private:
+    friend class Device;
+
+    void set(VkDevice device, VkShaderEXT shader) noexcept;
+
+  private:
+    VkDevice    _device{};
+    VkShaderEXT _shader{};
+  };
+
 }}

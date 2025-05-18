@@ -7,14 +7,14 @@
 namespace tk { namespace graphics_engine {
 
 template <typename T>
-void load_instance_ext_func(VkInstance instance, T& func, std::string_view func_name)
+inline void load_instance_ext_func(VkInstance instance, T& func, std::string_view func_name)
 {
   func = reinterpret_cast<T>(vkGetInstanceProcAddr(instance, func_name.data()));
   throw_if(!func, "failed to load {}", func_name);
 }
 
 template <typename T>
-void load_device_ext_func(VkDevice device, T& func, std::string_view func_name)
+inline void load_device_ext_func(VkDevice device, T& func, std::string_view func_name)
 {
   func = reinterpret_cast<T>(vkGetDeviceProcAddr(device, func_name.data()));
   throw_if(!func, "failed to load {}", func_name);
@@ -39,6 +39,18 @@ void GraphicsEngine::load_device_extension_funcs()
   load_device_ext_func(_device, vkGetDescriptorEXT);
   load_device_ext_func(_device, vkCmdBindDescriptorBuffersEXT);
   load_device_ext_func(_device, vkCmdSetDescriptorBufferOffsetsEXT);
+  load_device_ext_func(_device, vkCreateShadersEXT);
+  load_device_ext_func(_device, vkDestroyShaderEXT);
+  load_device_ext_func(_device, vkCmdBindShadersEXT);
+  load_device_ext_func(_device, vkCmdSetCullModeEXT);
+  load_device_ext_func(_device, vkCmdSetDepthWriteEnableEXT);
+  load_device_ext_func(_device, vkCmdSetPolygonModeEXT);
+  load_device_ext_func(_device, vkCmdSetRasterizationSamplesEXT);
+  load_device_ext_func(_device, vkCmdSetSampleMaskEXT);
+  load_device_ext_func(_device, vkCmdSetAlphaToCoverageEnableEXT);
+  load_device_ext_func(_device, vkCmdSetVertexInputEXT);
+  load_device_ext_func(_device, vkCmdSetColorBlendEnableEXT);
+  load_device_ext_func(_device, vkCmdSetColorWriteMaskEXT);
 }
 
 }}

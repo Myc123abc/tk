@@ -13,13 +13,16 @@
 
 #pragma once
 
+#include "tk/util.hpp"
+#include "tk/ErrorHandling.hpp"
+
 #include <vulkan/vulkan.h>
 
 #include <vector>
 #include <string_view>
 
 namespace tk { namespace graphics_engine { 
-  
+
   class Pipeline
   {
   public:
@@ -27,6 +30,35 @@ namespace tk { namespace graphics_engine {
     ~Pipeline() = default;
 
     auto get_layout() const noexcept { return _layout; }
+
+    // FIXME: discard, use internal shader module like compute pipeline creatation
+    //       just lazy so now not change...
+    struct Shader
+    {
+      VkShaderModule shader;
+    
+      Shader(VkDevice device, std::string_view filename)
+        : _device(device)
+      {
+        auto data = util::get_file_data(filename);
+        VkShaderModuleCreateInfo info
+        {
+          .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+          .codeSize = data.size() * sizeof(uint32_t),
+          .pCode    = reinterpret_cast<uint32_t*>(data.data()),
+        };
+        throw_if(vkCreateShaderModule(device, &info, nullptr, &shader) != VK_SUCCESS,
+                 "failed to create shader from {}", filename);
+      }
+    
+      ~Shader()
+      {
+        vkDestroyShaderModule(_device, shader, nullptr);
+      }
+    
+    private:
+      VkDevice _device;
+    };
 
   private:
 

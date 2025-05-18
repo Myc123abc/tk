@@ -17,7 +17,7 @@ struct Layout
 
 struct ui_context
 {
-  bool               using_layout = false;
+  bool               begining = false;
   std::queue<Layout> layouts;
   // TODO: currently, only single main window is being use
   glm::vec2          window_extent;

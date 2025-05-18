@@ -80,11 +80,6 @@ namespace tk { namespace graphics_engine {
     void update(std::span<Vertex> vertices, std::span<uint16_t> indices);
 
   private:
-    void post_process();
-
-    void test_descriptor_buffer();
-
-  private:
     //
     // initialize resources
     //
@@ -103,6 +98,9 @@ namespace tk { namespace graphics_engine {
     void create_sync_objects();
     void create_frame_resources();
     void create_buffer();
+    void update_descriptors_to_descrptor_buffer();
+    void set_pipeline_state(Command const& cmd);
+    void post_process();
 
     // vk extension funcs
     void load_instance_extension_funcs();
@@ -113,6 +111,9 @@ namespace tk { namespace graphics_engine {
     {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
       VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
+      VK_EXT_SHADER_OBJECT_EXTENSION_NAME,
+      //VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME,
+      //VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
     };
 
     //
@@ -161,6 +162,13 @@ namespace tk { namespace graphics_engine {
     VkPipelineLayout             _2D_pipeline_layout       = VK_NULL_HANDLE;
 
     CommandPool                  _command_pool;
+
+    // shaders
+    Shader _2D_vert;
+    Shader _2D_frag;
+    Shader _SMAA_edge_detection_comp;
+    Shader _SMAA_blend_weight_comp;
+    Shader _SMAA_neighbor_comp;
 
     //
     // frame resources

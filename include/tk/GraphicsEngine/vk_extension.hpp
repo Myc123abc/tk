@@ -11,5 +11,17 @@ inline PFN_vkGetDescriptorSetLayoutBindingOffsetEXT vkGetDescriptorSetLayoutBind
 inline PFN_vkGetDescriptorEXT                       vkGetDescriptorEXT{};
 inline PFN_vkCmdBindDescriptorBuffersEXT            vkCmdBindDescriptorBuffersEXT{};
 inline PFN_vkCmdSetDescriptorBufferOffsetsEXT       vkCmdSetDescriptorBufferOffsetsEXT{};
+inline PFN_vkCreateShadersEXT                       vkCreateShadersEXT{};
+inline PFN_vkDestroyShaderEXT                       vkDestroyShaderEXT{};
+inline PFN_vkCmdBindShadersEXT                      vkCmdBindShadersEXT{};
+inline PFN_vkCmdSetCullModeEXT                      vkCmdSetCullModeEXT{};
+inline PFN_vkCmdSetDepthWriteEnableEXT              vkCmdSetDepthWriteEnableEXT{};
+inline PFN_vkCmdSetPolygonModeEXT                   vkCmdSetPolygonModeEXT{};
+inline PFN_vkCmdSetRasterizationSamplesEXT          vkCmdSetRasterizationSamplesEXT{};
+inline PFN_vkCmdSetSampleMaskEXT                    vkCmdSetSampleMaskEXT{};
+inline PFN_vkCmdSetAlphaToCoverageEnableEXT         vkCmdSetAlphaToCoverageEnableEXT{};
+inline PFN_vkCmdSetVertexInputEXT                   vkCmdSetVertexInputEXT{};
+inline PFN_vkCmdSetColorBlendEnableEXT              vkCmdSetColorBlendEnableEXT{};
+inline PFN_vkCmdSetColorWriteMaskEXT                vkCmdSetColorWriteMaskEXT{};
 
 }}

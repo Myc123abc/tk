@@ -1,35 +1,12 @@
 #include "tk/GraphicsEngine/Pipeline.hpp"
 #include "tk/ErrorHandling.hpp"
+#include "tk/util.hpp"
 
 #include <cassert>
-#include <fstream>
 
 ////////////////////////////////////////////////////////////////////////////////
 //                               util
 ////////////////////////////////////////////////////////////////////////////////
-
-namespace
-{
-
-using namespace tk;
-
-auto get_file_data(std::string_view filename)
-{
-  std::ifstream file(filename.data(), std::ios::ate | std::ios::binary);
-  throw_if(!file.is_open(), "failed to open {}", filename);
-
-  auto file_size = (size_t)file.tellg();
-  // A SPIR-V module is defined a stream of 32bit words
-  auto buffer    = std::vector<uint32_t>(file_size / sizeof(uint32_t));
-  
-  file.seekg(0);
-  file.read((char*)buffer.data(), file_size);
-
-  file.close();
-  return buffer;
-}
-
-}
 
 namespace tk { namespace graphics_engine {
 
@@ -80,7 +57,7 @@ Pipeline::Pipeline(VkDevice device, std::string_view shader, std::vector<VkDescr
   };
 
   // TODO: use pipeline cache can quickly recreate pipeline which have same states
-  // but now we have VK_EXT_pipeline_library / VK_KHR_pipeline_executable_properties to replace pipelinec ache
+  // but now we have VK_EXT_pipeline_library / VK_KHR_pipeline_executable_properties to replace pipeline cache
   //
   // TODO: can create multiple pipeline single time
   throw_if(vkCreateComputePipelines(_device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &_pipeline) != VK_SUCCESS,
@@ -92,9 +69,27 @@ Pipeline::Pipeline(VkDevice device, std::string_view shader, std::vector<VkDescr
 
 Pipeline::Pipeline(VkDevice device, std::string_view vertex_shader, std::string_view fragment_shader, std::vector<VkDescriptorSetLayout> const& descritptor_layouts, std::vector<VkPushConstantRange> const& push_constants)
 {
-  // TODO: not move now
+  // TODO: currently, not use graphics library for graphics pipeline
+  //       still use old build
   assert(false);
+  //VkGraphicsPipelineLibraryCreateInfoEXT library_info
+  //{
+  //  .sType = VK_STRUCTURE_TYPE_PIPELINE_LIBRARY_CREATE_INFO_KHR,
+  //  .flags = VK_GRAPHICS_PIPELINE_LIBRARY_VERTEX_INPUT_INTERFACE_BIT_EXT,
+  //};
+//
+  //VkPipelineVertexInputStateCreateInfo vertex_input_state
+  //{
+  //  .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+  //};
+  //VkPipelineInputAssemblyStateCreateInfo input_assembly_state
+  //{ 
+  //  .sType    = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+  //  .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+  //};
+
 }
+
 
 auto Pipeline::create_shader_module(std::string_view shader) -> VkShaderModule
 {
@@ -102,7 +97,7 @@ auto Pipeline::create_shader_module(std::string_view shader) -> VkShaderModule
 
   VkShaderModule module;
 
-  auto data = get_file_data(shader);
+  auto data = util::get_file_data(shader);
   VkShaderModuleCreateInfo info
   {
     .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,

@@ -5,11 +5,22 @@
 #include "../type.hpp"
 #include "Pipeline.hpp"
 #include "Descriptor.hpp"
+#include "Shader.hpp"
 
 #include <vector>
 #include <string_view>
+#include <string>
 
 namespace tk { namespace graphics_engine {
+
+  struct ShaderCreateInfo
+  {
+    Shader&                            shader;
+    VkShaderStageFlagBits              stage{};
+    std::string                        shader_name;
+    std::vector<VkDescriptorSetLayout> descriptor_layouts;
+    std::vector<VkPushConstantRange>   push_constants;
+  };
 
   class Device
   {
@@ -20,6 +31,8 @@ namespace tk { namespace graphics_engine {
     void destroy() noexcept;
 
     auto get() const noexcept { return _device; }
+
+    void create_shaders(std::vector<ShaderCreateInfo> const& infos);
 
     auto create_descriptor_layout(std::vector<DescriptorInfo> const& infos) -> DescriptorLayout;
 

@@ -39,7 +39,7 @@ void GraphicsEngine::init(Window& window)
   create_buffer();
   create_frame_resources();
   
-  test_descriptor_buffer();
+  update_descriptors_to_descrptor_buffer();
 
   _window->show();
 }
@@ -174,30 +174,42 @@ void GraphicsEngine::create_device_and_get_queues()
     });
 
   // features
+  //VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT graphics_library_features
+  //{
+  //  .sType                   = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GRAPHICS_PIPELINE_LIBRARY_FEATURES_EXT,
+  //  .pNext                   = nullptr,
+  //  .graphicsPipelineLibrary = VK_TRUE,
+  //};
+  VkPhysicalDeviceShaderObjectFeaturesEXT shader_object_features
+  {
+    .sType        = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_OBJECT_FEATURES_EXT,
+    //.pNext        = &graphics_library_features,
+    .shaderObject = VK_TRUE,
+  };
   VkPhysicalDeviceDescriptorBufferFeaturesEXT descriptor_buffer_features
   {
-    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_FEATURES_EXT,
-    .pNext = nullptr,
-    .descriptorBuffer = true,
+    .sType            = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_FEATURES_EXT,
+    .pNext            = &shader_object_features,
+    .descriptorBuffer = VK_TRUE,
   };
   VkPhysicalDeviceVulkan13Features features13
   { 
     .sType               = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
     .pNext               = &descriptor_buffer_features, 
-    .synchronization2    = true,
-    .dynamicRendering    = true,
+    .synchronization2    = VK_TRUE,
+    .dynamicRendering    = VK_TRUE,
   };
   VkPhysicalDeviceVulkan12Features features12
   { 
     .sType               = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
     .pNext               = &features13,
-    .descriptorIndexing  = true,
-    .bufferDeviceAddress = true,
+    .descriptorIndexing  = VK_TRUE,
+    .bufferDeviceAddress = VK_TRUE,
   };
   VkPhysicalDeviceFeatures2 features2
   {
-    .sType    = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-    .pNext    = &features12,
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+    .pNext = &features12,
   };
 
   // device info 
@@ -451,8 +463,13 @@ void GraphicsEngine::create_graphics_pipeline()
   // create 2D pipeline
   VkPushConstantRange push_constant_range 
   {
-    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
     .size       = sizeof(PushConstant),
+  };
+  auto smaa_push_constant = VkPushConstantRange
+  {
+    .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+    .size       = sizeof(PushConstant_SMAA),
   };
   VkPipelineLayoutCreateInfo layout_info
   {
@@ -463,10 +480,29 @@ void GraphicsEngine::create_graphics_pipeline()
   throw_if(vkCreatePipelineLayout(_device, &layout_info, nullptr, &_2D_pipeline_layout) != VK_SUCCESS,
            "failed to create graphics pipeline layout");
 
+  // create shaders
+  _device.create_shaders(
+  {
+    { _2D_vert,                  VK_SHADER_STAGE_VERTEX_BIT,   "shader/2D_vert.spv",                  {},                          { push_constant_range } },
+    { _2D_frag,                  VK_SHADER_STAGE_FRAGMENT_BIT, "shader/2D_frag.spv",                  {},                          { push_constant_range } },
+    //{ _SMAA_edge_detection_comp, VK_SHADER_STAGE_COMPUTE_BIT,  "shader/SMAA_edge_detection_comp.spv", { _smaa_descriptor_layout }, { smaa_push_constant }  },
+    //{ _SMAA_blend_weight_comp,   VK_SHADER_STAGE_COMPUTE_BIT,  "shader/SMAA_blend_weight_comp.spv",   { _smaa_descriptor_layout }, { smaa_push_constant }  },
+    //{ _SMAA_neighbor_comp,       VK_SHADER_STAGE_COMPUTE_BIT,  "shader/SMAA_neighbor_comp.spv",       { _smaa_descriptor_layout }, { smaa_push_constant }  },
+  });
+
+  _destructors.push([this]
+  {
+    _2D_vert.destroy();
+    _2D_frag.destroy();
+    //_SMAA_edge_detection_comp.destroy();
+    //_SMAA_blend_weight_comp.destroy();
+    //_SMAA_neighbor_comp.destroy();
+  });
+
   auto builder = Pipeline();
 
-  auto shader_vertex2D   = Shader(_device, "shader/2D_vert.spv");
-  auto shader_fragment2D = Shader(_device, "shader/2D_frag.spv");
+  auto shader_vertex2D   = Pipeline::Shader(_device, "shader/2D_vert.spv");
+  auto shader_fragment2D = Pipeline::Shader(_device, "shader/2D_frag.spv");
   _2D_pipeline = builder
                  .clear()
                  .set_shaders(shader_vertex2D.shader, shader_fragment2D.shader)
@@ -475,7 +511,7 @@ void GraphicsEngine::create_graphics_pipeline()
                  .set_color_attachment_format(_swapchain_images[0].format)
                  // TODO: imgui not enable depth test
                  //.enable_depth_test(Depth_Format)
-                 .set_msaa(_msaa_sample_count)
+                 .set_msaa(VK_SAMPLE_COUNT_1_BIT)
                  .build(_device, _2D_pipeline_layout);
 
   // smaa pipelines
@@ -486,11 +522,6 @@ void GraphicsEngine::create_graphics_pipeline()
   throw_if(vkCreatePipelineLayout(_device, &layout_info, nullptr, &_smaa_pipeline_layout) != VK_SUCCESS,
            "failed to create smaa edge detection pipeline layout");
 
-  auto smaa_push_constant = VkPushConstantRange
-  {
-    .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-    .size       = sizeof(PushConstant_SMAA),
-  };
   // TODO: use graphics_pipeline_library can not create descriptor set layout
   _smaa_pipeline[0] = _device.create_pipeline(type::pipeline::compute, { "shader/SMAA_edge_detection_comp.spv" }, { _smaa_descriptor_layout }, { smaa_push_constant });
   _smaa_pipeline[1] = _device.create_pipeline(type::pipeline::compute, { "shader/SMAA_blend_weight_comp.spv" }, { _smaa_descriptor_layout }, { smaa_push_constant });
@@ -590,25 +621,6 @@ void GraphicsEngine::resize_swapchain()
   });
   _smaa_descriptor_layout.update_descriptors(_descriptor_buffer);
 }
-
-//void GraphicsEngine::use_single_time_command_init_something()
-//{
-//  // start single time command and destructor use for destruct stage buffer, etc.
-//  auto cmd        = _command_pool.create_command().begin();
-//  auto destructor = DestructorStack();
-//
-//  // use command
-//  MaterialLibrary::init(_mem_alloc, cmd, destructor);
-//
-//  // end command
-//  cmd.end().submit_wait_free(_command_pool, _graphics_queue);
-//
-//  // destroy stage buffer and others
-//  destructor.clear();
-//
-//  // add material library destructor
-//  _destructors.push([&] { MaterialLibrary::destroy(); });
-//}
 
 void GraphicsEngine::create_buffer()
 {
@@ -719,7 +731,7 @@ void GraphicsEngine::load_precalculated_textures()
   });
 }
 
-void GraphicsEngine::test_descriptor_buffer()
+void GraphicsEngine::update_descriptors_to_descrptor_buffer()
 {
   _descriptor_buffer = _mem_alloc.create_buffer(_smaa_descriptor_layout.size(), VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT  | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT , VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 
