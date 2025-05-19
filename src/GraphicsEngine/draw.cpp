@@ -171,7 +171,7 @@ void GraphicsEngine::render_end()
 
   vkCmdEndRendering(frame.cmd);
 
-  //post_process();
+  post_process();
 
   VkExtent2D extent = { _swapchain_images[image_index].extent.width, _swapchain_images[image_index].extent.height };
 
@@ -179,13 +179,13 @@ void GraphicsEngine::render_end()
 
   // copy resolved image to swapchain image
   // FIXME: can del
-  //transition_image_layout(frame.cmd, _smaa_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  transition_image_layout(frame.cmd, _smaa_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   //transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   //transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-  transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  //transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-  copy_image(frame.cmd, _resolved_image, _swapchain_images[image_index]);
-  //copy_image(frame.cmd, _smaa_image, _swapchain_images[image_index]);
+  //copy_image(frame.cmd, _resolved_image, _swapchain_images[image_index]);
+  copy_image(frame.cmd, _smaa_image, _swapchain_images[image_index]);
   //copy_image(frame.cmd, _smaa_image.handle, _swapchain_images[image_index].handle, extent, extent);
 
   // transition image layout to presentable
@@ -319,7 +319,10 @@ void GraphicsEngine::post_process()
   clear(frame.cmd, _edges_image);
   transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   
-  vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline[0]);
+  //vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline[0]);
+  auto stages  = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_COMPUTE_BIT };
+  auto shaders = std::vector<VkShaderEXT>{ _SMAA_edge_detection_comp, _SMAA_blend_weight_comp, _SMAA_neighbor_comp };
+  graphics_engine::vkCmdBindShadersEXT(frame.cmd, 1, stages.data(), &shaders[0]);
 
   uint32_t width, height;
   _window->get_framebuffer_size(width, height);
@@ -328,7 +331,7 @@ void GraphicsEngine::post_process()
   {
     .smaa_rt_metrics = glm::vec4(1.f / width, 1.f / height, width, height),
   };
-  vkCmdPushConstants(frame.cmd, _smaa_pipeline[0].get_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
+  vkCmdPushConstants(frame.cmd, _smaa_pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
 
   // HACK: all pass use same pipeline layout, but pipeline layout will be discard?
   bind_descriptor_buffer(frame.cmd, _descriptor_buffer.address(), VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT, _smaa_pipeline_layout, VK_PIPELINE_BIND_POINT_COMPUTE);
@@ -338,7 +341,8 @@ void GraphicsEngine::post_process()
   //
   // blend weight
   //
-  vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline[1]);
+  //vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline[1]);
+  graphics_engine::vkCmdBindShadersEXT(frame.cmd, 1, stages.data(), &shaders[1]);
   transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
   clear(frame.cmd, _blend_image);
   transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -347,10 +351,12 @@ void GraphicsEngine::post_process()
   //
   // neighbor
   //
-  vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline[2]);
+  //vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline[2]);
+  graphics_engine::vkCmdBindShadersEXT(frame.cmd, 1, stages.data(), &shaders[2]);
   transition_image_layout(frame.cmd, _smaa_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
   transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   vkCmdDispatch(frame.cmd, std::ceil((extent.width + 15) / 16), std::ceil((extent.height + 15) / 16), 1);
+  graphics_engine::vkCmdBindShadersEXT(frame.cmd, 1, stages.data(), nullptr);
 }
     
 } }

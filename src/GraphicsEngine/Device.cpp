@@ -37,20 +37,19 @@ auto Device::create_descriptor_layout(std::vector<DescriptorInfo> const& infos) 
   return DescriptorLayout(this, infos);
 }
 
-auto Device::create_pipeline(
-  type::pipeline                            type,
-  std::vector<std::string_view>      const& shaders,
-  std::vector<VkDescriptorSetLayout> const& descritptor_layouts, 
-  std::vector<VkPushConstantRange>   const& push_constants) -> Pipeline
-{
-  assert(type == type::pipeline::compute ? shaders.size() == 1 : shaders.size() == 2);
-  if (type == type::pipeline::compute)
-    return Pipeline(_device, shaders.front(), descritptor_layouts, push_constants);
-  return Pipeline(_device, shaders[0], shaders[1], descritptor_layouts, push_constants);
-}
+//auto Device::create_pipeline(
+//  type::pipeline                            type,
+//  std::vector<std::string_view>      const& shaders,
+//  std::vector<VkDescriptorSetLayout> const& descritptor_layouts, 
+//  std::vector<VkPushConstantRange>   const& push_constants) -> Pipeline
+//{
+//  assert(type == type::pipeline::compute ? shaders.size() == 1 : shaders.size() == 2);
+//  if (type == type::pipeline::compute)
+//    return Pipeline(_device, shaders.front(), descritptor_layouts, push_constants);
+//  return Pipeline(_device, shaders[0], shaders[1], descritptor_layouts, push_constants);
+//}
 
-// TODO: what about two pair of vert and frag for linking shaders in single vkCreateShadersEXT call
-void Device::create_shaders(std::vector<ShaderCreateInfo> const& infos)
+void Device::create_shaders(std::vector<ShaderCreateInfo> const& infos, bool link)
 {
   auto shader_datas = std::vector<std::vector<uint32_t>>();
   auto create_infos = std::vector<VkShaderCreateInfoEXT>();
@@ -61,25 +60,11 @@ void Device::create_shaders(std::vector<ShaderCreateInfo> const& infos)
   for (auto i = 0; i < infos.size(); ++i)
   {
     auto& info = infos[i];    
-
-    // TODO: currently, only process vert frag comp, and only vert frag directly link
-    assert(info.stage == VK_SHADER_STAGE_VERTEX_BIT   ||
-           info.stage == VK_SHADER_STAGE_FRAGMENT_BIT ||
-           info.stage == VK_SHADER_STAGE_COMPUTE_BIT);
-    // TODO: currently, only use single pair vert and frag to promise link is OK in single call
-    if (info.stage == VK_SHADER_STAGE_VERTEX_BIT)
-    {
-      static int cnt = 0;
-      if (cnt == 1)
-        assert(false);
-      ++cnt;
-    }
-
     shader_datas.emplace_back(util::get_file_data(info.shader_name));
     create_infos.emplace_back(VkShaderCreateInfoEXT
     {
       .sType                  = VK_STRUCTURE_TYPE_SHADER_CREATE_INFO_EXT,
-      .flags                  = info.stage == VK_SHADER_STAGE_VERTEX_BIT || info.stage == VK_SHADER_STAGE_FRAGMENT_BIT ? (VkShaderCreateFlagsEXT)VK_SHADER_CREATE_LINK_STAGE_BIT_EXT : 0,
+      .flags                  = link ? static_cast<VkShaderCreateFlagsEXT>(VK_SHADER_CREATE_LINK_STAGE_BIT_EXT) : 0,
       .stage                  = info.stage,
       .nextStage              = static_cast<VkShaderStageFlags>(info.stage == VK_SHADER_STAGE_VERTEX_BIT ? VK_SHADER_STAGE_FRAGMENT_BIT : 0),
       .codeType               = VK_SHADER_CODE_TYPE_SPIRV_EXT,

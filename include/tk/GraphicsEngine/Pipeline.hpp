@@ -1,11 +1,12 @@
 //
+// FIXME: discard, now only use shader objects replace pipeline, well shader objects cannnot use ray tracing in vulkan 1.4
+//
 // pipeline builder 
 //
 // config pipeline then create it 
 // use dynamic rendering so don't need framebuffer and render pass
 //
 // TODO:
-//  1. currently only graphics pipeline, after extend to compute pipeline
 //  2. try multiple create pipelines at once
 //  3. use VK_EXT_extended_dynamic_state3 to make more config become dynamic config
 //  4. need change, don't use xxxxstateInfo in pipeline, it should be builder

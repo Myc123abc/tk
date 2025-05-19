@@ -23,16 +23,11 @@
 #include "../DestructorStack.hpp"
 #include "MemoryAllocator.hpp"
 #include "CommandPool.hpp"
-#include "Shader.hpp"
-#include "Pipeline.hpp"
 #include "Device.hpp"
-#include "Descriptor.hpp"
 
 #include <glm/glm.hpp>
-#include <vk_mem_alloc.h>
 #include <SDL3/SDL_events.h>
 
-#include <vector>
 #include <span>
 
 namespace tk { namespace graphics_engine {
@@ -92,8 +87,8 @@ namespace tk { namespace graphics_engine {
     void create_swapchain_and_rendering_image();
     void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE);
     void create_descriptor_set_layout();
-    void create_compute_pipeline();
-    void create_graphics_pipeline();
+    void create_shaders_and_pipeline_layouts();
+    //void create_graphics_pipeline();
     void init_command_pool();
     void create_sync_objects();
     void create_frame_resources();
@@ -158,12 +153,12 @@ namespace tk { namespace graphics_engine {
     VkSwapchainKHR               _swapchain                = VK_NULL_HANDLE;
     std::vector<Image>           _swapchain_images;
 
-    VkPipeline                   _2D_pipeline              = VK_NULL_HANDLE;
-    VkPipelineLayout             _2D_pipeline_layout       = VK_NULL_HANDLE;
+    //VkPipeline                   _2D_pipeline              = VK_NULL_HANDLE;
+    PipelineLayout               _2D_pipeline_layout;
 
-    CommandPool                  _command_pool;
-
+    //
     // shaders
+    //
     Shader _2D_vert;
     Shader _2D_frag;
     Shader _SMAA_edge_detection_comp;
@@ -175,7 +170,6 @@ namespace tk { namespace graphics_engine {
     //
     struct FrameResource
     {
-      // HACK: will I want to use command not command_buffer, but adjust them it's so terrible... after day
       Command         cmd;
       VkFence         fence               = VK_NULL_HANDLE;
       VkSemaphore     image_available_sem = VK_NULL_HANDLE; 
@@ -187,22 +181,22 @@ namespace tk { namespace graphics_engine {
     uint32_t                     _current_frame            = 0;
     auto get_current_frame() -> FrameResource& { return _frames[_current_frame]; }
     
+    //
+    // misc
+    //
     DestructorStack              _destructors;
-
     // INFO:
     // allocate a big buffer.
     // should I recreate a bigger buffer when current buffer unenough?
     Buffer                       _buffer;
+    CommandPool                  _command_pool;
 
 
     //
-    // MSAA + SMAA
+    // MSAA
     //
-
-    // INFO: because some device unsupport dynamic msaa feature in pipeline
-    //       so we just fixed use 4bit msaa
-    static constexpr VkSampleCountFlagBits _msaa_sample_count = VK_SAMPLE_COUNT_4_BIT;
-    Image                        _msaa_image;
+    //static constexpr VkSampleCountFlagBits _msaa_sample_count = VK_SAMPLE_COUNT_4_BIT;
+    //Image                        _msaa_image;
     // Image                        _msaa_depth_image;
     Image                        _resolved_image;
 
@@ -213,14 +207,11 @@ namespace tk { namespace graphics_engine {
     Image     _blend_image;
     Image     _area_texture;
     Image     _search_texture;
-    VkSampler _smaa_sampler;
+    VkSampler _smaa_sampler{};
     Image     _smaa_image;
-
-    // TODO: try engine only single pipeline use dynamic pipeline
-    VkPipelineLayout _smaa_pipeline_layout;
-    Pipeline         _smaa_pipeline[3];
-    // FIXME: discard, use descriptor buffer and descriptor index? we not use these structure
+    PipelineLayout   _smaa_pipeline_layout;
     DescriptorLayout _smaa_descriptor_layout;
+    //Pipeline         _smaa_pipeline[3];
     // FIXME: discard, use only one buffer
     Buffer           _descriptor_buffer;
   };

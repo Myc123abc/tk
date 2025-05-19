@@ -35,7 +35,8 @@ void GraphicsEngine::init(Window& window)
   create_swapchain_and_rendering_image();
   load_precalculated_textures();
   create_descriptor_set_layout();
-  create_graphics_pipeline();
+  create_shaders_and_pipeline_layouts();
+  //create_graphics_pipeline();
   create_buffer();
   create_frame_resources();
   
@@ -266,8 +267,8 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
   //
   // MSAA + SMAA
   //
-  _msaa_image     = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, _msaa_sample_count);
-  _resolved_image = _mem_alloc.create_image(_msaa_image.format, _msaa_image.extent, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+  //_msaa_image     = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, _msaa_sample_count);
+  _resolved_image = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
   // FIXME: tmp transform src
   _edges_image    = _mem_alloc.create_image(VK_FORMAT_R8G8_UNORM, _swapchain_images[0].extent,        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
   _blend_image    = _mem_alloc.create_image(VK_FORMAT_R8G8B8A8_UNORM, _swapchain_images[0].extent,    VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
@@ -331,7 +332,7 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
     _mem_alloc.destroy_image(_blend_image);
     _mem_alloc.destroy_image(_edges_image);
     _mem_alloc.destroy_image(_resolved_image);
-    _mem_alloc.destroy_image(_msaa_image);
+    //_mem_alloc.destroy_image(_msaa_image);
     _mem_alloc.destroy_image(_smaa_image);
     vkDestroySwapchainKHR(_device, _swapchain, nullptr);
     for (auto const& image : _swapchain_images)
@@ -458,6 +459,50 @@ void GraphicsEngine::create_descriptor_set_layout()
   _destructors.push([this] { _smaa_descriptor_layout.destroy(); });
 }
 
+void GraphicsEngine::create_shaders_and_pipeline_layouts()
+{
+  // push constant and descriptor
+  VkPushConstantRange push_constant_range 
+  {
+    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+    .size       = sizeof(PushConstant),
+  };
+  auto smaa_push_constant = VkPushConstantRange
+  {
+    .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+    .size       = sizeof(PushConstant_SMAA),
+  };
+
+  // create shaders
+  _device.create_shaders(
+  { 
+    { _2D_vert,                  VK_SHADER_STAGE_VERTEX_BIT,   "shader/2D_vert.spv",                  {},                          { push_constant_range } },
+    { _2D_frag,                  VK_SHADER_STAGE_FRAGMENT_BIT, "shader/2D_frag.spv",                  {},                          { push_constant_range } },
+  }, true);
+  _device.create_shaders(
+  {
+    { _SMAA_edge_detection_comp, VK_SHADER_STAGE_COMPUTE_BIT,  "shader/SMAA_edge_detection_comp.spv", { _smaa_descriptor_layout }, { smaa_push_constant } },
+    { _SMAA_blend_weight_comp,   VK_SHADER_STAGE_COMPUTE_BIT,  "shader/SMAA_blend_weight_comp.spv",   { _smaa_descriptor_layout }, { smaa_push_constant } },
+    { _SMAA_neighbor_comp,       VK_SHADER_STAGE_COMPUTE_BIT,  "shader/SMAA_neighbor_comp.spv",       { _smaa_descriptor_layout }, { smaa_push_constant } },
+  });
+
+  // create pipeline layouts
+  _2D_pipeline_layout   = _device.create_pipeline_layout({},                          { push_constant_range });
+  _smaa_pipeline_layout = _device.create_pipeline_layout({ _smaa_descriptor_layout }, { smaa_push_constant  });
+
+  _destructors.push([this]
+  {
+    _2D_vert.destroy();
+    _2D_frag.destroy();
+    _SMAA_edge_detection_comp.destroy();
+    _SMAA_blend_weight_comp.destroy();
+    _SMAA_neighbor_comp.destroy();
+    _2D_pipeline_layout.destroy();
+    _smaa_pipeline_layout.destroy();
+  });
+}
+
+/*
 void GraphicsEngine::create_graphics_pipeline()
 {
   // create 2D pipeline
@@ -482,21 +527,24 @@ void GraphicsEngine::create_graphics_pipeline()
 
   // create shaders
   _device.create_shaders(
-  {
+  { 
     { _2D_vert,                  VK_SHADER_STAGE_VERTEX_BIT,   "shader/2D_vert.spv",                  {},                          { push_constant_range } },
     { _2D_frag,                  VK_SHADER_STAGE_FRAGMENT_BIT, "shader/2D_frag.spv",                  {},                          { push_constant_range } },
-    //{ _SMAA_edge_detection_comp, VK_SHADER_STAGE_COMPUTE_BIT,  "shader/SMAA_edge_detection_comp.spv", { _smaa_descriptor_layout }, { smaa_push_constant }  },
-    //{ _SMAA_blend_weight_comp,   VK_SHADER_STAGE_COMPUTE_BIT,  "shader/SMAA_blend_weight_comp.spv",   { _smaa_descriptor_layout }, { smaa_push_constant }  },
-    //{ _SMAA_neighbor_comp,       VK_SHADER_STAGE_COMPUTE_BIT,  "shader/SMAA_neighbor_comp.spv",       { _smaa_descriptor_layout }, { smaa_push_constant }  },
+  }, true);
+  _device.create_shaders(
+  {
+    { _SMAA_edge_detection_comp, VK_SHADER_STAGE_COMPUTE_BIT,  "shader/SMAA_edge_detection_comp.spv", { _smaa_descriptor_layout }, { smaa_push_constant } },
+    { _SMAA_blend_weight_comp,   VK_SHADER_STAGE_COMPUTE_BIT,  "shader/SMAA_blend_weight_comp.spv",   { _smaa_descriptor_layout }, { smaa_push_constant } },
+    { _SMAA_neighbor_comp,       VK_SHADER_STAGE_COMPUTE_BIT,  "shader/SMAA_neighbor_comp.spv",       { _smaa_descriptor_layout }, { smaa_push_constant } },
   });
 
   _destructors.push([this]
   {
     _2D_vert.destroy();
     _2D_frag.destroy();
-    //_SMAA_edge_detection_comp.destroy();
-    //_SMAA_blend_weight_comp.destroy();
-    //_SMAA_neighbor_comp.destroy();
+    _SMAA_edge_detection_comp.destroy();
+    _SMAA_blend_weight_comp.destroy();
+    _SMAA_neighbor_comp.destroy();
   });
 
   auto builder = Pipeline();
@@ -538,6 +586,7 @@ void GraphicsEngine::create_graphics_pipeline()
     vkDestroyPipelineLayout(_device, _2D_pipeline_layout, nullptr);
   });
 }
+*/
 
 void GraphicsEngine::init_command_pool()
 {
@@ -594,15 +643,15 @@ void GraphicsEngine::resize_swapchain()
   vkDestroySwapchainKHR(_device, old_swapchain, nullptr);
 
   // destroy old images
-  _mem_alloc.destroy_image(_msaa_image);
+  //_mem_alloc.destroy_image(_msaa_image);
   _mem_alloc.destroy_image(_resolved_image);
   _mem_alloc.destroy_image(_blend_image);
   _mem_alloc.destroy_image(_edges_image);
   _mem_alloc.destroy_image(_smaa_image);
 
   // recreate images
-  _msaa_image     = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, _msaa_sample_count);
-  _resolved_image = _mem_alloc.create_image(_msaa_image.format, _msaa_image.extent, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+  //_msaa_image     = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, _msaa_sample_count);
+  _resolved_image = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
   _edges_image    = _mem_alloc.create_image(VK_FORMAT_R8G8_UNORM, _swapchain_images[0].extent,        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
   _blend_image    = _mem_alloc.create_image(VK_FORMAT_R8G8B8A8_UNORM, _swapchain_images[0].extent,    VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
   _smaa_image     = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);

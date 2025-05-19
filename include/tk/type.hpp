@@ -2,10 +2,10 @@
 
 namespace tk { namespace type {
 
-  enum class pipeline
-  {
-    compute,
-    graphics,
-  };
+  //enum class pipeline
+  //{
+  //  compute,
+  //  graphics,
+  //};
 
 }}

@@ -2,13 +2,11 @@
 
 #include <vulkan/vulkan.h>
 
-#include "../type.hpp"
-#include "Pipeline.hpp"
 #include "Descriptor.hpp"
 #include "Shader.hpp"
+#include "PipelineLayout.hpp"
 
 #include <vector>
-#include <string_view>
 #include <string>
 
 namespace tk { namespace graphics_engine {
@@ -32,15 +30,22 @@ namespace tk { namespace graphics_engine {
 
     auto get() const noexcept { return _device; }
 
-    void create_shaders(std::vector<ShaderCreateInfo> const& infos);
+    void create_shaders(std::vector<ShaderCreateInfo> const& infos, bool link = false);
 
     auto create_descriptor_layout(std::vector<DescriptorInfo> const& infos) -> DescriptorLayout;
 
-    auto create_pipeline(
-      type::pipeline                            type,
-      std::vector<std::string_view>      const& shaders,
+    auto create_pipeline_layout(
       std::vector<VkDescriptorSetLayout> const& descritptor_layouts, 
-      std::vector<VkPushConstantRange>   const& push_constants) -> Pipeline;
+      std::vector<VkPushConstantRange>   const& push_constants) -> PipelineLayout
+    {
+      return { _device, descritptor_layouts, push_constants };
+    }
+
+    //auto create_pipeline(
+    //  type::pipeline                            type,
+    //  std::vector<std::string_view>      const& shaders,
+    //  std::vector<VkDescriptorSetLayout> const& descritptor_layouts, 
+    //  std::vector<VkPushConstantRange>   const& push_constants) -> Pipeline;
   
     auto& get_descriptor_buffer_info() const noexcept { return _descriptor_buffer_info; }
 
