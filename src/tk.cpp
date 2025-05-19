@@ -137,7 +137,7 @@ inline constexpr auto get_circle_segment_count(float radius, float max_error)
   return std::clamp(roundup_to_even(std::ceil(std::numbers::pi / std::acos(1 - std::min(max_error, radius) / radius))), circle_min_segment_num, circle_max_segment_num);
 }
 
-inline constexpr auto get_circle_segment_count_radius(float num, float max_error)
+inline auto get_circle_segment_count_radius(float num, float max_error)
 {
   return max_error / (1 - std::cos(std::numbers::pi / std::max(num, std::numbers::pi_v<float>)));
 }
