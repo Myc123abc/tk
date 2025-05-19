@@ -186,15 +186,19 @@ SDL_AppResult SDL_AppIterate(void *appstate)
       return SDL_APP_CONTINUE;
     }
 
+    auto& ui_ctx = ui::get_ctx();
+
     // update window size
     uint32_t width, height;
     tk_ctx->window.get_framebuffer_size(width, height);
-    ui::get_ctx().window_extent = { width, height };
+    ui_ctx.window_extent = { width, height };
 
     // render ui
     tk_ctx->engine.render_begin();
     ui::render();
     tk_ctx->engine.render_end();
+
+    ui_ctx.event_type = {};
   }
   catch (const std::exception& e)
   {
@@ -210,6 +214,8 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
   {
     tk_event(event);
 
+    auto& ui_ctx = ui::get_ctx();
+
     switch (event->type)
     {
     case SDL_EVENT_QUIT:
@@ -217,6 +223,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
       if (event->window.windowID == SDL_GetWindowID(tk_ctx->window.get()))
         return SDL_APP_SUCCESS;
+      assert(false);
     case SDL_EVENT_WINDOW_MINIMIZED:
       tk_ctx->paused = true;
       break;
@@ -231,6 +238,8 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         return SDL_APP_SUCCESS;
       break;
     }
+
+    ui_ctx.event_type = event->type;
   }
   catch (const std::exception& e)
   {

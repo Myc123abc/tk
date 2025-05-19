@@ -2,11 +2,16 @@
 #include "internal.hpp"
 
 #include <cassert>
-#include <algorithm>
+
+#include "tk/log.hpp"
 
 using namespace tk::graphics_engine;
 
 namespace tk { namespace ui {
+
+////////////////////////////////////////////////////////////////////////////////
+//                                  Misc
+////////////////////////////////////////////////////////////////////////////////
 
 void begin(glm::vec2 const& pos)
 {
@@ -40,6 +45,10 @@ void render()
     ctx.layouts.pop();
   }
 }
+
+////////////////////////////////////////////////////////////////////////////////
+//                                Shape
+////////////////////////////////////////////////////////////////////////////////
 
 void rectangle(glm::vec2 const& pos, glm::vec2 const& extent, uint32_t color)
 {
@@ -266,6 +275,83 @@ void path_stroke(uint32_t color, float thickness, bool is_closed)
   }
 
   points.clear();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//                                UI
+////////////////////////////////////////////////////////////////////////////////
+
+auto get_bounding_rectangle(std::vector<glm::vec2> const& data) -> std::pair<glm::vec2, glm::vec2>
+{
+  assert(data.size() > 2);
+
+  glm::vec2 min = data[0];
+  glm::vec2 max = data[0];
+
+  for (auto i = 1; i < data.size(); ++i)
+  {
+    auto& p = data[i];
+    if (p.x < min.x) min.x = p.x;
+    if (p.y < min.y) min.y = p.y;
+    if (p.x > max.x) max.x = p.x;
+    if (p.y > max.y) max.y = p.y;
+  }
+
+  return { min, max };
+}
+
+bool detect_mouse_on_button(std::vector<glm::vec2> const& data)
+{
+  // get bounding rectangle
+  auto win_pos = get_ctx().layouts.back().pos;
+  auto res     = get_bounding_rectangle(data);
+  auto min     = res.first  + win_pos;
+  auto max     = res.second + win_pos;
+
+  // get mouse pos
+  float x, y;
+  SDL_GetMouseState(&x, &y);  
+
+  // detect whether mouse on button
+  if (x > min.x && y > min.y &&
+      x < max.x && y < max.y)
+  {
+    return true;
+  }
+  return false;
+}
+
+bool button(type::shape shape, std::vector<glm::vec2> const& data, uint32_t color, float thickness)
+{
+  // draw shape
+  auto num  = data.size();
+  switch (shape)
+  {
+  case type::shape::triangle:
+    assert(num == 3);
+    triangle(data[0], data[1], data[2], color, thickness);
+    break;
+  }
+
+  static bool first_click = false;
+
+  auto& ctx = get_ctx();
+  if (ctx.event_type == SDL_EVENT_MOUSE_BUTTON_DOWN && detect_mouse_on_button(data))
+  {
+    first_click = true;
+    return false;
+  }
+
+  if (first_click && ctx.event_type == SDL_EVENT_MOUSE_BUTTON_UP)
+  {
+    first_click = false;
+    if (detect_mouse_on_button(data))
+      return true;
+    else
+      return false;
+  }
+
+  return false;
 }
 
 }}

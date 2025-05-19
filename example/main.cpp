@@ -36,7 +36,14 @@ void tk_iterate()
 
     // playback button
     auto playback_right_point = glm::vec2{ 5 + 12.5 * 1.414, 17.5 };
-    ui::triangle({ 5, 5 }, playback_right_point, { 5, 30 }, 0xFFFFFFFF, 1.f);
+    auto color1 = 0xFFFFFFFF;
+    auto color2 = 0xFFFF00FF;
+    static auto color = color1;
+    if (ui::button(type::shape::triangle, { { 5, 5 }, playback_right_point, { 5, 30 } }, color, 1.f))
+    {
+      if (color == color1) color = color2;
+      else                 color = color1;      
+    }
 
     // playback progress
     ui::rectangle({ playback_right_point.x + 5, playback_right_point.y }, { 100, 3 }, 0x808080FF );

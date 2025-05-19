@@ -8,4 +8,9 @@ namespace tk { namespace type {
   //  graphics,
   //};
 
+  enum class shape
+  {
+    triangle,
+  };
+
 }}

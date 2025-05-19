@@ -26,7 +26,15 @@ struct ui_context
   std::vector<graphics_engine::Vertex> vertices;
   std::vector<uint16_t>                indices;
 
+  // use for path draw
   std::vector<glm::vec2> points;
+
+  // 0: nothing (up)
+  // 1: first down
+  // 2: pressed
+  int mouse_down_state = 0;
+
+  uint32_t event_type{};
 };
 
 inline auto& get_ctx()

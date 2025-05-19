@@ -19,9 +19,9 @@ namespace tk
     ~DestructorStack() = default;
 
     DestructorStack(DestructorStack const&)            = delete;
-    DestructorStack(DestructorStack&& ds)              { *this = std::move(ds); }
+    DestructorStack(DestructorStack&& ds) noexcept { *this = std::move(ds); }
     DestructorStack& operator=(DestructorStack const&) = delete;
-    DestructorStack& operator=(DestructorStack&& ds)
+    DestructorStack& operator=(DestructorStack&& ds) noexcept
     {
       _destructors = std::move(ds._destructors);
       return *this;
