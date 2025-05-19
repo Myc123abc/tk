@@ -251,10 +251,6 @@ void GraphicsEngine::render_end()
   _current_frame = ++_current_frame % _swapchain_images.size();
 }
 
-/*
- * buffer storage
- * | vertices | indices |
- */
 void GraphicsEngine::render(std::span<IndexInfo> index_infos, glm::vec2 const& window_extent, glm::vec2 const& display_pos)
 {
   auto cmd = _frames[_current_frame].cmd;
@@ -273,8 +269,21 @@ void GraphicsEngine::render(std::span<IndexInfo> index_infos, glm::vec2 const& w
   auto shaders = std::vector<VkShaderEXT>{ _2D_vert, _2D_frag };
   graphics_engine::vkCmdBindShadersEXT(cmd, 2, stages.data(), shaders.data());
 
+  auto draws = std::vector<VkDrawIndexedIndirectCommand>();
+  draws.reserve(index_infos.size());
   for (auto const& index_info : index_infos)
-    vkCmdDrawIndexed(cmd, index_info.count, 1, index_info.offset, 0, 0);
+    draws.emplace_back(VkDrawIndexedIndirectCommand
+    {
+      .indexCount    = index_info.count,
+      .instanceCount = 1,
+      .firstIndex    = index_info.offset,
+      .vertexOffset  = 0,
+      .firstInstance = 0,
+    });
+  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), draws.data(), _indirect_draw_buffer.allocation(), 0, draws.size() * sizeof(VkDrawIndexedIndirectCommand)) != VK_SUCCESS,
+           "failed to copy data to buffer");
+  // TODO: use single buffer, remember to set buffer offset
+  vkCmdDrawIndexedIndirect(cmd, _indirect_draw_buffer.handle(), 0, draws.size(), sizeof(VkDrawIndexedIndirectCommand));
 
   graphics_engine::vkCmdBindShadersEXT(cmd, 2, stages.data(), nullptr);
 }

@@ -212,6 +212,7 @@ void GraphicsEngine::create_device_and_get_queues()
     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
     .pNext = &features12,
   };
+  features2.features.multiDrawIndirect = VK_TRUE;
 
   // device info 
   VkDeviceCreateInfo create_info
@@ -461,7 +462,7 @@ void GraphicsEngine::create_descriptor_set_layout()
 
 void GraphicsEngine::create_shaders_and_pipeline_layouts()
 {
-  // push constant and descriptor
+  // push constant
   VkPushConstantRange push_constant_range 
   {
     .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -673,11 +674,17 @@ void GraphicsEngine::resize_swapchain()
 
 void GraphicsEngine::create_buffer()
 {
-  _buffer = _mem_alloc.create_buffer(2 * 1024 * 1024, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT        |
-                                                      VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+  _buffer = _mem_alloc.create_buffer(2 * 1024 * 1024, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
                                                       VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                                                       VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
-  _destructors.push([this] { _buffer.destroy(); });
+
+  _indirect_draw_buffer = _mem_alloc.create_buffer(1024, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+
+  _destructors.push([this] 
+  {
+    _buffer.destroy(); 
+    _indirect_draw_buffer.destroy();
+  });
 }
 
 // TODO: abstract load array data to image as a method function of Image
