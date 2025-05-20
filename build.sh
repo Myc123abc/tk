@@ -19,3 +19,6 @@ glslc -fshader-stage=compute  shader/SMAA_neighbor.comp       -o shader/SMAA_nei
 cp shader/SMAA_edge_detection_comp.spv build/example/shader/SMAA_edge_detection_comp.spv
 cp shader/SMAA_blend_weight_comp.spv   build/example/shader/SMAA_blend_weight_comp.spv
 cp shader/SMAA_neighbor_comp.spv       build/example/shader/SMAA_neighbor_comp.spv
+
+glslc -fshader-stage=compute  shader/SDFAA.comp -o shader/SDFAA_comp.spv
+cp shader/SDFAA_comp.spv build/example/shader/SDFAA_comp.spv

@@ -181,21 +181,24 @@ void GraphicsEngine::render_end()
 
   vkCmdEndRendering(frame.cmd);
 
+  // TODO: use post_processing for all post processing
   post_process();
+  sdf_aa_post_processing();
 
   VkExtent2D extent = { _swapchain_images[image_index].extent.width, _swapchain_images[image_index].extent.height };
 
   // TODO: need resolved_image? directly use smaa to swapchain image is ok so...
 
   // copy resolved image to swapchain image
-  // FIXME: can del
-  transition_image_layout(frame.cmd, _smaa_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  transition_image_layout(frame.cmd, _sdfaa_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  //transition_image_layout(frame.cmd, _smaa_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   //transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   //transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   //transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
   
-  copy_image(frame.cmd, _smaa_image, _swapchain_images[image_index]);
+  copy_image(frame.cmd, _sdfaa_image, _swapchain_images[image_index]);
+  //copy_image(frame.cmd, _smaa_image, _swapchain_images[image_index]);
   //copy_image(frame.cmd, _resolved_image, _swapchain_images[image_index]);
   //copy_image(frame.cmd, _smaa_image.handle, _swapchain_images[image_index].handle, extent, extent);
 
@@ -335,7 +338,6 @@ void GraphicsEngine::post_process()
   };
   vkCmdPushConstants(frame.cmd, _smaa_pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
 
-  // HACK: all pass use same pipeline layout, but pipeline layout will be discard?
   bind_descriptor_buffer(frame.cmd, _descriptor_buffer.address(), VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT, _smaa_pipeline_layout, VK_PIPELINE_BIND_POINT_COMPUTE);
 
   vkCmdDispatch(frame.cmd, std::ceil((extent.width + 15) / 16), std::ceil((extent.height + 15) / 16), 1);
@@ -358,6 +360,25 @@ void GraphicsEngine::post_process()
   transition_image_layout(frame.cmd, _smaa_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
   transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   vkCmdDispatch(frame.cmd, std::ceil((extent.width + 15) / 16), std::ceil((extent.height + 15) / 16), 1);
+  graphics_engine::vkCmdBindShadersEXT(frame.cmd, 1, stages.data(), nullptr);
+}
+
+void GraphicsEngine::sdf_aa_post_processing()
+{
+  auto frame = get_current_frame();
+
+  VkExtent2D extent = { _swapchain_images[image_index].extent.width, _swapchain_images[image_index].extent.height };
+
+  transition_image_layout(frame.cmd, _sdfaa_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+
+  auto stages  = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_COMPUTE_BIT };
+  auto shaders = std::vector<VkShaderEXT>{ _sdfaa_comp };
+  graphics_engine::vkCmdBindShadersEXT(frame.cmd, 1, stages.data(), &shaders[0]);
+
+  bind_descriptor_buffer(frame.cmd, _sdfaa_descriptor_buffer.address(), 0, _sdfaa_pipeline_layout, VK_PIPELINE_BIND_POINT_COMPUTE);
+
+  vkCmdDispatch(frame.cmd, std::ceil((extent.width + 15) / 16), std::ceil((extent.height + 15) / 16), 1);
+
   graphics_engine::vkCmdBindShadersEXT(frame.cmd, 1, stages.data(), nullptr);
 }
     

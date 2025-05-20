@@ -6,6 +6,15 @@
 // event handles and other.
 //
 
+/*
+
+TODO:
+1. Use analytic aa in compute shader to proccess once on resolved image.
+   Evenry pixel will caculate alpha and color for every shape, and output aaa image.
+2. lerp animation can process also in analytic compute shader? or lerp animation compute shader? or vertex shader?
+
+*/
+
 #include "tk/tk.hpp"
 #include "tk/ui/ui.hpp"
 #include "tk/log.hpp"

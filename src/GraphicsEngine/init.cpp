@@ -39,6 +39,8 @@ void GraphicsEngine::init(Window& window)
   //create_graphics_pipeline();
   create_buffer();
   create_frame_resources();
+
+  create_sdfaa_resources();
   
   update_descriptors_to_descrptor_buffer();
 
@@ -272,7 +274,7 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
   // FIXME: tmp transform src
   _edges_image    = _mem_alloc.create_image(VK_FORMAT_R8G8_UNORM, _swapchain_images[0].extent,        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
   _blend_image    = _mem_alloc.create_image(VK_FORMAT_R8G8B8A8_UNORM, _swapchain_images[0].extent,    VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
-  _smaa_image     = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+  _smaa_image     = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
   // create msaa depth image and depth image
   // _msaa_depth_image.format = Depth_Format;
   // _msaa_depth_image.extent = _image.extent;
@@ -779,6 +781,43 @@ void GraphicsEngine::update_descriptors_to_descrptor_buffer()
   _smaa_descriptor_layout.update_descriptors(_descriptor_buffer);
   
   _destructors.push([this] { _descriptor_buffer.destroy(); });
+}
+
+// TODO: need handle recreate swapchain image recreate and descriptor layout update
+void GraphicsEngine::create_sdfaa_resources()
+{
+  // create image
+  _sdfaa_image = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT);
+
+  // create descriptor layout
+  _sdfaa_descriptor_layout = _device.create_descriptor_layout(
+  {
+    { 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT, _sdfaa_image.view },
+  });
+
+  // create and upload data of decriptor layout to descriptor buffer
+  _sdfaa_descriptor_buffer = _mem_alloc.create_buffer(_sdfaa_descriptor_layout.size(), VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT  | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+  _sdfaa_descriptor_layout.update_descriptors(_sdfaa_descriptor_buffer);
+
+  // create shader
+  _device.create_shaders(
+  {
+    { _sdfaa_comp, VK_SHADER_STAGE_COMPUTE_BIT,  "shader/SDFAA_comp.spv", { _sdfaa_descriptor_layout }, {} },
+  });
+
+  // create pipeline layout
+  _sdfaa_pipeline_layout = _device.create_pipeline_layout({ _sdfaa_descriptor_layout }, {});
+
+  // destroy resources
+  _destructors.push([&]
+  {
+    _sdfaa_pipeline_layout.destroy();
+    _sdfaa_comp.destroy();
+    _sdfaa_descriptor_buffer.destroy();
+    _sdfaa_descriptor_layout.destroy();
+    // TODO: change api, use image.destroy();
+    _mem_alloc.destroy_image(_sdfaa_image);
+  });
 }
 
 } }
