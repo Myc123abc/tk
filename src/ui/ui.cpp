@@ -313,6 +313,34 @@ void path_stroke(uint32_t color, float thickness, bool is_closed)
   points.clear();
 }
 
+void path_fill_convex(uint32_t color)
+{
+  auto& ctx      = get_ctx();
+  auto& points   = ctx.points;
+  auto& vertices = ctx.vertices;
+  auto& indices  = ctx.indices;
+
+  uint32_t idx_count  = (points.size() - 2) * 3;
+  uint32_t vtx_count  = points.size();
+  uint32_t idx_beg    = vertices.size();
+  uint32_t idx_offset = indices.size();
+
+  vertices.reserve(idx_beg + vtx_count);
+  for (auto i = 0; i < vtx_count; ++i)
+    vertices.emplace_back(Vertex{ points[i], {}, color });
+
+  indices.reserve(idx_offset + idx_count);
+  for (auto i = 2; i < vtx_count; ++i)
+    indices.append_range(std::vector<uint32_t>
+    {
+      idx_beg, idx_beg + i - 1, idx_beg + i,
+    });
+
+  ctx.layouts.back().index_infos.emplace_back(GraphicsEngine::IndexInfo{ idx_offset, idx_count });
+
+  points.clear();
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //                                UI
 ////////////////////////////////////////////////////////////////////////////////

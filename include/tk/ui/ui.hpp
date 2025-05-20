@@ -73,6 +73,12 @@ inline void path_line_to(float x, float y) { path_line_to({x, y}); };
  */
 void path_stroke(uint32_t color, float thickness, bool is_closed);
 
+/**
+ * draw filled convex poly using added points
+ * @param color color of stroke
+ */
+void path_fill_convex(uint32_t color);
+
 ////////////////////////////////////////////////////////////////////////////////
 //                                UI
 ////////////////////////////////////////////////////////////////////////////////
