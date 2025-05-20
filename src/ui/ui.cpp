@@ -4,8 +4,6 @@
 
 #include <cassert>
 
-#include "tk/log.hpp"
-
 using namespace tk::graphics_engine;
 
 namespace tk { namespace ui {
@@ -78,22 +76,31 @@ void render()
 //                                Shape
 ////////////////////////////////////////////////////////////////////////////////
 
-void rectangle(glm::vec2 const& pos, glm::vec2 const& extent, uint32_t color)
+void rectangle(glm::vec2 const& pos0, glm::vec2 const& pos1, uint32_t color, float thickness)
 {
   auto& ctx = get_ctx();
   assert(ctx.begining);
 
-  auto lower_down     = pos + extent;
+  if (thickness > 0.f)
+  {
+    path_line_to(pos0);
+    path_line_to(pos1.x, pos0.y);
+    path_line_to(pos1);
+    path_line_to(pos0.x, pos1.y);
+    path_stroke(color, thickness, true);
+    return;
+  }
+
   uint32_t idx_beg    = ctx.vertices.size();
   uint32_t idx_offset = ctx.indices.size();
 
   // set vertices
   ctx.vertices.append_range(std::vector<Vertex>
   {
-    { pos,                     {}, color },
-    { { lower_down.x, pos.y }, {}, color },
-    { lower_down,              {}, color },
-    { { pos.x, lower_down.y }, {}, color },
+    { pos0,               {}, color },
+    { { pos1.x, pos0.y }, {}, color },
+    { pos1,               {}, color },
+    { { pos0.x, pos1.y }, {}, color },
   });
 
   // set indices
@@ -350,6 +357,62 @@ bool detect_mouse_on_button(std::vector<glm::vec2> const& data)
   return false;
 }
 
+bool click_area(std::string_view name, glm::vec2 const& pos0, glm::vec2 const& pos1)
+{
+  auto& ctx    = get_ctx();
+  auto& layout = ctx.layouts.back();
+
+  // detect whether already have same button
+  {
+    // get current layout's widgets name
+    auto& widgets = ctx.call_stack.at(layout.name.data());
+    // have same button throw exception
+    auto it = std::find_if(widgets.begin(), widgets.end(), [&](auto const& str) { return str == name; });
+    if (it == widgets.end())
+      widgets.emplace_back(name.data());
+    else
+      throw_if(true, "duplication button");
+  }
+
+  // get widgets of current layout
+  auto& widgets = ctx.states.at(layout.name.data());
+  auto it = std::find_if(widgets.begin(), widgets.end(), [&](auto const& widget) { return widget.name == name; });
+
+  Widget* widget{};
+
+  // not found, create the new widget
+  if (it == widgets.end())
+  {
+    widgets.emplace_back(Widget
+    {
+      .name        = name.data(),
+      .id          = generate_id(),
+      .first_click = false,
+    });
+    widget = &widgets.back();
+  }
+  else
+    widget = &*it;
+
+  auto detect_data = { pos0, { pos1.x, pos0.y }, pos1, { pos0.x, pos1.y } };
+  if (ctx.event_type == SDL_EVENT_MOUSE_BUTTON_DOWN && detect_mouse_on_button(detect_data))
+  {
+    widget->first_click = true;
+    return false;
+  }
+
+  if (widget->first_click && ctx.event_type == SDL_EVENT_MOUSE_BUTTON_UP)
+  {
+    widget->first_click = false;
+    if (detect_mouse_on_button(detect_data))
+      return true;
+    else
+      return false;
+  }
+
+  return false;
+}
+
 bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> const& data, uint32_t color, float thickness)
 {
   auto& ctx    = get_ctx();
@@ -389,15 +452,22 @@ bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> con
 
   // draw shape
   auto num = data.size();
+  std::vector<glm::vec2> detect_data;
   switch (shape)
   {
   case type::shape::triangle:
     assert(num == 3);
     triangle(data[0], data[1], data[2], color, thickness);
+    detect_data = data;
+    break;
+  case type::shape::rectangle:
+    assert(num == 2);
+    rectangle(data[0], data[1], color, thickness);
+    detect_data = { data[0], { data[1].x, data[0].y }, data[1], { data[0].x, data[1].y } };
     break;
   }
 
-  if (ctx.event_type == SDL_EVENT_MOUSE_BUTTON_DOWN && detect_mouse_on_button(data))
+  if (ctx.event_type == SDL_EVENT_MOUSE_BUTTON_DOWN && detect_mouse_on_button(detect_data))
   {
     widget->first_click = true;
     return false;
@@ -406,7 +476,7 @@ bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> con
   if (widget->first_click && ctx.event_type == SDL_EVENT_MOUSE_BUTTON_UP)
   {
     widget->first_click = false;
-    if (detect_mouse_on_button(data))
+    if (detect_mouse_on_button(detect_data))
       return true;
     else
       return false;

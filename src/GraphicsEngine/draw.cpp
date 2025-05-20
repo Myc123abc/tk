@@ -274,25 +274,10 @@ void GraphicsEngine::render(std::span<IndexInfo> index_infos, glm::vec2 const& w
   };
   vkCmdPushConstants(cmd, _2D_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
 
-  //auto draws = std::vector<VkDrawIndexedIndirectCommand>();
-  //draws.reserve(index_infos.size());
-  //for (auto const& index_info : index_infos)
-  //  draws.emplace_back(VkDrawIndexedIndirectCommand
-  //  {
-  //    .indexCount    = index_info.count,
-  //    .instanceCount = 1,
-  //    .firstIndex    = index_info.offset,
-  //    .vertexOffset  = 0,
-  //    .firstInstance = 0,
-  //  });
-  //throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), draws.data(), _indirect_draw_buffer.allocation(), 0, draws.size() * sizeof(VkDrawIndexedIndirectCommand)) != VK_SUCCESS,
-  //         "failed to copy data to buffer");
-  // TODO: use single buffer, remember to set buffer offset
-  //vkCmdDrawIndexedIndirect(cmd, _indirect_draw_buffer.handle(), 0, draws.size(), sizeof(VkDrawIndexedIndirectCommand));
-  for (auto info : index_infos)
-  {
-    vkCmdDrawIndexed(cmd, info.count, 1, info.offset, 0, 0);
-  }
+  uint32_t count{};
+  for (auto const& info : index_infos)
+    count += info.count;
+  vkCmdDrawIndexed(cmd, count, 1, index_infos[0].offset, 0, 0);
 }
 
 void GraphicsEngine::update(std::span<Vertex> vertices, std::span<uint16_t> indices)

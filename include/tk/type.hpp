@@ -11,6 +11,7 @@ namespace tk { namespace type {
   enum class shape
   {
     triangle,
+    rectangle,
   };
 
 }}

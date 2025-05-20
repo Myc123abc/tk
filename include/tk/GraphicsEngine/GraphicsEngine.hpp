@@ -215,10 +215,6 @@ namespace tk { namespace graphics_engine {
     //Pipeline         _smaa_pipeline[3];
     // FIXME: discard, use only one buffer
     Buffer           _descriptor_buffer;
-
-    // indirect draw
-    // FIXME: integrate to single buffer
-    Buffer _indirect_draw_buffer;
   };
 
 } }

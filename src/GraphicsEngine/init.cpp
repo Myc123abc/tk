@@ -212,7 +212,6 @@ void GraphicsEngine::create_device_and_get_queues()
     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
     .pNext = &features12,
   };
-  features2.features.multiDrawIndirect = VK_TRUE;
 
   // device info 
   VkDeviceCreateInfo create_info
@@ -526,19 +525,6 @@ void GraphicsEngine::create_graphics_pipeline()
   throw_if(vkCreatePipelineLayout(_device, &layout_info, nullptr, &_2D_pipeline_layout) != VK_SUCCESS,
            "failed to create graphics pipeline layout");
 
-  // create shaders
-  _device.create_shaders(
-  { 
-    { _2D_vert,                  VK_SHADER_STAGE_VERTEX_BIT,   "shader/2D_vert.spv",                  {},                          { push_constant_range } },
-    { _2D_frag,                  VK_SHADER_STAGE_FRAGMENT_BIT, "shader/2D_frag.spv",                  {},                          { push_constant_range } },
-  }, true);
-  _device.create_shaders(
-  {
-    { _SMAA_edge_detection_comp, VK_SHADER_STAGE_COMPUTE_BIT,  "shader/SMAA_edge_detection_comp.spv", { _smaa_descriptor_layout }, { smaa_push_constant } },
-    { _SMAA_blend_weight_comp,   VK_SHADER_STAGE_COMPUTE_BIT,  "shader/SMAA_blend_weight_comp.spv",   { _smaa_descriptor_layout }, { smaa_push_constant } },
-    { _SMAA_neighbor_comp,       VK_SHADER_STAGE_COMPUTE_BIT,  "shader/SMAA_neighbor_comp.spv",       { _smaa_descriptor_layout }, { smaa_push_constant } },
-  });
-
   _destructors.push([this]
   {
     _2D_vert.destroy();
@@ -679,13 +665,9 @@ void GraphicsEngine::create_buffer()
   _buffer = _mem_alloc.create_buffer(Buffer_Size * _swapchain_images.size(), VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
                                                                              VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                                                                              VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
-
-  _indirect_draw_buffer = _mem_alloc.create_buffer(1024, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
-
   _destructors.push([this] 
   {
     _buffer.destroy(); 
-    _indirect_draw_buffer.destroy();
   });
 }
 

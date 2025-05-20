@@ -39,11 +39,12 @@ void end();
 
 /**
 * draw a rectangle
-* @param pos position of rectangle in a layout (which is a pair of begin and end)
-* @param extent the width and height of this rectangle
+* @param pos0 position on left upper
+* @param pos1 position on right lower
 * @param color color of rectangle, which use RGBA
+* @param thickness if thickness > 0, will enable stroke draw
 */
-void rectangle(glm::vec2 const& pos, glm::vec2 const& extent, uint32_t color);
+void rectangle(glm::vec2 const& pos0, glm::vec2 const& pos1, uint32_t color, float thickness = 0.f);
 
 /**
 * draw a triangle
@@ -62,6 +63,7 @@ void triangle(glm::vec2 p1, glm::vec2 p2, glm::vec2 p3, uint32_t color, float th
  * @param point point of path
  */
 void path_line_to(glm::vec2 point);
+inline void path_line_to(float x, float y) { path_line_to({x, y}); };
 
 /**
  * draw stroke using added points
@@ -85,5 +87,13 @@ void path_stroke(uint32_t color, float thickness, bool is_closed);
  * @return true if button is clicked
  */
 bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> const& data, uint32_t color, float thickness = 0.f);
+
+/**
+ * create a clickable rectangle area
+ * @param name name for id in layout (different layout can have same name widget)
+ * @param pos0 position on left upper
+ * @param pos1 position on right lower
+ */
+bool click_area(std::string_view name, glm::vec2 const& pos0, glm::vec2 const& pos1);
 
 }}
