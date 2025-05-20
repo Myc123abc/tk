@@ -23,6 +23,7 @@ namespace tk { namespace graphics_engine {
     glm::vec2 pos;
     glm::vec2 uv;
     uint32_t  col; // 0xRRGGBBAA
+    uint32_t  pad0{};
   };
 
   //

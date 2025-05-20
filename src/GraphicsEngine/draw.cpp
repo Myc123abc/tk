@@ -7,7 +7,8 @@
 
 namespace tk { namespace graphics_engine {
 
-// FIX: tmp way
+// FIXME: cannot use it as frame count!!!
+//        vulkan acquire in some case can get same image index as last frame!!!
 static uint32_t image_index = 0;
 
 // HACK: currently, not use
@@ -112,6 +113,12 @@ void GraphicsEngine::render_begin()
   };
   vkCmdBeginRendering(frame.cmd, &rendering);
 
+  // INFO: not use pipeline, using shader objects
+  //vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _2D_pipeline);
+  auto stages  = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
+  auto shaders = std::vector<VkShaderEXT>{ _2D_vert, _2D_frag };
+  graphics_engine::vkCmdBindShadersEXT(frame.cmd, 2, stages.data(), shaders.data());
+
   //VkViewport viewport
   //{
   //  .width  = (float)extent.width,
@@ -169,6 +176,9 @@ void GraphicsEngine::render_end()
   //
   auto frame = get_current_frame();
 
+  auto stages  = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
+  graphics_engine::vkCmdBindShadersEXT(frame.cmd, 2, stages.data(), nullptr);
+
   vkCmdEndRendering(frame.cmd);
 
   post_process();
@@ -184,8 +194,9 @@ void GraphicsEngine::render_end()
   //transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   //transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-  //copy_image(frame.cmd, _resolved_image, _swapchain_images[image_index]);
+  
   copy_image(frame.cmd, _smaa_image, _swapchain_images[image_index]);
+  //copy_image(frame.cmd, _resolved_image, _swapchain_images[image_index]);
   //copy_image(frame.cmd, _smaa_image.handle, _swapchain_images[image_index].handle, extent, extent);
 
   // transition image layout to presentable
@@ -257,35 +268,31 @@ void GraphicsEngine::render(std::span<IndexInfo> index_infos, glm::vec2 const& w
 
   PushConstant pc
   {
-    .vertices      = _buffer.address(),
+    .vertices      = _buffer.address() + Buffer_Size * _current_frame,
     .window_extent = window_extent,
     .display_pos   = display_pos,
   };
   vkCmdPushConstants(cmd, _2D_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
 
-  // INFO: not use pipeline, using shader objects
-  //vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _2D_pipeline);
-  auto stages  = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
-  auto shaders = std::vector<VkShaderEXT>{ _2D_vert, _2D_frag };
-  graphics_engine::vkCmdBindShadersEXT(cmd, 2, stages.data(), shaders.data());
-
-  auto draws = std::vector<VkDrawIndexedIndirectCommand>();
-  draws.reserve(index_infos.size());
-  for (auto const& index_info : index_infos)
-    draws.emplace_back(VkDrawIndexedIndirectCommand
-    {
-      .indexCount    = index_info.count,
-      .instanceCount = 1,
-      .firstIndex    = index_info.offset,
-      .vertexOffset  = 0,
-      .firstInstance = 0,
-    });
-  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), draws.data(), _indirect_draw_buffer.allocation(), 0, draws.size() * sizeof(VkDrawIndexedIndirectCommand)) != VK_SUCCESS,
-           "failed to copy data to buffer");
+  //auto draws = std::vector<VkDrawIndexedIndirectCommand>();
+  //draws.reserve(index_infos.size());
+  //for (auto const& index_info : index_infos)
+  //  draws.emplace_back(VkDrawIndexedIndirectCommand
+  //  {
+  //    .indexCount    = index_info.count,
+  //    .instanceCount = 1,
+  //    .firstIndex    = index_info.offset,
+  //    .vertexOffset  = 0,
+  //    .firstInstance = 0,
+  //  });
+  //throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), draws.data(), _indirect_draw_buffer.allocation(), 0, draws.size() * sizeof(VkDrawIndexedIndirectCommand)) != VK_SUCCESS,
+  //         "failed to copy data to buffer");
   // TODO: use single buffer, remember to set buffer offset
-  vkCmdDrawIndexedIndirect(cmd, _indirect_draw_buffer.handle(), 0, draws.size(), sizeof(VkDrawIndexedIndirectCommand));
-
-  graphics_engine::vkCmdBindShadersEXT(cmd, 2, stages.data(), nullptr);
+  //vkCmdDrawIndexedIndirect(cmd, _indirect_draw_buffer.handle(), 0, draws.size(), sizeof(VkDrawIndexedIndirectCommand));
+  for (auto info : index_infos)
+  {
+    vkCmdDrawIndexed(cmd, info.count, 1, info.offset, 0, 0);
+  }
 }
 
 void GraphicsEngine::update(std::span<Vertex> vertices, std::span<uint16_t> indices)
@@ -293,14 +300,15 @@ void GraphicsEngine::update(std::span<Vertex> vertices, std::span<uint16_t> indi
   auto vertices_size = sizeof(Vertex)   * vertices.size();
   auto indices_size  = sizeof(uint16_t) * indices.size();
 
-  throw_if(vertices_size + indices_size > 2 * 1024 * 1024, "too big vertices indices data!(bigger than 2MB)");
+  throw_if(vertices_size + indices_size > Buffer_Size, "too big vertices indices data!(bigger than {})", Buffer_Size);
 
-  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), vertices.data(), _buffer.allocation(), 0, vertices_size) != VK_SUCCESS,
-           "failed to copy vertices data to buffer");
-  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), indices.data(), _buffer.allocation(), vertices_size, indices_size) != VK_SUCCESS,
+  // TODO: abstract every frame's buffer, remember use _current_frame not image_index!!!
+  auto offset = Buffer_Size * _current_frame;
+  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), vertices.data(), _buffer.allocation(), offset, vertices_size) != VK_SUCCESS,
+           "failed to copy vertices data to buffer");         
+  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), indices.data(), _buffer.allocation(), offset + vertices_size, indices_size) != VK_SUCCESS,
            "failed to copy indices data to buffer");
-           
-  vkCmdBindIndexBuffer(_frames[_current_frame].cmd, _buffer.handle(), vertices_size, VK_INDEX_TYPE_UINT16);
+  vkCmdBindIndexBuffer(get_current_frame().cmd, _buffer.handle(), offset + vertices_size, VK_INDEX_TYPE_UINT16);
 }
 
 void clear(Command const& cmd, Image const& img)

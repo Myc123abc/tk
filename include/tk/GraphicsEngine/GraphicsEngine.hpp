@@ -102,7 +102,7 @@ namespace tk { namespace graphics_engine {
     void load_device_extension_funcs();
     static constexpr auto          Vulkan_Version    = VK_API_VERSION_1_4;
     static constexpr auto          Depth_Format      = VK_FORMAT_D32_SFLOAT;
-    const std::vector<const char*> Device_Extensions = 
+    std::vector<const char*> const Device_Extensions = 
     {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
       VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
@@ -188,6 +188,7 @@ namespace tk { namespace graphics_engine {
     // INFO:
     // allocate a big buffer.
     // should I recreate a bigger buffer when current buffer unenough?
+    static constexpr uint32_t    Buffer_Size = 1024 * 1024;
     Buffer                       _buffer;
     CommandPool                  _command_pool;
 

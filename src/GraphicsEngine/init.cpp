@@ -674,9 +674,11 @@ void GraphicsEngine::resize_swapchain()
 
 void GraphicsEngine::create_buffer()
 {
-  _buffer = _mem_alloc.create_buffer(2 * 1024 * 1024, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-                                                      VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                                                      VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+  // promise every swapchain image have seperate vertices indices buffer avoid GPU-CPU data race
+  // e.g. GPU read last frame unfinished but CPU already write the using buffer next frame data
+  _buffer = _mem_alloc.create_buffer(Buffer_Size * _swapchain_images.size(), VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+                                                                             VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                                                                             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
 
   _indirect_draw_buffer = _mem_alloc.create_buffer(1024, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
 
@@ -778,6 +780,7 @@ void GraphicsEngine::load_precalculated_textures()
   };
   throw_if(vkCreateSampler(_device, &sampler_info, nullptr, &_smaa_sampler) != VK_SUCCESS,
            "failed to create smaa sampler");
+
   // record destructors
   _destructors.push([this]
   {

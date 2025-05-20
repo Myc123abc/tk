@@ -1,5 +1,6 @@
 #include "tk/ui/ui.hpp"
 #include "internal.hpp"
+#include "tk/ErrorHandling.hpp"
 
 #include <cassert>
 
@@ -13,11 +14,25 @@ namespace tk { namespace ui {
 //                                  Misc
 ////////////////////////////////////////////////////////////////////////////////
 
-void begin(glm::vec2 const& pos)
+// FIXME: discard?
+auto generate_id() -> uint32_t
 {
-  assert(get_ctx().begining == false);
-  get_ctx().begining = true;
-  get_ctx().layouts.push({ pos });
+  static uint32_t id = 0;
+  assert(id < UINT32_MAX);
+  return ++id;
+}
+
+void begin(std::string_view name, glm::vec2 const& pos)
+{
+  auto& ctx = get_ctx();
+  
+  assert(ctx.begining == false);
+  ctx.begining = true;
+
+  ctx.layouts.emplace(Layout{ name, pos });
+
+  ctx.states.try_emplace(name.data(), std::vector<Widget>());
+  ctx.call_stack.try_emplace(name.data(), std::vector<std::string>());
 }
 
 void end()
@@ -32,6 +47,12 @@ void render()
 
   auto& ctx = get_ctx();
 
+  if (ctx.vertices.empty())
+  {
+    ctx.layouts = {};
+    return;
+  }
+
   // update vertices indices data
   ctx.engine->update(ctx.vertices, ctx.indices);
   ctx.vertices.clear();
@@ -40,10 +61,17 @@ void render()
   // render every layout
   while (!ctx.layouts.empty())
   {
-    auto& layout = ctx.layouts.back();
+    auto& layout = ctx.layouts.front();
+    if (layout.index_infos.empty())
+    {
+      ctx.layouts.pop();
+      break;
+    }
     ctx.engine->render(layout.index_infos, ctx.window_extent, layout.pos);
     ctx.layouts.pop();
   }
+
+  ctx.call_stack.clear();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -52,14 +80,15 @@ void render()
 
 void rectangle(glm::vec2 const& pos, glm::vec2 const& extent, uint32_t color)
 {
-  assert(get_ctx().begining);
+  auto& ctx = get_ctx();
+  assert(ctx.begining);
 
   auto lower_down     = pos + extent;
-  uint32_t idx_beg    = get_ctx().vertices.size();
-  uint32_t idx_offset = get_ctx().indices.size();
+  uint32_t idx_beg    = ctx.vertices.size();
+  uint32_t idx_offset = ctx.indices.size();
 
   // set vertices
-  get_ctx().vertices.append_range(std::vector<Vertex>
+  ctx.vertices.append_range(std::vector<Vertex>
   {
     { pos,                     {}, color },
     { { lower_down.x, pos.y }, {}, color },
@@ -68,14 +97,14 @@ void rectangle(glm::vec2 const& pos, glm::vec2 const& extent, uint32_t color)
   });
 
   // set indices
-  get_ctx().indices.append_range(std::vector<uint32_t>
+  ctx.indices.append_range(std::vector<uint32_t>
   {
     idx_beg, idx_beg + 1, idx_beg + 2,
     idx_beg, idx_beg + 2, idx_beg + 3,
   });
 
   // set index info
-  get_ctx().layouts.back().index_infos.emplace_back(GraphicsEngine::IndexInfo{ idx_offset, 6 });
+  ctx.layouts.back().index_infos.emplace_back(GraphicsEngine::IndexInfo{ idx_offset, 6 });
 }
 
 void triangle(glm::vec2 p1, glm::vec2 p2, glm::vec2 p3, uint32_t color, float thickness)
@@ -321,10 +350,45 @@ bool detect_mouse_on_button(std::vector<glm::vec2> const& data)
   return false;
 }
 
-bool button(type::shape shape, std::vector<glm::vec2> const& data, uint32_t color, float thickness)
+bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> const& data, uint32_t color, float thickness)
 {
+  auto& ctx    = get_ctx();
+  auto& layout = ctx.layouts.back();
+
+  // detect whether already have same button
+  {
+    // get current layout's widgets name
+    auto& widgets = ctx.call_stack.at(layout.name.data());
+    // have same button throw exception
+    auto it = std::find_if(widgets.begin(), widgets.end(), [&](auto const& str) { return str == name; });
+    if (it == widgets.end())
+      widgets.emplace_back(name.data());
+    else
+      throw_if(true, "duplication button");
+  }
+
+  // get widgets of current layout
+  auto& widgets = ctx.states.at(layout.name.data());
+  auto it = std::find_if(widgets.begin(), widgets.end(), [&](auto const& widget) { return widget.name == name; });
+
+  Widget* widget{};
+
+  // not found, create the new widget
+  if (it == widgets.end())
+  {
+    widgets.emplace_back(Widget
+    {
+      .name        = name.data(),
+      .id          = generate_id(),
+      .first_click = false,
+    });
+    widget = &widgets.back();
+  }
+  else
+    widget = &*it;
+
   // draw shape
-  auto num  = data.size();
+  auto num = data.size();
   switch (shape)
   {
   case type::shape::triangle:
@@ -333,18 +397,15 @@ bool button(type::shape shape, std::vector<glm::vec2> const& data, uint32_t colo
     break;
   }
 
-  static bool first_click = false;
-
-  auto& ctx = get_ctx();
   if (ctx.event_type == SDL_EVENT_MOUSE_BUTTON_DOWN && detect_mouse_on_button(data))
   {
-    first_click = true;
+    widget->first_click = true;
     return false;
   }
 
-  if (first_click && ctx.event_type == SDL_EVENT_MOUSE_BUTTON_UP)
+  if (widget->first_click && ctx.event_type == SDL_EVENT_MOUSE_BUTTON_UP)
   {
-    first_click = false;
+    widget->first_click = false;
     if (detect_mouse_on_button(data))
       return true;
     else

@@ -12,6 +12,7 @@
 #include <glm/glm.hpp>
 
 #include <vector>
+#include <string_view>
 
 namespace tk { namespace ui {
 
@@ -21,10 +22,12 @@ namespace tk { namespace ui {
 
 /**
 * start a new layout
+* @param name name of layout, must unique (TODO: in multi-window, can same)
 * @param pos position of the window (TODO: currently, we only have a signle main window)
 */
-void begin(glm::vec2 const& pos);
-inline void begin(float x, float y) { begin({ x, y }); }
+void begin(std::string_view name, glm::vec2 const& pos);
+inline void begin(std::string_view name, float x, float y) { begin(name, { x, y }); }
+
 /**
 * end a layout
 */
@@ -74,12 +77,13 @@ void path_stroke(uint32_t color, float thickness, bool is_closed);
 
 /**
  * button, can be clicked
+ * @param name name for id in layout (different layout can have same name widget)
  * @param shape shape of button
  * @param data data of shape, number of data should be right, such as triangle have three data
  * @param color color of button
  * @param thickness thickness of button's shape
  * @return true if button is clicked
  */
-bool button(type::shape shape, std::vector<glm::vec2> const& data, uint32_t color, float thickness = 0.f);
+bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> const& data, uint32_t color, float thickness = 0.f);
 
 }}

@@ -6,12 +6,22 @@
 
 #include <queue>
 #include <vector>
+#include <string>
+#include <map>
 
 namespace tk { namespace ui {
 
+struct Widget
+{
+  std::string name;
+  uint32_t    id          = 0;
+  bool        first_click = false;
+};
+
 struct Layout
 {
-  glm::vec2 pos;
+  std::string_view name;
+  glm::vec2        pos;
   std::vector<graphics_engine::GraphicsEngine::IndexInfo> index_infos;
 };
 
@@ -29,12 +39,10 @@ struct ui_context
   // use for path draw
   std::vector<glm::vec2> points;
 
-  // 0: nothing (up)
-  // 1: first down
-  // 2: pressed
-  int mouse_down_state = 0;
-
   uint32_t event_type{};
+
+  std::unordered_map<std::string, std::vector<Widget>>      states;
+  std::unordered_map<std::string, std::vector<std::string>> call_stack;
 };
 
 inline auto& get_ctx()
@@ -44,5 +52,7 @@ inline auto& get_ctx()
 }
 
 void render();
+
+auto generate_id() -> uint32_t;
 
 }}
