@@ -183,22 +183,19 @@ void GraphicsEngine::render_end()
 
   // TODO: use post_processing for all post processing
   post_process();
-  sdf_aa_post_processing();
 
   VkExtent2D extent = { _swapchain_images[image_index].extent.width, _swapchain_images[image_index].extent.height };
 
   // TODO: need resolved_image? directly use smaa to swapchain image is ok so...
 
   // copy resolved image to swapchain image
-  transition_image_layout(frame.cmd, _sdfaa_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-  //transition_image_layout(frame.cmd, _smaa_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  transition_image_layout(frame.cmd, _smaa_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   //transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   //transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   //transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
   
-  copy_image(frame.cmd, _sdfaa_image, _swapchain_images[image_index]);
-  //copy_image(frame.cmd, _smaa_image, _swapchain_images[image_index]);
+  copy_image(frame.cmd, _smaa_image, _swapchain_images[image_index]);
   //copy_image(frame.cmd, _resolved_image, _swapchain_images[image_index]);
   //copy_image(frame.cmd, _smaa_image.handle, _swapchain_images[image_index].handle, extent, extent);
 
@@ -375,73 +372,6 @@ float sdTriangle(glm::vec2 const& p, glm::vec2 const& p0, glm::vec2 const& p1, g
                      glm::vec2(glm::dot(pq1,pq1), s*(v1.x*e1.y-v1.y*e1.x))),
                      glm::vec2(glm::dot(pq2,pq2), s*(v2.x*e2.y-v2.y*e2.x)));
     return -glm::sqrt(d.x)*glm::sign(d.y);
-}
-
-void GraphicsEngine::sdf_aa_post_processing()
-{
-  auto p  = glm::vec2(0,0);
-  auto p0 = glm::vec2(100,50);
-  auto p1 = glm::vec2(150,150);
-  auto p2 = glm::vec2(50,150);
-  //auto sd = sdTriangle(p, p0, p1, p2);
-  //auto r1 = sd / 200;
-//
-  //p0 /= glm::vec2(200, 200);
-  //p1 /= glm::vec2(200, 200);
-  //p2 /= glm::vec2(200, 200);
-  //auto sd2 = sdTriangle(p, p0, p1, p2);
-
-  // get current pixel coord
-  glm::vec2 pixel_coord = {100,100};
-
-  // get image size
-  glm::vec2 image_size = {200,200};
-
-  // convert to (-1, -1) (1, 1) coordinate system
-  glm::vec2 scale = {2 / image_size.x, 2 / image_size.y};
-  glm::vec2 translate = glm::vec2(-1, -1);
-  glm::vec2 coord = pixel_coord * scale + translate;
-  p0 = p0 * scale + translate;
-  p1 = p1 * scale + translate;
-  p2 = p2 * scale + translate;
-
-  float sd = sdTriangle(coord, p0, p1, p2);
-
-  auto frame = get_current_frame();
-
-  VkExtent2D extent = { _swapchain_images[image_index].extent.width, _swapchain_images[image_index].extent.height };
-
-  transition_image_layout(frame.cmd, _sdfaa_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  VkRenderingAttachmentInfo color_attachment
-  {
-    .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-    .imageView   = _sdfaa_image.view,
-    .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    .loadOp      = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-    .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
-  };
-  // TODO: can begin rendering single call multi color attachments for multi-pipelines?
-  VkRenderingInfo rendering
-  {
-    .sType                = VK_STRUCTURE_TYPE_RENDERING_INFO,
-    .renderArea           = { .extent = extent, },
-    .layerCount           = 1,
-    .colorAttachmentCount = 1,
-    .pColorAttachments    = &color_attachment,
-  };
-  vkCmdBeginRendering(frame.cmd, &rendering);
-
-  auto stages  = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
-  auto shaders = std::vector<VkShaderEXT>{ _sdfaa_vert, _sdfaa_frag };
-  graphics_engine::vkCmdBindShadersEXT(frame.cmd, 2, stages.data(), shaders.data());
-
-  //bind_descriptor_buffer(frame.cmd, _sdfaa_descriptor_buffer.address(), 0, _sdfaa_pipeline_layout, VK_PIPELINE_BIND_POINT_COMPUTE);
-
-  vkCmdDraw(frame.cmd, 3, 1, 0, 0);
-
-  graphics_engine::vkCmdBindShadersEXT(frame.cmd, 2, stages.data(), nullptr);
-
-  vkCmdEndRendering(frame.cmd);
 }
     
 } }
