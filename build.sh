@@ -20,5 +20,7 @@ cp shader/SMAA_edge_detection_comp.spv build/example/shader/SMAA_edge_detection_
 cp shader/SMAA_blend_weight_comp.spv   build/example/shader/SMAA_blend_weight_comp.spv
 cp shader/SMAA_neighbor_comp.spv       build/example/shader/SMAA_neighbor_comp.spv
 
-glslc -fshader-stage=compute  shader/SDFAA.comp -o shader/SDFAA_comp.spv
-cp shader/SDFAA_comp.spv build/example/shader/SDFAA_comp.spv
+glslc -fshader-stage=vertex   shader/SDFAA.vert -o shader/SDFAA_vert.spv
+glslc -fshader-stage=fragment shader/SDFAA.frag -o shader/SDFAA_frag.spv
+cp shader/SDFAA_vert.spv build/example/shader/SDFAA_vert.spv
+cp shader/SDFAA_frag.spv build/example/shader/SDFAA_frag.spv

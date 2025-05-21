@@ -1,12 +1,9 @@
 #version 460
+#extension GL_NV_compute_shader_derivatives : require
 
 layout(binding = 0) uniform writeonly image2D SDFAA_image;
 
 layout(local_size_x = 16, local_size_y = 16) in;
-
-float dot2(vec2 v) {
-    return dot(v, v);
-}
 
 float sdTriangle( in vec2 p, in vec2 p0, in vec2 p1, in vec2 p2 )
 {
@@ -22,30 +19,34 @@ float sdTriangle( in vec2 p, in vec2 p0, in vec2 p1, in vec2 p2 )
     return -sqrt(d.x)*sign(d.y);
 }
 
-// test data
-vec2 a = vec2(0.1, 0.2);
-vec2 b = vec2(0.8, 0.3);
-vec2 c = vec2(0.4, 0.9);
+// TODO: if triangle not in center
+// TODO: move to vert frag for use fwidth
 
 void main()
 {
   // get current pixel coord
   ivec2 pixel_coord = ivec2(gl_GlobalInvocationID.xy);
+
   // get image size
   ivec2 image_size = imageSize(SDFAA_image);
-  // get uv
-  vec2 uv = vec2(pixel_coord) / vec2(image_size);
 
-  // get sd for triangle
-  float sd = sdTriangle(uv, a, b, c);
+  // convert to (-1, -1) (1, 1) coordinate system
+  vec2 scale = vec2(2.0 / image_size.x, 2.0 / image_size.y);
+  vec2 translate = vec2(-1, -1);
+  vec2 coord = pixel_coord * scale + translate;
 
-  // set color
-  vec4 color;
-  if (sd < 0.0)
-    color = vec4(1.0 + sd * 2.0, 0.0, 0.0, 1.0);
+  // test data
+  vec2 a = vec2(100, 50);
+  vec2 b = vec2(150, 150);
+  vec2 c = vec2(50, 150);
+  a = a * scale + translate;
+  b = b * scale + translate;
+  c = c * scale + translate;
+
+  float d = sdTriangle(coord, a, b, c);
+
+  if (d < 0)
+    imageStore(SDFAA_image, pixel_coord, vec4(1, 1, 1, 1));
   else
-    color = vec4(0.0, 1.0 - sd * 0.5, 0.0, 1.0);
-  
-  // store color to image
-  imageStore(SDFAA_image, pixel_coord, color);
+    imageStore(SDFAA_image, pixel_coord, vec4(w, w, w, 1));
 }

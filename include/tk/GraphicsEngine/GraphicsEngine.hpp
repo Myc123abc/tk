@@ -223,7 +223,8 @@ namespace tk { namespace graphics_engine {
     DescriptorLayout _sdfaa_descriptor_layout;
     // FIXME: discard, only use single buffer
     Buffer           _sdfaa_descriptor_buffer;
-    Shader           _sdfaa_comp;
+    Shader           _sdfaa_vert;
+    Shader           _sdfaa_frag;
     PipelineLayout   _sdfaa_pipeline_layout;
     void create_sdfaa_resources();
     void sdf_aa_post_processing();
