@@ -23,7 +23,7 @@ auto get_file_data(std::string_view filename) -> std::vector<uint32_t>
 
 auto lerp(glm::vec2 const& a, glm::vec2 const& b, float t) -> glm::vec2
 {
-  return { std::lerp(a.x, b.x, t), std::lerp(a.y, b.y, t) };
+  return { std::round(std::lerp(a.x, b.x, t)), std::round(std::lerp(a.y, b.y, t)) };
 }
 
 auto lerp(std::vector<glm::vec2> const& a, std::vector<glm::vec2> const& b, float t) -> std::vector<glm::vec2>

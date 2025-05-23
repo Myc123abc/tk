@@ -196,8 +196,8 @@ namespace tk { namespace graphics_engine {
     //
     // MSAA
     //
-    //static constexpr VkSampleCountFlagBits _msaa_sample_count = VK_SAMPLE_COUNT_4_BIT;
-    //Image                        _msaa_image;
+    static constexpr VkSampleCountFlagBits _msaa_sample_count = VK_SAMPLE_COUNT_4_BIT;
+    Image                        _msaa_image;
     // Image                        _msaa_depth_image;
     Image                        _resolved_image;
 
@@ -215,6 +215,19 @@ namespace tk { namespace graphics_engine {
     //Pipeline         _smaa_pipeline[3];
     // FIXME: discard, use only one buffer
     Buffer           _descriptor_buffer;
+
+    //
+    // Analytical anti-aliasing
+    //
+    Image            _aaa_image;
+    DescriptorLayout _aaa_descriptor_layout;
+    // FIXME: discard, only use single buffer
+    Buffer           _aaa_descriptor_buffer;
+    Shader           _aaa_vert;
+    Shader           _aaa_frag;
+    PipelineLayout   _aaa_pipeline_layout;
+    void create_aaa_resources();
+    void draw_by_aaa();
   };
 
 } }

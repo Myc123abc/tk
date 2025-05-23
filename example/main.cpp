@@ -8,10 +8,10 @@
 
 /*
 
-TODO:
-1. Use analytic aa in compute shader to proccess once on resolved image.
-   Evenry pixel will caculate alpha and color for every shape, and output aaa image.
-2. lerp animation can process also in analytic compute shader? or lerp animation compute shader? or vertex shader?
+For 1 pixel line slope too large lead jagged aliasing solution:
+1. Enforce 1 pixel to 2 pixel.
+2. Use Analytical anti-aliasing. (SDF, but too large a slop results in dashed line when use fwidth)
+3. Wavelet Rasterization. (complex, and maybe slow)
 
 */
 
@@ -86,23 +86,26 @@ void tk_iterate()
   {
     ui::begin("Interpolation Animation", 50, 50);
 
-    static const auto pos0  = glm::vec2(0);
-    static const auto pos11 = glm::vec2(50, 25);
-    static const auto pos12 = pos11;
-    static const auto pos2  = glm::vec2(0, 50);
+    static const auto pos0  = glm::vec2(15);
+    static const auto pos1 = glm::vec2(35, 15);
+    static const auto pos2 = glm::vec2(35);
+    static const auto pos3  = glm::vec2(15, 35);
     
-    static auto pos_change_1 = pos11;
-    static auto pos_change_2 = pos12;
+    static auto pos_change_0 = pos0;
+    static auto pos_change_1 = pos1;
+    static auto pos_change_2 = pos2;
+    static auto pos_change_3 = pos3;
 
-    ui::path_line_to(pos0);
+    ui::path_line_to(pos_change_0);
     ui::path_line_to(pos_change_1);
-    if (pos_change_2 != pos_change_1)
-      ui::path_line_to(pos_change_2);
-    ui::path_line_to(pos2);
-    ui::path_stroke(0x00ff00ff, 1.f, 0x00ff00ff);
+    ui::path_line_to(pos_change_2);
+    ui::path_line_to(pos_change_3);
+    ui::path_stroke(0x00ff00ff, 2.f, true);
 
-    static auto pos11e = glm::vec2(50, 0);
-    static auto pos12e = glm::vec2(50, 50);
+    static const auto pos0e  = glm::vec2(0);
+    static const auto pos1e = glm::vec2(50, 0);
+    static const auto pos2e = glm::vec2(50);
+    static const auto pos3e  = glm::vec2(0, 50);
 
     auto change_time = 1;
     static float rate = 0.f;
@@ -117,8 +120,10 @@ void tk_iterate()
       auto duration = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(current_time - start_time).count());
       rate = duration / change_time / 1000;
 
-      pos_change_1 = util::lerp(pos11, pos11e, rate);
-      pos_change_2 = util::lerp(pos12, pos12e, rate);
+      //pos_change_0 = util::lerp(pos0, pos0e, rate);
+      pos_change_1 = util::lerp(pos1, pos1e, rate);
+      //pos_change_2 = util::lerp(pos2, pos2e, rate);
+      //pos_change_3 = util::lerp(pos3, pos3e, rate);
 
       //auto v1 = pos11e - pos11;
       //auto e1 = v1 * rate;

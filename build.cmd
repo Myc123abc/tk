@@ -14,3 +14,8 @@ glslc -fshader-stage=compute  shader/SMAA_neighbor.comp       -o shader/SMAA_nei
 copy .\shader\SMAA_edge_detection_comp.spv .\build\example\shader\SMAA_edge_detection_comp.spv
 copy .\shader\SMAA_blend_weight_comp.spv   .\build\example\shader\SMAA_blend_weight_comp.spv
 copy .\shader\SMAA_neighbor_comp.spv       .\build\example\shader\SMAA_neighbor_comp.spv
+
+glslc -fshader-stage=vertex   shader/AAA.vert -o shader/AAA_vert.spv
+glslc -fshader-stage=fragment shader/AAA.frag -o shader/AAA_frag.spv
+copy .\shader\AAA_vert.spv .\build\example\shader\AAA_vert.spv
+copy .\shader\AAA_frag.spv .\build\example\shader\AAA_frag.spv

@@ -62,7 +62,7 @@ void GraphicsEngine::render_begin()
   // depth_image_barrier_begin(frame.cmd);
 
   // transition image layout to writeable
-  //transition_image_layout(frame.cmd, _msaa_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  transition_image_layout(frame.cmd, _msaa_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   //transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   // transition_image_layout(frame.cmd, _msaa_depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
@@ -76,6 +76,7 @@ void GraphicsEngine::render_begin()
   VkRenderingAttachmentInfo color_attachment
   {
     .sType              = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+    //.imageView          = _msaa_image.view,
     .imageView          = _resolved_image.view,
     .imageLayout        = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
     //.resolveMode        = VK_RESOLVE_MODE_AVERAGE_BIT,
@@ -142,10 +143,13 @@ void GraphicsEngine::set_pipeline_state(Command const& cmd)
   vkCmdSetDepthTestEnable(cmd, VK_FALSE);
   vkCmdSetStencilTestEnable(cmd, VK_FALSE);
   vkCmdSetDepthBiasEnable(cmd, VK_FALSE);
-  graphics_engine::vkCmdSetPolygonModeEXT(cmd, VK_POLYGON_MODE_FILL);
+  //graphics_engine::vkCmdSetPolygonModeEXT(cmd, VK_POLYGON_MODE_FILL);
   graphics_engine::vkCmdSetRasterizationSamplesEXT(cmd, VK_SAMPLE_COUNT_1_BIT);
+  graphics_engine::vkCmdSetRasterizationSamplesEXT(cmd, _msaa_sample_count);
   VkSampleMask sampler_mask{ 0b1 };
   graphics_engine::vkCmdSetSampleMaskEXT(cmd, VK_SAMPLE_COUNT_1_BIT, &sampler_mask);
+  //VkSampleMask sampler_mask{ 0b1111 };
+  //graphics_engine::vkCmdSetSampleMaskEXT(cmd, _msaa_sample_count, &sampler_mask);
   vkCmdSetFrontFace(cmd, VK_FRONT_FACE_CLOCKWISE);
   graphics_engine::vkCmdSetAlphaToCoverageEnableEXT(cmd, VK_FALSE);
   VkViewport viewport
@@ -183,18 +187,21 @@ void GraphicsEngine::render_end()
 
   // TODO: use post_processing for all post processing
   post_process();
+  draw_by_aaa();
 
   VkExtent2D extent = { _swapchain_images[image_index].extent.width, _swapchain_images[image_index].extent.height };
 
   // TODO: need resolved_image? directly use smaa to swapchain image is ok so...
 
   // copy resolved image to swapchain image
+  transition_image_layout(frame.cmd, _aaa_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   transition_image_layout(frame.cmd, _smaa_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   //transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   //transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   //transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
   
+  copy_image(frame.cmd, _aaa_image, _swapchain_images[image_index]);
   copy_image(frame.cmd, _smaa_image, _swapchain_images[image_index]);
   //copy_image(frame.cmd, _resolved_image, _swapchain_images[image_index]);
   //copy_image(frame.cmd, _smaa_image.handle, _swapchain_images[image_index].handle, extent, extent);
@@ -360,18 +367,43 @@ void GraphicsEngine::post_process()
   graphics_engine::vkCmdBindShadersEXT(frame.cmd, 1, stages.data(), nullptr);
 }
 
-float sdTriangle(glm::vec2 const& p, glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2)
+void GraphicsEngine::draw_by_aaa()
 {
-    glm::vec2 e0 = p1-p0, e1 = p2-p1, e2 = p0-p2;
-    glm::vec2 v0 = p -p0, v1 = p -p1, v2 = p -p2;
-    glm::vec2 pq0 = v0 - e0*glm::clamp( glm::dot(v0,e0)/glm::dot(e0,e0), 0.f, 1.f );
-    glm::vec2 pq1 = v1 - e1*glm::clamp( glm::dot(v1,e1)/glm::dot(e1,e1), 0.f, 1.f );
-    glm::vec2 pq2 = v2 - e2*glm::clamp( glm::dot(v2,e2)/glm::dot(e2,e2), 0.f, 1.f );
-    float s = glm::sign( e0.x*e2.y - e0.y*e2.x );
-    glm::vec2 d = min(min(glm::vec2(glm::dot(pq0,pq0), s*(v0.x*e0.y-v0.y*e0.x)),
-                     glm::vec2(glm::dot(pq1,pq1), s*(v1.x*e1.y-v1.y*e1.x))),
-                     glm::vec2(glm::dot(pq2,pq2), s*(v2.x*e2.y-v2.y*e2.x)));
-    return -glm::sqrt(d.x)*glm::sign(d.y);
+  auto frame = get_current_frame();
+
+  VkExtent2D extent = { _swapchain_images[image_index].extent.width, _swapchain_images[image_index].extent.height };
+
+  transition_image_layout(frame.cmd, _aaa_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  VkRenderingAttachmentInfo color_attachment
+  {
+    .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+    .imageView   = _aaa_image.view,
+    .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    .loadOp      = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+    .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
+  };
+  // TODO: can begin rendering single call multi color attachments for multi-pipelines?
+  VkRenderingInfo rendering
+  {
+    .sType                = VK_STRUCTURE_TYPE_RENDERING_INFO,
+    .renderArea           = { .extent = extent, },
+    .layerCount           = 1,
+    .colorAttachmentCount = 1,
+    .pColorAttachments    = &color_attachment,
+  };
+  vkCmdBeginRendering(frame.cmd, &rendering);
+
+  auto stages  = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
+  auto shaders = std::vector<VkShaderEXT>{ _aaa_vert, _aaa_frag };
+  graphics_engine::vkCmdBindShadersEXT(frame.cmd, 2, stages.data(), shaders.data());
+
+  //bind_descriptor_buffer(frame.cmd, _sdfaa_descriptor_buffer.address(), 0, _sdfaa_pipeline_layout, VK_PIPELINE_BIND_POINT_COMPUTE);
+
+  vkCmdDraw(frame.cmd, 3, 1, 0, 0);
+
+  graphics_engine::vkCmdBindShadersEXT(frame.cmd, 2, stages.data(), nullptr);
+
+  vkCmdEndRendering(frame.cmd);
 }
     
 } }

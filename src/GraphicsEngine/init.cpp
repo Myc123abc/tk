@@ -42,6 +42,8 @@ void GraphicsEngine::init(Window& window)
   
   update_descriptors_to_descrptor_buffer();
 
+  create_aaa_resources();
+
   _window->show();
 }
 
@@ -267,7 +269,7 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
   //
   // MSAA + SMAA
   //
-  //_msaa_image     = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, _msaa_sample_count);
+  _msaa_image     = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, _msaa_sample_count);
   _resolved_image = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
   // FIXME: tmp transform src
   _edges_image    = _mem_alloc.create_image(VK_FORMAT_R8G8_UNORM, _swapchain_images[0].extent,        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
@@ -332,7 +334,7 @@ void GraphicsEngine::create_swapchain_and_rendering_image()
     _mem_alloc.destroy_image(_blend_image);
     _mem_alloc.destroy_image(_edges_image);
     _mem_alloc.destroy_image(_resolved_image);
-    //_mem_alloc.destroy_image(_msaa_image);
+    _mem_alloc.destroy_image(_msaa_image);
     _mem_alloc.destroy_image(_smaa_image);
     vkDestroySwapchainKHR(_device, _swapchain, nullptr);
     for (auto const& image : _swapchain_images)
@@ -630,18 +632,20 @@ void GraphicsEngine::resize_swapchain()
   vkDestroySwapchainKHR(_device, old_swapchain, nullptr);
 
   // destroy old images
-  //_mem_alloc.destroy_image(_msaa_image);
+  _mem_alloc.destroy_image(_msaa_image);
   _mem_alloc.destroy_image(_resolved_image);
   _mem_alloc.destroy_image(_blend_image);
   _mem_alloc.destroy_image(_edges_image);
   _mem_alloc.destroy_image(_smaa_image);
+  _mem_alloc.destroy_image(_aaa_image);
 
   // recreate images
-  //_msaa_image     = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, _msaa_sample_count);
+  _msaa_image     = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, _msaa_sample_count);
   _resolved_image = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
   _edges_image    = _mem_alloc.create_image(VK_FORMAT_R8G8_UNORM, _swapchain_images[0].extent,        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
   _blend_image    = _mem_alloc.create_image(VK_FORMAT_R8G8B8A8_UNORM, _swapchain_images[0].extent,    VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
   _smaa_image     = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+  _aaa_image      = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
 
   // update image views
   _smaa_descriptor_layout.update_descriptor_image_views(
@@ -781,6 +785,45 @@ void GraphicsEngine::update_descriptors_to_descrptor_buffer()
   _smaa_descriptor_layout.update_descriptors(_descriptor_buffer);
   
   _destructors.push([this] { _descriptor_buffer.destroy(); });
+}
+
+// TODO: need handle recreate swapchain image recreate and descriptor layout update
+void GraphicsEngine::create_aaa_resources()
+{
+  // create image
+  _aaa_image = _mem_alloc.create_image(_swapchain_images[0].format, _swapchain_images[0].extent, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+
+  // create descriptor layout
+  //_sdfaa_descriptor_layout = _device.create_descriptor_layout(
+  //{
+  //  //{ 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT, _sdfaa_image.view },
+  //});
+
+  // create and upload data of decriptor layout to descriptor buffer
+  //_aaa_descriptor_buffer = _mem_alloc.create_buffer(_aaa_descriptor_layout.size(), VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT  | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+  //_aaa_descriptor_layout.update_descriptors(_aaa_descriptor_buffer);
+
+  // create shader
+  _device.create_shaders(
+  {
+    { _aaa_vert, VK_SHADER_STAGE_VERTEX_BIT,    "shader/AAA_vert.spv", {}, {} },
+    { _aaa_frag, VK_SHADER_STAGE_FRAGMENT_BIT,  "shader/AAA_frag.spv", {}, {} },
+  });
+
+  // create pipeline layout
+  _aaa_pipeline_layout = _device.create_pipeline_layout({}, {});
+
+  // destroy resources
+  _destructors.push([&]
+  {
+    _aaa_pipeline_layout.destroy();
+    _aaa_frag.destroy();
+    _aaa_vert.destroy();
+    //_aaa_descriptor_buffer.destroy();
+    //_aaa_descriptor_layout.destroy();
+    // TODO: change api, use image.destroy();
+    _mem_alloc.destroy_image(_aaa_image);
+  });
 }
 
 } }
