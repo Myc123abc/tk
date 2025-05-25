@@ -39,6 +39,8 @@ void GraphicsEngine::init(Window& window)
   init_memory_allocator();
   create_frame_resources();
 
+  create_sdf_rendering_resource();
+
   _window->show();
 }
 
@@ -396,6 +398,27 @@ void GraphicsEngine::resize_swapchain()
   auto old_swapchain = _swapchain;
   create_swapchain(old_swapchain);
   vkDestroySwapchainKHR(_device, old_swapchain, nullptr);
+}
+
+void GraphicsEngine::create_sdf_rendering_resource()
+{
+  // create shader
+  _device.create_shaders(
+  {
+    { _sdf_vert, VK_SHADER_STAGE_VERTEX_BIT,   "shader/SDF_vert.spv" },
+    { _sdf_frag, VK_SHADER_STAGE_FRAGMENT_BIT, "shader/SDF_frag.spv" },
+  }, true);
+
+  // create pipeline layout
+  _sdf_pipeline_layout = _device.create_pipeline_layout();
+
+  // destroy resources
+  _destructors.push([&]
+  {
+    _sdf_pipeline_layout.destroy();
+    _sdf_frag.destroy();
+    _sdf_vert.destroy();
+  });
 }
 
 } }

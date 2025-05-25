@@ -35,8 +35,8 @@ namespace tk { namespace graphics_engine {
     auto create_descriptor_layout(std::vector<DescriptorInfo> const& infos) -> DescriptorLayout;
 
     auto create_pipeline_layout(
-      std::vector<VkDescriptorSetLayout> const& descritptor_layouts, 
-      std::vector<VkPushConstantRange>   const& push_constants) -> PipelineLayout
+      std::vector<VkDescriptorSetLayout> const& descritptor_layouts = {},
+      std::vector<VkPushConstantRange>   const& push_constants      = {}) -> PipelineLayout
     {
       return { _device, descritptor_layouts, push_constants };
     }

@@ -66,6 +66,8 @@ namespace tk { namespace graphics_engine {
     void init_memory_allocator();
     void create_frame_resources();
 
+    void create_sdf_rendering_resource();
+
     // vk extension funcs
     void load_instance_extension_funcs();
     void load_device_extension_funcs();
@@ -111,6 +113,14 @@ namespace tk { namespace graphics_engine {
     uint32_t                   _current_swapchain_image_index = {};
     auto get_current_frame()           noexcept -> FrameResource& { return _frames[_current_frame]; }
     auto get_current_swapchain_image() noexcept -> Image&         { return _swapchain_images[_current_swapchain_image_index]; }
+
+    //
+    // SDF rendering resources
+    //
+    Shader         _sdf_vert;
+    Shader         _sdf_frag;
+    PipelineLayout _sdf_pipeline_layout;
+    void render_sdf();
   };
 
 } }

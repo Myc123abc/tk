@@ -116,6 +116,8 @@ void GraphicsEngine::render_begin()
     .pColorAttachments    = &color_attachment,
   };
   vkCmdBeginRendering(frame->cmd, &rendering);
+
+  render_sdf();
 }
 
 void GraphicsEngine::set_pipeline_state(Command const& cmd)
@@ -177,5 +179,18 @@ void GraphicsEngine::update(std::span<ShapeInfo> shape_infos)
 {
 
 }
-    
+
+void GraphicsEngine::render_sdf()
+{
+  auto cmd = get_current_frame().cmd;
+
+  auto stages  = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
+  auto shaders = std::vector<VkShaderEXT>{ _sdf_vert, _sdf_frag };
+  graphics_engine::vkCmdBindShadersEXT(cmd, stages.size(), stages.data(), shaders.data());
+
+  vkCmdDraw(cmd, 3, 1, 0, 0);
+
+  graphics_engine::vkCmdBindShadersEXT(cmd, stages.size(), stages.data(), nullptr);
+}
+
 } }
