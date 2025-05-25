@@ -49,7 +49,6 @@ endif()
 
 set(INCLUDE
   include
-  lib/SMAA/include
 )
 
 file(GLOB_RECURSE SOURCE src/*.cpp)

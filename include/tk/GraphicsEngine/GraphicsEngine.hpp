@@ -1,21 +1,6 @@
 //
 // graphics engine
 //
-// use Vulkan to implement
-//
-// TODO:
-// 1. use offscreen rendering, but when window size bigger than image size, it will be stretch,
-//    maybe need to recreate image in this case.
-// 2. use VkSampler as image sampler, like imgui_impl_vulkan.cpp:1031
-// 3. embed spv
-// 4. currently, not see mouse handling, just graphics handling
-// 5. not handle font now
-//
-// INFO:
-// use MSAA and FXAA for AA
-// about 2D pipeline, not use depth test, and vertex only store vec2 pos, uv, col
-//
-
 
 #pragma once
 
@@ -32,8 +17,6 @@
 
 namespace tk { namespace graphics_engine {
 
-  // TODO: graphics engine only initialize.
-  // you need add vertices, indices, uniform, and shaders to run it.
   class GraphicsEngine
   {
   public:
@@ -63,16 +46,11 @@ namespace tk { namespace graphics_engine {
 
     void render_begin();
 
-    struct IndexInfo
-    {
-      uint32_t offset  = {};
-      uint32_t count   = {};
-    };
-    void render(std::span<IndexInfo> index_infos, glm::vec2 const& window_extent, glm::vec2 const& display_pos);
+    void render(glm::vec2 const& window_extent, glm::vec2 const& display_pos);
 
     void render_end();
 
-    void update(std::span<Vertex> vertices, std::span<uint16_t> indices);
+    void update(std::span<ShapeInfo> shape_infos);
 
   private:
     //
@@ -83,151 +61,56 @@ namespace tk { namespace graphics_engine {
     void create_surface();
     void select_physical_device();
     void create_device_and_get_queues();
-    void init_memory_allocator();
-    void create_swapchain_and_rendering_image();
     void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE);
-    void create_descriptor_set_layout();
-    void create_shaders_and_pipeline_layouts();
-    //void create_graphics_pipeline();
     void init_command_pool();
-    void create_sync_objects();
+    void init_memory_allocator();
     void create_frame_resources();
-    void create_buffer();
-    void update_descriptors_to_descrptor_buffer();
-    void set_pipeline_state(Command const& cmd);
-    void post_process();
 
     // vk extension funcs
     void load_instance_extension_funcs();
     void load_device_extension_funcs();
-    static constexpr auto          Vulkan_Version    = VK_API_VERSION_1_4;
-    static constexpr auto          Depth_Format      = VK_FORMAT_D32_SFLOAT;
-    std::vector<const char*> const Device_Extensions = 
-    {
-      VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-      VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
-      VK_EXT_SHADER_OBJECT_EXTENSION_NAME,
-      //VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME,
-      //VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
-    };
 
-    //
-    // util 
-    //
-    static void transition_image_layout(VkCommandBuffer cmd, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout);
-    static auto get_image_subresource_range(VkImageAspectFlags aspect) -> VkImageSubresourceRange;
-    static void copy_image(VkCommandBuffer cmd, VkImage src, VkImage dst, VkExtent2D src_extent, VkExtent2D dst_extent);
-    static void copy_image(Command const& cmd, Image const& src, Image const& dst);
+    // rendering
+    void set_pipeline_state(Command const& cmd);
 
-    // INFO: 
-    // this is depth image memory barrier, depend on this link
-    // https://stackoverflow.com/questions/62371266/why-is-a-single-depth-buffer-sufficient-for-this-vulkan-swapchain-render-loop
-    // it's difficult for me now, so I just use multi depth images
-    void depth_image_barrier_begin(VkCommandBuffer cmd);
-    void depth_image_barrier_end(VkCommandBuffer cmd);
-
-    //
-    // SMAA
-    //
-    void load_precalculated_textures();
+    struct FrameResource;
+    auto frame_begin() -> FrameResource*; 
+    void frame_end();
 
   private:
     //
     // common resources
     //
     // HACK: expand to multi-windows manage, use WindowManager in future.
-    Window*                      _window                   = nullptr;
-    VkInstance                   _instance                 = VK_NULL_HANDLE;
-    VkDebugUtilsMessengerEXT     _debug_messenger          = VK_NULL_HANDLE;
-    VkSurfaceKHR                 _surface                  = VK_NULL_HANDLE;
-    VkPhysicalDevice             _physical_device          = VK_NULL_HANDLE;
+    Window*                      _window          = nullptr;
+    VkInstance                   _instance        = VK_NULL_HANDLE;
+    VkDebugUtilsMessengerEXT     _debug_messenger = VK_NULL_HANDLE;
+    VkSurfaceKHR                 _surface         = VK_NULL_HANDLE;
+    VkPhysicalDevice             _physical_device = VK_NULL_HANDLE;
     Device                       _device;
-    VkQueue                      _graphics_queue           = VK_NULL_HANDLE;
-    VkQueue                      _present_queue            = VK_NULL_HANDLE;
-
-    MemoryAllocator              _mem_alloc;
-
-    //
-    // use dynamic rendering
-    //
-    VkSwapchainKHR               _swapchain                = VK_NULL_HANDLE;
+    VkQueue                      _graphics_queue  = VK_NULL_HANDLE;
+    VkQueue                      _present_queue   = VK_NULL_HANDLE;
+    VkSwapchainKHR               _swapchain       = VK_NULL_HANDLE;
     std::vector<Image>           _swapchain_images;
-
-    //VkPipeline                   _2D_pipeline              = VK_NULL_HANDLE;
-    PipelineLayout               _2D_pipeline_layout;
-
-    //
-    // shaders
-    //
-    Shader _2D_vert;
-    Shader _2D_frag;
-    Shader _SMAA_edge_detection_comp;
-    Shader _SMAA_blend_weight_comp;
-    Shader _SMAA_neighbor_comp;
+    CommandPool                  _command_pool;
+    MemoryAllocator              _mem_alloc;
+    DestructorStack              _destructors;
 
     //
     // frame resources
     //
     struct FrameResource
     {
-      Command         cmd;
-      VkFence         fence               = VK_NULL_HANDLE;
-      VkSemaphore     image_available_sem = VK_NULL_HANDLE; 
-      VkSemaphore     render_finished_sem = VK_NULL_HANDLE; 
-      //Image           depth_image;
+      Command     cmd;
+      VkFence     fence                 = VK_NULL_HANDLE;
+      VkSemaphore image_available_sem   = VK_NULL_HANDLE; 
+      VkSemaphore render_finished_sem   = VK_NULL_HANDLE;
     };
-
-    std::vector<FrameResource>   _frames;
-    uint32_t                     _current_frame            = 0;
-    auto get_current_frame() -> FrameResource& { return _frames[_current_frame]; }
-    
-    //
-    // misc
-    //
-    DestructorStack              _destructors;
-    // INFO:
-    // allocate a big buffer.
-    // should I recreate a bigger buffer when current buffer unenough?
-    static constexpr uint32_t    Buffer_Size = 1024 * 1024;
-    Buffer                       _buffer;
-    CommandPool                  _command_pool;
-
-
-    //
-    // MSAA
-    //
-    static constexpr VkSampleCountFlagBits _msaa_sample_count = VK_SAMPLE_COUNT_4_BIT;
-    Image                        _msaa_image;
-    // Image                        _msaa_depth_image;
-    Image                        _resolved_image;
-
-    //
-    // SMAA
-    //
-    Image     _edges_image;
-    Image     _blend_image;
-    Image     _area_texture;
-    Image     _search_texture;
-    VkSampler _smaa_sampler{};
-    Image     _smaa_image;
-    PipelineLayout   _smaa_pipeline_layout;
-    DescriptorLayout _smaa_descriptor_layout;
-    //Pipeline         _smaa_pipeline[3];
-    // FIXME: discard, use only one buffer
-    Buffer           _descriptor_buffer;
-
-    //
-    // Analytical anti-aliasing
-    //
-    Image            _aaa_image;
-    DescriptorLayout _aaa_descriptor_layout;
-    // FIXME: discard, only use single buffer
-    Buffer           _aaa_descriptor_buffer;
-    Shader           _aaa_vert;
-    Shader           _aaa_frag;
-    PipelineLayout   _aaa_pipeline_layout;
-    void create_aaa_resources();
-    void draw_by_aaa();
+    std::vector<FrameResource> _frames;
+    uint32_t                   _current_frame                 = {};
+    uint32_t                   _current_swapchain_image_index = {};
+    auto get_current_frame()           noexcept -> FrameResource& { return _frames[_current_frame]; }
+    auto get_current_swapchain_image() noexcept -> Image&         { return _swapchain_images[_current_swapchain_image_index]; }
   };
 
 } }

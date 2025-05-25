@@ -4,6 +4,12 @@
 // use imgui mode
 // for mouse handle, I only use a bound rectangle to detection for simply
 //
+// draw way use sdf
+// primitive:
+// 1. line segment
+// 2. circle
+// 3. oriented half plane (need points as counter clockwise)
+//
 
 #pragma once
 
@@ -37,47 +43,15 @@ void end();
 //                                Shape
 ////////////////////////////////////////////////////////////////////////////////
 
-/**
-* draw a rectangle
-* @param pos0 position on left upper
-* @param pos1 position on right lower
-* @param color color of rectangle, which use RGBA
-* @param thickness if thickness > 0, will enable stroke draw
-*/
-void rectangle(glm::vec2 const& pos0, glm::vec2 const& pos1, uint32_t color, float thickness = 0.f);
+void line(glm::vec2 start, glm::vec2 end, uint32_t color, float thickness = 0.f);
 
 /**
-* draw a triangle
-* three points should be clockwise
-* @param p1 point 1
-* @param p2 point 2
-* @param p3 point 3
-* @param color color of triangle
-* @param thickness if thickness > 0, will enable stroke draw
-*/
-void triangle(glm::vec2 p1, glm::vec2 p2, glm::vec2 p3, uint32_t color, float thickness = 0.f);
-
-  /**
- * path draw, add point
- * please promise points are clockwise to connect a shape
- * @param point point of path
+ * draw polygon
+ * @param points points of polygon. If it's filled polygon, need to be counter clockwise.
+ * @param color color of oriented half plane
+ * @param thickness if thickness > 0, will enable stroke draw
  */
-void path_line_to(glm::vec2 point);
-inline void path_line_to(float x, float y) { path_line_to({x, y}); };
-
-/**
- * draw stroke using added points
- * @param color color of stroke
- * @param thickness thickness of stroke
- * @param is_closed whether is closed shape
- */
-void path_stroke(uint32_t color, float thickness, bool is_closed);
-
-/**
- * draw filled convex poly using added points
- * @param color color of stroke
- */
-void path_fill_convex(uint32_t color);
+void polygon(std::vector<glm::vec2> const& points, uint32_t color, float thickness = 0.f);
 
 ////////////////////////////////////////////////////////////////////////////////
 //                                UI

@@ -7,217 +7,42 @@
 
 namespace tk { namespace graphics_engine {
 
-// FIXME: cannot use it as frame count!!!
-//        vulkan acquire in some case can get same image index as last frame!!!
-static uint32_t image_index = 0;
-
-// HACK: currently, not use
-// use independent image to draw, and copy it to swapchain image has may resons,
-// detail reference: https://vkguide.dev/docs/new_chapter_2/vulkan_new_rendering/#new-draw-loop
-void GraphicsEngine::render_begin()
+auto GraphicsEngine::frame_begin() -> FrameResource*
 {
-  //
-  // get current frame resource
-  //
-  auto frame = get_current_frame();
+  auto* frame = &get_current_frame();
 
-  //
-  // wait commands completely submitted to GPU,
-  // and we can record next frame's commands.
-  //
-
-  // set forth parameter to 0, make vkWaitForFences return immediately,
-  // so you can know whether finished for commands handled by GPU.
-  throw_if(vkWaitForFences(_device, 1, &frame.fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS,
+  throw_if(vkWaitForFences(_device, 1, &frame->fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS,
            "failed to wait fence");
-  throw_if(vkResetFences(_device, 1, &frame.fence) != VK_SUCCESS,
+  throw_if(vkResetFences(_device, 1, &frame->fence) != VK_SUCCESS,
            "failed to reset fence");
 
-  //
-  // acquire an available image which GPU not used currently,
-  // so we can save render result on it.
-  //
-  auto res = vkAcquireNextImageKHR(_device, _swapchain, UINT64_MAX, frame.image_available_sem, VK_NULL_HANDLE, &image_index);
+  auto res = vkAcquireNextImageKHR(_device, _swapchain, UINT64_MAX, frame->image_available_sem, VK_NULL_HANDLE, &_current_swapchain_image_index);
   if (res == VK_ERROR_OUT_OF_DATE_KHR)
-    return;
+    return nullptr;
   else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
     throw_if(true, "failed to acquire swapechain image");
 
-  //
-  // now we know current frame resource is available,
-  // and we need to reset command buffer to begin to record commands.
-  // after record we need to end command so it can be submitted to queue.
-  //
-  throw_if(vkResetCommandBuffer(frame.cmd, 0) != VK_SUCCESS,
+  throw_if(vkResetCommandBuffer(frame->cmd, 0) != VK_SUCCESS,
            "failed to reset command buffer");
   VkCommandBufferBeginInfo beg_info
   {
     .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
     .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
   };
-  vkBeginCommandBuffer(frame.cmd, &beg_info);
+  vkBeginCommandBuffer(frame->cmd, &beg_info);
 
-  set_pipeline_state(frame.cmd);
-
-  // depth_image_barrier_begin(frame.cmd);
-
-  // transition image layout to writeable
-  transition_image_layout(frame.cmd, _msaa_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  //transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  // transition_image_layout(frame.cmd, _msaa_depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-  // transition_image_layout(frame.cmd, frame.depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-
-  // TODO: clear edges and blend images
-
-  //
-  // dynamic rendering
-  //
-  VkRenderingAttachmentInfo color_attachment
-  {
-    .sType              = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-    //.imageView          = _msaa_image.view,
-    .imageView          = _resolved_image.view,
-    .imageLayout        = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    //.resolveMode        = VK_RESOLVE_MODE_AVERAGE_BIT,
-    //.resolveImageView   = _resolved_image.view,
-    //.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    .loadOp             = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-    .storeOp            = VK_ATTACHMENT_STORE_OP_STORE,
-  };
-  // VkRenderingAttachmentInfo depth_attachment
-  // {
-  //   .sType              = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-  //   .imageView          = _msaa_depth_image.view,
-  //   .imageLayout        = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-  //   // HACK: when I test this on renderdoc, it not do resolve depth image...
-  //   .resolveMode        = VK_RESOLVE_MODE_AVERAGE_BIT,
-  //   .resolveImageView   = frame.depth_image.view,
-  //   .resolveImageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-  //   .loadOp             = VK_ATTACHMENT_LOAD_OP_CLEAR,
-  //   .storeOp            = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-  // };
-
-  VkExtent2D extent = { _swapchain_images[image_index].extent.width, _swapchain_images[image_index].extent.height };
-
-  VkRenderingInfo rendering
-  {
-    .sType                = VK_STRUCTURE_TYPE_RENDERING_INFO,
-    .renderArea           =
-    {
-      .extent = extent,
-    },
-    .layerCount           = 1,
-    .colorAttachmentCount = 1,
-    .pColorAttachments    = &color_attachment,
-    // .pDepthAttachment     = &depth_attachment,
-  };
-  vkCmdBeginRendering(frame.cmd, &rendering);
-
-  // INFO: not use pipeline, using shader objects
-  //vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _2D_pipeline);
-  auto stages  = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
-  auto shaders = std::vector<VkShaderEXT>{ _2D_vert, _2D_frag };
-  graphics_engine::vkCmdBindShadersEXT(frame.cmd, 2, stages.data(), shaders.data());
-
-  //VkViewport viewport
-  //{
-  //  .width  = (float)extent.width,
-  //  .height = (float)extent.height, 
-  //  .maxDepth = 1.f,
-  //};
-  //vkCmdSetViewport(frame.cmd, 0, 1, &viewport);
-  //VkRect2D scissor 
-  //{
-  //  .extent = extent,
-  //};
-  //vkCmdSetScissor(frame.cmd, 0, 1, &scissor);
+  return frame;
 }
 
-
-void GraphicsEngine::set_pipeline_state(Command const& cmd)
+void GraphicsEngine::frame_end()
 {
-  graphics_engine::vkCmdSetCullModeEXT(cmd, VK_CULL_MODE_BACK_BIT);
-  graphics_engine::vkCmdSetDepthWriteEnableEXT(cmd, VK_FALSE);
-  vkCmdSetRasterizerDiscardEnable(cmd, VK_FALSE);
-  vkCmdSetDepthTestEnable(cmd, VK_FALSE);
-  vkCmdSetStencilTestEnable(cmd, VK_FALSE);
-  vkCmdSetDepthBiasEnable(cmd, VK_FALSE);
-  //graphics_engine::vkCmdSetPolygonModeEXT(cmd, VK_POLYGON_MODE_FILL);
-  graphics_engine::vkCmdSetRasterizationSamplesEXT(cmd, VK_SAMPLE_COUNT_1_BIT);
-  graphics_engine::vkCmdSetRasterizationSamplesEXT(cmd, _msaa_sample_count);
-  VkSampleMask sampler_mask{ 0b1 };
-  graphics_engine::vkCmdSetSampleMaskEXT(cmd, VK_SAMPLE_COUNT_1_BIT, &sampler_mask);
-  //VkSampleMask sampler_mask{ 0b1111 };
-  //graphics_engine::vkCmdSetSampleMaskEXT(cmd, _msaa_sample_count, &sampler_mask);
-  vkCmdSetFrontFace(cmd, VK_FRONT_FACE_CLOCKWISE);
-  graphics_engine::vkCmdSetAlphaToCoverageEnableEXT(cmd, VK_FALSE);
-  VkViewport viewport
-  {
-    .width  = static_cast<float>(_resolved_image.extent.width),
-    .height = static_cast<float>(_resolved_image.extent.height), 
-    .maxDepth = 1.f,
-  };
-  VkRect2D scissor 
-  {
-    .extent = { _resolved_image.extent.width, _resolved_image.extent.height },
-  };
-  vkCmdSetViewportWithCount(cmd, 1, &viewport);
-  vkCmdSetScissorWithCount(cmd, 1, &scissor);
-  vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-  vkCmdSetPrimitiveRestartEnable(cmd, VK_FALSE);
-  graphics_engine::vkCmdSetVertexInputEXT(cmd, 0, nullptr, 0, nullptr);
-  VkBool32 color_blend_enables{ VK_FALSE };
-  graphics_engine::vkCmdSetColorBlendEnableEXT(cmd, 0, 1, &color_blend_enables);
-  VkColorComponentFlags color_write_mask{ VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT };
-  graphics_engine::vkCmdSetColorWriteMaskEXT(cmd, 0, 1, &color_write_mask);
-}
-
-void GraphicsEngine::render_end()
-{
-  //
-  // get current frame resource
-  //
   auto frame = get_current_frame();
 
-  auto stages  = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
-  graphics_engine::vkCmdBindShadersEXT(frame.cmd, 2, stages.data(), nullptr);
-
-  vkCmdEndRendering(frame.cmd);
-
-  // TODO: use post_processing for all post processing
-  post_process();
-  draw_by_aaa();
-
-  VkExtent2D extent = { _swapchain_images[image_index].extent.width, _swapchain_images[image_index].extent.height };
-
-  // TODO: need resolved_image? directly use smaa to swapchain image is ok so...
-
-  // copy resolved image to swapchain image
-  transition_image_layout(frame.cmd, _aaa_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-  transition_image_layout(frame.cmd, _smaa_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-  //transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-  //transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-  //transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-  transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  get_current_swapchain_image().set_layout(frame.cmd, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
   
-  copy_image(frame.cmd, _aaa_image, _swapchain_images[image_index]);
-  copy_image(frame.cmd, _smaa_image, _swapchain_images[image_index]);
-  //copy_image(frame.cmd, _resolved_image, _swapchain_images[image_index]);
-  //copy_image(frame.cmd, _smaa_image.handle, _swapchain_images[image_index].handle, extent, extent);
-
-  // transition image layout to presentable
-  transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-  //transition_image_layout(frame.cmd, _swapchain_images[image_index].handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-
-  // depth_image_barrier_end(frame.cmd);
-
   throw_if(vkEndCommandBuffer(frame.cmd) != VK_SUCCESS,
            "failed to end command buffer");
 
-  //
-  // submit commands to queue, which will copied to GPU.
-  //
   VkCommandBufferSubmitInfo cmd_submit_info
   {
     .sType         = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
@@ -247,17 +72,14 @@ void GraphicsEngine::render_end()
   throw_if(vkQueueSubmit2(_graphics_queue, 1, &submit_info, frame.fence),
            "failed to submit to queue");
 
-  //
-  // present to screen
-  //
   VkPresentInfoKHR presentation_info
   {
-    .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+    .sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
     .waitSemaphoreCount = 1,
     .pWaitSemaphores    = &frame.render_finished_sem,
     .swapchainCount     = 1,
     .pSwapchains        = &_swapchain,
-    .pImageIndices      = &image_index,
+    .pImageIndices      = &_current_swapchain_image_index,
   };
   auto res = vkQueuePresentKHR(_present_queue, &presentation_info); 
   if (res != VK_SUCCESS               &&
@@ -265,145 +87,95 @@ void GraphicsEngine::render_end()
       res != VK_SUBOPTIMAL_KHR)
     throw_if(true, "failed to present swapchain image");
 
-  // update frame index
   _current_frame = ++_current_frame % _swapchain_images.size();
 }
 
-void GraphicsEngine::render(std::span<IndexInfo> index_infos, glm::vec2 const& window_extent, glm::vec2 const& display_pos)
+void GraphicsEngine::render_begin()
 {
-  auto cmd = _frames[_current_frame].cmd;
+  auto frame = frame_begin();
+  if (frame == nullptr) return;
 
-  PushConstant pc
-  {
-    .vertices      = _buffer.address() + Buffer_Size * _current_frame,
-    .window_extent = window_extent,
-    .display_pos   = display_pos,
-  };
-  vkCmdPushConstants(cmd, _2D_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+  set_pipeline_state(frame->cmd);
 
-  uint32_t count{};
-  for (auto const& info : index_infos)
-    count += info.count;
-  vkCmdDrawIndexed(cmd, count, 1, index_infos[0].offset, 0, 0);
-}
-
-void GraphicsEngine::update(std::span<Vertex> vertices, std::span<uint16_t> indices)
-{
-  auto vertices_size = sizeof(Vertex)   * vertices.size();
-  auto indices_size  = sizeof(uint16_t) * indices.size();
-
-  throw_if(vertices_size + indices_size > Buffer_Size, "too big vertices indices data!(bigger than {})", Buffer_Size);
-
-  // TODO: abstract every frame's buffer, remember use _current_frame not image_index!!!
-  auto offset = Buffer_Size * _current_frame;
-  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), vertices.data(), _buffer.allocation(), offset, vertices_size) != VK_SUCCESS,
-           "failed to copy vertices data to buffer");         
-  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), indices.data(), _buffer.allocation(), offset + vertices_size, indices_size) != VK_SUCCESS,
-           "failed to copy indices data to buffer");
-  vkCmdBindIndexBuffer(get_current_frame().cmd, _buffer.handle(), offset + vertices_size, VK_INDEX_TYPE_UINT16);
-}
-
-void clear(Command const& cmd, Image const& img)
-{
-  VkImageSubresourceRange range
-  {
-    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-    .levelCount = VK_REMAINING_MIP_LEVELS,
-    .layerCount = VK_REMAINING_ARRAY_LAYERS,
-  };
-  VkClearColorValue value{};
-  vkCmdClearColorImage(cmd, img.handle, VK_IMAGE_LAYOUT_GENERAL, &value, 1, &range);
-}
-
-void GraphicsEngine::post_process()
-{
-  auto frame = get_current_frame();
-
-  VkExtent2D extent = { _swapchain_images[image_index].extent.width, _swapchain_images[image_index].extent.height };
-
-  //
-  // edge detection
-  //
-  transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-  clear(frame.cmd, _edges_image);
-  transition_image_layout(frame.cmd, _resolved_image.handle, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  get_current_swapchain_image().set_layout(frame->cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   
-  //vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline[0]);
-  auto stages  = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_COMPUTE_BIT };
-  auto shaders = std::vector<VkShaderEXT>{ _SMAA_edge_detection_comp, _SMAA_blend_weight_comp, _SMAA_neighbor_comp };
-  graphics_engine::vkCmdBindShadersEXT(frame.cmd, 1, stages.data(), &shaders[0]);
-
-  uint32_t width, height;
-  _window->get_framebuffer_size(width, height);
-
-  PushConstant_SMAA pc
+  auto color_attachment = VkRenderingAttachmentInfo
   {
-    .smaa_rt_metrics = glm::vec4(1.f / width, 1.f / height, width, height),
+    .sType              = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+    .imageView          = get_current_swapchain_image().view(),
+    .imageLayout        = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    .loadOp             = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+    .storeOp            = VK_ATTACHMENT_STORE_OP_STORE,
   };
-  vkCmdPushConstants(frame.cmd, _smaa_pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
-
-  bind_descriptor_buffer(frame.cmd, _descriptor_buffer.address(), VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT, _smaa_pipeline_layout, VK_PIPELINE_BIND_POINT_COMPUTE);
-
-  vkCmdDispatch(frame.cmd, std::ceil((extent.width + 15) / 16), std::ceil((extent.height + 15) / 16), 1);
-
-  //
-  // blend weight
-  //
-  //vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline[1]);
-  graphics_engine::vkCmdBindShadersEXT(frame.cmd, 1, stages.data(), &shaders[1]);
-  transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-  clear(frame.cmd, _blend_image);
-  transition_image_layout(frame.cmd, _edges_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  vkCmdDispatch(frame.cmd, std::ceil((extent.width + 15) / 16), std::ceil((extent.height + 15) / 16), 1);
-
-  //
-  // neighbor
-  //
-  //vkCmdBindPipeline(frame.cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _smaa_pipeline[2]);
-  graphics_engine::vkCmdBindShadersEXT(frame.cmd, 1, stages.data(), &shaders[2]);
-  transition_image_layout(frame.cmd, _smaa_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-  transition_image_layout(frame.cmd, _blend_image.handle, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  vkCmdDispatch(frame.cmd, std::ceil((extent.width + 15) / 16), std::ceil((extent.height + 15) / 16), 1);
-  graphics_engine::vkCmdBindShadersEXT(frame.cmd, 1, stages.data(), nullptr);
-}
-
-void GraphicsEngine::draw_by_aaa()
-{
-  auto frame = get_current_frame();
-
-  VkExtent2D extent = { _swapchain_images[image_index].extent.width, _swapchain_images[image_index].extent.height };
-
-  transition_image_layout(frame.cmd, _aaa_image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  VkRenderingAttachmentInfo color_attachment
-  {
-    .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-    .imageView   = _aaa_image.view,
-    .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    .loadOp      = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-    .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
-  };
-  // TODO: can begin rendering single call multi color attachments for multi-pipelines?
-  VkRenderingInfo rendering
+  auto rendering = VkRenderingInfo
   {
     .sType                = VK_STRUCTURE_TYPE_RENDERING_INFO,
-    .renderArea           = { .extent = extent, },
+    .renderArea           = { .extent = get_current_swapchain_image().extent2D(), },
     .layerCount           = 1,
     .colorAttachmentCount = 1,
     .pColorAttachments    = &color_attachment,
   };
-  vkCmdBeginRendering(frame.cmd, &rendering);
+  vkCmdBeginRendering(frame->cmd, &rendering);
+}
 
-  auto stages  = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
-  auto shaders = std::vector<VkShaderEXT>{ _aaa_vert, _aaa_frag };
-  graphics_engine::vkCmdBindShadersEXT(frame.cmd, 2, stages.data(), shaders.data());
+void GraphicsEngine::set_pipeline_state(Command const& cmd)
+{
+  graphics_engine::vkCmdSetCullModeEXT(cmd, VK_CULL_MODE_BACK_BIT);
+  graphics_engine::vkCmdSetDepthWriteEnableEXT(cmd, VK_FALSE);
+  vkCmdSetRasterizerDiscardEnable(cmd, VK_FALSE);
+  vkCmdSetDepthTestEnable(cmd, VK_FALSE);
+  vkCmdSetStencilTestEnable(cmd, VK_FALSE);
+  vkCmdSetDepthBiasEnable(cmd, VK_FALSE);
+  graphics_engine::vkCmdSetPolygonModeEXT(cmd, VK_POLYGON_MODE_FILL);
+  graphics_engine::vkCmdSetRasterizationSamplesEXT(cmd, VK_SAMPLE_COUNT_1_BIT);
+  VkSampleMask sampler_mask{ 0b1 };
+  graphics_engine::vkCmdSetSampleMaskEXT(cmd, VK_SAMPLE_COUNT_1_BIT, &sampler_mask);
+  vkCmdSetFrontFace(cmd, VK_FRONT_FACE_CLOCKWISE);
+  graphics_engine::vkCmdSetAlphaToCoverageEnableEXT(cmd, VK_FALSE);
+  VkViewport viewport
+  {
+    .width  = static_cast<float>(get_current_swapchain_image().extent3D().width),
+    .height = static_cast<float>(get_current_swapchain_image().extent3D().height), 
+    .maxDepth = 1.f,
+  };
+  VkRect2D scissor{ .extent = get_current_swapchain_image().extent2D(), };
+  vkCmdSetViewportWithCount(cmd, 1, &viewport);
+  vkCmdSetScissorWithCount(cmd, 1, &scissor);
+  vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+  vkCmdSetPrimitiveRestartEnable(cmd, VK_FALSE);
+  graphics_engine::vkCmdSetVertexInputEXT(cmd, 0, nullptr, 0, nullptr);
+  VkBool32 color_blend_enables{ VK_FALSE };
+  graphics_engine::vkCmdSetColorBlendEnableEXT(cmd, 0, 1, &color_blend_enables);
+  VkColorComponentFlags color_write_mask{ VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT };
+  graphics_engine::vkCmdSetColorWriteMaskEXT(cmd, 0, 1, &color_write_mask);
+}
 
-  //bind_descriptor_buffer(frame.cmd, _sdfaa_descriptor_buffer.address(), 0, _sdfaa_pipeline_layout, VK_PIPELINE_BIND_POINT_COMPUTE);
-
-  vkCmdDraw(frame.cmd, 3, 1, 0, 0);
-
-  graphics_engine::vkCmdBindShadersEXT(frame.cmd, 2, stages.data(), nullptr);
+void GraphicsEngine::render_end()
+{
+  auto frame = get_current_frame();
 
   vkCmdEndRendering(frame.cmd);
+
+  frame_end();
+}
+
+void GraphicsEngine::render(glm::vec2 const& window_extent, glm::vec2 const& display_pos)
+{
+
+}
+
+auto convert_color_format(uint32_t color)
+{
+  float r = float((color >> 24) & 0xFF) / 255;
+  float g = float((color >> 16) & 0xFF) / 255;
+  float b = float((color >> 8 ) & 0xFF) / 255;
+  float a = float((color      ) & 0xFF) / 255;
+  return glm::vec4(r, g, b, a);
+}
+
+void GraphicsEngine::update(std::span<ShapeInfo> shape_infos)
+{
+
 }
     
 } }

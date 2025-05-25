@@ -38,14 +38,39 @@ namespace tk { namespace graphics_engine {
     uint32_t        _size       = {};
   };
 
-  struct Image
+  class Image
   {
-    VkImage       handle     = {};
-    VkImageView   view       = {};
-    VmaAllocation allocation = {};
-    VkExtent3D    extent     = {};
-    VkFormat      format     = {};
+  public:
+    Image() = default;
+    Image(MemoryAllocator* allocator, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage);
+    Image(VkImage handle, VkImageView view, VkExtent2D const& extent, VkFormat format)
+      : _handle(handle), _view(view), _extent({ extent.width, extent.height }), _format(format) {}
+
+    void destroy();
+
+    auto handle()     const noexcept { return _handle;     }
+    auto view()       const noexcept { return _view;       }
+    auto allocation() const noexcept { return _allocation; }
+    auto extent3D()   const noexcept { return _extent;     }
+    auto extent2D()   const noexcept { return VkExtent2D{ _extent.width, _extent.height }; }
+    auto format()     const noexcept { return _format;     }
+
+    void set_layout(class Command const& cmd, VkImageLayout layout);
+    void clear(class Command const& cmd, VkClearColorValue value = {});
+
+  private:
+    VmaAllocator  _allocator  = {};
+    VkDevice      _device     = {};
+    VkImage       _handle     = {};
+    VkImageView   _view       = {};
+    VmaAllocation _allocation = {};
+    VkExtent3D    _extent     = {};
+    VkFormat      _format     = {};
+    VkImageLayout _layout     = VK_IMAGE_LAYOUT_UNDEFINED;
   };
+
+void blit_image(Command const& cmd, Image const& src, Image const& dst);
+void copy_image(Command const& cmd, Image const& src, Image const& dst);
 
   class MemoryAllocator
   {
@@ -62,16 +87,11 @@ namespace tk { namespace graphics_engine {
     void init(VkPhysicalDevice physical_device, VkDevice device, VkInstance instance, uint32_t vulkan_version);
     void destroy();
 
-    // HACK: tmp, use for old code, should be discard
-    auto get() { return _allocator; }
+    auto get()    const noexcept { return _allocator; }
+    auto device() const noexcept { return _device;    }
 
-    auto create_buffer(uint32_t size, VkBufferUsageFlags usages, VmaAllocationCreateFlags flags = 0) {  return Buffer(this, size, usages, flags); }
-
-    auto create_image(VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_1_BIT) -> Image;
-    void destroy_image(Image& image);
-
-    // auto create_mesh_buffer(class Command& command, std::vector<class Mesh>& meshs, DestructorStack& destructor, std::vector<MeshInfo>& mesh_infos) -> MeshBuffer;
-    // void destroy_mesh_buffer(MeshBuffer& buffer);
+    auto create_buffer(uint32_t size, VkBufferUsageFlags usages, VmaAllocationCreateFlags flags = 0) { return Buffer(this, size, usages, flags);  }
+    auto create_image(VkFormat format, VkExtent3D extent, VkImageUsageFlags usage)                   { return Image(this, format, extent, usage); }
 
   private:
     VkDevice     _device    = VK_NULL_HANDLE;

@@ -1,5 +1,6 @@
 #include "tk/GraphicsEngine/MemoryAllocator.hpp"
 #include "tk/ErrorHandling.hpp"
+#include "tk/GraphicsEngine/CommandPool.hpp"
 
 #include <cassert>
 
@@ -19,7 +20,6 @@ void Buffer::destroy()
   _address    = {};
   _data       = {};
 }
-
 
 Buffer::Buffer(MemoryAllocator* allocator, uint32_t size, VkBufferUsageFlags usages, VmaAllocationCreateFlags flags) 
 {
@@ -57,6 +57,185 @@ Buffer::Buffer(MemoryAllocator* allocator, uint32_t size, VkBufferUsageFlags usa
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+//                                  Image
+////////////////////////////////////////////////////////////////////////////////
+
+Image::Image(MemoryAllocator* allocator, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage)
+{
+  _allocator = allocator->get();
+  _device    = allocator->device();
+
+  VkImageCreateInfo image_info
+  {
+    .sType       = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+    .imageType   = VK_IMAGE_TYPE_2D,
+    .format      = _format,
+    .extent      = _extent,
+    .mipLevels   = 1,
+    .arrayLayers = 1,
+    .samples     = VK_SAMPLE_COUNT_1_BIT,
+    .tiling      = VK_IMAGE_TILING_OPTIMAL,
+    .usage       = usage,
+  };
+
+  VmaAllocationCreateInfo alloc_info
+  {
+    .flags         = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
+    .usage         = VMA_MEMORY_USAGE_AUTO,
+  };
+  throw_if(vmaCreateImage(_allocator, &image_info, &alloc_info, &_handle, &_allocation, nullptr) != VK_SUCCESS,
+           "failed to create image");
+
+  VkImageViewCreateInfo image_view_info
+  {
+    .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+    .image    = _handle,
+    .viewType = VK_IMAGE_VIEW_TYPE_2D,
+    .format   = _format,
+    .subresourceRange =
+    {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .levelCount = 1,
+      .layerCount = 1,
+    },
+  };
+  throw_if(vkCreateImageView(allocator->device(), &image_view_info, nullptr, &_view) != VK_SUCCESS,
+           "failed to create image view");
+}
+
+void Image::set_layout(class Command const& cmd, VkImageLayout layout)
+{
+  VkImageMemoryBarrier2 barrier
+  {
+    .sType            = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+    // HACK: use all commands bit will stall the GPU pipeline a bit, is inefficient.
+    // should make stageMask more accurate.
+    // reference: https://github.com/KhronosGroup/Vulkan-Docs/wiki/Synchronization-Examples
+    .srcStageMask     = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+    .srcAccessMask    = VK_ACCESS_2_MEMORY_WRITE_BIT,
+    .dstStageMask     = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+    .dstAccessMask    = VK_ACCESS_2_MEMORY_READ_BIT  |
+                        VK_ACCESS_2_MEMORY_WRITE_BIT,
+    .oldLayout        = _layout,
+    .newLayout        = layout,
+    .image            = _handle,
+    .subresourceRange =  
+    { 
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, 
+      .levelCount = VK_REMAINING_MIP_LEVELS,
+      .layerCount = VK_REMAINING_ARRAY_LAYERS,
+    }
+  };
+  VkDependencyInfo dep_info
+  {
+    .sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+    .imageMemoryBarrierCount = 1,
+    .pImageMemoryBarriers    = &barrier,
+  };
+  vkCmdPipelineBarrier2(cmd, &dep_info);
+  _layout = layout;
+}
+
+void Image::destroy()
+{
+  assert(_handle && _allocation);
+
+  vkDestroyImageView(_device, _view, nullptr);
+  vmaDestroyImage(_allocator, _handle, _allocation);
+
+  _allocator  = {};
+  _device     = {};
+  _handle     = {};
+  _view       = {};
+  _allocation = {};
+  _extent     = {};
+  _format     = {};
+  _layout     = VK_IMAGE_LAYOUT_UNDEFINED;
+}
+
+void Image::clear(class Command const& cmd, VkClearColorValue value)
+{
+  assert(_layout == VK_IMAGE_LAYOUT_GENERAL);
+  VkImageSubresourceRange range
+  {
+    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+    .levelCount = VK_REMAINING_MIP_LEVELS,
+    .layerCount = VK_REMAINING_ARRAY_LAYERS,
+  };
+  vkCmdClearColorImage(cmd, _handle, VK_IMAGE_LAYOUT_GENERAL, &value, 1, &range);
+}
+
+
+// HACK: VkCmdCopyImage can be faster but most restriction such as src and dst are same format and extent. 
+void blit_image(Command const& cmd, Image const& src, Image const& dst)
+{
+  VkImageBlit2 blit
+  { 
+    .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2,
+    .srcSubresource =
+    {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .layerCount = 1,
+    },
+    .dstSubresource =
+    {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .layerCount = 1,
+    },
+  };
+  blit.srcOffsets[1].x = src.extent3D().width;
+  blit.srcOffsets[1].y = src.extent3D().height;
+  blit.srcOffsets[1].z = 1;
+  blit.dstOffsets[1].x = dst.extent3D().width;
+  blit.dstOffsets[1].y = dst.extent3D().height;
+  blit.dstOffsets[1].z = 1;
+
+  VkBlitImageInfo2 info
+  {
+    .sType          = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2,
+    .srcImage       = src.handle(),
+    .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    .dstImage       = dst.handle(),
+    .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    .regionCount    = 1,
+    .pRegions       = &blit,
+    .filter         = VK_FILTER_LINEAR,
+  };
+
+  vkCmdBlitImage2(cmd, &info);
+}
+
+void copy_image(Command const& cmd, Image const& src, Image const& dst)
+{
+  VkImageCopy2 region
+  {
+    .sType = VK_STRUCTURE_TYPE_IMAGE_COPY_2,
+    .srcSubresource =
+    {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .layerCount = 1,
+    },
+    .dstSubresource =
+    {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .layerCount = 1,
+    },
+    .extent = src.extent3D(),
+  };
+  VkCopyImageInfo2 info
+  {
+    .sType          = VK_STRUCTURE_TYPE_COPY_IMAGE_INFO_2,
+    .srcImage       = src.handle(),
+    .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    .dstImage       = dst.handle(),
+    .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    .regionCount    = 1,
+    .pRegions       = &region,
+  };
+  vkCmdCopyImage2(cmd, &info);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 //                              Memory Allocator
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -82,138 +261,6 @@ void MemoryAllocator::destroy()
     vmaDestroyAllocator(_allocator);
   _device    = VK_NULL_HANDLE;
   _allocator = VK_NULL_HANDLE;
-}
-
-// auto MemoryAllocator::create_mesh_buffer(Command& command, std::vector<Mesh>& meshs, DestructorStack& destructor, std::vector<MeshInfo>& mesh_infos) -> MeshBuffer
-// {
-//   MeshBuffer buffer;
-//
-//   // get mesh infos
-//   mesh_infos.reserve(meshs.size());
-//   uint32_t vertices_offset = 0, indices_offset = 0;
-//   auto vertices      = std::vector<Vertex>();
-//   auto indices       = std::vector<uint16_t>();
-//   for (auto const& mesh : meshs)
-//   {
-//     uint32_t vertices_byte_size = sizeof(Vertex)  * mesh.vertices.size();
-//     uint32_t indices_byte_size  = sizeof(uint8_t) * mesh.indices.size();
-//     mesh_infos.emplace_back(MeshInfo
-//     {
-//       .vertices_offset = vertices_offset,
-//       .indices_offset  = indices_offset,
-//       .indices_count   = (uint32_t)mesh.indices.size(),
-//     });
-//     vertices_offset += vertices_byte_size;
-//     indices_offset  += indices_byte_size;
-//     vertices.append_range(mesh.vertices);
-//     indices.append_range(mesh.indices);
-//   }
-//
-//   // create mesh buffer 
-//   uint32_t vertices_byte_size = sizeof(Vertex)   * vertices.size();
-//   int32_t  indices_byte_size  = sizeof(uint16_t) * indices.size();
-//   buffer.vertices = create_buffer(vertices_byte_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT        |
-//                                                       VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-//                                                       VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-//   buffer.indices  = create_buffer(indices_byte_size,  VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-//                                                       VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-//   // get address
-//   VkBufferDeviceAddressInfo info
-//   {
-//     .sType  = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-//     .buffer = buffer.vertices.handle,
-//   };
-//   buffer.address = vkGetBufferDeviceAddress(_device, &info);
-//     
-//   // create stage buffer
-//   auto stage = create_buffer(vertices_byte_size + indices_byte_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
-//
-//   // copy mesh data to stage buffer
-//   throw_if(vmaCopyMemoryToAllocation(_allocator, vertices.data(), stage.allocation, 0, vertices_byte_size) != VK_SUCCESS,
-//            "failed to copy vertices data to stage buffer");
-//   throw_if(vmaCopyMemoryToAllocation(_allocator, indices.data(), stage.allocation, vertices_byte_size, indices_byte_size) != VK_SUCCESS,
-//            "failed to copy indices data to stage buffer");
-//
-//   // transform data from stage to mesh buffer
-//   VkBufferCopy copy
-//   {
-//     .size = vertices_byte_size,
-//   };
-//   vkCmdCopyBuffer(command, stage.handle, buffer.vertices.handle, 1, &copy);
-//   copy.size      = indices_byte_size;
-//   copy.srcOffset = vertices_byte_size;
-//   vkCmdCopyBuffer(command, stage.handle, buffer.indices.handle, 1, &copy);
-//
-//   destructor.push([stage, this] mutable { destroy_buffer(stage); });
-//
-//   return buffer;
-// }
-//
-// void MemoryAllocator::destroy_mesh_buffer(MeshBuffer& buffer)
-// {
-//   destroy_buffer(buffer.vertices);
-//   destroy_buffer(buffer.indices);
-//   buffer = {};
-// }
-
-auto MemoryAllocator::create_image(VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkSampleCountFlagBits sample_count) -> Image
-{
-  Image image
-  {
-    .extent = extent,
-    .format = format,
-  };
-
-  VkImageCreateInfo image_info
-  {
-    .sType       = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-    .imageType   = VK_IMAGE_TYPE_2D,
-    .format      = image.format,
-    .extent      = image.extent,
-    .mipLevels   = 1,
-    .arrayLayers = 1,
-    .samples     = sample_count,
-    .tiling      = VK_IMAGE_TILING_OPTIMAL,
-    .usage       = usage,
-  };
-
-  VmaAllocationCreateInfo alloc_info
-  {
-    .flags         = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
-    .usage         = VMA_MEMORY_USAGE_AUTO,
-    //.usage         = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-    //.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-  };
-  throw_if(vmaCreateImage(_allocator, &image_info, &alloc_info, &image.handle, &image.allocation, nullptr) != VK_SUCCESS,
-           "failed to create image");
-
-  VkImageViewCreateInfo image_view_info
-  {
-    .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-    .image    = image.handle,
-    .viewType = VK_IMAGE_VIEW_TYPE_2D,
-    .format   = image.format,
-    .subresourceRange =
-    {
-      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-      .levelCount = 1,
-      .layerCount = 1,
-    },
-  };
-  throw_if(vkCreateImageView(_device, &image_view_info, nullptr, &image.view) != VK_SUCCESS,
-           "failed to create image view");
-
-  return image;
-}
-
-void MemoryAllocator::destroy_image(Image& image)
-{
-  if (image.handle != VK_NULL_HANDLE && image.allocation != VK_NULL_HANDLE)
-  {
-    vkDestroyImageView(_device, image.view, nullptr);
-    vmaDestroyImage(_allocator, image.handle, image.allocation);
-  }
-  image = {};
 }
 
 }}

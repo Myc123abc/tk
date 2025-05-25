@@ -4,7 +4,6 @@
 #include "tk/ErrorHandling.hpp"
 #include "tk/Window.hpp"
 
-#include <fstream>
 #include <map>
 #include <print>
 #include <algorithm>
@@ -407,32 +406,6 @@ inline void print_present_mode(VkPresentModeKHR present_mode)
   else if (present_mode == VK_PRESENT_MODE_MAILBOX_KHR)
     std::print("Mailbox");
   std::println();
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-//                               Image 
-////////////////////////////////////////////////////////////////////////////////
-
-inline VkImageView create_image_view(VkDevice device, VkImage image, VkFormat format)
-{
-  VkImageViewCreateInfo view_info
-  {
-    .sType            = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-    .image            = image,
-    .viewType         = VK_IMAGE_VIEW_TYPE_2D,
-    .format           = format,
-    .subresourceRange =
-    {
-      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-      .levelCount = 1,
-      .layerCount = 1,
-    },
-  };
-  VkImageView view;
-  throw_if(vkCreateImageView(device, &view_info, nullptr, &view) != VK_SUCCESS,
-          "failed to create image view");
-  return view;
 }
 
 } }

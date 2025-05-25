@@ -22,7 +22,7 @@ struct Layout
 {
   std::string_view name;
   glm::vec2        pos;
-  std::vector<graphics_engine::GraphicsEngine::IndexInfo> index_infos;
+  std::vector<graphics_engine::ShapeInfo> shape_infos;
 };
 
 struct ui_context
@@ -32,12 +32,7 @@ struct ui_context
   // TODO: currently, only single main window is being use
   glm::vec2          window_extent;
 
-  graphics_engine::GraphicsEngine*     engine = nullptr;
-  std::vector<graphics_engine::Vertex> vertices;
-  std::vector<uint16_t>                indices;
-
-  // use for path draw
-  std::vector<glm::vec2> points;
+  graphics_engine::GraphicsEngine* engine = nullptr;
 
   uint32_t event_type{};
 

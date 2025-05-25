@@ -1,6 +1,10 @@
 #pragma once
 
-namespace tk { namespace type {
+namespace tk
+{
+
+namespace type
+{
 
   //enum class pipeline
   //{
@@ -10,8 +14,9 @@ namespace tk { namespace type {
 
   enum class shape
   {
-    triangle,
-    rectangle,
+    polygon = 0,
   };
 
-}}
+}
+
+}

@@ -6,24 +6,43 @@
 
 #pragma once
 
+#include "tk/type.hpp"
+
+#include <vector>
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
 
 namespace tk { namespace graphics_engine {
 
-  struct PushConstant 
+  struct PushConstant_AAA_preprocessing
   {
-    VkDeviceAddress vertices = {};
+    VkDeviceAddress buffer = {};
     glm::vec2       window_extent;
     glm::vec2       display_pos;
   };
-  
-  struct alignas(8) Vertex
+
+  struct PushConstant_AAA
   {
-    glm::vec2 pos;
-    glm::vec2 uv;
-    uint32_t  col; // 0xRRGGBBAA
-    uint32_t  pad0{};
+    VkDeviceAddress buffer             = {};
+    uint32_t        shape_infos_offset = {};
+    uint32_t        shape_num          = {};
+  };
+
+  // TODO: currently, not concern about color and uv of per point
+  struct ShapeInfo
+  {
+    std::vector<glm::vec2> points;
+    uint32_t               color;
+    tk::type::shape        type;
+  };
+
+  struct alignas(8) BufferShapeInfo
+  {
+    glm::vec4 color     = {};
+    uint32_t  type      = {};
+    uint32_t  offset    = {};
+    uint32_t  point_num = {};
+    uint32_t  pad0      = {};
   };
 
   //
