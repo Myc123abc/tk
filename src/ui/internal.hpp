@@ -22,7 +22,7 @@ struct Layout
 {
   std::string_view name;
   glm::vec2        pos;
-  std::vector<graphics_engine::ShapeInfo> shape_infos;
+  //std::vector<graphics_engine::ShapeInfo> shape_infos;
 };
 
 struct ui_context

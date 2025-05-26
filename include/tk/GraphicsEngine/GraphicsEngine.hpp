@@ -13,8 +13,6 @@
 #include <glm/glm.hpp>
 #include <SDL3/SDL_events.h>
 
-#include <span>
-
 namespace tk { namespace graphics_engine {
 
   class GraphicsEngine
@@ -45,12 +43,9 @@ namespace tk { namespace graphics_engine {
     void resize_swapchain();
 
     void render_begin();
-
-    void render(glm::vec2 const& window_extent, glm::vec2 const& display_pos);
-
+    void update();
+    void render();
     void render_end();
-
-    void update(std::span<ShapeInfo> shape_infos);
 
   private:
     //
@@ -121,6 +116,27 @@ namespace tk { namespace graphics_engine {
     Shader         _sdf_frag;
     PipelineLayout _sdf_pipeline_layout;
     void render_sdf();
+
+    static constexpr uint32_t Buffer_Size = 1024;
+    Buffer _buffer;
+    void create_buffer();
+
+    struct PushConstant_SDF
+    {
+      VkDeviceAddress address = {};
+      uint32_t        offset  = {}; // offset of shape infos
+      uint32_t        num     = {}; // number of shape infos
+    };
+    struct ShapeInfo
+    {
+      uint32_t  offset = {}; // offset of points
+      uint32_t  num    = {}; // number of points
+      glm::vec4 color;
+    };
+
+    // FIXME: tmp
+    std::vector<glm::vec2> points;
+    std::vector<GraphicsEngine::ShapeInfo> shape_infos;
   };
 
-} }
+}}

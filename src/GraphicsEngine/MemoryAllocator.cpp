@@ -24,7 +24,6 @@ void Buffer::destroy()
 Buffer::Buffer(MemoryAllocator* allocator, uint32_t size, VkBufferUsageFlags usages, VmaAllocationCreateFlags flags) 
 {
   _allocator = allocator->get();
-  _capacity  = size;
   
   VkBufferCreateInfo buf_info
   {

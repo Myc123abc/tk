@@ -45,14 +45,17 @@ void render()
 
   auto& ctx = get_ctx();
 
+  ctx.engine->update();
+  ctx.engine->render();
+
   while (!ctx.layouts.empty())
   {
     auto& layout = ctx.layouts.front();
-    if (layout.shape_infos.empty())
-    {
-      ctx.layouts.pop();
-      break;
-    }
+    //if (layout.shape_infos.empty())
+    //{
+    //  ctx.layouts.pop();
+    //  break;
+    //}
     //ctx.engine->update(layout.shape_infos);
     //ctx.engine->render(layout.shape_infos, ctx.window_extent, layout.pos);
     ctx.layouts.pop();

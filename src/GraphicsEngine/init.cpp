@@ -39,6 +39,7 @@ void GraphicsEngine::init(Window& window)
   init_memory_allocator();
   create_frame_resources();
 
+  create_buffer();
   create_sdf_rendering_resource();
 
   _window->show();
@@ -389,6 +390,16 @@ void GraphicsEngine::create_frame_resources()
   });
 }
 
+void GraphicsEngine::create_buffer()
+{
+  _buffer = _mem_alloc.create_buffer(Buffer_Size * _swapchain_images.size(), VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+  
+  _destructors.push([&]
+  {
+    _buffer.destroy();
+  });
+}
+
 void GraphicsEngine::resize_swapchain()
 {
   // wait GPU to handle finishing resource
@@ -402,15 +413,22 @@ void GraphicsEngine::resize_swapchain()
 
 void GraphicsEngine::create_sdf_rendering_resource()
 {
+  // pushconstant
+  VkPushConstantRange pc
+  {
+    .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+    .size       = sizeof(PushConstant_SDF),
+  };
+
   // create shader
   _device.create_shaders(
   {
-    { _sdf_vert, VK_SHADER_STAGE_VERTEX_BIT,   "shader/SDF_vert.spv" },
-    { _sdf_frag, VK_SHADER_STAGE_FRAGMENT_BIT, "shader/SDF_frag.spv" },
+    { _sdf_vert, VK_SHADER_STAGE_VERTEX_BIT,   "shader/SDF_vert.spv", {}, { pc } },
+    { _sdf_frag, VK_SHADER_STAGE_FRAGMENT_BIT, "shader/SDF_frag.spv", {}, { pc } },
   }, true);
 
   // create pipeline layout
-  _sdf_pipeline_layout = _device.create_pipeline_layout();
+  _sdf_pipeline_layout = _device.create_pipeline_layout({}, {pc});
 
   // destroy resources
   _destructors.push([&]

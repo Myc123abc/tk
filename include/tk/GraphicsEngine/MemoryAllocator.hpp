@@ -26,7 +26,7 @@ namespace tk { namespace graphics_engine {
     auto address()    const noexcept { return _address;    }
     auto data()       const noexcept { return _data;       }
 
-    // TODO: internal record every memory block type, offset and auto increase capacity
+    bool is_valid() const noexcept { return _handle; }
 
   private:
     VmaAllocator    _allocator  = {};
@@ -34,8 +34,6 @@ namespace tk { namespace graphics_engine {
     VmaAllocation   _allocation = {};
     VkDeviceAddress _address    = {};
     void*           _data       = {};
-    uint32_t        _capacity   = {};
-    uint32_t        _size       = {};
   };
 
   class Image

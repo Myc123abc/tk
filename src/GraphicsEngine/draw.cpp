@@ -117,7 +117,9 @@ void GraphicsEngine::render_begin()
   };
   vkCmdBeginRendering(frame->cmd, &rendering);
 
-  render_sdf();
+  auto stages  = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
+  auto shaders = std::vector<VkShaderEXT>{ _sdf_vert, _sdf_frag };
+  graphics_engine::vkCmdBindShadersEXT(frame->cmd, stages.size(), stages.data(), shaders.data());
 }
 
 void GraphicsEngine::set_pipeline_state(Command const& cmd)
@@ -156,14 +158,12 @@ void GraphicsEngine::render_end()
 {
   auto frame = get_current_frame();
 
+  auto stages = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
+  graphics_engine::vkCmdBindShadersEXT(frame.cmd, stages.size(), stages.data(), nullptr);
+
   vkCmdEndRendering(frame.cmd);
 
   frame_end();
-}
-
-void GraphicsEngine::render(glm::vec2 const& window_extent, glm::vec2 const& display_pos)
-{
-
 }
 
 auto convert_color_format(uint32_t color)
@@ -175,22 +175,72 @@ auto convert_color_format(uint32_t color)
   return glm::vec4(r, g, b, a);
 }
 
-void GraphicsEngine::update(std::span<ShapeInfo> shape_infos)
+void GraphicsEngine::update()
 {
+  points =
+  {
+    // line0
+    {-1, 0},
+    { 1, 0},
+    // line1
+    { 0, -1},
+    { 0, 1},
+    // line2
+    { -1, 1},
+    { 1, -1},
+    // line3
+    { 1,1},
+    {-1,-1},
+  };
 
+  shape_infos =
+  {
+    {
+      .offset = 0,
+      .num    = 2,
+      .color  = convert_color_format(0xff0000ff),
+    },
+    {
+      .offset = 4,
+      .num    = 2,
+      .color  = convert_color_format(0x00ff00ff),
+    },
+    {
+      .offset = 8,
+      .num    = 2,
+      .color  = convert_color_format(0x0000ffff),
+    },
+    {
+      .offset = 12,
+      .num    = 2,
+      .color  = convert_color_format(0xffff00ff),
+    },
+  };
+
+  auto points_byte_size      = points.size() * sizeof(glm::vec2);
+  auto shape_infos_byte_size = shape_infos.size() * sizeof(ShapeInfo);
+
+  throw_if(points_byte_size + shape_infos_byte_size > Buffer_Size, "buffer memory unenough!");
+
+  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), points.data(), _buffer.allocation(), Buffer_Size * _current_frame, points_byte_size) != VK_SUCCESS,
+           "failed to copy data to buffer");
+  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), shape_infos.data(), _buffer.allocation(), Buffer_Size * _current_frame + points_byte_size, shape_infos_byte_size) != VK_SUCCESS,
+           "failed to copy data to buffer");
 }
 
-void GraphicsEngine::render_sdf()
+void GraphicsEngine::render()
 {
   auto cmd = get_current_frame().cmd;
 
-  auto stages  = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
-  auto shaders = std::vector<VkShaderEXT>{ _sdf_vert, _sdf_frag };
-  graphics_engine::vkCmdBindShadersEXT(cmd, stages.size(), stages.data(), shaders.data());
+  auto pc = PushConstant_SDF
+  {
+    .address = _buffer.address() + Buffer_Size * _current_frame,
+    .offset  = static_cast<uint32_t>(points.size() * 2),
+    .num     = static_cast<uint32_t>(shape_infos.size()),
+  };
+  vkCmdPushConstants(cmd, _sdf_pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
 
   vkCmdDraw(cmd, 3, 1, 0, 0);
-
-  graphics_engine::vkCmdBindShadersEXT(cmd, stages.size(), stages.data(), nullptr);
 }
 
 } }
