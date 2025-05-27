@@ -4,7 +4,8 @@ namespace tk { namespace type {
 
   enum class shape
   {
-    polygon,
+    line,
+    rectangle,
   };
 
 }}

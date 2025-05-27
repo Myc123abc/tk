@@ -1,41 +1,19 @@
 #version 460
-#extension GL_EXT_buffer_reference : require
+
+#include "SDF.h"
 
 layout(location = 0) in  vec2 uv;
 layout(location = 0) out vec4 col;
 
-#include "SDF.h"
-
-layout(std430, buffer_reference) readonly buffer Buffer
-{
-  uint data[];
-};
-
-/*
-  buffer:      points | shape_infos
-
-  shape_infos: offset | num | color
-*/
-
-layout(push_constant) uniform PushConstant
-{
-  Buffer buf;
-  uint   offset; // offset of shape infos
-  uint   num;    // number of shape infos
-} pc;
-
 struct ShapeInfo
 {
+  uint type;
   uint offset;
   uint num;
   vec4 color;
   // d
-  // type
 };
-
-const uint Shape_Info_Size = 6;
-const uint Point_Size      = 2;
-const uint Line_Point_Num  = 2;
+const uint Shape_Info_Size = 7;
 
 void main()
 {
@@ -47,18 +25,33 @@ void main()
   {
     uint shape_info_idx = pc.offset + i * Shape_Info_Size;
     ShapeInfo info;
-    info.offset = pc.buf.data[shape_info_idx];
-    info.num    = pc.buf.data[shape_info_idx + 1];
-    info.color  = vec4(uintBitsToFloat(pc.buf.data[shape_info_idx + 2]),
-                       uintBitsToFloat(pc.buf.data[shape_info_idx + 3]),
+    info.type   = pc.buf.data[shape_info_idx];
+    info.offset = pc.buf.data[shape_info_idx + 1];
+    info.num    = pc.buf.data[shape_info_idx + 2];
+    info.color  = vec4(uintBitsToFloat(pc.buf.data[shape_info_idx + 3]),
                        uintBitsToFloat(pc.buf.data[shape_info_idx + 4]),
-                       uintBitsToFloat(pc.buf.data[shape_info_idx + 5]));
+                       uintBitsToFloat(pc.buf.data[shape_info_idx + 5]),
+                       uintBitsToFloat(pc.buf.data[shape_info_idx + 6]));
 
     uint point_idx = info.offset;
-    vec2 p0 = vec2(uintBitsToFloat(pc.buf.data[point_idx]),     uintBitsToFloat(pc.buf.data[point_idx + 1]));
-    vec2 p1 = vec2(uintBitsToFloat(pc.buf.data[point_idx + 2]), uintBitsToFloat(pc.buf.data[point_idx + 3]));
+    float d;
 
-    float d = sdSegment(uv, p0, p1);
+    // line
+    if (info.type == 0)
+    {
+      vec2 p0 = vec2(uintBitsToFloat(pc.buf.data[point_idx]),     uintBitsToFloat(pc.buf.data[point_idx + 1]));
+      vec2 p1 = vec2(uintBitsToFloat(pc.buf.data[point_idx + 2]), uintBitsToFloat(pc.buf.data[point_idx + 3]));
+      d = sdSegment(uv, p0, p1);
+    }
+    // box
+    else if (info.type == 1)
+    {
+      vec2 p0 = vec2(uintBitsToFloat(pc.buf.data[point_idx]),     uintBitsToFloat(pc.buf.data[point_idx + 1]));
+      vec2 p1 = vec2(uintBitsToFloat(pc.buf.data[point_idx + 2]), uintBitsToFloat(pc.buf.data[point_idx + 3]));
+      vec2 extent_div2 = (p1 - p0) * 0.5;
+      vec2 center = p0 + extent_div2;
+      d = sdBox(uv - center, extent_div2);
+    }
 
     col = mix(info.color, col, smoothstep(0.0, w, d));
   }

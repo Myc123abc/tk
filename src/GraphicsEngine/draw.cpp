@@ -180,37 +180,41 @@ void GraphicsEngine::update()
   points =
   {
     // line0
-    {-1, 0},
-    { 1, 0},
-    // line1
-    { 0, -1},
-    { 0, 1},
+    {0, 0},
+    {10, 200},
+    // box0
+    { 100, 100},
+    { 200, 150},
     // line2
-    { -1, 1},
-    { 1, -1},
+    { 200, 200},
+    { 190, 0},
     // line3
-    { 1,1},
-    {-1,-1},
+    { 200, 0},
+    {0,10},
   };
 
   shape_infos =
   {
     {
+      .type   = type::shape::line,
       .offset = 0,
       .num    = 2,
       .color  = convert_color_format(0xff0000ff),
     },
     {
+      .type   = type::shape::rectangle,
       .offset = 4,
       .num    = 2,
       .color  = convert_color_format(0x00ff00ff),
     },
     {
+      .type   = type::shape::line,
       .offset = 8,
       .num    = 2,
       .color  = convert_color_format(0x0000ffff),
     },
     {
+      .type   = type::shape::line,
       .offset = 12,
       .num    = 2,
       .color  = convert_color_format(0xffff00ff),
@@ -232,13 +236,17 @@ void GraphicsEngine::render()
 {
   auto cmd = get_current_frame().cmd;
 
+  uint32_t w, h;
+  _window->get_framebuffer_size(w, h);
   auto pc = PushConstant_SDF
   {
-    .address = _buffer.address() + Buffer_Size * _current_frame,
-    .offset  = static_cast<uint32_t>(points.size() * 2),
-    .num     = static_cast<uint32_t>(shape_infos.size()),
+    .address       = _buffer.address() + Buffer_Size * _current_frame,
+    .offset        = static_cast<uint32_t>(points.size() * 2),
+    .num           = static_cast<uint32_t>(shape_infos.size()),
+    .window_extent = { w, h },  
   };
-  vkCmdPushConstants(cmd, _sdf_pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+
+  vkCmdPushConstants(cmd, _sdf_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
 
   vkCmdDraw(cmd, 3, 1, 0, 0);
 }

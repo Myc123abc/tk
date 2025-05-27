@@ -9,6 +9,7 @@
 #include "MemoryAllocator.hpp"
 #include "CommandPool.hpp"
 #include "Device.hpp"
+#include "../type.hpp"
 
 #include <glm/glm.hpp>
 #include <SDL3/SDL_events.h>
@@ -126,12 +127,14 @@ namespace tk { namespace graphics_engine {
       VkDeviceAddress address = {};
       uint32_t        offset  = {}; // offset of shape infos
       uint32_t        num     = {}; // number of shape infos
+      glm::vec2       window_extent;
     };
     struct ShapeInfo
     {
-      uint32_t  offset = {}; // offset of points
-      uint32_t  num    = {}; // number of points
-      glm::vec4 color;
+      type::shape type   = {};
+      uint32_t    offset = {}; // offset of points
+      uint32_t    num    = {}; // number of points
+      glm::vec4   color;
     };
 
     // FIXME: tmp

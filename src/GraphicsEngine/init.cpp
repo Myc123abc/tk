@@ -414,9 +414,9 @@ void GraphicsEngine::resize_swapchain()
 void GraphicsEngine::create_sdf_rendering_resource()
 {
   // pushconstant
-  VkPushConstantRange pc
+  auto pc = VkPushConstantRange
   {
-    .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
     .size       = sizeof(PushConstant_SDF),
   };
 
@@ -428,7 +428,7 @@ void GraphicsEngine::create_sdf_rendering_resource()
   }, true);
 
   // create pipeline layout
-  _sdf_pipeline_layout = _device.create_pipeline_layout({}, {pc});
+  _sdf_pipeline_layout = _device.create_pipeline_layout({}, { pc });
 
   // destroy resources
   _destructors.push([&]
