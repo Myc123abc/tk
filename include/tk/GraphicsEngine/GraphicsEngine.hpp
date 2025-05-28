@@ -14,7 +14,17 @@
 #include <glm/glm.hpp>
 #include <SDL3/SDL_events.h>
 
+#include <span>
+
 namespace tk { namespace graphics_engine {
+
+  struct ShapeInfo
+  {
+    type::shape type   = {};
+    uint32_t    offset = {}; // offset of points
+    uint32_t    num    = {}; // number of points
+    glm::vec4   color;
+  };
 
   class GraphicsEngine
   {
@@ -44,8 +54,8 @@ namespace tk { namespace graphics_engine {
     void resize_swapchain();
 
     void render_begin();
-    void update();
-    void render();
+    void update(std::span<glm::vec2> points, std::span<ShapeInfo> infos);
+    void render(std::span<glm::vec2> points, std::span<ShapeInfo> infos);
     void render_end();
 
   private:
@@ -129,17 +139,6 @@ namespace tk { namespace graphics_engine {
       uint32_t        num     = {}; // number of shape infos
       glm::vec2       window_extent;
     };
-    struct ShapeInfo
-    {
-      type::shape type   = {};
-      uint32_t    offset = {}; // offset of points
-      uint32_t    num    = {}; // number of points
-      glm::vec4   color;
-    };
-
-    // FIXME: tmp
-    std::vector<glm::vec2> points;
-    std::vector<GraphicsEngine::ShapeInfo> shape_infos;
   };
 
 }}

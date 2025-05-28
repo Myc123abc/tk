@@ -34,6 +34,9 @@ struct ui_context
 
   graphics_engine::GraphicsEngine* engine = nullptr;
 
+  std::vector<glm::vec2> points;
+  std::vector<graphics_engine::ShapeInfo> shape_infos;
+
   uint32_t event_type{};
 
   std::unordered_map<std::string, std::vector<Widget>>      states;

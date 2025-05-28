@@ -46,6 +46,23 @@ void end();
 void line(glm::vec2 start, glm::vec2 end, uint32_t color, float thickness = 0.f);
 
 /**
+ * draw rectangle
+ * @param left_upper left upper corner
+ * @param right_down right down corner
+ * @param color rgba
+ */
+void rectangle(glm::vec2 const& left_upper, glm::vec2 const& right_down, uint32_t color);
+
+/**
+ * draw triangle
+ * @param p0
+ * @param p1
+ * @param p2
+ * @param color rgba
+ */
+void triangle(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint32_t color);
+
+/**
  * draw polygon
  * @param points points of polygon. If it's filled polygon, need to be counter clockwise.
  * @param color color of oriented half plane

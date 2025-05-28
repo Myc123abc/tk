@@ -9,7 +9,7 @@ struct ShapeInfo
 {
   uint type;
   uint offset;
-  uint num;
+  uint num; // DISCARD: unuse now
   vec4 color;
   // d
 };
@@ -51,6 +51,14 @@ void main()
       vec2 extent_div2 = (p1 - p0) * 0.5;
       vec2 center = p0 + extent_div2;
       d = sdBox(uv - center, extent_div2);
+    }
+    // triangle
+    else if (info.type == 2)
+    {
+      vec2 p0 = vec2(uintBitsToFloat(pc.buf.data[point_idx]),     uintBitsToFloat(pc.buf.data[point_idx + 1]));
+      vec2 p1 = vec2(uintBitsToFloat(pc.buf.data[point_idx + 2]), uintBitsToFloat(pc.buf.data[point_idx + 3]));
+      vec2 p2 = vec2(uintBitsToFloat(pc.buf.data[point_idx + 4]), uintBitsToFloat(pc.buf.data[point_idx + 5]));
+      d = sdTriangle(uv, p0, p1, p2);
     }
 
     col = mix(info.color, col, smoothstep(0.0, w, d));

@@ -6,6 +6,7 @@ namespace tk { namespace type {
   {
     line,
     rectangle,
+    triangle,
   };
 
 }}

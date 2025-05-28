@@ -166,73 +166,20 @@ void GraphicsEngine::render_end()
   frame_end();
 }
 
-auto convert_color_format(uint32_t color)
+void GraphicsEngine::update(std::span<glm::vec2> points, std::span<ShapeInfo> infos)
 {
-  float r = float((color >> 24) & 0xFF) / 255;
-  float g = float((color >> 16) & 0xFF) / 255;
-  float b = float((color >> 8 ) & 0xFF) / 255;
-  float a = float((color      ) & 0xFF) / 255;
-  return glm::vec4(r, g, b, a);
-}
-
-void GraphicsEngine::update()
-{
-  points =
-  {
-    // line0
-    {0, 0},
-    {10, 200},
-    // box0
-    { 100, 100},
-    { 200, 150},
-    // line2
-    { 200, 200},
-    { 190, 0},
-    // line3
-    { 200, 0},
-    {0,10},
-  };
-
-  shape_infos =
-  {
-    {
-      .type   = type::shape::line,
-      .offset = 0,
-      .num    = 2,
-      .color  = convert_color_format(0xff0000ff),
-    },
-    {
-      .type   = type::shape::rectangle,
-      .offset = 4,
-      .num    = 2,
-      .color  = convert_color_format(0x00ff00ff),
-    },
-    {
-      .type   = type::shape::line,
-      .offset = 8,
-      .num    = 2,
-      .color  = convert_color_format(0x0000ffff),
-    },
-    {
-      .type   = type::shape::line,
-      .offset = 12,
-      .num    = 2,
-      .color  = convert_color_format(0xffff00ff),
-    },
-  };
-
   auto points_byte_size      = points.size() * sizeof(glm::vec2);
-  auto shape_infos_byte_size = shape_infos.size() * sizeof(ShapeInfo);
+  auto shape_infos_byte_size = infos.size()  * sizeof(ShapeInfo);
 
   throw_if(points_byte_size + shape_infos_byte_size > Buffer_Size, "buffer memory unenough!");
 
   throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), points.data(), _buffer.allocation(), Buffer_Size * _current_frame, points_byte_size) != VK_SUCCESS,
            "failed to copy data to buffer");
-  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), shape_infos.data(), _buffer.allocation(), Buffer_Size * _current_frame + points_byte_size, shape_infos_byte_size) != VK_SUCCESS,
+  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), infos.data(), _buffer.allocation(), Buffer_Size * _current_frame + points_byte_size, shape_infos_byte_size) != VK_SUCCESS,
            "failed to copy data to buffer");
 }
 
-void GraphicsEngine::render()
+void GraphicsEngine::render(std::span<glm::vec2> points, std::span<ShapeInfo> infos)
 {
   auto cmd = get_current_frame().cmd;
 
@@ -242,7 +189,7 @@ void GraphicsEngine::render()
   {
     .address       = _buffer.address() + Buffer_Size * _current_frame,
     .offset        = static_cast<uint32_t>(points.size() * 2),
-    .num           = static_cast<uint32_t>(shape_infos.size()),
+    .num           = static_cast<uint32_t>(infos.size()),
     .window_extent = { w, h },  
   };
 

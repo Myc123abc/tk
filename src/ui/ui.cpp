@@ -45,12 +45,14 @@ void render()
 
   auto& ctx = get_ctx();
 
-  ctx.engine->update();
-  ctx.engine->render();
+  ctx.engine->update(ctx.points, ctx.shape_infos);
+  ctx.engine->render(ctx.points, ctx.shape_infos);
+  ctx.points.clear();
+  ctx.shape_infos.clear();
 
-  while (!ctx.layouts.empty())
-  {
-    auto& layout = ctx.layouts.front();
+  //while (!ctx.layouts.empty())
+  //{
+  //  auto& layout = ctx.layouts.front();
     //if (layout.shape_infos.empty())
     //{
     //  ctx.layouts.pop();
@@ -58,15 +60,71 @@ void render()
     //}
     //ctx.engine->update(layout.shape_infos);
     //ctx.engine->render(layout.shape_infos, ctx.window_extent, layout.pos);
-    ctx.layouts.pop();
-  }
-
+  //  ctx.layouts.pop();
+  //}
+  while (!ctx.layouts.empty()) ctx.layouts.pop();
   ctx.call_stack.clear();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 //                                Shape
 ////////////////////////////////////////////////////////////////////////////////
+
+auto convert_color_format(uint32_t color)
+{
+  float r = float((color >> 24) & 0xFF) / 255;
+  float g = float((color >> 16) & 0xFF) / 255;
+  float b = float((color >> 8 ) & 0xFF) / 255;
+  float a = float((color      ) & 0xFF) / 255;
+  return glm::vec4(r, g, b, a);
+}
+
+void rectangle(glm::vec2 const& left_upper, glm::vec2 const& right_down, uint32_t color)
+{
+  auto& ctx = get_ctx();
+  assert(ctx.begining                &&
+         left_upper.x < right_down.x &&
+         left_upper.y < right_down.y);
+  
+  auto& pos = ctx.layouts.back().pos;
+
+  uint32_t offset = ctx.points.size() * 2;
+  ctx.points.append_range(std::vector<glm::vec2>
+  {
+    pos + left_upper,
+    pos + right_down,
+  });
+  ctx.shape_infos.emplace_back(ShapeInfo
+  {
+    .type   = type::shape::rectangle,
+    .offset = offset,
+    .num    = 2,
+    .color  = convert_color_format(color),
+  });
+}
+
+void triangle(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint32_t color)
+{
+  auto& ctx = get_ctx();
+  assert(ctx.begining);
+
+  auto& pos = ctx.layouts.back().pos;
+
+  uint32_t offset = ctx.points.size() * 2;
+  ctx.points.append_range(std::vector<glm::vec2>
+  {
+    pos + p0,
+    pos + p1,
+    pos + p2,
+  });
+  ctx.shape_infos.emplace_back(ShapeInfo
+  {
+    .type   = type::shape::triangle,
+    .offset = offset,
+    .num    = 3,
+    .color  = convert_color_format(color),
+  });
+}
 
 void line(glm::vec2 start, glm::vec2 end, uint32_t color, float thickness)
 {
