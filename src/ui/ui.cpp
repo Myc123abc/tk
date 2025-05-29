@@ -79,76 +79,32 @@ auto convert_color_format(uint32_t color)
   return glm::vec4(r, g, b, a);
 }
 
-void rectangle(glm::vec2 const& left_upper, glm::vec2 const& right_down, uint32_t color)
+void shape(type::shape type, std::vector<glm::vec2> const& points, uint32_t color, uint32_t thickness)
 {
-  auto& ctx = get_ctx();
-  assert(ctx.begining                &&
-         left_upper.x < right_down.x &&
-         left_upper.y < right_down.y);
-  
-  auto& pos = ctx.layouts.back().pos;
-
-  uint32_t offset = ctx.points.size() * 2;
-  ctx.points.append_range(std::vector<glm::vec2>
-  {
-    pos + left_upper,
-    pos + right_down,
-  });
-  ctx.shape_infos.emplace_back(ShapeInfo
-  {
-    .type   = type::shape::rectangle,
-    .offset = offset,
-    .num    = 2,
-    .color  = convert_color_format(color),
-  });
-}
-
-void triangle(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint32_t color)
-{
+  // promise use ui::begin()
   auto& ctx = get_ctx();
   assert(ctx.begining);
-
+  
+  // get layout position
   auto& pos = ctx.layouts.back().pos;
 
+  // start index of points
   uint32_t offset = ctx.points.size() * 2;
-  ctx.points.append_range(std::vector<glm::vec2>
-  {
-    pos + p0,
-    pos + p1,
-    pos + p2,
-  });
+
+  // add points
+  ctx.points.reserve(ctx.points.size() + points.size());
+  for (auto& point : points) 
+    ctx.points.emplace_back(pos + point);
+
+  // add shape info
   ctx.shape_infos.emplace_back(ShapeInfo
   {
-    .type   = type::shape::triangle,
-    .offset = offset,
-    .num    = 3,
-    .color  = convert_color_format(color),
+    .type      = type,
+    .offset    = offset,
+    .num       = static_cast<uint32_t>(points.size()),
+    .color     = convert_color_format(color),
+    .thickness = thickness,
   });
-}
-
-void line(glm::vec2 start, glm::vec2 end, uint32_t color, float thickness)
-{
-
-}
-
-void polygon(std::vector<glm::vec2> const& points, uint32_t color, float thickness)
-{
-  assert(points.size() > 2 && thickness >= 0.f);
-
-  //if (thickness == 0.f)
-  //{
-  //  auto& ctx = get_ctx();
-  //  ctx.shape_infos.emplace_back(ShapeInfo
-  //  {
-  //    .points = points,
-  //    .color  = color,
-  //    .type   = type::shape::polygon,
-  //  });
-  //  return;
-  //}
-  //
-  //// TODO:
-  //assert(false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -251,7 +207,7 @@ bool click_area(std::string_view name, glm::vec2 const& pos0, glm::vec2 const& p
   return false;
 }
 
-bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> const& data, uint32_t color, float thickness)
+bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> const& data, uint32_t color, uint32_t thickness)
 {
   auto& ctx    = get_ctx();
   auto& layout = ctx.layouts.back();
@@ -291,19 +247,23 @@ bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> con
   // draw shape
   auto num = data.size();
   std::vector<glm::vec2> detect_data;
-  //switch (shape)
-  //{
-  //case type::shape::triangle:
-  //  assert(num == 3);
-  //  triangle(data[0], data[1], data[2], color, thickness);
-  //  detect_data = data;
-  //  break;
-  //case type::shape::rectangle:
-  //  assert(num == 2);
-  //  rectangle(data[0], data[1], color, thickness);
-  //  detect_data = { data[0], { data[1].x, data[0].y }, data[1], { data[0].x, data[1].y } };
-  //  break;
-  //}
+  switch (shape)
+  {
+  case type::shape::line:
+    assert(false);
+
+  case type::shape::triangle:
+    assert(num == 3);
+    triangle(data[0], data[1], data[2], color, thickness);
+    detect_data = data;
+    break;
+    
+  case type::shape::rectangle:
+    assert(num == 2);
+    rectangle(data[0], data[1], color, thickness);
+    detect_data = { data[0], { data[1].x, data[0].y }, data[1], { data[0].x, data[1].y } };
+    break;
+  }
 
   if (ctx.event_type == SDL_EVENT_MOUSE_BUTTON_DOWN && detect_mouse_on_button(detect_data))
   {

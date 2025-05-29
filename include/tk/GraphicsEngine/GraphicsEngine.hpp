@@ -20,10 +20,11 @@ namespace tk { namespace graphics_engine {
 
   struct ShapeInfo
   {
-    type::shape type   = {};
-    uint32_t    offset = {}; // offset of points
-    uint32_t    num    = {}; // number of points
+    type::shape type      = {};
+    uint32_t    offset    = {}; // offset of points
+    uint32_t    num       = {}; // number of points
     glm::vec4   color;
+    uint32_t    thickness = {};
   };
 
   class GraphicsEngine
