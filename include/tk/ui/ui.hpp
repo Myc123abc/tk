@@ -19,6 +19,7 @@
 
 #include <vector>
 #include <string_view>
+#include <span>
 
 namespace tk { namespace ui {
 

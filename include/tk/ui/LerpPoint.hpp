@@ -6,16 +6,20 @@
 
 #include <glm/glm.hpp>
 #include <chrono>
+#include <vector>
 
 namespace tk { namespace ui {
+
+struct LerpContext
+{
+
+};
 
 class LerpPoint
 {
 public:
-  LerpPoint(glm::vec2 start, glm::vec2 end, uint32_t time = 0)
+  LerpPoint(glm::vec2 start, glm::vec2 end, uint32_t time)
     : _start(start), _end(end), _now(start), _time(time) {}
-
-  void set_time(uint32_t time) noexcept { _time = time; }
 
   enum class status
   {
@@ -28,9 +32,11 @@ public:
 
   void reverse() noexcept { std::swap(_start, _end); }
 
-  auto start() const noexcept { return _start; }
-  auto end()   const noexcept { return _end;   }
-  auto now()   const noexcept { return _now;   }
+  auto& start() const noexcept { return _start; }
+  auto& end()   const noexcept { return _end;   }
+  auto& now()   const noexcept { return _now;   }
+
+  operator glm::vec2() const noexcept { return _now; }
 
 private:
   glm::vec2 _start, _end, _now;
@@ -39,11 +45,48 @@ private:
   double    _rate   = {};
   decltype(std::chrono::high_resolution_clock::now()) _start_time;
 
-  uint32_t              _reentry_count = {};
-  bool                  _reentry       = {};
+  bool                  _reentry = {};
   glm::vec2             _reentry_start, _reentry_end;
   uint32_t              _reentry_time;
-  decltype(_start_time) _reentry_start_time;
+};
+
+struct LerpInfo
+{
+  glm::vec2 start;
+  glm::vec2 end;
+  uint32_t  time;
+};
+
+class LerpPoints
+{
+public:
+  LerpPoints(std::vector<LerpInfo> const& infos)
+    :_infos(infos), _now(infos.begin()->start), _it(_infos.begin()) {}
+
+  void run();
+  void render();
+
+  auto& start() const noexcept { return _infos.begin()->start; }
+  auto& end()   const noexcept { return _infos.rbegin()->end;  }
+  auto& now()   const noexcept { return _now; }
+
+private:
+  enum class status
+  {
+    unrun,
+    running,
+  };
+
+  glm::vec2                _now;
+  std::vector<LerpInfo>    _infos;
+  decltype(_infos.begin()) _it;
+  status                   _status = status::unrun;
+  decltype(std::chrono::high_resolution_clock::now()) _start_time;
+  double                   _rate = {};
+
+  bool      _reentry       = {};
+  glm::vec2 _reentry_start, _reentry_end;
+  uint32_t  _renetry_time  = {};
 };
 
 }}

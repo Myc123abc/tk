@@ -9,6 +9,7 @@
 #include "tk/ui/LerpPoint.hpp"
 
 #include <chrono>
+#include <span>
 
 using namespace tk;
 using namespace tk::ui;
@@ -37,101 +38,84 @@ auto pause_right4 = glm::vec2(pause_right1.x, pause_right3.y);
 //                             lerp animation
 ////////////////////////////////////////////////////////////////////////////////
 
-class PlaybackButton final
+class PlayBackButton
 {
 public:
-  PlaybackButton(std::string const& name, glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2)
+  PlayBackButton(std::string const& name, glm::vec2 p0, glm::vec2 p1, glm::vec2 p2)
   {
-    _playback_btn_name = name + "play";
-    _pause_btn_name    = name + "pause";
+    _playback_btn_name = name + "playback";
+    _pasue_btn_name    = name + "pause";
 
-    _positions[0] = p0;
-    _positions[3] = p2;
-    _positions[5] = p1;
-    _positions[6] = _positions[5];
-    _part = (_positions[5] - _positions[0]) / 2.f;
-    _positions[1] = _positions[0] + _part;
-    _positions[4] = _positions[1];
-    _positions[2] = glm::vec2(_positions[3].x + _part.x, _positions[3].y - _part.y);
-    _positions[7] = _positions[2];
+    auto rect = glm::vec2(p1.x - p0.x, (p1.y - p0.y) * 2);
 
-    _playback_pos[0] = _positions[0];
-    _playback_pos[1] = _positions[5];
-    _playback_pos[2] = _positions[3];
+    _lps.reserve(8);
+    _lps.append_range(std::vector<LerpPoint>
+    {
+      // pause button                       // playback buttin
+      { p0,                                 p0,                                      100 },
+      { p0 + glm::vec2( rect.x / 3, 0),     p0 + glm::vec2(rect.x / 2,  rect.y / 4), 100 },
+      { p2 + glm::vec2( rect.x / 3, 0),     p2 + glm::vec2(rect.x / 2, -rect.y / 4), 100 },
+      { p2,                                 p2,                                      100 },
+      { glm::vec2(p1.x - rect.x / 3, p0.y), p0 + glm::vec2(rect.x / 2,  rect.y / 4), 100 },
+      { glm::vec2(p1.x, p0.y),              p1,                                      100 },
+      { glm::vec2(p1.x, p2.y),              p1,                                      100 },
+      { glm::vec2(p1.x - rect.x / 3, p2.y), p2 + glm::vec2(rect.x / 2, -rect.y / 4), 100 },
+    });
 
-    _pause_pos[0] = _positions[0];
-    auto part = (_positions[5].x - _positions[0].x) / 3.f;
-    _pause_pos[1] = _pause_pos[0] + glm::vec2(part, 0);
-    _pause_pos[2] = _pause_pos[1] + glm::vec2(0, _part.y * 4);
-    _pause_pos[3] = _pause_pos[0] + glm::vec2(0, _part.y * 4);
-    _pause_pos[5] = _positions[0] + glm::vec2(_part.x * 2, 0);
-    _pause_pos[4] = _pause_pos[5] - glm::vec2(part, 0);
-    _pause_pos[6] = _pause_pos[5] + glm::vec2(0, _part.y * 4);
-    _pause_pos[7] = _pause_pos[4] + glm::vec2(0, _part.y * 4);
-
-    for (auto i = 0; i < 8; ++i)
-      _positions2[i] = _pause_pos[i];
+    _left_upper  = p0;
+    _right_lower = _lps[6].start();
   }
 
-  enum
+  auto button() -> bool
   {
-    playing,
-    paused,
-    animation,
-  };
+    if (ui::click_area("test", _left_upper, _right_lower))
+    {
+      if (_lps[1].end() == _lps[1].now())
+      {
+        for (auto& p : _lps)
+          p.reverse();
+      }
 
-  auto pause_button()
-  {
-    ui::rectangle(_pause_pos[0], _pause_pos[2], 0xFFFFFFFF, 1.f);
-    ui::rectangle(_pause_pos[4], _pause_pos[6], 0xFFFFFFFF, 1.f);
-    return ui::click_area(_pause_btn_name, _pause_pos[0], _pause_pos[6]);
+      for (auto& p : _lps)  
+        p.run();
+
+      return true;
+    } 
+    return false;
   }
 
   void render()
   {
-    if (_status == playing)
-    {
-      if (pause_button())
-      {
-        _status = paused;
-      }
-    }
-    else if (_status == paused)
-    {
-      if (ui::button(_playback_btn_name, type::shape::triangle, { _playback_pos[0], _playback_pos[1], _playback_pos[2] }, 0xFFFFFFFF, 1))
-      {
-        _status = playing;
-      }
-    }
-    else if (_status == animation)
-    {
+    for (auto& p : _lps)
+      p.render();
 
-    }
+    auto rect0 = std::span(_lps.begin(), _lps.begin() + 4);
+    auto rect1 = std::span(_lps.begin() + 4, _lps.end());
+    ui::polygon({ rect0.begin(), rect0.end() }, 0xffffffff, 1);
+    ui::polygon({ rect1.begin(), rect1.end() }, 0xffffffff, 1);
   }
 
-  auto status() const noexcept { return _status; }
-
 private:
-  std::string _playback_btn_name;
-  std::string _pause_btn_name;
-  glm::vec2   _positions[8];
-  glm::vec2   _positions2[8];
-  glm::vec2   _playback_pos[3];
-  glm::vec2   _pause_pos[8];
-  glm::vec2   _part;
-  uint32_t    _status;
+  std::vector<LerpPoint> _lps;
+  std::string _playback_btn_name, _pasue_btn_name;
+  glm::vec2 _left_upper, _right_lower;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 //                               tk callback
 ////////////////////////////////////////////////////////////////////////////////
 
-PlaybackButton playback_btn("playback_btn", { 5, 5 }, { 5 + 12.5 * 1.414, 5 + 12.5 }, { 5, 5 + 25 });
+PlayBackButton playback_btn("playback_btn", { 5, 5 }, { 5 + 12.5 * 1.414, 5 + 12.5 }, { 5, 5 + 25 });
 LerpPoint lp({0, 100}, {100, 100}, 1000);
+LerpPoints lps(std::vector<LerpInfo>
+{
+  { { 0, 150 }, { 100, 150 }, 1000 },
+  { { 100, 150 }, { 100, 250 }, 1000 },
+});
 
 void tk_init(int argc, char** argv)
 {
-  init_tk_context("tk", 200, 200, nullptr);
+  init_tk_context("tk", 200, 350, nullptr);
 }
 
 void tk_iterate()
@@ -150,12 +134,18 @@ void tk_iterate()
 
     // playback button
     playback_btn.render();
+    if (playback_btn.button())
+    {
+      log::info("click");
+    }
     
     if (ui::button("lp btn", type::shape::circle, { glm::vec2(75), glm::vec2(25) }, 0xffffffff))
     {
       if (lp.now() == lp.end())
         lp.reverse();
       lp.run();
+
+      lps.run();
     }
 
     //if (paused)
@@ -175,12 +165,17 @@ void tk_iterate()
     ui::begin("Interpolation Animation", 50, 50);
  
     lp.render();
-    ui::line(lp.start(), lp.end(), 0xffffffff);
+    ui::line({0, 100}, {100, 100}, 0xffffffff);
     ui::circle(lp.now(), 2, 0xff000000);
     //if (lp.single_finished())
     //{
     //  log::info("finished");
     //}
+
+    lps.render();
+    ui::line({ 0, 150 }, { 100, 150 }, 0xffffffff);
+    ui::line({ 100, 150 }, { 100, 250 }, 0xffffffff);
+    ui::circle(lps.now(), 2, 0xff000000);
 
     ui::end();
   }
