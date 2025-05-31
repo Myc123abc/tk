@@ -8,6 +8,7 @@ namespace tk { namespace type {
     rectangle,
     triangle,
     polygon,
+    circle,
   };
 
 }}

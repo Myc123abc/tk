@@ -75,6 +75,12 @@ void main()
     {
       d = sdPolygon(info.offset, info.num, uv);
     }
+    else if (info.type == Circle)
+    {
+      vec2  center = GetVec2(info.offset);
+      float radius = GetDataF(info.offset + 2);
+      d = sdCircle(uv - center, radius);
+    }
 
     col = mix_color(info.color, col, w, d, info.thickness);
   }

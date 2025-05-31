@@ -99,6 +99,15 @@ inline void polygon(std::vector<glm::vec2> const& points, uint32_t color, uint32
   shape(type::shape::polygon, points, color, thickness);
 }
 
+/**
+ * draw circle
+ * @param center
+ * @param radius
+ * @param color
+ * @param thickness
+ */
+void circle(glm::vec2 const& center, float radius, uint32_t color, uint32_t thickness = 0);
+
 ////////////////////////////////////////////////////////////////////////////////
 //                                UI
 ////////////////////////////////////////////////////////////////////////////////

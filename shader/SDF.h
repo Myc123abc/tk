@@ -29,6 +29,7 @@ layout(push_constant) uniform PushConstant
 #define Rectangle 1
 #define Triangle  2
 #define Polygon   3
+#define Circle    4
 
 float sdSegment( in vec2 p, in vec2 a, in vec2 b )
 {
@@ -74,4 +75,9 @@ float sdPolygon( in uint offset, in uint n, in vec2 p )
         if( all(c) || all(not(c)) ) s*=-1.0;  
     }
     return s*sqrt(d);
+}
+
+float sdCircle( vec2 p, float r )
+{
+    return length(p) - r;
 }

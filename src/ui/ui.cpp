@@ -107,13 +107,40 @@ void shape(type::shape type, std::vector<glm::vec2> const& points, uint32_t colo
   });
 }
 
+void circle(glm::vec2 const& center, float radius, uint32_t color, uint32_t thickness)
+{
+  auto& ctx = get_ctx();
+  assert(ctx.begining);
+  
+  auto& pos = ctx.layouts.back().pos;
+
+  uint32_t offset = ctx.points.size() * 2;
+
+  ctx.points.reserve(ctx.points.size() + 2);
+  ctx.points.append_range(std::vector<glm::vec2>
+  {
+    pos + center,
+    glm::vec2(radius), // TODO: just for simply, store vec2(radius) rather than radius because ctx.points is vector<vec2>
+  });
+
+  // add shape info
+  ctx.shape_infos.emplace_back(ShapeInfo
+  {
+    .type      = type::shape::circle,
+    .offset    = offset,
+    .num       = 2,
+    .color     = convert_color_format(color),
+    .thickness = thickness,
+  });
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //                                UI
 ////////////////////////////////////////////////////////////////////////////////
 
 auto get_bounding_rectangle(std::vector<glm::vec2> const& data) -> std::pair<glm::vec2, glm::vec2>
 {
-  assert(data.size() > 2);
+  assert(data.size() > 1);
 
   glm::vec2 min = data[0];
   glm::vec2 max = data[0];
@@ -268,6 +295,12 @@ bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> con
     assert(num > 2);
     polygon(data, color, thickness);
     detect_data = data;
+    break;
+
+  case type::shape::circle:
+    assert(num == 2);
+    circle(data[0], data[1].x, color, thickness);
+    detect_data = { data[0] - data[1], data[0] + data[1] };
     break;
   }
 
