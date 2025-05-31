@@ -10,11 +10,6 @@
 
 namespace tk { namespace ui {
 
-struct LerpContext
-{
-
-};
-
 class LerpPoint
 {
 public:
@@ -54,14 +49,19 @@ struct LerpInfo
 {
   glm::vec2 start;
   glm::vec2 end;
-  uint32_t  time;
+  uint32_t  time  = {};
+  uint32_t  stage = {};
 };
 
 class LerpPoints
 {
 public:
   LerpPoints(std::vector<LerpInfo> const& infos)
-    :_infos(infos), _now(infos.begin()->start), _it(_infos.begin()) {}
+    :_infos(infos), _now(infos.begin()->start), _it(_infos.begin())
+  {
+    for (auto i = 0; i < _infos.size(); ++i)
+      _infos[i].stage = i;
+  }
 
   void run();
   void render();
@@ -69,6 +69,10 @@ public:
   auto& start() const noexcept { return _infos.begin()->start; }
   auto& end()   const noexcept { return _infos.rbegin()->end;  }
   auto& now()   const noexcept { return _now; }
+
+  operator glm::vec2() const noexcept { return _now; }
+
+  auto stage() const noexcept  { return _stage; }
 
 private:
   enum class status
@@ -87,6 +91,8 @@ private:
   bool      _reentry       = {};
   glm::vec2 _reentry_start, _reentry_end;
   uint32_t  _renetry_time  = {};
+
+  uint32_t  _stage = {};
 };
 
 }}

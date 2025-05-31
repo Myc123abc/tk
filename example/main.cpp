@@ -5,11 +5,9 @@
 #include "tk/tk.hpp"
 #include "tk/ui/ui.hpp"
 #include "tk/log.hpp"
-#include "tk/util.hpp"
 #include "tk/ui/LerpPoint.hpp"
 
 #include <chrono>
-#include <span>
 
 using namespace tk;
 using namespace tk::ui;
@@ -31,9 +29,6 @@ auto pause_right1 = pause_right2 - glm::vec2(part, 0);
 auto pause_right3 = pause_right2 + glm::vec2(0, playback_pos4.y);
 auto pause_right4 = glm::vec2(pause_right1.x, pause_right3.y);
 
-//ui::polygon({ playback_pos1, playback_pos2, playback_pos3, playback_pos4 }, 0xffffffff, 1);
-//ui::polygon({ playback_pos5, playback_pos6, playback_pos7, playback_pos8 }, 0xffffffff, 1);
-
 ////////////////////////////////////////////////////////////////////////////////
 //                             lerp animation
 ////////////////////////////////////////////////////////////////////////////////
@@ -41,7 +36,7 @@ auto pause_right4 = glm::vec2(pause_right1.x, pause_right3.y);
 class PlayBackButton
 {
 public:
-  PlayBackButton(std::string const& name, glm::vec2 p0, glm::vec2 p1, glm::vec2 p2)
+  PlayBackButton(std::string const& name, glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, uint32_t time = 100)
   {
     _playback_btn_name = name + "playback";
     _pasue_btn_name    = name + "pause";
@@ -52,14 +47,36 @@ public:
     _lps.append_range(std::vector<LerpPoint>
     {
       // pause button                       // playback buttin
-      { p0,                                 p0,                                      100 },
-      { p0 + glm::vec2( rect.x / 3, 0),     p0 + glm::vec2(rect.x / 2,  rect.y / 4), 100 },
-      { p2 + glm::vec2( rect.x / 3, 0),     p2 + glm::vec2(rect.x / 2, -rect.y / 4), 100 },
-      { p2,                                 p2,                                      100 },
-      { glm::vec2(p1.x - rect.x / 3, p0.y), p0 + glm::vec2(rect.x / 2,  rect.y / 4), 100 },
-      { glm::vec2(p1.x, p0.y),              p1,                                      100 },
-      { glm::vec2(p1.x, p2.y),              p1,                                      100 },
-      { glm::vec2(p1.x - rect.x / 3, p2.y), p2 + glm::vec2(rect.x / 2, -rect.y / 4), 100 },
+      { p0,                                 p0,                                      time },
+      { p0 + glm::vec2( rect.x / 3, 0),     p0 + glm::vec2(rect.x / 4,  rect.y / 8), time },
+      { p2 + glm::vec2( rect.x / 3, 0),     p2 + glm::vec2(rect.x / 4, -rect.y / 8), time },
+      { p2,                                 p2,                                      time },
+      { glm::vec2(p1.x - rect.x / 3, p0.y), p1 - glm::vec2(rect.x / 4,  rect.y / 8), time },
+      { glm::vec2(p1.x, p0.y),              p1,                                      time },
+      { glm::vec2(p1.x, p2.y),              p1,                                      time },
+      { glm::vec2(p1.x - rect.x / 3, p2.y), p1 - glm::vec2(rect.x / 4, -rect.y / 8), time },
+    });
+
+    _lpss.reserve(4);
+    _lpss.emplace_back(std::vector<LerpInfo>
+    {
+      { p0 + glm::vec2(rect.x / 3, rect.y / 2), p0 + rect / 2.f,                         time / 2 },
+      { p0 + rect / 2.f,                        p0 + glm::vec2(rect.x / 2,  rect.y / 4), time / 2 },
+    });
+    _lpss.emplace_back(std::vector<LerpInfo>
+    {
+      { p0 + glm::vec2(rect.x / 3, rect.y / 2), p0 + rect / 2.f,                         time / 2 },
+      { p0 + rect / 2.f,                        p2 + glm::vec2(rect.x / 2, -rect.y / 4), time / 2 },
+    });
+    _lpss.emplace_back(std::vector<LerpInfo>
+    {
+      { glm::vec2(p1.x - rect.x / 3, p1.y),     p0 + rect / 2.f,                         time / 2 },
+      { p0 + rect / 2.f,                        p0 + glm::vec2(rect.x / 2,  rect.y / 4), time / 2 },
+    });
+    _lpss.emplace_back(std::vector<LerpInfo>
+    {
+      { glm::vec2(p1.x - rect.x / 3, p1.y),     p0 + rect / 2.f,                         time / 2 },
+      { p0 + rect / 2.f,                        p2 + glm::vec2(rect.x / 2, -rect.y / 4), time / 2 },
     });
 
     _left_upper  = p0;
@@ -78,6 +95,8 @@ public:
 
       for (auto& p : _lps)  
         p.run();
+      for (auto& p : _lpss)
+        p.run();
 
       return true;
     } 
@@ -88,15 +107,37 @@ public:
   {
     for (auto& p : _lps)
       p.render();
-
-    auto rect0 = std::span(_lps.begin(), _lps.begin() + 4);
-    auto rect1 = std::span(_lps.begin() + 4, _lps.end());
-    ui::polygon({ rect0.begin(), rect0.end() }, 0xffffffff, 1);
-    ui::polygon({ rect1.begin(), rect1.end() }, 0xffffffff, 1);
+    for (auto& p : _lpss)
+      p.render();
+    
+    if (_lpss[0].stage())
+    {
+      auto rect = std::vector<glm::vec2>
+      {
+        _lps[0],  _lps[1], _lpss[0],
+        _lps[4],  _lps[5], _lps[6],  _lps[7],
+        _lpss[1], _lps[2], _lps[3],
+      };
+      ui::polygon({ rect.begin(), rect.end() }, 0xffffffff, 1);
+    }
+    else
+    {
+      auto rect0 = std::vector<glm::vec2>
+      {
+        _lps[0], _lps[1], _lpss[0], _lpss[1], _lps[2], _lps[3],
+      };
+      auto rect1 = std::vector<glm::vec2>
+      {
+        _lps[4], _lps[5], _lps[6], _lps[7], _lpss[3], _lpss[2], 
+      };
+      ui::polygon({ rect0.begin(), rect0.end() }, 0xffffffff, 1);
+      ui::polygon({ rect1.begin(), rect1.end() }, 0xffffffff, 1);
+    }
   }
 
 private:
-  std::vector<LerpPoint> _lps;
+  std::vector<LerpPoint>  _lps;
+  std::vector<LerpPoints> _lpss;
   std::string _playback_btn_name, _pasue_btn_name;
   glm::vec2 _left_upper, _right_lower;
 };
@@ -112,10 +153,11 @@ LerpPoints lps(std::vector<LerpInfo>
   { { 0, 150 }, { 100, 150 }, 1000 },
   { { 100, 150 }, { 100, 250 }, 1000 },
 });
+PlayBackButton pbtn("test pbtn", { 0, 0 }, { 200, 100 }, { 0, 200 }, 3000);
 
 void tk_init(int argc, char** argv)
 {
-  init_tk_context("tk", 200, 350, nullptr);
+  init_tk_context("tk", 350, 350, nullptr);
 }
 
 void tk_iterate()
@@ -139,14 +181,14 @@ void tk_iterate()
       log::info("click");
     }
     
-    if (ui::button("lp btn", type::shape::circle, { glm::vec2(75), glm::vec2(25) }, 0xffffffff))
-    {
-      if (lp.now() == lp.end())
-        lp.reverse();
-      lp.run();
-
-      lps.run();
-    }
+    //if (ui::button("lp btn", type::shape::circle, { glm::vec2(75), glm::vec2(25) }, 0xffffffff))
+    //{
+    //  if (lp.now() == lp.end())
+    //    lp.reverse();
+    //  lp.run();
+    //
+    //  lps.run();
+    //}
 
     //if (paused)
     //  paused = !pause_button();
@@ -164,18 +206,21 @@ void tk_iterate()
   {
     ui::begin("Interpolation Animation", 50, 50);
  
-    lp.render();
-    ui::line({0, 100}, {100, 100}, 0xffffffff);
-    ui::circle(lp.now(), 2, 0xff000000);
+    //lp.render();
+    //ui::line({0, 100}, {100, 100}, 0xffffffff);
+    //ui::circle(lp.now(), 2, 0xff000000);
     //if (lp.single_finished())
     //{
     //  log::info("finished");
     //}
 
-    lps.render();
-    ui::line({ 0, 150 }, { 100, 150 }, 0xffffffff);
-    ui::line({ 100, 150 }, { 100, 250 }, 0xffffffff);
-    ui::circle(lps.now(), 2, 0xff000000);
+    //lps.render();
+    //ui::line({ 0, 150 }, { 100, 150 }, 0xffffffff);
+    //ui::line({ 100, 150 }, { 100, 250 }, 0xffffffff);
+    //ui::circle(lps.now(), 2, 0xff000000);
+
+    pbtn.button();
+    pbtn.render();
 
     ui::end();
   }
