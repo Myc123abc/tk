@@ -25,12 +25,6 @@ public:
   void run();
   void render();
 
-  void reverse() noexcept { std::swap(_start, _end); }
-
-  auto& start() const noexcept { return _start; }
-  auto& end()   const noexcept { return _end;   }
-  auto& now()   const noexcept { return _now;   }
-
   operator glm::vec2() const noexcept { return _now; }
 
 private:
@@ -65,10 +59,6 @@ public:
 
   void run();
   void render();
-
-  auto& start() const noexcept { return _infos.begin()->start; }
-  auto& end()   const noexcept { return _infos.rbegin()->end;  }
-  auto& now()   const noexcept { return _now; }
 
   operator glm::vec2() const noexcept { return _now; }
 

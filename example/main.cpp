@@ -80,19 +80,13 @@ public:
     });
 
     _left_upper  = p0;
-    _right_lower = _lps[6].start();
+    _right_lower = glm::vec2(p1.x, p2.y);
   }
 
   auto button() -> bool
   {
     if (ui::click_area("test", _left_upper, _right_lower))
     {
-      if (_lps[1].end() == _lps[1].now())
-      {
-        for (auto& p : _lps)
-          p.reverse();
-      }
-
       for (auto& p : _lps)  
         p.run();
       for (auto& p : _lpss)

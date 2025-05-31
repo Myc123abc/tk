@@ -10,6 +10,8 @@ void LerpPoint::run()
   {
     _status     = running;
     _start_time = std::chrono::high_resolution_clock::now();
+    if (_now == _end)
+      std::swap(_start, _end);
   }
   else if (_status == running)
   {
