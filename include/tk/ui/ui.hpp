@@ -88,6 +88,17 @@ inline void triangle(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& 
   shape(type::shape::triangle, { p0, p1, p2 }, color, thickness);
 }
 
+/**
+ * draw polygon
+ * @param points
+ * @param color rgba
+ * @param thickness
+ */
+inline void polygon(std::vector<glm::vec2> const& points, uint32_t color, uint32_t thickness = 0)
+{ 
+  shape(type::shape::polygon, points, color, thickness);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //                                UI
 ////////////////////////////////////////////////////////////////////////////////

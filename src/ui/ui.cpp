@@ -263,6 +263,12 @@ bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> con
     rectangle(data[0], data[1], color, thickness);
     detect_data = { data[0], { data[1].x, data[0].y }, data[1], { data[0].x, data[1].y } };
     break;
+  
+  case type::shape::polygon:
+    assert(num > 2);
+    polygon(data, color, thickness);
+    detect_data = data;
+    break;
   }
 
   if (ctx.event_type == SDL_EVENT_MOUSE_BUTTON_DOWN && detect_mouse_on_button(detect_data))

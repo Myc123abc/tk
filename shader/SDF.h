@@ -19,6 +19,17 @@ layout(push_constant) uniform PushConstant
   vec2   window_extent;
 } pc;
 
+#define GetData(idx)  pc.buf.data[idx]
+#define GetDataF(idx) uintBitsToFloat(GetData(idx))
+#define GetVec2(idx)  vec2(GetDataF(idx), GetDataF(idx + 1))
+#define GetVec3(idx)  vec3(GetDataF(idx), GetDataF(idx + 1), GetDataF(idx + 2))
+#define GetVec4(idx)  vec4(GetDataF(idx), GetDataF(idx + 1), GetDataF(idx + 2), GetDataF(idx + 3))
+
+#define Line      0
+#define Rectangle 1
+#define Triangle  2
+#define Polygon   3
+
 float sdSegment( in vec2 p, in vec2 a, in vec2 b )
 {
     vec2 pa = p-a, ba = b-a;
@@ -46,7 +57,21 @@ float sdTriangle( in vec2 p, in vec2 p0, in vec2 p1, in vec2 p2 )
     return -sqrt(d.x)*sign(d.y);
 }
 
-//float sdHalfPlane( in vec2 p, in vec2 p0, in vec2 n)
-//{
-//  return dot(p - p0, n);
-//}
+float sdPolygon( in uint offset, in uint n, in vec2 p )
+{
+    float d = dot(p-GetVec2(offset),p-GetVec2(offset));
+    float s = 1.0;
+    uint count = n*2;
+    for( uint i=0, j=(n-1)*2; i<count; j=i, i+=2 )
+    {
+        vec2 vj = GetVec2(offset+j);
+        vec2 vi = GetVec2(offset+i);
+        vec2 e = vj - vi;
+        vec2 w =    p - vi;
+        vec2 b = w - e*clamp( dot(w,e)/dot(e,e), 0.0, 1.0 );
+        d = min( d, dot(b,b) );
+        bvec3 c = bvec3(p.y>=vi.y,p.y<vj.y,e.x*w.y>e.y*w.x);
+        if( all(c) || all(not(c)) ) s*=-1.0;  
+    }
+    return s*sqrt(d);
+}

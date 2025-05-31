@@ -176,7 +176,7 @@ void GraphicsEngine::update(std::span<glm::vec2> points, std::span<ShapeInfo> in
   throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), points.data(), _buffer.allocation(), Buffer_Size * _current_frame, points_byte_size) != VK_SUCCESS,
            "failed to copy data to buffer");
   throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), infos.data(), _buffer.allocation(), Buffer_Size * _current_frame + points_byte_size, shape_infos_byte_size) != VK_SUCCESS,
-           "failed to copy data to buffer");
+         "failed to copy data to buffer");
 }
 
 void GraphicsEngine::render(std::span<glm::vec2> points, std::span<ShapeInfo> infos)

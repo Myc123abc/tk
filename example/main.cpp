@@ -81,11 +81,7 @@ void tk_iterate()
     static auto pos_change_2 = pos2;
     static auto pos_change_3 = pos3;
 
-    //ui::path_line_to(pos_change_0);
-    //ui::path_line_to(pos_change_1);
-    //ui::path_line_to(pos_change_2);
-    //ui::path_line_to(pos_change_3);
-    //ui::path_stroke(0x00ff00ff, 2.f, true);
+    ui::polygon({pos_change_0, pos_change_1, pos_change_2, pos_change_3}, 0x00ff00ff, 1);
 
     static const auto pos0e  = glm::vec2(0);
     static const auto pos1e = glm::vec2(50, 0);

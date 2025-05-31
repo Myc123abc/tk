@@ -33,19 +33,9 @@ vec4 mix_color(vec4 color, vec4 background, float w, float d, uint t)
   return mix(color, background, smoothstep(0.0, w, value));
 }
 
-#define GetData(idx)  pc.buf.data[idx]
-#define GetDataF(idx) uintBitsToFloat(GetData(idx))
-#define GetVec2(idx)  vec2(GetDataF(idx), GetDataF(idx + 1))
-#define GetVec3(idx)  vec3(GetDataF(idx), GetDataF(idx + 1)，GetDataF(idx + 2))
-#define GetVec4(idx)  vec4(GetDataF(idx), GetDataF(idx + 1), GetDataF(idx + 2), GetDataF(idx + 3))
-
-#define Line      0
-#define Rectangle 1
-#define Triangle  2
-
 void main()
 {
-  float w = length(vec2(dFdx(uv.x), dFdy(uv.y)));
+  float w = length(vec2(dFdxFine(uv.x), dFdyFine(uv.y)));
   float d;
 
   col = vec4(0.0);
@@ -80,6 +70,10 @@ void main()
       vec2 p1 = GetVec2(info.offset + 2);
       vec2 p2 = GetVec2(info.offset + 4);
       d = sdTriangle(uv, p0, p1, p2);
+    }
+    else if (info.type == Polygon)
+    {
+      d = sdPolygon(info.offset, info.num, uv);
     }
 
     col = mix_color(info.color, col, w, d, info.thickness);
