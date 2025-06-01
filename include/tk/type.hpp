@@ -11,4 +11,10 @@ namespace tk { namespace type {
     circle,
   };
 
+  enum class shape_op
+  {
+    mix,
+    min,
+  };
+
 }}

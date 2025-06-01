@@ -41,9 +41,8 @@ void end()
 
 void render()
 {
-  assert(get_ctx().engine);
-
   auto& ctx = get_ctx();
+  assert(ctx.engine && ctx.shape_infos.back().op == type::shape_op::mix);
 
   ctx.engine->update(ctx.points, ctx.shape_infos);
   ctx.engine->render(ctx.points, ctx.shape_infos);
@@ -137,6 +136,13 @@ void circle(glm::vec2 const& center, float radius, uint32_t color, uint32_t thic
 ////////////////////////////////////////////////////////////////////////////////
 //                                UI
 ////////////////////////////////////////////////////////////////////////////////
+
+void set_operation(type::shape_op op)
+{
+  auto& ctx = get_ctx();
+  assert(ctx.begining);
+  ctx.shape_infos.back().op = op;
+}
 
 auto get_bounding_rectangle(std::vector<glm::vec2> const& data) -> std::pair<glm::vec2, glm::vec2>
 {

@@ -43,40 +43,20 @@ public:
 
     auto rect = glm::vec2(p1.x - p0.x, (p1.y - p0.y) * 2);
 
-    _lps.reserve(8);
+    _lps.reserve(10);
     _lps.append_range(std::vector<LerpPoint>
     {
-      // pause button                       // playback buttin
-      { p0,                                 p0,                                      time },
-      { p0 + glm::vec2( rect.x / 3, 0),     p0 + glm::vec2(rect.x / 4,  rect.y / 8), time },
-      { p2 + glm::vec2( rect.x / 3, 0),     p2 + glm::vec2(rect.x / 4, -rect.y / 8), time },
-      { p2,                                 p2,                                      time },
-      { glm::vec2(p1.x - rect.x / 3, p0.y), p1 - glm::vec2(rect.x / 4,  rect.y / 8), time },
-      { glm::vec2(p1.x, p0.y),              p1,                                      time },
-      { glm::vec2(p1.x, p2.y),              p1,                                      time },
-      { glm::vec2(p1.x - rect.x / 3, p2.y), p1 - glm::vec2(rect.x / 4, -rect.y / 8), time },
-    });
-
-    _lpss.reserve(4);
-    _lpss.emplace_back(std::vector<LerpInfo>
-    {
-      { p0 + glm::vec2(rect.x / 3, rect.y / 2), p0 + rect / 2.f,                         time / 2 },
-      { p0 + rect / 2.f,                        p0 + glm::vec2(rect.x / 2,  rect.y / 4), time / 2 },
-    });
-    _lpss.emplace_back(std::vector<LerpInfo>
-    {
-      { p0 + glm::vec2(rect.x / 3, rect.y / 2), p0 + rect / 2.f,                         time / 2 },
-      { p0 + rect / 2.f,                        p2 + glm::vec2(rect.x / 2, -rect.y / 4), time / 2 },
-    });
-    _lpss.emplace_back(std::vector<LerpInfo>
-    {
-      { glm::vec2(p1.x - rect.x / 3, p1.y),     p0 + rect / 2.f,                         time / 2 },
-      { p0 + rect / 2.f,                        p0 + glm::vec2(rect.x / 2,  rect.y / 4), time / 2 },
-    });
-    _lpss.emplace_back(std::vector<LerpInfo>
-    {
-      { glm::vec2(p1.x - rect.x / 3, p1.y),     p0 + rect / 2.f,                         time / 2 },
-      { p0 + rect / 2.f,                        p2 + glm::vec2(rect.x / 2, -rect.y / 4), time / 2 },
+      // pause button                           // playback buttin
+      { p0,                                     p0,                                      time },
+      { p0 + glm::vec2( rect.x / 3, 0),         p0 + glm::vec2(rect.x / 2,  rect.y / 4), time },
+      { p2 + glm::vec2( rect.x / 3, 0),         p2 + glm::vec2(rect.x / 2, -rect.y / 4), time },
+      { p2,                                     p2,                                      time },
+      { glm::vec2(p1.x - rect.x / 3, p0.y),     p0 + glm::vec2(rect.x / 2,  rect.y / 4), time },
+      { glm::vec2(p1.x, p0.y),                  p1,                                      time },
+      { glm::vec2(p1.x, p2.y),                  p1,                                      time },
+      { glm::vec2(p1.x - rect.x / 3, p2.y),     p2 + glm::vec2(rect.x / 2, -rect.y / 4), time },
+      { p0 + glm::vec2(rect.x / 3, rect.y / 2), p1,                                      time },
+      { glm::vec2(p1.x - rect.x / 3, p1.y),     glm::vec2(p0.x, p1.y),                   time },
     });
 
     _left_upper  = p0;
@@ -89,8 +69,6 @@ public:
     {
       for (auto& p : _lps)  
         p.run();
-      for (auto& p : _lpss)
-        p.run();
 
       return true;
     } 
@@ -101,37 +79,22 @@ public:
   {
     for (auto& p : _lps)
       p.render();
-    for (auto& p : _lpss)
-      p.render();
     
-    if (_lpss[0].stage())
+    auto rect0 = std::vector<glm::vec2>
     {
-      auto rect = std::vector<glm::vec2>
-      {
-        _lps[0],  _lps[1], _lpss[0],
-        _lps[4],  _lps[5], _lps[6],  _lps[7],
-        _lpss[1], _lps[2], _lps[3],
-      };
-      ui::polygon({ rect.begin(), rect.end() }, 0xffffffff, 1);
-    }
-    else
+      _lps[0], _lps[1], _lps[8], _lps[2], _lps[3],
+    };
+    auto rect1 = std::vector<glm::vec2>
     {
-      auto rect0 = std::vector<glm::vec2>
-      {
-        _lps[0], _lps[1], _lpss[0], _lpss[1], _lps[2], _lps[3],
-      };
-      auto rect1 = std::vector<glm::vec2>
-      {
-        _lps[4], _lps[5], _lps[6], _lps[7], _lpss[3], _lpss[2], 
-      };
-      ui::polygon({ rect0.begin(), rect0.end() }, 0xffffffff, 1);
-      ui::polygon({ rect1.begin(), rect1.end() }, 0xffffffff, 1);
-    }
+      _lps[4], _lps[5], _lps[6], _lps[7], _lps[9],
+    };
+    ui::polygon({ rect0.begin(), rect0.end() }, 0xffffffff, 1);
+    ui::set_operation(type::shape_op::min);
+    ui::polygon({ rect1.begin(), rect1.end() }, 0xffffffff, 1);
   }
 
 private:
   std::vector<LerpPoint>  _lps;
-  std::vector<LerpPoints> _lpss;
   std::string _playback_btn_name, _pasue_btn_name;
   glm::vec2 _left_upper, _right_lower;
 };

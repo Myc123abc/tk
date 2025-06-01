@@ -114,6 +114,14 @@ void circle(glm::vec2 const& center, float radius, uint32_t color, uint32_t thic
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
+ * set current shape mix operation with next shape.
+ * the final shape operation must be mix (default).
+ * the operator for two shapes only use thickness of first shape.
+ * @param op operator for current shape with next shape
+ */
+void set_operation(type::shape_op op);
+
+/**
  * button, can be clicked
  * @param name name for id in layout (different layout can have same name widget)
  * @param shape shape of button

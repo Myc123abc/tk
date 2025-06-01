@@ -9,12 +9,12 @@ struct ShapeInfo
 {
   uint type;
   uint offset;
-  uint num; // DISCARD: unuse now
+  uint num;
   vec4 color;
   uint thickness;
-  // d
+  uint op;
 };
-const uint Shape_Info_Size = 8;
+const uint Shape_Info_Size = 9;
 
 vec4 mix_color(vec4 color, vec4 background, float w, float d, uint t)
 {
@@ -33,55 +33,82 @@ vec4 mix_color(vec4 color, vec4 background, float w, float d, uint t)
   return mix(color, background, smoothstep(0.0, w, value));
 }
 
+ShapeInfo get_shape_info(uint idx)
+{
+  ShapeInfo info;
+  info.type      = GetData(idx);
+  info.offset    = GetData(idx + 1);
+  info.num       = GetData(idx + 2);
+  info.color     = GetVec4(idx + 3);
+  info.thickness = GetData(idx + 7);
+  info.op        = GetData(idx + 8);
+  return info;
+}
+
+float get_distance(ShapeInfo info)
+{
+  float d;
+  if (info.type == Line)
+  {
+    vec2 p0 = GetVec2(info.offset);
+    vec2 p1 = GetVec2(info.offset + 2);
+    d = sdSegment(uv, p0, p1);
+  }
+  else if (info.type == Rectangle)
+  {
+    vec2 p0 = GetVec2(info.offset);
+    vec2 p1 = GetVec2(info.offset + 2);
+    vec2 extent_div2 = (p1 - p0) * 0.5;
+    vec2 center = p0 + extent_div2;
+    d = sdBox(uv - center, extent_div2);
+  }
+  else if (info.type == Triangle)
+  {
+    vec2 p0 = GetVec2(info.offset);
+    vec2 p1 = GetVec2(info.offset + 2);
+    vec2 p2 = GetVec2(info.offset + 4);
+    d = sdTriangle(uv, p0, p1, p2);
+  }
+  else if (info.type == Polygon)
+  {
+    d = sdPolygon(info.offset, info.num, uv);
+  }
+  else if (info.type == Circle)
+  {
+    vec2  center = GetVec2(info.offset);
+    float radius = GetDataF(info.offset + 2);
+    d = sdCircle(uv - center, radius);
+  }
+  return d;
+}
+
 void main()
 {
   float w = length(vec2(dFdxFine(uv.x), dFdyFine(uv.y)));
-  float d;
 
   col = vec4(0.0);
 
   for (uint i = 0; i < pc.num; ++i)
   {
-    uint shape_info_idx = pc.offset + i * Shape_Info_Size;
-    ShapeInfo info;
-    info.type      = GetData(shape_info_idx);
-    info.offset    = GetData(shape_info_idx + 1);
-    info.num       = GetData(shape_info_idx + 2);
-    info.color     = GetVec4(shape_info_idx + 3);
-    info.thickness = GetData(shape_info_idx + 7);
+    uint      idx  = pc.offset + i * Shape_Info_Size;
+    ShapeInfo info = get_shape_info(idx);
+    float     d    = get_distance(info);
+    
+    if (info.op == Mix)
+    {
+      col = mix_color(info.color, col, w, d, info.thickness);
+    }
+    else if (info.op == Min)
+    {
+      ShapeInfo next_info = get_shape_info(idx + Shape_Info_Size);
+      
+      d = min(d, get_distance(next_info));
 
-    if (info.type == Line)
-    {
-      vec2 p0 = GetVec2(info.offset);
-      vec2 p1 = GetVec2(info.offset + 2);
-      d = sdSegment(uv, p0, p1);
-    }
-    else if (info.type == Rectangle)
-    {
-      vec2 p0 = GetVec2(info.offset);
-      vec2 p1 = GetVec2(info.offset + 2);
-      vec2 extent_div2 = (p1 - p0) * 0.5;
-      vec2 center = p0 + extent_div2;
-      d = sdBox(uv - center, extent_div2);
-    }
-    else if (info.type == Triangle)
-    {
-      vec2 p0 = GetVec2(info.offset);
-      vec2 p1 = GetVec2(info.offset + 2);
-      vec2 p2 = GetVec2(info.offset + 4);
-      d = sdTriangle(uv, p0, p1, p2);
-    }
-    else if (info.type == Polygon)
-    {
-      d = sdPolygon(info.offset, info.num, uv);
-    }
-    else if (info.type == Circle)
-    {
-      vec2  center = GetVec2(info.offset);
-      float radius = GetDataF(info.offset + 2);
-      d = sdCircle(uv - center, radius);
-    }
+      vec4 color = mix(info.color, next_info.color, smoothstep(0.0, w, d));
 
-    col = mix_color(info.color, col, w, d, info.thickness);
+      col = mix_color(color, col, w, d, info.thickness);
+
+      ++i;
+    }
   }
 }

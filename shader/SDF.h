@@ -31,6 +31,9 @@ layout(push_constant) uniform PushConstant
 #define Polygon   3
 #define Circle    4
 
+#define Mix       0
+#define Min       1
+
 float sdSegment( in vec2 p, in vec2 a, in vec2 b )
 {
     vec2 pa = p-a, ba = b-a;
