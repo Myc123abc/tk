@@ -45,7 +45,7 @@ void render()
   assert(ctx.engine && ctx.shape_infos.back().op == type::shape_op::mix);
 
   ctx.engine->update(ctx.points, ctx.shape_infos);
-  ctx.engine->render(ctx.points, ctx.shape_infos);
+  ctx.engine->render(ctx.points.size() * 2, ctx.shape_infos.size());
   ctx.points.clear();
   ctx.shape_infos.clear();
 
@@ -68,9 +68,25 @@ auto convert_color_format(uint32_t color)
 
 void shape(type::shape type, std::vector<glm::vec2> const& points, uint32_t color, uint32_t thickness)
 {
-  // promise use ui::begin()
+  using enum type::shape;
+
   auto& ctx = get_ctx();
-  assert(ctx.begining);
+
+  // convert type when use path
+  if (ctx.path_begining)
+  {
+    if (type == line)
+    {
+      type = line_partition;
+    }
+    else if (type == bezier)
+    {
+      type = bezier_partition;
+    }
+  }
+
+  // promise use ui::begin() and ui::path_begin() if use
+  assert(ctx.begining && ctx.path_begining ? type == line_partition || type == bezier_partition : true);
   
   // get layout position
   auto& pos = ctx.layouts.back().pos;
@@ -97,7 +113,7 @@ void shape(type::shape type, std::vector<glm::vec2> const& points, uint32_t colo
 void circle(glm::vec2 const& center, float radius, uint32_t color, uint32_t thickness)
 {
   auto& ctx = get_ctx();
-  assert(ctx.begining);
+  assert(ctx.begining && ctx.path_begining == false);
   
   auto& pos = ctx.layouts.back().pos;
 
@@ -119,6 +135,34 @@ void circle(glm::vec2 const& center, float radius, uint32_t color, uint32_t thic
     .color     = convert_color_format(color),
     .thickness = thickness,
   });
+}
+
+void path_begin()
+{
+  auto& ctx = get_ctx();
+  assert(ctx.begining && ctx.path_begining == false);
+  ctx.path_begining = true;
+
+  ctx.path_idx = ctx.shape_infos.size();
+
+  ctx.shape_infos.emplace_back(ShapeInfo
+  {
+    .type = type::shape::path,
+  });
+}
+
+// TODO: how to op
+void path_end(uint32_t color, uint32_t thickness)
+{
+  auto& ctx = get_ctx();
+  assert(ctx.begining && ctx.path_begining);
+  ctx.path_begining = false;
+
+  auto& info     = ctx.shape_infos[ctx.path_idx];
+  info.color     = convert_color_format(color);
+  info.thickness = thickness;
+  info.num       = ctx.shape_infos.size() - ctx.path_idx - 1;
+  assert(info.num != 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -272,7 +316,10 @@ bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> con
   {
   case type::shape::line:
   case type::shape::bezier:
-    assert(false);
+  case type::shape::path:
+  case type::shape::line_partition:
+  case type::shape::bezier_partition:
+    throw_if(false, "this type cannot use on button, please use ui::clickarea");
 
   case type::shape::triangle:
     assert(num == 3);

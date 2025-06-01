@@ -1,11 +1,5 @@
 #extension GL_EXT_buffer_reference : require
 
-/*
-  buffer:      points | shape_infos
-
-  shape_infos: offset | num | color
-*/
-
 layout(std430, buffer_reference) readonly buffer Buffer
 {
   uint data[];
@@ -25,12 +19,15 @@ layout(push_constant) uniform PushConstant
 #define GetVec3(idx)  vec3(GetDataF(idx), GetDataF(idx + 1), GetDataF(idx + 2))
 #define GetVec4(idx)  vec4(GetDataF(idx), GetDataF(idx + 1), GetDataF(idx + 2), GetDataF(idx + 3))
 
-#define Line          0
-#define Rectangle     1
-#define Triangle      2
-#define Polygon       3
-#define Circle        4
-#define Bezier        5
+#define Line             0
+#define Rectangle        1
+#define Triangle         2
+#define Polygon          3
+#define Circle           4
+#define Bezier           5
+#define Path             6
+#define Line_Partition   7
+#define Bezier_Partition 8
 
 #define Mix       0
 #define Min       1
@@ -124,4 +121,105 @@ float sdBezier( in vec2 pos, in vec2 A, in vec2 B, in vec2 C )
         // res = min(res,dot2(d+(c+b*t.z)*t.z));
     }
     return sqrt( res );
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//                      line and bezier with partition
+////////////////////////////////////////////////////////////////////////////////
+
+const float SQRT3 = 1.732050807568877;
+
+// Clamp a value to [0, 1]
+float saturate(in float a) {
+    return clamp(a, 0.0, 1.0);
+}
+vec3 saturate(in vec3 a) {
+    return clamp(a, 0.0, 1.0);
+}
+
+// Cross-product of two 2D vectors
+float cross2(in vec2 a, in vec2 b) {
+    return a.x*b.y - a.y*b.x;
+}
+
+// Like the SDF for a line but partitioning space into positive and negative
+float sdf_line_partition(in vec2 p, in vec2 a, in vec2 b) {
+    vec2 ba = b - a;
+    vec2 pa = p - a;
+    float h = saturate(dot(pa, ba) / dot(ba, ba));
+    vec2 k = pa - h * ba;
+    vec2 n = vec2(ba.y, -ba.x);
+    return (dot(k,n) >= 0.0) ? length(k) : -length(k);
+}
+
+// Signed distance to a quadratic Bézier curve
+// Mostly identical to https://www.shadertoy.com/view/MlKcDD
+// with some additions to combat degenerate cases.
+float sdf_bezier_partition(in vec2 pos, in vec2 A, in vec2 B, in vec2 C) {
+    const float EPSILON = 1e-3;
+    const float ONE_THIRD = 1.0 / 3.0;
+
+    // Handle cases where points coincide
+    bool abEqual = all(equal(A, B));
+    bool bcEqual = all(equal(B, C));
+    bool acEqual = all(equal(A, C));
+    
+    if (abEqual && bcEqual) {
+        return distance(pos, A);
+    } else if (abEqual || acEqual) {
+        return sdf_line_partition(pos, B, C);
+    } else if (bcEqual) {
+        return sdf_line_partition(pos, A, C);
+    }
+    
+    // Handle colinear points
+    if (abs(dot(normalize(B - A), normalize(C - B)) - 1.0) < EPSILON) {
+        return sdf_line_partition(pos, A, C);
+    }
+    
+    vec2 a = B - A;
+    vec2 b = A - 2.0*B + C;
+    vec2 c = a * 2.0;
+    vec2 d = A - pos;
+
+    float kk = 1.0 / dot(b,b);
+    float kx = kk * dot(a,b);
+    float ky = kk * (2.0*dot(a,a)+dot(d,b)) * ONE_THIRD;
+    float kz = kk * dot(d,a);
+
+    float res = 0.0;
+    float sgn = 0.0;
+
+    float p = ky - kx*kx;
+    float p3 = p*p*p;
+    float q = kx*(2.0*kx*kx - 3.0*ky) + kz;
+    float h = q*q + 4.0*p3;
+
+    if (h >= 0.0) {
+        // One root
+        h = sqrt(h);
+        vec2 x = 0.5 * (vec2(h, -h) - q);
+        vec2 uv = sign(x) * pow(abs(x), vec2(ONE_THIRD));
+        float t = saturate(uv.x + uv.y - kx) + EPSILON;
+        vec2 q = d + (c + b*t) * t;
+        res = dot(q, q);
+        sgn = cross2(c + 2.0*b*t, q);
+    } else {
+        // Three roots
+        float z = sqrt(-p);
+        float v = acos(q/(p*z*2.0)) * ONE_THIRD;
+        float m = cos(v);
+        float n = sin(v) * SQRT3;
+        vec3 t = saturate(vec3(m+m,-n-m,n-m)*z-kx) + EPSILON;
+        vec2 qx = d + (c+b*t.x)*t.x;
+        float dx = dot(qx, qx);
+        float sx = cross2(c+2.0*b*t.x, qx);
+        vec2 qy = d + (c+b*t.y)*t.y;
+        float dy = dot(qy, qy);
+        float sy = cross2(c+2.0*b*t.y, qy);
+        res = (dx < dy) ? dx : dy;
+        sgn = (dx < dy) ? sx : sy;
+    }
+    
+    return sign(sgn) * sqrt(res);
 }

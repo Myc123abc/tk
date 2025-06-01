@@ -58,9 +58,9 @@ void shape(type::shape type, std::vector<glm::vec2> const& points, uint32_t colo
  * @param p1 end point
  * @param color
  */
-inline void line(glm::vec2 p0, glm::vec2 p1, uint32_t color)
+inline void line(glm::vec2 p0, glm::vec2 p1, uint32_t color = 0xffffffff)
 { 
-  shape(type::shape::line, { p0, p1 }, color);
+  if (p0 != p1) shape(type::shape::line, { p0, p1 }, color);
 }
 
 /**
@@ -115,10 +115,13 @@ void circle(glm::vec2 const& center, float radius, uint32_t color, uint32_t thic
  * @param p2
  * @param color rgba
  */
-inline void bezier(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint32_t color)
+inline void bezier(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint32_t color = 0xffffffff)
 { 
   shape(type::shape::bezier, { p0, p1, p2 }, color);
 }
+
+void path_begin();
+void path_end(uint32_t color, uint32_t thickness = 0);
 
 ////////////////////////////////////////////////////////////////////////////////
 //                                UI

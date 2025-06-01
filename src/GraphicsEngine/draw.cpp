@@ -179,7 +179,7 @@ void GraphicsEngine::update(std::span<glm::vec2> points, std::span<ShapeInfo> in
          "failed to copy data to buffer");
 }
 
-void GraphicsEngine::render(std::span<glm::vec2> points, std::span<ShapeInfo> infos)
+void GraphicsEngine::render(uint32_t offset, uint32_t num)
 {
   auto cmd = get_current_frame().cmd;
 
@@ -188,8 +188,8 @@ void GraphicsEngine::render(std::span<glm::vec2> points, std::span<ShapeInfo> in
   auto pc = PushConstant_SDF
   {
     .address       = _buffer.address() + Buffer_Size * _current_frame,
-    .offset        = static_cast<uint32_t>(points.size() * 2),
-    .num           = static_cast<uint32_t>(infos.size()),
+    .offset        = offset,
+    .num           = num,
     .window_extent = { w, h },  
   };
 

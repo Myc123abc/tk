@@ -10,6 +10,10 @@ namespace tk { namespace type {
     polygon,
     circle,
     bezier,
+    
+    path,
+    line_partition,
+    bezier_partition,
   };
 
   enum class shape_op

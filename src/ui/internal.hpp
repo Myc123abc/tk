@@ -27,12 +27,12 @@ struct Layout
 
 struct ui_context
 {
-  bool               begining = false;
+  bool               begining = {};
   std::queue<Layout> layouts;
   // TODO: currently, only single main window is being use
   glm::vec2          window_extent;
 
-  graphics_engine::GraphicsEngine* engine = nullptr;
+  graphics_engine::GraphicsEngine* engine = {};
 
   std::vector<glm::vec2> points;
   std::vector<graphics_engine::ShapeInfo> shape_infos;
@@ -41,6 +41,9 @@ struct ui_context
 
   std::unordered_map<std::string, std::vector<Widget>>      states;
   std::unordered_map<std::string, std::vector<std::string>> call_stack;
+
+  bool     path_begining = {};
+  uint32_t path_idx      = {};
 };
 
 inline auto& get_ctx()

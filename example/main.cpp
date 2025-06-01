@@ -79,35 +79,36 @@ public:
     for (auto& p : _lps)
       p.render();
     
-    bool change = _lps[1].now().x == _lps[8].now().x;
-
-    ui::line(_lps[0], _lps[1], 0xffffffff);
-    ui::line(_lps[2], _lps[3], 0xffffffff);
-    ui::line(_lps[3], _lps[0], 0xffffffff);
-    ui::line(_lps[4], _lps[5], 0xffffffff);
-    ui::line(_lps[5], _lps[6], 0xffffffff);
-    ui::line(_lps[6], _lps[7], 0xffffffff);
-
-    if (change)
-      ui::line(_lps[1], _lps[2], 0xffffffff);
-    else
-      ui::bezier(_lps[1], _lps[8], _lps[2], 0xffffffff);
-    if (change)
-      ui::line(_lps[7], _lps[4], 0xffffffff);
-    else
-      ui::bezier(_lps[7], _lps[9], _lps[4], 0xffffffff);
-
-    //auto rect0 = std::vector<glm::vec2>
+    bool change = _lps[1].now().x != _lps[8].now().x;
+    bool change2 = _lps[8].now().x == _lps[5].now().x;
+    
+    //if (change2)
     //{
-    //  _lps[0], _lps[1], _lps[8], _lps[2], _lps[3],
-    //};
-    //auto rect1 = std::vector<glm::vec2>
-    //{
-    //  _lps[4], _lps[5], _lps[6], _lps[7], _lps[9],
-    //};
-    //ui::polygon({ rect0.begin(), rect0.end() }, 0xffffffff, 1);
-    //ui::set_operation(type::shape_op::min);
-    //ui::polygon({ rect1.begin(), rect1.end() }, 0xffffffff, 1);
+    //  ui::triangle(_lps[0], _lps[5], _lps[3], 0xffffffff, 1);
+    //  return;
+    //}
+    
+    ui::path_begin();
+    ui::set_operation(type::shape_op::min);
+
+    ui::line(_lps[0], _lps[1]);
+    if (change)
+      ui::bezier(_lps[1], _lps[8], _lps[2]);
+    else
+      ui::line(_lps[1], _lps[2]);
+    ui::line(_lps[2], _lps[3]);
+    ui::line(_lps[3], _lps[0]);
+    ui::path_end(0xffffffff, 1);
+    
+    ui::path_begin();
+    ui::line(_lps[4], _lps[5]);
+    ui::line(_lps[5], _lps[6]);
+    ui::line(_lps[6], _lps[7]);
+    if (change)
+      ui::bezier(_lps[7], _lps[9], _lps[4]);
+    else
+      ui::line(_lps[7], _lps[4]);
+    ui::path_end(0xffffffff, 1);
   }
 
 private:
@@ -121,13 +122,7 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 
 PlayBackButton playback_btn("playback_btn", { 5, 5 }, { 5 + 12.5 * 1.414, 5 + 12.5 }, { 5, 5 + 25 });
-LerpPoint lp({0, 100}, {100, 100}, 1000);
-LerpPoints lps(std::vector<LerpInfo>
-{
-  { { 0, 150 }, { 100, 150 }, 1000 },
-  { { 100, 150 }, { 100, 250 }, 1000 },
-});
-PlayBackButton pbtn("test pbtn", { 0, 0 }, { 200, 100 }, { 0, 200 }, 3000);
+PlayBackButton pbtn("test pbtn", { 0, 0 }, { 200, 100 }, { 0, 200 }, 2000);
 
 void tk_init(int argc, char** argv)
 {
@@ -155,20 +150,6 @@ void tk_iterate()
       log::info("click");
     }
     
-    //if (ui::button("lp btn", type::shape::circle, { glm::vec2(75), glm::vec2(25) }, 0xffffffff))
-    //{
-    //  if (lp.now() == lp.end())
-    //    lp.reverse();
-    //  lp.run();
-    //
-    //  lps.run();
-    //}
-
-    //if (paused)
-    //  paused = !pause_button();
-    //else
-    //  paused = ui::button("playback button", type::shape::polygon, { playback_pos1, playback_pos4, playback_pos6 }, 0xFFFFFFFF, 1);
-      
     // playback progress
     auto playback_progree_pos = playback_pos6 + glm::vec2(5, 0);
     ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ 100, 3 }, 0x808080FF );
@@ -180,21 +161,14 @@ void tk_iterate()
   {
     ui::begin("Interpolation Animation", 50, 50);
  
-    //lp.render();
-    //ui::line({0, 100}, {100, 100}, 0xffffffff);
-    //ui::circle(lp.now(), 2, 0xff000000);
-    //if (lp.single_finished())
-    //{
-    //  log::info("finished");
-    //}
+    //pbtn.button();
+    //pbtn.render();
 
-    //lps.render();
-    //ui::line({ 0, 150 }, { 100, 150 }, 0xffffffff);
-    //ui::line({ 100, 150 }, { 100, 250 }, 0xffffffff);
-    //ui::circle(lps.now(), 2, 0xff000000);
-
-    pbtn.button();
-    pbtn.render();
+    ui::path_begin();
+    ui::line({0,0}, {50,50});
+    ui::line({50,50}, {100,100});
+    //ui::bezier({50,50}, {100,100},{50,150});
+    ui::path_end(0xffffffff, 1);
 
     ui::end();
   }

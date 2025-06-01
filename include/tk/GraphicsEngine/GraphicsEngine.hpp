@@ -57,7 +57,7 @@ namespace tk { namespace graphics_engine {
 
     void render_begin();
     void update(std::span<glm::vec2> points, std::span<ShapeInfo> infos);
-    void render(std::span<glm::vec2> points, std::span<ShapeInfo> infos);
+    void render(uint32_t offset, uint32_t num);
     void render_end();
 
   private:
