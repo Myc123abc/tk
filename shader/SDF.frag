@@ -116,7 +116,20 @@ float get_distance(ShapeInfo info)
     for (uint i = 0; i < info.num; ++i)
     {
       ShapeInfo partition_info = get_shape_info();
-      d = max(d, get_distance_parition(partition_info));   
+      float partition_distance = get_distance_parition(partition_info);
+      float distance = max(d, partition_distance);
+      
+      // aliasing problem:
+      // when two line segment in same line, such as (0,0)(50,50) to (50,50)(100,100)
+      // max(d0,d1) will lead aliasing problem
+      // so use min(abs(d0),abs(d1)) to resolve
+      // well min's way can only use for 1-pixel case,
+      // so for filled and thickness wireform we use max still,
+      // and use min on bround, perfect! (I spent half day to resolve... my holiday...)
+      if (distance > 0.0)
+        d = min(abs(d), abs(partition_distance));
+      else
+        d = distance;
     }
   }
   return d;
@@ -125,13 +138,13 @@ float get_distance(ShapeInfo info)
 void main()
 {
   float w = length(vec2(dFdxFine(uv.x), dFdyFine(uv.y)));
-
+  
   col = vec4(0.0);
 
   while (shape_info_idx < pc.num)
   {
-    ShapeInfo info   = get_shape_info();
-    float     d      = get_distance(info);
+    ShapeInfo info = get_shape_info();
+    float     d    = get_distance(info);
     
     if (info.op == Mix)
     {

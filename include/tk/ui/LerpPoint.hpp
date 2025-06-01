@@ -31,14 +31,14 @@ public:
 
 private:
   glm::vec2 _start, _end, _now;
-  uint32_t  _time; // millisecond
+  uint32_t  _time   = {}; // millisecond
   status    _status = status::unrun;
   double    _rate   = {};
   decltype(std::chrono::high_resolution_clock::now()) _start_time;
 
-  bool                  _reentry = {};
+  bool                  _reentry      = {};
   glm::vec2             _reentry_start, _reentry_end;
-  uint32_t              _reentry_time;
+  uint32_t              _reentry_time = {};
 };
 
 struct LerpInfo
