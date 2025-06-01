@@ -19,7 +19,6 @@
 
 #include <vector>
 #include <string_view>
-#include <span>
 
 namespace tk { namespace ui {
 
@@ -108,6 +107,18 @@ inline void polygon(std::vector<glm::vec2> const& points, uint32_t color, uint32
  * @param thickness
  */
 void circle(glm::vec2 const& center, float radius, uint32_t color, uint32_t thickness = 0);
+
+/**
+ * draw quadratic bezier
+ * @param p0
+ * @param p1
+ * @param p2
+ * @param color rgba
+ */
+inline void bezier(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint32_t color)
+{ 
+  shape(type::shape::bezier, { p0, p1, p2 }, color);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //                                UI

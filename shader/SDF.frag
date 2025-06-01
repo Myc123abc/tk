@@ -47,7 +47,7 @@ ShapeInfo get_shape_info(uint idx)
 
 float get_distance(ShapeInfo info)
 {
-  float d;
+  float d = 3.4028235e+38;
   if (info.type == Line)
   {
     vec2 p0 = GetVec2(info.offset);
@@ -78,6 +78,13 @@ float get_distance(ShapeInfo info)
     vec2  center = GetVec2(info.offset);
     float radius = GetDataF(info.offset + 2);
     d = sdCircle(uv - center, radius);
+  }
+  else if (info.type == Bezier)
+  {
+    vec2 p0 = GetVec2(info.offset);
+    vec2 p1 = GetVec2(info.offset + 2);
+    vec2 p2 = GetVec2(info.offset + 4);
+    d = sdBezier(uv, p0, p1, p2);
   }
   return d;
 }

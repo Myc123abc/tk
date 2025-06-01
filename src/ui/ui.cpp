@@ -49,18 +49,6 @@ void render()
   ctx.points.clear();
   ctx.shape_infos.clear();
 
-  //while (!ctx.layouts.empty())
-  //{
-  //  auto& layout = ctx.layouts.front();
-    //if (layout.shape_infos.empty())
-    //{
-    //  ctx.layouts.pop();
-    //  break;
-    //}
-    //ctx.engine->update(layout.shape_infos);
-    //ctx.engine->render(layout.shape_infos, ctx.window_extent, layout.pos);
-  //  ctx.layouts.pop();
-  //}
   while (!ctx.layouts.empty()) ctx.layouts.pop();
   ctx.call_stack.clear();
 }
@@ -283,6 +271,7 @@ bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> con
   switch (shape)
   {
   case type::shape::line:
+  case type::shape::bezier:
     assert(false);
 
   case type::shape::triangle:

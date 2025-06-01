@@ -25,6 +25,8 @@ public:
   void run();
   void render();
 
+  auto& now() const noexcept { return _now; }
+
   operator glm::vec2() const noexcept { return _now; }
 
 private:
@@ -59,6 +61,8 @@ public:
 
   void run();
   void render();
+
+  auto& now() const noexcept { return _now; }
 
   operator glm::vec2() const noexcept { return _now; }
 

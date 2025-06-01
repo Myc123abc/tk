@@ -9,6 +9,7 @@ namespace tk { namespace type {
     triangle,
     polygon,
     circle,
+    bezier,
   };
 
   enum class shape_op

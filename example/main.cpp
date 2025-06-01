@@ -69,7 +69,6 @@ public:
     {
       for (auto& p : _lps)  
         p.run();
-
       return true;
     } 
     return false;
@@ -80,23 +79,41 @@ public:
     for (auto& p : _lps)
       p.render();
     
-    auto rect0 = std::vector<glm::vec2>
-    {
-      _lps[0], _lps[1], _lps[8], _lps[2], _lps[3],
-    };
-    auto rect1 = std::vector<glm::vec2>
-    {
-      _lps[4], _lps[5], _lps[6], _lps[7], _lps[9],
-    };
-    ui::polygon({ rect0.begin(), rect0.end() }, 0xffffffff, 1);
-    ui::set_operation(type::shape_op::min);
-    ui::polygon({ rect1.begin(), rect1.end() }, 0xffffffff, 1);
+    bool change = _lps[1].now().x == _lps[8].now().x;
+
+    ui::line(_lps[0], _lps[1], 0xffffffff);
+    ui::line(_lps[2], _lps[3], 0xffffffff);
+    ui::line(_lps[3], _lps[0], 0xffffffff);
+    ui::line(_lps[4], _lps[5], 0xffffffff);
+    ui::line(_lps[5], _lps[6], 0xffffffff);
+    ui::line(_lps[6], _lps[7], 0xffffffff);
+
+    if (change)
+      ui::line(_lps[1], _lps[2], 0xffffffff);
+    else
+      ui::bezier(_lps[1], _lps[8], _lps[2], 0xffffffff);
+    if (change)
+      ui::line(_lps[7], _lps[4], 0xffffffff);
+    else
+      ui::bezier(_lps[7], _lps[9], _lps[4], 0xffffffff);
+
+    //auto rect0 = std::vector<glm::vec2>
+    //{
+    //  _lps[0], _lps[1], _lps[8], _lps[2], _lps[3],
+    //};
+    //auto rect1 = std::vector<glm::vec2>
+    //{
+    //  _lps[4], _lps[5], _lps[6], _lps[7], _lps[9],
+    //};
+    //ui::polygon({ rect0.begin(), rect0.end() }, 0xffffffff, 1);
+    //ui::set_operation(type::shape_op::min);
+    //ui::polygon({ rect1.begin(), rect1.end() }, 0xffffffff, 1);
   }
 
 private:
   std::vector<LerpPoint>  _lps;
-  std::string _playback_btn_name, _pasue_btn_name;
-  glm::vec2 _left_upper, _right_lower;
+  std::string             _playback_btn_name, _pasue_btn_name;
+  glm::vec2               _left_upper, _right_lower;
 };
 
 ////////////////////////////////////////////////////////////////////////////////

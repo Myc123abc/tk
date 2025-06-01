@@ -130,7 +130,7 @@ namespace tk { namespace graphics_engine {
     PipelineLayout _sdf_pipeline_layout;
     void render_sdf();
 
-    static constexpr uint32_t Buffer_Size = 1024;
+    static constexpr uint32_t Buffer_Size = 1024 * 1024;
     Buffer _buffer;
     void create_buffer();
 
