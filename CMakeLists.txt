@@ -43,12 +43,21 @@ if(WIN32)
 find_package(Vulkan REQUIRED)
 endif()
 
+include(FetchContent)
+FetchContent_Declare(
+  FreeType
+  GIT_REPOSITORY https://gitlab.freedesktop.org/freetype/freetype.git
+  GIT_TAG        master 
+)
+FetchContent_MakeAvailable(FreeType)
+
 ################################################################################
 #                               Build Static Library 
 ################################################################################
 
 set(INCLUDE
   include
+  ${freetype_SOURCE_DIR}/include
 )
 
 file(GLOB_RECURSE SOURCE src/*.cpp)
@@ -58,6 +67,7 @@ if(WIN32)
     SDL3::SDL3-static
     GPUOpen::VulkanMemoryAllocator
     spdlog::spdlog
+    freetyped
   )
 elseif(UNIX)
   set(LIBS
@@ -70,6 +80,7 @@ elseif(UNIX)
     Xi
     SDL3::SDL3-static
     GPUOpen::VulkanMemoryAllocator
+    FreeType::FreeType # it's this? I'm not test
   )
 endif()
 
@@ -87,6 +98,9 @@ target_compile_definitions(tk PUBLIC
 if(WIN32)
 
 target_include_directories(tk PUBLIC ${Vulkan_INCLUDE_DIRS})
+target_link_directories(tk PUBLIC
+  ${freetype_BINARY_DIR}
+)
 target_link_libraries(tk PUBLIC ${Vulkan_LIBRARIES})
 
 endif()

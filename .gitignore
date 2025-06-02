@@ -4,3 +4,4 @@ lib/spdlog
 out
 .vs
 shader/*.spv
+resources/*

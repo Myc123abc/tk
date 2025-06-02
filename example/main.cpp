@@ -5,6 +5,7 @@
 #include "PlayBackButton.hpp"
 #include "tk/tk.hpp"
 #include "tk/log.hpp"
+#include "tk/ui/Font.hpp"
 
 ////////////////////////////////////////////////////////////////////////////////
 //                               global variable
@@ -23,6 +24,7 @@ PlayBackButton playback_btn("playback_btn", playback_pos0, playback_pos1, playba
 void tk_init(int argc, char** argv)
 {
   init_tk_context("tk", 200, 200, nullptr);
+  load_font("resources/SourceCodePro-Regular.ttf");
 }
 
 void tk_iterate()

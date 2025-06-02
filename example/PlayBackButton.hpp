@@ -86,9 +86,9 @@ public:
   }
 
 private:
-  std::vector<LerpPoint>  _lps;
-  std::string             _playback_btn_name, _pasue_btn_name;
-  glm::vec2               _left_upper, _right_lower;
-  uint32_t                _color;
-  uint32_t                _thickness;
+  std::vector<LerpPoint> _lps;
+  std::string            _playback_btn_name, _pasue_btn_name;
+  glm::vec2              _left_upper, _right_lower;
+  uint32_t               _color;
+  uint32_t               _thickness;
 };
