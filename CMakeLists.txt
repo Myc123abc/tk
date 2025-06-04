@@ -14,13 +14,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #                                Library
 ################################################################################
 
-add_definitions(-DSPDLOG_USE_STD_FORMAT)
-if(WIN32)
-add_subdirectory(lib/spdlog)
-elseif(UNIX)
-find_package(spdlog CONFIG REQUIRED)
-endif()
-
 set(SDL_SHARED OFF)
 set(SDL_STATIC ON)
 include(FetchContent)
@@ -66,7 +59,6 @@ if(WIN32)
   set(LIBS
     SDL3::SDL3-static
     GPUOpen::VulkanMemoryAllocator
-    spdlog::spdlog
     freetyped
   )
 elseif(UNIX)

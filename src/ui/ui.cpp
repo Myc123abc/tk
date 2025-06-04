@@ -151,7 +151,6 @@ void path_begin()
   });
 }
 
-// TODO: how to op
 void path_end(uint32_t color, uint32_t thickness)
 {
   auto& ctx = get_ctx();

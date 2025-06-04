@@ -22,9 +22,8 @@ check other memory leak maybe sdl3
 #include "tk/log.hpp"
 #include "ui/internal.hpp"
 
-#define SDL_MAIN_USE_CALLBACKS
-#include <SDL3/SDL_main.h>
-#include <SDL3/SDL_timer.h>
+//#define SDL_MAIN_USE_CALLBACKS
+#include <SDL3/SDL.h>
 
 using namespace tk;
 using namespace tk::graphics_engine;
@@ -92,6 +91,91 @@ auto tk::get_main_window_extent() -> glm::vec2
 //                          SDL3 Callback System
 ////////////////////////////////////////////////////////////////////////////////
 
+int main()
+{
+    try
+    {
+        tk_init(0, nullptr);
+        SDL_Event event;
+        bool run = true;
+        while (run)
+        {
+            while (SDL_PollEvent(&event))
+            {
+                tk_event(&event);
+
+                auto& ui_ctx = ui::get_ctx();
+
+                switch (event.type)
+                {
+                case SDL_EVENT_QUIT:
+                    run = false;
+                    break;
+                case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+                    if (event.window.windowID == SDL_GetWindowID(tk_ctx->window.get()))
+                        break;
+                    assert(false);
+                case SDL_EVENT_WINDOW_MINIMIZED:
+                    tk_ctx->paused = true;
+                    break;
+                case SDL_EVENT_WINDOW_MAXIMIZED:
+                    tk_ctx->paused = false;
+                    break;
+                case SDL_EVENT_WINDOW_RESIZED:
+                    tk_ctx->resize = true;
+                    break;
+                case SDL_EVENT_KEY_DOWN:
+                    if (event.key.key == SDLK_Q)
+                        run = false;
+                    break;
+                }
+
+                ui_ctx.event_type = event.type;
+            }
+            
+            tk_iterate();
+            if (tk_ctx->paused)
+            {
+                SDL_Delay(10);
+                continue;
+            }
+
+            auto& ui_ctx = ui::get_ctx();
+
+            if (tk_ctx->resize)
+            {
+                tk_ctx->engine.resize_swapchain();
+                tk_ctx->resize = false;
+            }
+
+            // update window size
+            uint32_t width, height;
+            tk_ctx->window.get_framebuffer_size(width, height);
+            ui_ctx.window_extent = { width, height };
+
+            // render ui
+            tk_ctx->engine.render_begin();
+            ui::render();
+            tk_ctx->engine.render_end();
+
+            ui_ctx.event_type = {};
+        }
+
+        tk_quit();
+
+        ui::destroy();
+
+        delete tk_ctx;
+
+        SDL_Quit();
+    }
+    catch (const std::exception& e)
+    {
+        log::error(e.what());
+        return 1;
+    }
+}
+#if 0
 SDL_AppResult SDL_AppInit(void**, int argc, char** argv)
 {
   try
@@ -208,3 +292,4 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
   if (result == SDL_APP_FAILURE)
     exit(EXIT_FAILURE);
 }
+#endif

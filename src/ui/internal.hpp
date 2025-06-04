@@ -48,8 +48,19 @@ struct ui_context
 
 inline auto& get_ctx()
 {
-  static ui_context ctx;
-  return ctx;
+  static auto ctx = new ui_context();
+  return *ctx;
+}
+
+inline void destroy()
+{
+  auto& ctx = get_ctx();
+  while (!ctx.layouts.empty()) ctx.layouts.pop();
+  ctx.points.clear();
+  ctx.shape_infos.clear();
+  ctx.states.clear();
+  ctx.call_stack.clear();
+  delete &ctx;
 }
 
 void render();

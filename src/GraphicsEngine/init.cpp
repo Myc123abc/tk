@@ -8,14 +8,6 @@
 
 namespace tk { namespace graphics_engine { 
 
-static constexpr auto          Vulkan_Version    = VK_API_VERSION_1_4;
-std::vector<const char*> const Device_Extensions = 
-{
-  VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-  VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
-  VK_EXT_SHADER_OBJECT_EXTENSION_NAME,
-};
-
 void GraphicsEngine::init(Window& window)
 {
   // only have single graphics engine
@@ -49,6 +41,7 @@ void GraphicsEngine::destroy()
 {
   vkDeviceWaitIdle(_device);
   _destructors.clear();
+  Device_Extensions.clear();
 }
 
 void GraphicsEngine::create_instance()

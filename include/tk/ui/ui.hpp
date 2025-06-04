@@ -120,6 +120,10 @@ inline void bezier(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2
   shape(type::shape::bezier, { p0, p1, p2 }, color);
 }
 
+/*
+ * start path shape, can only use line and bezier now.
+ * and set_operation can only use with path_begin
+ */
 void path_begin();
 void path_end(uint32_t color, uint32_t thickness = 0);
 
@@ -131,6 +135,7 @@ void path_end(uint32_t color, uint32_t thickness = 0);
  * set current shape mix operation with next shape.
  * the final shape operation must be mix (default).
  * the operator for two shapes only use thickness of first shape.
+ * for path shape, can only be used with path_begin
  * @param op operator for current shape with next shape
  */
 void set_operation(type::shape_op op);

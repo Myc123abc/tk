@@ -14,7 +14,6 @@ TODO:
 
 ## Third Party
 * https://github.com/KhronosGroup/Vulkan-Headers (Apache-2.0)
-* https://github.com/gabime/spdlog (MIT)
 * https://github.com/libsdl-org/SDL (Zlib)
 * https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator (MIT)
 * https://iquilezles.org/articles/distfunctions2d/ (MIT)

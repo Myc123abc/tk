@@ -106,6 +106,14 @@ namespace tk { namespace graphics_engine {
     MemoryAllocator              _mem_alloc;
     DestructorStack              _destructors;
 
+    static constexpr auto    Vulkan_Version    = VK_API_VERSION_1_4;
+    std::vector<const char*> Device_Extensions = 
+    {
+      VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+      VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
+      VK_EXT_SHADER_OBJECT_EXTENSION_NAME,
+    };
+
     //
     // frame resources
     //
