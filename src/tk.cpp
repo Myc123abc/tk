@@ -9,13 +9,6 @@
 // 1. should not use try catch in internal callback system!
 //
 
-/*
-intergrate resizeswapchain as private in engine not in tk
-use main not callback
-not use static resources which is reachable memory leak
-check other memory leak maybe sdl3
-*/
-
 #include "tk/tk.hpp"
 #include "tk/Window.hpp"
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
