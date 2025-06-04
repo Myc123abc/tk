@@ -112,11 +112,12 @@ namespace tk { namespace graphics_engine {
     struct FrameResource
     {
       Command     cmd;
-      VkFence     fence                 = VK_NULL_HANDLE;
-      VkSemaphore image_available_sem   = VK_NULL_HANDLE; 
-      VkSemaphore render_finished_sem   = VK_NULL_HANDLE;
+      VkFence     fence       = VK_NULL_HANDLE;
+      VkSemaphore acquire_sem = VK_NULL_HANDLE;
+      VkSemaphore submit_sem  = VK_NULL_HANDLE;
     };
     std::vector<FrameResource> _frames;
+    std::vector<VkSemaphore>   _submit_sems;
     uint32_t                   _current_frame                 = {};
     uint32_t                   _current_swapchain_image_index = {};
     auto get_current_frame()           noexcept -> FrameResource& { return _frames[_current_frame]; }

@@ -16,11 +16,12 @@ auto GraphicsEngine::frame_begin() -> FrameResource*
   throw_if(vkResetFences(_device, 1, &frame->fence) != VK_SUCCESS,
            "failed to reset fence");
 
-  auto res = vkAcquireNextImageKHR(_device, _swapchain, UINT64_MAX, frame->image_available_sem, VK_NULL_HANDLE, &_current_swapchain_image_index);
+  auto res = vkAcquireNextImageKHR(_device, _swapchain, UINT64_MAX, frame->acquire_sem, VK_NULL_HANDLE, &_current_swapchain_image_index);
   if (res == VK_ERROR_OUT_OF_DATE_KHR)
     return nullptr;
   else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
     throw_if(true, "failed to acquire swapechain image");
+  frame->submit_sem = _submit_sems[_current_swapchain_image_index];
 
   throw_if(vkResetCommandBuffer(frame->cmd, 0) != VK_SUCCESS,
            "failed to reset command buffer");
@@ -51,12 +52,12 @@ void GraphicsEngine::frame_end()
   VkSemaphoreSubmitInfo wait_sem_submit_info
   {
     .sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-    .semaphore = frame.image_available_sem,
+    .semaphore = frame.acquire_sem,
     .value     = 1,
     .stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
   };
   auto signal_sem_submit_info      = wait_sem_submit_info;
-  signal_sem_submit_info.semaphore = frame.render_finished_sem;
+  signal_sem_submit_info.semaphore = frame.submit_sem;
   signal_sem_submit_info.stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
 
   VkSubmitInfo2 submit_info
@@ -76,7 +77,7 @@ void GraphicsEngine::frame_end()
   {
     .sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
     .waitSemaphoreCount = 1,
-    .pWaitSemaphores    = &frame.render_finished_sem,
+    .pWaitSemaphores    = &frame.submit_sem,
     .swapchainCount     = 1,
     .pSwapchains        = &_swapchain,
     .pImageIndices      = &_current_swapchain_image_index,

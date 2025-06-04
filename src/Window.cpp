@@ -44,7 +44,6 @@ auto Window::init(std::string_view title, uint32_t width, uint32_t height) -> Wi
 void Window::destroy() const
 {
   SDL_DestroyWindow(_window);
-  SDL_Quit();
 }
 
 auto Window::show() -> Window&

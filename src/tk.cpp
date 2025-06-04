@@ -9,6 +9,13 @@
 // 1. should not use try catch in internal callback system!
 //
 
+/*
+intergrate resizeswapchain as private in engine not in tk
+use main not callback
+not use static resources which is reachable memory leak
+check other memory leak maybe sdl3
+*/
+
 #include "tk/tk.hpp"
 #include "tk/Window.hpp"
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
@@ -18,10 +25,6 @@
 #define SDL_MAIN_USE_CALLBACKS
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_timer.h>
-
-#include <algorithm>
-#include <numbers>
-#include <span>
 
 using namespace tk;
 using namespace tk::graphics_engine;
@@ -47,6 +50,7 @@ struct tk_context
   GraphicsEngine engine;
 
   bool           paused    = false;
+  bool           resize    = false;
 
   ~tk_context()
   {
@@ -85,72 +89,6 @@ auto tk::get_main_window_extent() -> glm::vec2
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-//                                From imgui
-////////////////////////////////////////////////////////////////////////////////
-
-
-static float dpi_scale = {};
-
-static float   curve_tessellation_tolerance  = 1.25f;
-static float   circle_tessellation_max_error = 0.30f;
-static uint8_t circle_segment_counts[64]; // Precomputed segment count for given radius before we calculate it dynamically (to avoid calculation overhead)
-constexpr uint32_t Circle_Max_Sample_Number = 48; // imgui think 48 is enough 'circle'
-static float   arc_fast_radius_cutoff = {};
-
-void update_dpi_scale()
-{
-  int count;
-  auto displays = SDL_GetDisplays(&count);
-  for (auto display : std::span(displays, count))
-  {
-    dpi_scale = SDL_GetDisplayContentScale(display);
-    if (dpi_scale <= 0.0f)
-      continue;
-    else
-      // FIXME: only single monitor for me
-      break;
-  }
-  SDL_free(displays);
-}
-
-// Helper function to calculate a circle's segment count given its radius and a "maximum error" value.
-// Estimation of number of circle segment based on error is derived using method described in https://stackoverflow.com/a/2244088/15194693
-// Number of segments (N) is calculated using equation:
-//   N = ceil ( pi / acos(1 - error / r) )     where r > 0, error <= r
-// Our equation is significantly simpler that one in the post thanks for choosing segment that is
-// perpendicular to X axis. Follow steps in the article from this starting condition and you will
-// will get this result.
-//
-// Rendering circles with an odd number of segments, while mathematically correct will produce
-// asymmetrical results on the raster grid. Therefore we're rounding N to next even number (7->8, 8->8, 9->10 etc.)
-inline constexpr auto roundup_to_even(uint32_t num)
-{
-  return (num + 1) / 2 * 2;
-}
-
-inline constexpr auto get_circle_segment_count(float radius, float max_error)
-{
-  static constexpr uint32_t circle_max_segment_num = 512;
-  static constexpr uint32_t circle_min_segment_num = 4;
-  if (radius <= 0.f)
-    return Circle_Max_Sample_Number;
-  return std::clamp(roundup_to_even(std::ceil(std::numbers::pi / std::acos(1 - std::min(max_error, radius) / radius))), circle_min_segment_num, circle_max_segment_num);
-}
-
-inline auto get_circle_segment_count_radius(float num, float max_error)
-{
-  return max_error / (1 - std::cos(std::numbers::pi / std::max(num, std::numbers::pi_v<float>)));
-}
-
-void init_circle_tesslation_counts()
-{
-  for (auto i = 0; i < sizeof(circle_segment_counts); ++i)
-    circle_segment_counts[i] = get_circle_segment_count(i, circle_tessellation_max_error);
-  // FIXME: why arc_fast_radius_cutoff not equal sizeof(circle_segment_counts)
-  arc_fast_radius_cutoff = get_circle_segment_count_radius(Circle_Max_Sample_Number, circle_tessellation_max_error);
-}
-
-////////////////////////////////////////////////////////////////////////////////
 //                          SDL3 Callback System
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -158,7 +96,6 @@ SDL_AppResult SDL_AppInit(void**, int argc, char** argv)
 {
   try
   {
-    init_circle_tesslation_counts();
     tk_init(argc, argv);
   }
   catch (const std::exception& e)
@@ -173,11 +110,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 {
   try
   {
-    //
-    // update dpi
-    //
-    update_dpi_scale();
-
     tk_iterate();
 
     if (tk_ctx->paused)
@@ -187,6 +119,12 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     }
 
     auto& ui_ctx = ui::get_ctx();
+
+    if (tk_ctx->resize)
+    {
+      tk_ctx->engine.resize_swapchain();
+      tk_ctx->resize = false;
+    }
 
     // update window size
     uint32_t width, height;
@@ -231,7 +169,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
       tk_ctx->paused = false;
       break;
     case SDL_EVENT_WINDOW_RESIZED:
-      tk_ctx->engine.resize_swapchain();
+      tk_ctx->resize = true;
       break;
     case SDL_EVENT_KEY_DOWN:
       if (event->key.key == SDLK_Q)
@@ -254,8 +192,10 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
   try
   {
     tk_quit();
-
+    
     delete tk_ctx;
+    
+    SDL_Quit();
   }
   catch (const std::exception& e)
   {

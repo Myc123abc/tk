@@ -24,7 +24,7 @@ PlayBackButton playback_btn("playback_btn", playback_pos0, playback_pos1, playba
 void tk_init(int argc, char** argv)
 {
   init_tk_context("tk", 200, 200, nullptr);
-  load_font("resources/SourceCodePro-Regular.ttf");
+  // load_font("resources/SourceCodePro-Regular.ttf");
 }
 
 void tk_iterate()
@@ -45,7 +45,7 @@ void tk_iterate()
     playback_btn.render();
     if (playback_btn.button())
     {
-      log::info("click");
+      //log::info("click");
     }
     
     // playback progress

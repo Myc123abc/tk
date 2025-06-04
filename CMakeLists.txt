@@ -80,7 +80,7 @@ elseif(UNIX)
     Xi
     SDL3::SDL3-static
     GPUOpen::VulkanMemoryAllocator
-    FreeType::FreeType # it's this? I'm not test
+    freetype
   )
 endif()
 
