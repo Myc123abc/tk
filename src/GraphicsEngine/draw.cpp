@@ -165,7 +165,7 @@ void GraphicsEngine::render_end()
   auto shaders = std::vector<VkShaderEXT>{ _text_render_vert, _text_render_frag };
   graphics_engine::vkCmdBindShadersEXT(frame.cmd, stages.size(), stages.data(), shaders.data());
   bind_descriptor_buffer(frame.cmd, _descriptor_buffer.address(), VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT, _text_render_pipeline_layout, VK_PIPELINE_BIND_POINT_GRAPHICS);
-  vkCmdDraw(frame.cmd, 3, 1, 0, 0);
+  //vkCmdDraw(frame.cmd, 3, 1, 0, 0);
 
   graphics_engine::vkCmdBindShadersEXT(frame.cmd, stages.size(), stages.data(), nullptr);
 
@@ -176,14 +176,7 @@ void GraphicsEngine::render_end()
 
 void GraphicsEngine::update(std::span<glm::vec2> points, std::span<ShapeInfo> infos)
 {
-  auto points_byte_size      = points.size() * sizeof(glm::vec2);
-  auto shape_infos_byte_size = infos.size()  * sizeof(ShapeInfo);
-
-  throw_if(points_byte_size + shape_infos_byte_size > Buffer_Size, "buffer memory unenough!");
-
-  auto offset = Buffer_Size * _current_frame;
-  copy(points.data(), _buffer, offset,                    points_byte_size);
-  copy(infos.data(),  _buffer, offset + points_byte_size, shape_infos_byte_size);
+  _buffers[_current_frame].clear().append(points).append(infos);
 }
 
 void GraphicsEngine::render(uint32_t offset, uint32_t num)
@@ -194,7 +187,8 @@ void GraphicsEngine::render(uint32_t offset, uint32_t num)
   _window->get_framebuffer_size(w, h);
   auto pc = PushConstant_SDF
   {
-    .address       = _buffer.address() + Buffer_Size * _current_frame,
+    .address       = _buffers[_current_frame].address(),
+    // this offset is not byte offset, is float offset
     .offset        = offset,
     .num           = num,
     .window_extent = { w, h },  

@@ -392,11 +392,14 @@ void GraphicsEngine::create_frame_resources()
 
 void GraphicsEngine::create_buffer()
 {
-  _buffer = _mem_alloc.create_buffer(Buffer_Size * _swapchain_images.size(), VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+  _buffers.reserve(_swapchain_images.size());
+  for (auto i = 0; i < _swapchain_images.size(); ++i)
+    _buffers.emplace_back(_mem_alloc.create_buffer(Buffer_Size, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT));
   
   _destructors.push([&]
   {
-    _buffer.destroy();
+    for (auto& buf : _buffers)
+      buf.destroy();
   });
 }
 
@@ -480,8 +483,8 @@ void GraphicsEngine::load_font()
   auto byte_size = _ft_face->glyph->bitmap.width * _ft_face->glyph->bitmap.rows;
   auto buf = _mem_alloc.create_buffer(byte_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
 
-  // copy data
-  copy(_ft_face->glyph->bitmap.buffer, buf, 0, byte_size);
+  // copy 
+  buf.append(_ft_face->glyph->bitmap.buffer, byte_size);
   
   // copy to image
   auto cmd = _command_pool.create_command().begin();

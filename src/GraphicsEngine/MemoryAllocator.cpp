@@ -19,11 +19,14 @@ void Buffer::destroy()
   _allocation = {};
   _address    = {};
   _data       = {};
+  _capacity   = {};
+  _size       = {};
 }
 
 Buffer::Buffer(MemoryAllocator* allocator, uint32_t size, VkBufferUsageFlags usages, VmaAllocationCreateFlags flags) 
 {
   _allocator = allocator->get();
+  _capacity  = size;
   
   VkBufferCreateInfo buf_info
   {
@@ -53,6 +56,21 @@ Buffer::Buffer(MemoryAllocator* allocator, uint32_t size, VkBufferUsageFlags usa
     };
     _address = vkGetBufferDeviceAddress(allocator->_device, &info);
   }
+}
+
+void Buffer::add_tag(std::string_view tag)
+{
+  throw_if(_offsets.emplace(tag, _size).second == false, "already have tag {}", tag);
+}
+
+auto Buffer::append(void* data, uint32_t size) -> Buffer&
+{
+  auto total_size = _size + size;
+  throw_if(total_size > _capacity, "exceeding capcity");
+  throw_if(vmaCopyMemoryToAllocation(_allocator, data, _allocation, _size, size) != VK_SUCCESS,
+           "failed to copy data to upload buffer");
+  _size = total_size;
+  return *this;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -263,12 +281,6 @@ void copy(Command const& cmd, Buffer const& src, Image& dst)
     .pRegions       = &region,
   };
   vkCmdCopyBufferToImage2(cmd, &info);
-}
-
-void copy(void* data, Buffer const& buf, uint32_t offset, uint32_t size)
-{
-  throw_if(vmaCopyMemoryToAllocation(buf.allocator(), data, buf.allocation(), offset, size) != VK_SUCCESS,
-           "failed to copy data to upload buffer");
 }
 
 ////////////////////////////////////////////////////////////////////////////////

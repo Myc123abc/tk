@@ -49,9 +49,15 @@ void tk_iterate()
 
     // playback button
     global->playback_btn.render();
+    static bool click = {};
     if (global->playback_btn.button())
     {
       //log::info("click");
+      click = !click;
+    }
+    if (click)
+    {
+      ui::circle({50, 50}, 10, 0x00ff00ff);
     }
     
     // playback progress

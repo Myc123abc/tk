@@ -143,7 +143,7 @@ namespace tk { namespace graphics_engine {
     void render_sdf();
 
     static constexpr uint32_t Buffer_Size = 1024 * 1024;
-    Buffer _buffer;
+    std::vector<Buffer> _buffers;
     void create_buffer();
 
     struct PushConstant_SDF

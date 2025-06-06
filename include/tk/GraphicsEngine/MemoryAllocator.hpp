@@ -9,6 +9,11 @@
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
 
+#include <span>
+#include <unordered_map>
+#include <string_view>
+#include <string>
+
 namespace tk { namespace graphics_engine {
 
   class MemoryAllocator;
@@ -26,8 +31,53 @@ namespace tk { namespace graphics_engine {
     auto address()    const noexcept { return _address;    }
     auto data()       const noexcept { return _data;       }
     auto allocator()  const noexcept { return _allocator;  }
+    auto capacity()   const noexcept { return _capacity;   }
+    auto size()       const noexcept { return _size;       }
 
-    bool is_valid() const noexcept { return _handle; }
+    auto offset(std::string const& tag) const { return _offsets.at(tag); }
+
+    auto clear() noexcept -> Buffer&
+    {
+      _size = {};
+      _offsets.clear();
+      return *this;
+    }
+
+    auto append(void* data, uint32_t size) -> Buffer&;
+    auto append(std::string_view tag, void* data, uint32_t size) -> Buffer&
+    {
+      add_tag(tag);
+      return append(data, size);
+    }
+
+    template <typename T>
+    auto append(T const& value) -> Buffer&
+    {
+      append(&value, sizeof(T));
+      return *this;
+    }
+    template <typename T>
+    auto append(std::string_view tag, T const& value) -> Buffer&
+    {
+      add_tag(tag);
+      return append(value);
+    }
+
+    template <typename T>
+    auto append(std::span<T> values) -> Buffer&
+    {
+      append(values.data(), values.size() * sizeof(T));
+      return *this;
+    }
+    template <typename T>
+    auto append(std::string_view tag, std::span<T> values) -> Buffer&
+    {
+      add_tag(tag);
+      return append(values);
+    }
+
+  private:
+    void add_tag(std::string_view tag);
 
   private:
     VmaAllocator    _allocator  = {};
@@ -35,6 +85,9 @@ namespace tk { namespace graphics_engine {
     VmaAllocation   _allocation = {};
     VkDeviceAddress _address    = {};
     void*           _data       = {};
+    uint32_t        _capacity   = {};
+    uint32_t        _size       = {};
+    std::unordered_map<std::string, uint32_t> _offsets;
   };
 
   class Image
@@ -91,15 +144,6 @@ void copy(Command const& cmd, Image  const& src, Image const& dst);
  * @param dst image
  */
 void copy(Command const& cmd, Buffer const& src, Image& dst);
-
-/**
- * copy data to buffer
- * @param data
- * @param buf buffer
- * @param offset offset of data
- * @param size byte size of data
- */
-void copy(void* data, Buffer const& buf, uint32_t offset, uint32_t size);
 
   class MemoryAllocator
   {
