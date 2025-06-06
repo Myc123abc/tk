@@ -37,18 +37,6 @@ auto Device::create_descriptor_layout(std::vector<DescriptorInfo> const& infos) 
   return DescriptorLayout(this, infos);
 }
 
-//auto Device::create_pipeline(
-//  type::pipeline                            type,
-//  std::vector<std::string_view>      const& shaders,
-//  std::vector<VkDescriptorSetLayout> const& descritptor_layouts, 
-//  std::vector<VkPushConstantRange>   const& push_constants) -> Pipeline
-//{
-//  assert(type == type::pipeline::compute ? shaders.size() == 1 : shaders.size() == 2);
-//  if (type == type::pipeline::compute)
-//    return Pipeline(_device, shaders.front(), descritptor_layouts, push_constants);
-//  return Pipeline(_device, shaders[0], shaders[1], descritptor_layouts, push_constants);
-//}
-
 void Device::create_shaders(std::vector<ShaderCreateInfo> const& infos, bool link)
 {
   auto shader_datas = std::vector<std::vector<uint32_t>>();

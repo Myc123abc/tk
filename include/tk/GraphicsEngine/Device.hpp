@@ -2,7 +2,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include "Descriptor.hpp"
+#include "DescriptorLayout.hpp"
 #include "Shader.hpp"
 #include "PipelineLayout.hpp"
 
@@ -41,12 +41,6 @@ namespace tk { namespace graphics_engine {
       return { _device, descritptor_layouts, push_constants };
     }
 
-    //auto create_pipeline(
-    //  type::pipeline                            type,
-    //  std::vector<std::string_view>      const& shaders,
-    //  std::vector<VkDescriptorSetLayout> const& descritptor_layouts, 
-    //  std::vector<VkPushConstantRange>   const& push_constants) -> Pipeline;
-  
     auto& get_descriptor_buffer_info() const noexcept { return _descriptor_buffer_info; }
 
   private:

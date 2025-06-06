@@ -1,4 +1,4 @@
-#include "tk/GraphicsEngine/Descriptor.hpp"
+#include "tk/GraphicsEngine/DescriptorLayout.hpp"
 #include "tk/ErrorHandling.hpp"
 #include "tk/GraphicsEngine/Device.hpp"
 #include "tk/util.hpp"
@@ -36,22 +36,12 @@ DescriptorLayout::DescriptorLayout(Device* device, std::vector<DescriptorInfo> c
     assert(layout.type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
            layout.type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
 
-    assert(layout.binding >= 0                                  &&
-           layout.type    != VK_DESCRIPTOR_TYPE_MAX_ENUM        &&    
-           layout.count   >  0                                  && 
-           layout.stages  != VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM &&
-           layout.type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ?
-             layout.sampler    != VK_NULL_HANDLE &&
-             layout.image_view != VK_NULL_HANDLE : true         ||
-           layout.type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ?
-             layout.image_view != VK_NULL_HANDLE : true);
-
     bindings.emplace_back(VkDescriptorSetLayoutBinding
     {
-      .binding            = (uint32_t)layout.binding,
-      .descriptorType     = layout.type,
-      .descriptorCount    = layout.count,
-      .stageFlags         = layout.stages,
+      .binding         = (uint32_t)layout.binding,
+      .descriptorType  = layout.type,
+      .descriptorCount = layout.count,
+      .stageFlags      = layout.stages,
     });
   }
 
@@ -60,7 +50,7 @@ DescriptorLayout::DescriptorLayout(Device* device, std::vector<DescriptorInfo> c
   {
     .sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
     .flags        = VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT,
-    .bindingCount = (uint32_t)layouts.size(),
+    .bindingCount = static_cast<uint32_t>(layouts.size()),
     .pBindings    = bindings.data(),
   };
   throw_if(vkCreateDescriptorSetLayout(device->get(), &info, nullptr, &_layout) != VK_SUCCESS,
