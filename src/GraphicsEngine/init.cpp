@@ -510,6 +510,21 @@ void GraphicsEngine::load_font()
     { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, _ft_image.view(), _sampler }
   });
 
+  /*
+   * FIXME:
+   * descriptor buffer need different manage than frame buffers
+   * actually, you can put all precompiled shader's descriptor layout to descriptor buffer before rendering
+   * and just offset bind in rendering
+   * when need to dynamic add shader or other case, need to upload new descriptor layout to descriptor buffer
+   * or local update descriptor buffer in hundreds descriptors need to use
+   * 1. offset must be multiple of descriptorBufferOffsetAlignment
+   * 2. byte size of descriptor buffer can be got from sum of descriptor in each iteration in update_descriptors
+   * 3. bind_descriptor_buffer need to set offset and buffer index (buffer index use for what is unknow for currently...)
+   * 4. bind_descriptor_buffer should be redesign for single binding multi-descriptor-buffers
+   * maybe not really do
+   * 5. integrate descriptor layout with pipeline layout to class Layout
+   * 6. integrate shader object to class Layout, change class Layout to class Shader? which have shader, descriptor layout, pipeline layout?
+   */
   _descriptor_buffer = _mem_alloc.create_buffer(_text_render_destriptor_layout.size(), VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT  | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT , VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 
   _text_render_destriptor_layout.update_descriptors(_descriptor_buffer);

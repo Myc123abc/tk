@@ -4,3 +4,4 @@ out
 .vs
 shader/*.spv
 resources/*
+CMakeSettings.json
