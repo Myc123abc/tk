@@ -25,6 +25,7 @@ namespace tk { namespace graphics_engine {
     auto allocation() const noexcept { return _allocation; }
     auto address()    const noexcept { return _address;    }
     auto data()       const noexcept { return _data;       }
+    auto allocator()  const noexcept { return _allocator;  }
 
     bool is_valid() const noexcept { return _handle; }
 
@@ -67,8 +68,38 @@ namespace tk { namespace graphics_engine {
     VkImageLayout _layout     = VK_IMAGE_LAYOUT_UNDEFINED;
   };
 
-void blit_image(Command const& cmd, Image const& src, Image const& dst);
-void copy_image(Command const& cmd, Image const& src, Image const& dst);
+/**
+ * copy image to image, permit different format and extent
+ * @param cmd command
+ * @param src image
+ * @param dst image
+ */
+void blit(Command const& cmd, Image  const& src, Image const& dst);
+
+/**
+ * copy image to image, only same format and extent
+ * @param cmd command
+ * @param src image
+ * @param dst image
+ */
+void copy(Command const& cmd, Image  const& src, Image const& dst);
+
+/**
+ * copy buffer to image
+ * @param cmd command
+ * @param src buffer
+ * @param dst image
+ */
+void copy(Command const& cmd, Buffer const& src, Image& dst);
+
+/**
+ * copy data to buffer
+ * @param data
+ * @param buf buffer
+ * @param offset offset of data
+ * @param size byte size of data
+ */
+void copy(void* data, Buffer const& buf, uint32_t offset, uint32_t size);
 
   class MemoryAllocator
   {

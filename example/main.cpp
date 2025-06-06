@@ -5,7 +5,6 @@
 #include "PlayBackButton.hpp"
 #include "tk/tk.hpp"
 #include "tk/log.hpp"
-#include "tk/ui/Font.hpp"
 
 ////////////////////////////////////////////////////////////////////////////////
 //                               global variable
@@ -20,11 +19,8 @@ struct Global
 
   Global()
     : playback_btn("playback_btn", playback_pos0, playback_pos1, playback_pos2, 0xffffffff, 1)
-  {
-  }
+  {}
 };
-
-Global* global;
 
 ////////////////////////////////////////////////////////////////////////////////
 //                               tk callback
@@ -32,13 +28,13 @@ Global* global;
 
 void tk_init(int argc, char** argv)
 {
-  init_tk_context("tk", 200, 200, nullptr);
-  // load_font("resources/SourceCodePro-Regular.ttf");
-  global = new Global();
+  init_tk_context("tk", 200, 200, new Global());
 }
 
 void tk_iterate()
 {
+  auto global = (Global*)get_user_data();
+
   static auto start_time = std::chrono::high_resolution_clock::now();
   auto now = std::chrono::high_resolution_clock::now();
   auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
@@ -69,9 +65,18 @@ void tk_iterate()
 
 void tk_event(SDL_Event* event)
 {
+  auto global = (Global*)get_user_data();
+  switch (event->type)
+  {
+  case SDL_EVENT_KEY_DOWN:
+      if (event->key.key == SDLK_SPACE)
+        global->playback_btn.click();
+        break;
+      break;
+  }
 }
 
 void tk_quit()
 {
-  delete global;
+  delete (Global*)get_user_data();;
 }

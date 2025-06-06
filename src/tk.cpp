@@ -15,8 +15,10 @@
 #include "tk/log.hpp"
 #include "ui/internal.hpp"
 
-//#define SDL_MAIN_USE_CALLBACKS
-#include <SDL3/SDL.h>
+#define SDL_MAIN_USE_CALLBACKS
+#include <SDL3/SDL_main.h>
+
+#include <mutex>
 
 using namespace tk;
 using namespace tk::graphics_engine;
@@ -51,7 +53,7 @@ struct tk_context
   }
 };
 
-static tk_context* tk_ctx;
+static tk_context* tk_ctx = {};
 extern struct ui_context ui_ctx;
 
 void tk::init_tk_context(std::string_view title, uint32_t width, uint32_t height, void* user_data)
@@ -64,8 +66,8 @@ void tk::init_tk_context(std::string_view title, uint32_t width, uint32_t height
 
   // init ui context
   // TODO: currently only use main window for entire ui
-  ui::get_ctx().window_extent = { width, height };
-  ui::get_ctx().engine        = &tk_ctx->engine;
+  ui::get_ctx()->window_extent = { width, height };
+  ui::get_ctx()->engine        = &tk_ctx->engine;
 }
 
 auto tk::get_user_data() -> void*
@@ -84,96 +86,16 @@ auto tk::get_main_window_extent() -> glm::vec2
 //                          SDL3 Callback System
 ////////////////////////////////////////////////////////////////////////////////
 
-int main()
-{
-    try
-    {
-        tk_init(0, nullptr);
-        SDL_Event event;
-        bool run = true;
-        while (run)
-        {
-            while (SDL_PollEvent(&event))
-            {
-                tk_event(&event);
-
-                auto& ui_ctx = ui::get_ctx();
-
-                switch (event.type)
-                {
-                case SDL_EVENT_QUIT:
-                    run = false;
-                    break;
-                case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-                    if (event.window.windowID == SDL_GetWindowID(tk_ctx->window.get()))
-                        break;
-                    assert(false);
-                case SDL_EVENT_WINDOW_MINIMIZED:
-                    tk_ctx->paused = true;
-                    break;
-                case SDL_EVENT_WINDOW_MAXIMIZED:
-                    tk_ctx->paused = false;
-                    break;
-                case SDL_EVENT_WINDOW_RESIZED:
-                    tk_ctx->resize = true;
-                    break;
-                case SDL_EVENT_KEY_DOWN:
-                    if (event.key.key == SDLK_Q)
-                        run = false;
-                    break;
-                }
-
-                ui_ctx.event_type = event.type;
-            }
-            
-            tk_iterate();
-            if (tk_ctx->paused)
-            {
-                SDL_Delay(10);
-                continue;
-            }
-
-            auto& ui_ctx = ui::get_ctx();
-
-            if (tk_ctx->resize)
-            {
-                tk_ctx->engine.resize_swapchain();
-                tk_ctx->resize = false;
-            }
-
-            // update window size
-            uint32_t width, height;
-            tk_ctx->window.get_framebuffer_size(width, height);
-            ui_ctx.window_extent = { width, height };
-
-            // render ui
-            tk_ctx->engine.render_begin();
-            ui::render();
-            tk_ctx->engine.render_end();
-
-            ui_ctx.event_type = {};
-        }
-
-        tk_quit();
-
-        ui::destroy();
-
-        delete tk_ctx;
-
-        SDL_Quit();
-    }
-    catch (const std::exception& e)
-    {
-        log::error(e.what());
-        return 1;
-    }
-}
-#if 0
 SDL_AppResult SDL_AppInit(void**, int argc, char** argv)
 {
   try
   {
     tk_init(argc, argv);
+    if(!tk_ctx) 
+    {
+      log::error("uninit tk");
+      exit(EXIT_FAILURE);
+    }
   }
   catch (const std::exception& e)
   {
@@ -183,37 +105,46 @@ SDL_AppResult SDL_AppInit(void**, int argc, char** argv)
   return SDL_APP_CONTINUE;
 }
 
+std::mutex g_mutex;
+
 SDL_AppResult SDL_AppIterate(void *appstate)
 {
   try
   {
-    tk_iterate();
+    std::unique_lock lock(g_mutex);
 
     if (tk_ctx->paused)
     {
-      SDL_Delay(10);
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
       return SDL_APP_CONTINUE;
     }
 
-    auto& ui_ctx = ui::get_ctx();
-
-    if (tk_ctx->resize)
-    {
-      tk_ctx->engine.resize_swapchain();
-      tk_ctx->resize = false;
-    }
+    auto ui_ctx = ui::get_ctx();
 
     // update window size
     uint32_t width, height;
     tk_ctx->window.get_framebuffer_size(width, height);
-    ui_ctx.window_extent = { width, height };
+    ui_ctx->window_extent = { width, height };
+
+    if (tk_ctx->resize)
+    {
+      if (width == 0 || height == 0)
+      {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        return SDL_APP_CONTINUE;
+      }
+      tk_ctx->engine.resize_swapchain();
+      tk_ctx->resize = false;
+    }
+
+    tk_iterate();
 
     // render ui
     tk_ctx->engine.render_begin();
     ui::render();
     tk_ctx->engine.render_end();
 
-    ui_ctx.event_type = {};
+    ui_ctx->event_type = {};
   }
   catch (const std::exception& e)
   {
@@ -223,13 +154,18 @@ SDL_AppResult SDL_AppIterate(void *appstate)
   return SDL_APP_CONTINUE;
 }
 
+/*
+ * WARN: event handle is thread unsafe with iterate handle
+ */
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 {
   try
   {
+    std::unique_lock lock(g_mutex);
+
     tk_event(event);
 
-    auto& ui_ctx = ui::get_ctx();
+    auto ui_ctx = ui::get_ctx();
 
     switch (event->type)
     {
@@ -243,6 +179,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
       tk_ctx->paused = true;
       break;
     case SDL_EVENT_WINDOW_MAXIMIZED:
+    case SDL_EVENT_WINDOW_RESTORED:
       tk_ctx->paused = false;
       break;
     case SDL_EVENT_WINDOW_RESIZED:
@@ -254,7 +191,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
       break;
     }
 
-    ui_ctx.event_type = event->type;
+    ui_ctx->event_type = event->type;
   }
   catch (const std::exception& e)
   {
@@ -269,9 +206,8 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
   try
   {
     tk_quit();
-    
+    delete ui::get_ctx();
     delete tk_ctx;
-    
     SDL_Quit();
   }
   catch (const std::exception& e)
@@ -285,4 +221,3 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
   if (result == SDL_APP_FAILURE)
     exit(EXIT_FAILURE);
 }
-#endif

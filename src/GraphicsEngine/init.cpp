@@ -30,9 +30,12 @@ void GraphicsEngine::init(Window& window)
   init_command_pool();
   init_memory_allocator();
   create_frame_resources();
+  create_sampler();
 
   create_buffer();
   create_sdf_rendering_resource();
+
+  load_font();
 
   _window->show();
 }
@@ -433,6 +436,99 @@ void GraphicsEngine::create_sdf_rendering_resource()
     _sdf_pipeline_layout.destroy();
     _sdf_frag.destroy();
     _sdf_vert.destroy();
+  });
+}
+
+void GraphicsEngine::create_sampler()
+{
+  VkSamplerCreateInfo sampler_info
+  {
+    .sType        = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+    .magFilter    = VK_FILTER_LINEAR,
+    .minFilter    = VK_FILTER_LINEAR,
+    .mipmapMode   = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+    .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+    .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+    .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+  };
+  throw_if(vkCreateSampler(_device, &sampler_info, nullptr, &_sampler) != VK_SUCCESS,
+           "failed to create smaa sampler");
+  _destructors.push([&] { vkDestroySampler(_device, _sampler, nullptr); });
+}
+
+void GraphicsEngine::load_font()
+{
+  auto path = "resources/SourceCodePro-Regular.ttf";
+
+  // init freetype
+  throw_if(FT_Init_FreeType(&_ft_lib), "failed to init FreeType Library");
+
+  // load font
+  throw_if(FT_New_Face(_ft_lib, path, 0, &_ft_face), "failed to load font {}", path);
+
+  // set pixel size
+  throw_if(FT_Set_Pixel_Sizes(_ft_face, 0, 96), "failed to set pixel size in freetype");
+
+  // load character
+  char character = 'g';
+  throw_if(FT_Load_Char(_ft_face, character, FT_LOAD_RENDER), "failed to load char {}", character);
+
+  // prepare image
+  _ft_image = _mem_alloc.create_image(VK_FORMAT_R8_UNORM, { _ft_face->glyph->bitmap.width, _ft_face->glyph->bitmap.rows, 1 }, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+
+  // upload buffer
+  auto byte_size = _ft_face->glyph->bitmap.width * _ft_face->glyph->bitmap.rows;
+  auto buf = _mem_alloc.create_buffer(byte_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+
+  // copy data
+  copy(_ft_face->glyph->bitmap.buffer, buf, 0, byte_size);
+  
+  // copy to image
+  auto cmd = _command_pool.create_command().begin();
+  copy(cmd, buf, _ft_image);
+  _ft_image.set_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  cmd.end().submit_wait_free(_command_pool, _graphics_queue);
+  
+  // destroy upload buffer
+  buf.destroy();
+
+  // destroy freetype resources
+  throw_if(FT_Done_Face(_ft_face), "failed to unload font");
+  throw_if(FT_Done_FreeType(_ft_lib), "failed to destroy freetype library");
+
+  // destruct resources
+  _destructors.push([&] { _ft_image.destroy(); });
+
+  /////////////////
+  // shaders
+  /////////////////
+  _text_render_destriptor_layout = _device.create_descriptor_layout(
+  {
+    { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, _ft_image.view(), _sampler }
+  });
+
+  _descriptor_buffer = _mem_alloc.create_buffer(_text_render_destriptor_layout.size(), VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT  | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT , VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+
+  _text_render_destriptor_layout.update_descriptors(_descriptor_buffer);
+  
+  _destructors.push([this] { _descriptor_buffer.destroy(); });
+
+  _device.create_shaders(
+  {
+    { _text_render_vert, VK_SHADER_STAGE_VERTEX_BIT,   "shader/text_render_vert.spv", { _text_render_destriptor_layout }, {} },
+    { _text_render_frag, VK_SHADER_STAGE_FRAGMENT_BIT, "shader/text_render_frag.spv", { _text_render_destriptor_layout }, {} },
+  }, true);
+
+  // create pipeline layout
+  _text_render_pipeline_layout = _device.create_pipeline_layout({ _text_render_destriptor_layout }, {});
+
+  // destroy resources
+  _destructors.push([&]
+  {
+    _text_render_destriptor_layout.destroy();
+    _text_render_pipeline_layout.destroy();
+    _text_render_frag.destroy();
+    _text_render_vert.destroy();
   });
 }
 

@@ -63,6 +63,8 @@ Image::Image(MemoryAllocator* allocator, VkFormat format, VkExtent3D extent, VkI
 {
   _allocator = allocator->get();
   _device    = allocator->device();
+  _format    = format;
+  _extent    = extent;
 
   VkImageCreateInfo image_info
   {
@@ -104,6 +106,7 @@ Image::Image(MemoryAllocator* allocator, VkFormat format, VkExtent3D extent, VkI
 
 void Image::set_layout(class Command const& cmd, VkImageLayout layout)
 {
+  if (_layout == layout) return;
   VkImageMemoryBarrier2 barrier
   {
     .sType            = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
@@ -164,9 +167,11 @@ void Image::clear(class Command const& cmd, VkClearColorValue value)
   vkCmdClearColorImage(cmd, _handle, VK_IMAGE_LAYOUT_GENERAL, &value, 1, &range);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+//                                 util
+////////////////////////////////////////////////////////////////////////////////
 
-// HACK: VkCmdCopyImage can be faster but most restriction such as src and dst are same format and extent. 
-void blit_image(Command const& cmd, Image const& src, Image const& dst)
+void blit(Command const& cmd, Image const& src, Image const& dst)
 {
   VkImageBlit2 blit
   { 
@@ -204,7 +209,7 @@ void blit_image(Command const& cmd, Image const& src, Image const& dst)
   vkCmdBlitImage2(cmd, &info);
 }
 
-void copy_image(Command const& cmd, Image const& src, Image const& dst)
+void copy(Command const& cmd, Image const& src, Image const& dst)
 {
   VkImageCopy2 region
   {
@@ -234,12 +239,48 @@ void copy_image(Command const& cmd, Image const& src, Image const& dst)
   vkCmdCopyImage2(cmd, &info);
 }
 
+void copy(Command const& cmd, Buffer const& src, Image& dst)
+{
+  dst.set_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  VkBufferImageCopy2 region
+  {
+    .sType            = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
+    .bufferOffset     = 0,
+    .imageSubresource =
+    {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .layerCount = 1,
+    },
+    .imageExtent = dst.extent3D(),
+  };
+  VkCopyBufferToImageInfo2 info
+  {
+    .sType          = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2,
+    .srcBuffer      = src.handle(),
+    .dstImage       = dst.handle(),
+    .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    .regionCount    = 1,
+    .pRegions       = &region,
+  };
+  vkCmdCopyBufferToImage2(cmd, &info);
+}
+
+void copy(void* data, Buffer const& buf, uint32_t offset, uint32_t size)
+{
+  throw_if(vmaCopyMemoryToAllocation(buf.allocator(), data, buf.allocation(), offset, size) != VK_SUCCESS,
+           "failed to copy data to upload buffer");
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //                              Memory Allocator
 ////////////////////////////////////////////////////////////////////////////////
 
 void MemoryAllocator::init(VkPhysicalDevice physical_device, VkDevice device, VkInstance instance, uint32_t vulkan_version)
 {
+  static bool only_one = true;
+  if (only_one) only_one = false;
+  else throw_if(true, "only single memory allocator be permitted");
+
   _device = device;
   VmaAllocatorCreateInfo alloc_info
   {

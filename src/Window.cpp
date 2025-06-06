@@ -16,6 +16,8 @@ auto Window::init(std::string_view title, uint32_t width, uint32_t height) -> Wi
   assert(first);
   if (first)  first = false;
 
+  assert(width > 0 && height > 0);
+
   SDL_Init(SDL_INIT_VIDEO);
 
   // Set SDL hint to receive mouse click events on window focus, otherwise SDL doesn't emit the event.

@@ -44,12 +44,17 @@ public:
     _right_lower = glm::vec2(p1.x, p2.y);
   }
 
+  auto click()
+  {
+    for (auto& p : _lps)  
+      p.run();
+  }
+
   auto button() -> bool
   {
     if (ui::click_area("test", _left_upper, _right_lower))
     {
-      for (auto& p : _lps)  
-        p.run();
+      click();
       return true;
     } 
     return false;

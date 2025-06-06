@@ -160,6 +160,13 @@ void GraphicsEngine::render_end()
   auto frame = get_current_frame();
 
   auto stages = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
+
+  // TODO: tmp, test, render text
+  auto shaders = std::vector<VkShaderEXT>{ _text_render_vert, _text_render_frag };
+  graphics_engine::vkCmdBindShadersEXT(frame.cmd, stages.size(), stages.data(), shaders.data());
+  bind_descriptor_buffer(frame.cmd, _descriptor_buffer.address(), VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT, _text_render_pipeline_layout, VK_PIPELINE_BIND_POINT_GRAPHICS);
+  vkCmdDraw(frame.cmd, 3, 1, 0, 0);
+
   graphics_engine::vkCmdBindShadersEXT(frame.cmd, stages.size(), stages.data(), nullptr);
 
   vkCmdEndRendering(frame.cmd);
@@ -174,10 +181,9 @@ void GraphicsEngine::update(std::span<glm::vec2> points, std::span<ShapeInfo> in
 
   throw_if(points_byte_size + shape_infos_byte_size > Buffer_Size, "buffer memory unenough!");
 
-  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), points.data(), _buffer.allocation(), Buffer_Size * _current_frame, points_byte_size) != VK_SUCCESS,
-           "failed to copy data to buffer");
-  throw_if(vmaCopyMemoryToAllocation(_mem_alloc.get(), infos.data(), _buffer.allocation(), Buffer_Size * _current_frame + points_byte_size, shape_infos_byte_size) != VK_SUCCESS,
-         "failed to copy data to buffer");
+  auto offset = Buffer_Size * _current_frame;
+  copy(points.data(), _buffer, offset,                    points_byte_size);
+  copy(infos.data(),  _buffer, offset + points_byte_size, shape_infos_byte_size);
 }
 
 void GraphicsEngine::render(uint32_t offset, uint32_t num)

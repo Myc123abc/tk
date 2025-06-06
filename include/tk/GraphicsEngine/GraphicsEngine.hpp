@@ -13,6 +13,8 @@
 
 #include <glm/glm.hpp>
 #include <SDL3/SDL_events.h>
+#include <ft2build.h>
+#include FT_FREETYPE_H
 
 #include <span>
 
@@ -73,6 +75,7 @@ namespace tk { namespace graphics_engine {
     void init_command_pool();
     void init_memory_allocator();
     void create_frame_resources();
+    void create_sampler();
 
     void create_sdf_rendering_resource();
 
@@ -92,15 +95,15 @@ namespace tk { namespace graphics_engine {
     // common resources
     //
     // HACK: expand to multi-windows manage, use WindowManager in future.
-    Window*                      _window          = nullptr;
-    VkInstance                   _instance        = VK_NULL_HANDLE;
-    VkDebugUtilsMessengerEXT     _debug_messenger = VK_NULL_HANDLE;
-    VkSurfaceKHR                 _surface         = VK_NULL_HANDLE;
-    VkPhysicalDevice             _physical_device = VK_NULL_HANDLE;
+    Window*                      _window          = {};
+    VkInstance                   _instance        = {};
+    VkDebugUtilsMessengerEXT     _debug_messenger = {};
+    VkSurfaceKHR                 _surface         = {};
+    VkPhysicalDevice             _physical_device = {};
     Device                       _device;
-    VkQueue                      _graphics_queue  = VK_NULL_HANDLE;
-    VkQueue                      _present_queue   = VK_NULL_HANDLE;
-    VkSwapchainKHR               _swapchain       = VK_NULL_HANDLE;
+    VkQueue                      _graphics_queue  = {};
+    VkQueue                      _present_queue   = {};
+    VkSwapchainKHR               _swapchain       = {};
     std::vector<Image>           _swapchain_images;
     CommandPool                  _command_pool;
     MemoryAllocator              _mem_alloc;
@@ -120,9 +123,9 @@ namespace tk { namespace graphics_engine {
     struct FrameResource
     {
       Command     cmd;
-      VkFence     fence       = VK_NULL_HANDLE;
-      VkSemaphore acquire_sem = VK_NULL_HANDLE;
-      VkSemaphore submit_sem  = VK_NULL_HANDLE;
+      VkFence     fence       = {};
+      VkSemaphore acquire_sem = {};
+      VkSemaphore submit_sem  = {};
     };
     std::vector<FrameResource> _frames;
     std::vector<VkSemaphore>   _submit_sems;
@@ -150,6 +153,19 @@ namespace tk { namespace graphics_engine {
       uint32_t        num     = {}; // number of shape infos
       glm::vec2       window_extent;
     };
+
+    //
+    // Text Render
+    //
+    FT_Library _ft_lib  = {};
+    FT_Face    _ft_face = {};
+    void load_font();
+    Image      _ft_image;
+    VkSampler  _sampler = {};
+    PipelineLayout   _text_render_pipeline_layout;
+    DescriptorLayout _text_render_destriptor_layout;
+    Shader           _text_render_vert, _text_render_frag;
+    Buffer     _descriptor_buffer;
   };
 
 }}

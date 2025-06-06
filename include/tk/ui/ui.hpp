@@ -131,6 +131,7 @@ void path_end(uint32_t color, uint32_t thickness = 0);
 //                                UI
 ////////////////////////////////////////////////////////////////////////////////
 
+// TODO: not perfect design when handle path draw
 /**
  * set current shape mix operation with next shape.
  * the final shape operation must be mix (default).

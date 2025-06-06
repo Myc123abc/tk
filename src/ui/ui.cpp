@@ -22,35 +22,35 @@ auto generate_id() -> uint32_t
 
 void begin(std::string_view name, glm::vec2 const& pos)
 {
-  auto& ctx = get_ctx();
+  auto ctx = get_ctx();
   
-  assert(ctx.begining == false);
-  ctx.begining = true;
+  assert(ctx->begining == false);
+  ctx->begining = true;
 
-  ctx.layouts.emplace(Layout{ name, pos });
+  ctx->layouts.emplace(Layout{ name, pos });
 
-  ctx.states.try_emplace(name.data(), std::vector<Widget>());
-  ctx.call_stack.try_emplace(name.data(), std::vector<std::string>());
+  ctx->states.try_emplace(name.data(), std::vector<Widget>());
+  ctx->call_stack.try_emplace(name.data(), std::vector<std::string>());
 }
 
 void end()
 {
-  assert(get_ctx().begining);
-  get_ctx().begining = false;
+  assert(get_ctx()->begining);
+  get_ctx()->begining = false;
 }
 
 void render()
 {
-  auto& ctx = get_ctx();
-  assert(ctx.engine && ctx.shape_infos.back().op == type::shape_op::mix);
+  auto ctx = get_ctx();
+  assert(ctx->engine && ctx->shape_infos.back().op == type::shape_op::mix);
 
-  ctx.engine->update(ctx.points, ctx.shape_infos);
-  ctx.engine->render(ctx.points.size() * 2, ctx.shape_infos.size());
-  ctx.points.clear();
-  ctx.shape_infos.clear();
+  ctx->engine->update(ctx->points, ctx->shape_infos);
+  ctx->engine->render(ctx->points.size() * 2, ctx->shape_infos.size());
+  ctx->points.clear();
+  ctx->shape_infos.clear();
 
-  while (!ctx.layouts.empty()) ctx.layouts.pop();
-  ctx.call_stack.clear();
+  while (!ctx->layouts.empty()) ctx->layouts.pop();
+  ctx->call_stack.clear();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -70,10 +70,10 @@ void shape(type::shape type, std::vector<glm::vec2> const& points, uint32_t colo
 {
   using enum type::shape;
 
-  auto& ctx = get_ctx();
+  auto ctx = get_ctx();
 
   // convert type when use path
-  if (ctx.path_begining)
+  if (ctx->path_begining)
   {
     if (type == line)
     {
@@ -86,21 +86,21 @@ void shape(type::shape type, std::vector<glm::vec2> const& points, uint32_t colo
   }
 
   // promise use ui::begin() and ui::path_begin() if use
-  assert(ctx.begining && ctx.path_begining ? type == line_partition || type == bezier_partition : true);
+  assert(ctx->begining && ctx->path_begining ? type == line_partition || type == bezier_partition : true);
   
   // get layout position
-  auto& pos = ctx.layouts.back().pos;
+  auto& pos = ctx->layouts.back().pos;
 
   // start index of points
-  uint32_t offset = ctx.points.size() * 2;
+  uint32_t offset = ctx->points.size() * 2;
 
   // add points
-  ctx.points.reserve(ctx.points.size() + points.size());
+  ctx->points.reserve(ctx->points.size() + points.size());
   for (auto& point : points) 
-    ctx.points.emplace_back(pos + point);
+    ctx->points.emplace_back(pos + point);
 
   // add shape info
-  ctx.shape_infos.emplace_back(ShapeInfo
+  ctx->shape_infos.emplace_back(ShapeInfo
   {
     .type      = type,
     .offset    = offset,
@@ -112,22 +112,22 @@ void shape(type::shape type, std::vector<glm::vec2> const& points, uint32_t colo
 
 void circle(glm::vec2 const& center, float radius, uint32_t color, uint32_t thickness)
 {
-  auto& ctx = get_ctx();
-  assert(ctx.begining && ctx.path_begining == false);
+  auto ctx = get_ctx();
+  assert(ctx->begining && ctx->path_begining == false);
   
-  auto& pos = ctx.layouts.back().pos;
+  auto& pos = ctx->layouts.back().pos;
 
-  uint32_t offset = ctx.points.size() * 2;
+  uint32_t offset = ctx->points.size() * 2;
 
-  ctx.points.reserve(ctx.points.size() + 2);
-  ctx.points.append_range(std::vector<glm::vec2>
+  ctx->points.reserve(ctx->points.size() + 2);
+  ctx->points.append_range(std::vector<glm::vec2>
   {
     pos + center,
-    glm::vec2(radius), // TODO: just for simply, store vec2(radius) rather than radius because ctx.points is vector<vec2>
+    glm::vec2(radius), // TODO: just for simply, store vec2(radius) rather than radius because ctx->points is vector<vec2>
   });
 
   // add shape info
-  ctx.shape_infos.emplace_back(ShapeInfo
+  ctx->shape_infos.emplace_back(ShapeInfo
   {
     .type      = type::shape::circle,
     .offset    = offset,
@@ -139,13 +139,13 @@ void circle(glm::vec2 const& center, float radius, uint32_t color, uint32_t thic
 
 void path_begin()
 {
-  auto& ctx = get_ctx();
-  assert(ctx.begining && ctx.path_begining == false);
-  ctx.path_begining = true;
+  auto ctx = get_ctx();
+  assert(ctx->begining && ctx->path_begining == false);
+  ctx->path_begining = true;
 
-  ctx.path_idx = ctx.shape_infos.size();
+  ctx->path_idx = ctx->shape_infos.size();
 
-  ctx.shape_infos.emplace_back(ShapeInfo
+  ctx->shape_infos.emplace_back(ShapeInfo
   {
     .type = type::shape::path,
   });
@@ -153,14 +153,14 @@ void path_begin()
 
 void path_end(uint32_t color, uint32_t thickness)
 {
-  auto& ctx = get_ctx();
-  assert(ctx.begining && ctx.path_begining);
-  ctx.path_begining = false;
+  auto ctx = get_ctx();
+  assert(ctx->begining && ctx->path_begining);
+  ctx->path_begining = false;
 
-  auto& info     = ctx.shape_infos[ctx.path_idx];
+  auto& info     = ctx->shape_infos[ctx->path_idx];
   info.color     = convert_color_format(color);
   info.thickness = thickness;
-  info.num       = ctx.shape_infos.size() - ctx.path_idx - 1;
+  info.num       = ctx->shape_infos.size() - ctx->path_idx - 1;
   assert(info.num != 0);
 }
 
@@ -170,9 +170,9 @@ void path_end(uint32_t color, uint32_t thickness)
 
 void set_operation(type::shape_op op)
 {
-  auto& ctx = get_ctx();
-  assert(ctx.begining);
-  ctx.shape_infos.back().op = op;
+  auto ctx = get_ctx();
+  assert(ctx->begining);
+  ctx->shape_infos.back().op = op;
 }
 
 auto get_bounding_rectangle(std::vector<glm::vec2> const& data) -> std::pair<glm::vec2, glm::vec2>
@@ -197,7 +197,7 @@ auto get_bounding_rectangle(std::vector<glm::vec2> const& data) -> std::pair<glm
 bool detect_mouse_on_button(std::vector<glm::vec2> const& data)
 {
   // get bounding rectangle
-  auto win_pos = get_ctx().layouts.back().pos;
+  auto win_pos = get_ctx()->layouts.back().pos;
   auto res     = get_bounding_rectangle(data);
   auto min     = res.first  + win_pos;
   auto max     = res.second + win_pos;
@@ -217,13 +217,13 @@ bool detect_mouse_on_button(std::vector<glm::vec2> const& data)
 
 bool click_area(std::string_view name, glm::vec2 const& pos0, glm::vec2 const& pos1)
 {
-  auto& ctx    = get_ctx();
-  auto& layout = ctx.layouts.back();
+  auto ctx    = get_ctx();
+  auto& layout = ctx->layouts.back();
 
   // detect whether already have same button
   {
     // get current layout's widgets name
-    auto& widgets = ctx.call_stack.at(layout.name.data());
+    auto& widgets = ctx->call_stack.at(layout.name.data());
     // have same button throw exception
     auto it = std::find_if(widgets.begin(), widgets.end(), [&](auto const& str) { return str == name; });
     if (it == widgets.end())
@@ -233,7 +233,7 @@ bool click_area(std::string_view name, glm::vec2 const& pos0, glm::vec2 const& p
   }
 
   // get widgets of current layout
-  auto& widgets = ctx.states.at(layout.name.data());
+  auto& widgets = ctx->states.at(layout.name.data());
   auto it = std::find_if(widgets.begin(), widgets.end(), [&](auto const& widget) { return widget.name == name; });
 
   Widget* widget{};
@@ -253,13 +253,13 @@ bool click_area(std::string_view name, glm::vec2 const& pos0, glm::vec2 const& p
     widget = &*it;
 
   auto detect_data = { pos0, { pos1.x, pos0.y }, pos1, { pos0.x, pos1.y } };
-  if (ctx.event_type == SDL_EVENT_MOUSE_BUTTON_DOWN && detect_mouse_on_button(detect_data))
+  if (ctx->event_type == SDL_EVENT_MOUSE_BUTTON_DOWN && detect_mouse_on_button(detect_data))
   {
     widget->first_click = true;
     return false;
   }
 
-  if (widget->first_click && ctx.event_type == SDL_EVENT_MOUSE_BUTTON_UP)
+  if (widget->first_click && ctx->event_type == SDL_EVENT_MOUSE_BUTTON_UP)
   {
     widget->first_click = false;
     if (detect_mouse_on_button(detect_data))
@@ -273,13 +273,13 @@ bool click_area(std::string_view name, glm::vec2 const& pos0, glm::vec2 const& p
 
 bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> const& data, uint32_t color, uint32_t thickness)
 {
-  auto& ctx    = get_ctx();
-  auto& layout = ctx.layouts.back();
+  auto ctx    = get_ctx();
+  auto& layout = ctx->layouts.back();
 
   // detect whether already have same button
   {
     // get current layout's widgets name
-    auto& widgets = ctx.call_stack.at(layout.name.data());
+    auto& widgets = ctx->call_stack.at(layout.name.data());
     // have same button throw exception
     auto it = std::find_if(widgets.begin(), widgets.end(), [&](auto const& str) { return str == name; });
     if (it == widgets.end())
@@ -289,7 +289,7 @@ bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> con
   }
 
   // get widgets of current layout
-  auto& widgets = ctx.states.at(layout.name.data());
+  auto& widgets = ctx->states.at(layout.name.data());
   auto it = std::find_if(widgets.begin(), widgets.end(), [&](auto const& widget) { return widget.name == name; });
 
   Widget* widget{};
@@ -345,13 +345,13 @@ bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> con
     break;
   }
 
-  if (ctx.event_type == SDL_EVENT_MOUSE_BUTTON_DOWN && detect_mouse_on_button(detect_data))
+  if (ctx->event_type == SDL_EVENT_MOUSE_BUTTON_DOWN && detect_mouse_on_button(detect_data))
   {
     widget->first_click = true;
     return false;
   }
 
-  if (widget->first_click && ctx.event_type == SDL_EVENT_MOUSE_BUTTON_UP)
+  if (widget->first_click && ctx->event_type == SDL_EVENT_MOUSE_BUTTON_UP)
   {
     widget->first_click = false;
     if (detect_mouse_on_button(detect_data))

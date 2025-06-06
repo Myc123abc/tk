@@ -46,21 +46,10 @@ struct ui_context
   uint32_t path_idx      = {};
 };
 
-inline auto& get_ctx()
+inline auto get_ctx()
 {
   static auto ctx = new ui_context();
-  return *ctx;
-}
-
-inline void destroy()
-{
-  auto& ctx = get_ctx();
-  while (!ctx.layouts.empty()) ctx.layouts.pop();
-  ctx.points.clear();
-  ctx.shape_infos.clear();
-  ctx.states.clear();
-  ctx.call_stack.clear();
-  delete &ctx;
+  return ctx;
 }
 
 void render();
