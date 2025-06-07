@@ -159,7 +159,6 @@ namespace tk { namespace graphics_engine {
     // Text Render
     //
     VkSampler  _sampler = {};
-    void load_font();
 #if FREETYPE_USE
     FT_Library _ft_lib  = {};
     FT_Face    _ft_face = {};

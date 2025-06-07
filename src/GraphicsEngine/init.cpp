@@ -2,12 +2,11 @@
 #include "init-util.hpp"
 #include "tk/GraphicsEngine/vk_extension.hpp"
 
+#include "tk/ui/Font.hpp"
+
 #include <ranges>
 #include <set>
 #include <print>
-
-#include <msdfgen.h>
-#include <msdfgen-ext.h>
 
 namespace tk { namespace graphics_engine { 
 
@@ -38,7 +37,8 @@ void GraphicsEngine::init(Window& window)
   create_buffer();
   create_sdf_rendering_resource();
 
-  load_font();
+  ui::Font font;
+  font.init("resources/SourceCodePro-Regular.ttf");
 
   _window->show();
 }
@@ -460,29 +460,6 @@ void GraphicsEngine::create_sampler()
   throw_if(vkCreateSampler(_device, &sampler_info, nullptr, &_sampler) != VK_SUCCESS,
            "failed to create smaa sampler");
   _destructors.push([&] { vkDestroySampler(_device, _sampler, nullptr); });
-}
-
-void GraphicsEngine::load_font()
-{
-  using namespace msdfgen;
-    if (FreetypeHandle *ft = initializeFreetype()) {
-        if (FontHandle *font = loadFont(ft, "C:\\Windows\\Fonts\\arialbd.ttf")) {
-            Shape shape;
-            if (loadGlyph(shape, font, 'A', FONT_SCALING_EM_NORMALIZED)) {
-                shape.normalize();
-                //                      max. angle
-                edgeColoringSimple(shape, 3.0);
-                //          output width, height
-                Bitmap<float, 3> msdf(32, 32);
-                //                            scale, translation (in em's)
-                SDFTransformation t(Projection(32.0, Vector2(0.125, 0.125)), Range(0.125));
-                generateMSDF(msdf, shape, t);
-                //savePng(msdf, "output.png");
-            }
-            destroyFont(font);
-        }
-        deinitializeFreetype(ft);
-    }
 }
 
 #if FREETYPE_USE

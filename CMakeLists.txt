@@ -42,6 +42,8 @@ FetchContent_Declare(
   GIT_TAG        master 
 )
 
+# when build system is not visual studio, it maybe error because of rc file
+# just clear the content of rc file and build again, it's ok
 FetchContent_Declare(
   freetype
   GIT_REPOSITORY https://gitlab.freedesktop.org/freetype/freetype.git
