@@ -13,6 +13,7 @@ TODO:
 * consider depth, 3D, light, particle effects, physics collision, etc.
 
 ## Third Party
+* https://github.com/g-truc/glm (MIT)
 * https://github.com/KhronosGroup/Vulkan-Headers (Apache-2.0)
 * https://github.com/libsdl-org/SDL (Zlib)
 * https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator (MIT)

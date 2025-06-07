@@ -9,7 +9,7 @@
 #include "MemoryAllocator.hpp"
 #include "CommandPool.hpp"
 #include "Device.hpp"
-#include "../type.hpp"
+#include "tk/type.hpp"
 
 #include <glm/glm.hpp>
 #include <SDL3/SDL_events.h>

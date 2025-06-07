@@ -8,7 +8,7 @@ namespace tk { namespace ui {
 
 void Font::init(std::filesystem::path const& path)
 {
-  throw_if(!std::filesystem::exists(path), "{} not exist");
+  throw_if(!std::filesystem::exists(path), "{} is not exist", path.string());
 
   auto ft = msdfgen::initializeFreetype();
   throw_if(!ft, "failed to init freetype");

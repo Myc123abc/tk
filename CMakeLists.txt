@@ -15,103 +15,83 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 ################################################################################
 
 if(WIN32)
-find_package(Vulkan REQUIRED)
-# avoid vma use MTd_StaticDebug but msdfgen use MDd_DynamicDebug
-set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  find_package(Vulkan REQUIRED)
+  # avoid vma use MTd_StaticDebug but msdfgen use MDd_DynamicDebug
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
 set(SDL_SHARED OFF)
 set(SDL_STATIC ON)
 set(SDL_TEST_LIBRARY OFF)
+set(SDL_AUDIO OFF)
+set(SDL_VIDEO ON)
+set(SDL_GPU OFF)
+set(SDL_RENDER OFF)
+set(SDL_CAMERA OFF)
+set(SDL_JOYSTICK OFF)
+set(SDL_HAPTIC OFF)
+set(SDL_HIDAPI OFF)
+set(SDL_POWER OFF)
+set(SDL_SENSOR OFF)
+set(SDL_DIALOG OFF)
+
 set(MSDF_ATLAS_BUILD_STANDALONE OFF)
 set(MSDF_ATLAS_USE_VCPKG OFF)
 set(MSDF_ATLAS_USE_SKIA OFF)
 set(MSDFGEN_DISABLE_PNG ON)
 
-include(FetchContent)
+add_subdirectory(vendor/glm)
+add_subdirectory(vendor/SDL)
+add_subdirectory(vendor/vma)
+add_subdirectory(vendor/freetype)
 
-FetchContent_Declare(
-  SDL3 
-  GIT_REPOSITORY https://github.com/libsdl-org/SDL
-  GIT_TAG        main 
-)
+# when generator not vs, ftver.rc which in freetype will be built fail
+if (NOT "${CMAKE_GENERATOR}" MATCHES "Visual Studio")
+  file(WRITE vendor/freetype/src/base/ftver.rc "")
+endif()
 
-FetchContent_Declare(
-  VMA
-  GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
-  GIT_TAG        master 
-)
-
-# when build system is not visual studio, it maybe error because of rc file
-# just clear the content of rc file and build again, it's ok
-FetchContent_Declare(
-  freetype
-  GIT_REPOSITORY https://gitlab.freedesktop.org/freetype/freetype.git
-  GIT_TAG        master
-  OVERRIDE_FIND_PACKAGE
-)
-
-FetchContent_Declare(
-  msdf-atlas-gen
-  GIT_REPOSITORY https://github.com/Chlumsky/msdf-atlas-gen.git
-  GIT_TAG        master
-)
-
-FetchContent_MakeAvailable(SDL3 VMA freetype msdf-atlas-gen)
-
+# msdfgen only have find_package(Freetype::Freetype)
+# we need alias freetype to Freetype::Freetype
 if(TARGET freetype AND NOT TARGET Freetype::Freetype)
   add_library(Freetype::Freetype ALIAS freetype)
   message(STATUS "Created ALIAS Freetype::Freetype pointing to actual 'freetype' library.")
 endif()
 
+add_subdirectory(vendor/msdf-atlas-gen)
+
 ################################################################################
 #                               Build Static Library 
 ################################################################################
 
-set(INCLUDE
-  include
-)
-
 file(GLOB_RECURSE SOURCE src/*.cpp)
-
-if(WIN32)
-  set(LIBS
-    SDL3::SDL3-static
-    GPUOpen::VulkanMemoryAllocator
-    msdf-atlas-gen
-  )
-elseif(UNIX)
-  set(LIBS
-    vulkan
-    dl
-    pthread
-    X11
-    Xxf86vm
-    Xrandr
-    Xi
-    SDL3::SDL3-static
-    GPUOpen::VulkanMemoryAllocator
-    msdf-atlas-gen
-  )
-endif()
-
 add_library(tk STATIC ${SOURCE})
 
-target_include_directories(tk PUBLIC ${INCLUDE})
+target_include_directories(tk
+  PUBLIC
+    interface
+    ${glm_SOURCE_DIR}
+  PRIVATE
+    include
+    ${Vulkan_INCLUDE_DIRS}
+)
 
-target_link_libraries(tk PUBLIC ${LIBS})
+target_link_libraries(tk
+  PUBLIC
+    SDL3::SDL3-static
+    ${Vulkan_LIBRARIES}
+    GPUOpen::VulkanMemoryAllocator
+    msdf-atlas-gen
+)
+
+target_link_directories(tk
+  PRIVATE
+    ${Vulkan_LIBRARIES}
+)
 
 target_compile_definitions(tk PUBLIC 
   GLM_FORCE_DEPTH_ZERO_TO_ONE
   GLM_FORCE_RADIANS
 )
-
-if(WIN32)
-
-target_include_directories(tk PUBLIC ${Vulkan_INCLUDE_DIRS})
-target_link_libraries(tk PUBLIC ${Vulkan_LIBRARIES})
-
-endif()
 
 ################################################################################
 #                              Example 
