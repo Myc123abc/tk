@@ -13,10 +13,11 @@
 
 #include <glm/glm.hpp>
 #include <SDL3/SDL_events.h>
-#include <ft2build.h>
-#include FT_FREETYPE_H
 
 #include <span>
+
+// TODO: these should be delete after implement text rendering based on msdf-atlas-gen
+#define FREETYPE_USE 0
 
 namespace tk { namespace graphics_engine {
 
@@ -157,15 +158,21 @@ namespace tk { namespace graphics_engine {
     //
     // Text Render
     //
+    VkSampler  _sampler = {};
+    void load_font();
+#if FREETYPE_USE
     FT_Library _ft_lib  = {};
     FT_Face    _ft_face = {};
-    void load_font();
     Image      _ft_image;
-    VkSampler  _sampler = {};
+    Buffer     _descriptor_buffer;
     PipelineLayout   _text_render_pipeline_layout;
     DescriptorLayout _text_render_destriptor_layout;
     Shader           _text_render_vert, _text_render_frag;
-    Buffer     _descriptor_buffer;
+    struct PushConstant_text_render
+    {
+      glm::vec4 color;
+    };
+#endif
   };
 
 }}

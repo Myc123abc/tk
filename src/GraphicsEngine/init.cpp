@@ -6,6 +6,9 @@
 #include <set>
 #include <print>
 
+#include <msdfgen.h>
+#include <msdfgen-ext.h>
+
 namespace tk { namespace graphics_engine { 
 
 void GraphicsEngine::init(Window& window)
@@ -461,6 +464,30 @@ void GraphicsEngine::create_sampler()
 
 void GraphicsEngine::load_font()
 {
+  using namespace msdfgen;
+    if (FreetypeHandle *ft = initializeFreetype()) {
+        if (FontHandle *font = loadFont(ft, "C:\\Windows\\Fonts\\arialbd.ttf")) {
+            Shape shape;
+            if (loadGlyph(shape, font, 'A', FONT_SCALING_EM_NORMALIZED)) {
+                shape.normalize();
+                //                      max. angle
+                edgeColoringSimple(shape, 3.0);
+                //          output width, height
+                Bitmap<float, 3> msdf(32, 32);
+                //                            scale, translation (in em's)
+                SDFTransformation t(Projection(32.0, Vector2(0.125, 0.125)), Range(0.125));
+                generateMSDF(msdf, shape, t);
+                //savePng(msdf, "output.png");
+            }
+            destroyFont(font);
+        }
+        deinitializeFreetype(ft);
+    }
+}
+
+#if FREETYPE_USE
+void GraphicsEngine::load_font()
+{
   auto path = "resources/SourceCodePro-Regular.ttf";
 
   // init freetype
@@ -469,8 +496,14 @@ void GraphicsEngine::load_font()
   // load font
   throw_if(FT_New_Face(_ft_lib, path, 0, &_ft_face), "failed to load font {}", path);
 
+  _window->get_dpi();
+
   // set pixel size
-  throw_if(FT_Set_Pixel_Sizes(_ft_face, 0, 96), "failed to set pixel size in freetype");
+  auto point_size = 42.52;
+  auto pixel_size = point_size * _window->get_dpi() / 72;
+  // pixel_size = point_size * resolution / 72
+  // pixel_coord = grid_coord * pixel_size / EM_size
+  throw_if(FT_Set_Char_Size(_ft_face, 0, point_size * 72, 200, 200), "failed to set pixel size in freetype");
 
   // load character
   char character = 'g';
@@ -505,6 +538,12 @@ void GraphicsEngine::load_font()
   /////////////////
   // shaders
   /////////////////
+  auto pc = VkPushConstantRange
+  {
+    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+    .size       = sizeof(PushConstant_text_render),
+  };
+
   _text_render_destriptor_layout = _device.create_descriptor_layout(
   {
     { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, _ft_image.view(), _sampler }
@@ -533,12 +572,12 @@ void GraphicsEngine::load_font()
 
   _device.create_shaders(
   {
-    { _text_render_vert, VK_SHADER_STAGE_VERTEX_BIT,   "shader/text_render_vert.spv", { _text_render_destriptor_layout }, {} },
-    { _text_render_frag, VK_SHADER_STAGE_FRAGMENT_BIT, "shader/text_render_frag.spv", { _text_render_destriptor_layout }, {} },
+    { _text_render_vert, VK_SHADER_STAGE_VERTEX_BIT,   "shader/text_render_vert.spv", { _text_render_destriptor_layout }, { pc } },
+    { _text_render_frag, VK_SHADER_STAGE_FRAGMENT_BIT, "shader/text_render_frag.spv", { _text_render_destriptor_layout }, { pc } },
   }, true);
 
   // create pipeline layout
-  _text_render_pipeline_layout = _device.create_pipeline_layout({ _text_render_destriptor_layout }, {});
+  _text_render_pipeline_layout = _device.create_pipeline_layout({ _text_render_destriptor_layout }, { pc });
 
   // destroy resources
   _destructors.push([&]
@@ -549,5 +588,6 @@ void GraphicsEngine::load_font()
     _text_render_vert.destroy();
   });
 }
+#endif
 
 } }

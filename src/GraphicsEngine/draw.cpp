@@ -149,8 +149,21 @@ void GraphicsEngine::set_pipeline_state(Command const& cmd)
   vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
   vkCmdSetPrimitiveRestartEnable(cmd, VK_FALSE);
   graphics_engine::vkCmdSetVertexInputEXT(cmd, 0, nullptr, 0, nullptr);
-  VkBool32 color_blend_enables{ VK_FALSE };
+  VkBool32 color_blend_enables{ VK_TRUE };
   graphics_engine::vkCmdSetColorBlendEnableEXT(cmd, 0, 1, &color_blend_enables);
+  if (color_blend_enables)
+  {
+    VkColorBlendEquationEXT blend_op
+    {
+      .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+      .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+      .colorBlendOp        = VK_BLEND_OP_ADD,
+      .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+      .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+      .alphaBlendOp        = VK_BLEND_OP_ADD,
+    };
+    graphics_engine::vkCmdSetColorBlendEquationEXT(cmd, 0, 1, &blend_op);
+  }
   VkColorComponentFlags color_write_mask{ VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT };
   graphics_engine::vkCmdSetColorWriteMaskEXT(cmd, 0, 1, &color_write_mask);
 }
@@ -161,16 +174,21 @@ void GraphicsEngine::render_end()
 
   auto stages = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
 
+#if FREETYPE_USE
   // TODO: tmp, test, render text
   auto shaders = std::vector<VkShaderEXT>{ _text_render_vert, _text_render_frag };
   graphics_engine::vkCmdBindShadersEXT(frame.cmd, stages.size(), stages.data(), shaders.data());
   bind_descriptor_buffer(frame.cmd, _descriptor_buffer.address(), VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT, _text_render_pipeline_layout, VK_PIPELINE_BIND_POINT_GRAPHICS);
-  //vkCmdDraw(frame.cmd, 3, 1, 0, 0);
+  auto pc = PushConstant_text_render
+  {
+    .color = glm::vec4(0.0, 1.0, 0.0, 1.0),
+  };
+  vkCmdPushConstants(frame.cmd, _sdf_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+  vkCmdDraw(frame.cmd, 3, 1, 0, 0);
+#endif
 
   graphics_engine::vkCmdBindShadersEXT(frame.cmd, stages.size(), stages.data(), nullptr);
-
   vkCmdEndRendering(frame.cmd);
-
   frame_end();
 }
 

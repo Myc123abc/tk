@@ -3,14 +3,8 @@
 //
 // only can generate single window
 //
-// TODO:
-// expand to window manager
-// one init sdl3, multi-generate windows
-//
-// HACK:
-// 1. on windows, event loop resize event only tringle once, use callback system is normal...
-// 2. in wayland, sdl3 defaul use x11, which resize window is suck.
-//    forcely use wayland the framebuffer size return 16384x16384 out of device memory...
+// use SDL_GetDisplayContentScale can get display scale, and have SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED event
+// but I don't care scale ui. I want to keep ui size in different scale
 //
 
 #pragma once
@@ -21,6 +15,8 @@
 #include <string_view>
 
 struct SDL_Window;
+
+#define GET_DPI_IMPL 0
 
 namespace tk {
 
@@ -49,6 +45,10 @@ namespace tk {
     static auto get_vulkan_instance_extensions() -> std::vector<const char*>;
 
     auto get() const noexcept { return _window; }
+
+#if GET_DPI_IMPL
+    auto get_dpi() const noexcept -> uint32_t;
+#endif
 
   private:
     SDL_Window* _window;

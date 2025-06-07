@@ -1,4 +1,4 @@
-cmake -GNinja -Bbuild .
+cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -GNinja -Bbuild .
 cmake --build build
 
 md .\build\example\shader

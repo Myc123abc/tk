@@ -23,5 +23,6 @@ inline PFN_vkCmdSetAlphaToCoverageEnableEXT         vkCmdSetAlphaToCoverageEnabl
 inline PFN_vkCmdSetVertexInputEXT                   vkCmdSetVertexInputEXT{};
 inline PFN_vkCmdSetColorBlendEnableEXT              vkCmdSetColorBlendEnableEXT{};
 inline PFN_vkCmdSetColorWriteMaskEXT                vkCmdSetColorWriteMaskEXT{};
+inline PFN_vkCmdSetColorBlendEquationEXT            vkCmdSetColorBlendEquationEXT{};
 
 }}

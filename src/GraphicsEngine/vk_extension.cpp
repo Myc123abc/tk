@@ -51,6 +51,7 @@ void GraphicsEngine::load_device_extension_funcs()
   load_device_ext_func(_device, vkCmdSetVertexInputEXT);
   load_device_ext_func(_device, vkCmdSetColorBlendEnableEXT);
   load_device_ext_func(_device, vkCmdSetColorWriteMaskEXT);
+  load_device_ext_func(_device, vkCmdSetColorBlendEquationEXT);
 }
 
 }}
