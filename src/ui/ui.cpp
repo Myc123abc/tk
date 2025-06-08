@@ -196,6 +196,7 @@ auto get_bounding_rectangle(std::vector<glm::vec2> const& data) -> std::pair<glm
 
 bool detect_mouse_on_button(std::vector<glm::vec2> const& data)
 {
+  auto ctx = get_ctx();
   // get bounding rectangle
   auto win_pos = get_ctx()->layouts.back().pos;
   auto res     = get_bounding_rectangle(data);
@@ -203,12 +204,11 @@ bool detect_mouse_on_button(std::vector<glm::vec2> const& data)
   auto max     = res.second + win_pos;
 
   // get mouse pos
-  float x, y;
-  SDL_GetMouseState(&x, &y);  
+  auto cursor_pos = ctx->window->get_cursor_position();
 
   // detect whether mouse on button
-  if (x > min.x && y > min.y &&
-      x < max.x && y < max.y)
+  if (cursor_pos.x > min.x && cursor_pos.y > min.y &&
+      cursor_pos.x < max.x && cursor_pos.y < max.y)
   {
     return true;
   }
@@ -253,13 +253,14 @@ bool click_area(std::string_view name, glm::vec2 const& pos0, glm::vec2 const& p
     widget = &*it;
 
   auto detect_data = { pos0, { pos1.x, pos0.y }, pos1, { pos0.x, pos1.y } };
-  if (ctx->event_type == SDL_EVENT_MOUSE_BUTTON_DOWN && detect_mouse_on_button(detect_data))
+  auto mouse_state = ctx->window->get_mouse_state();
+  if (mouse_state == type::mouse::left_down && detect_mouse_on_button(detect_data))
   {
     widget->first_click = true;
     return false;
   }
 
-  if (widget->first_click && ctx->event_type == SDL_EVENT_MOUSE_BUTTON_UP)
+  if (widget->first_click && mouse_state == type::mouse::left_up)
   {
     widget->first_click = false;
     if (detect_mouse_on_button(detect_data))
@@ -345,13 +346,14 @@ bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> con
     break;
   }
 
-  if (ctx->event_type == SDL_EVENT_MOUSE_BUTTON_DOWN && detect_mouse_on_button(detect_data))
+  auto mouse_state = ctx->window->get_mouse_state();
+  if (mouse_state == type::mouse::left_down && detect_mouse_on_button(detect_data))
   {
     widget->first_click = true;
     return false;
   }
 
-  if (widget->first_click && ctx->event_type == SDL_EVENT_MOUSE_BUTTON_UP)
+  if (widget->first_click && mouse_state == type::mouse::left_up)
   {
     widget->first_click = false;
     if (detect_mouse_on_button(detect_data))

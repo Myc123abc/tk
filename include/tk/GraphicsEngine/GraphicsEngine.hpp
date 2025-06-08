@@ -12,7 +12,6 @@
 #include "tk/type.hpp"
 
 #include <glm/glm.hpp>
-#include <SDL3/SDL_events.h>
 
 #include <span>
 

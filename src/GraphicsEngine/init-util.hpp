@@ -367,10 +367,8 @@ struct SwapChainSupportDetails
     if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
       return capabilities.currentExtent;
   
-    uint32_t width, height;
-    window.get_framebuffer_size(width, height);
-  
-    VkExtent2D actual_extent{ width, height };
+    auto size = window.get_framebuffer_size();
+    VkExtent2D actual_extent{ static_cast<uint32_t>(size.x), static_cast<uint32_t>(size.y) };
   
     actual_extent.width = std::clamp(actual_extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
     actual_extent.height = std::clamp(actual_extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);

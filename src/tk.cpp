@@ -20,16 +20,13 @@
 using namespace tk;
 using namespace tk::graphics_engine;
 
-////////////////////////////////////////////////////////////////////////////////
-//                           tk context
-////////////////////////////////////////////////////////////////////////////////
+namespace tk 
+{
 
 struct tk_context
 {
   Window         window;
   GraphicsEngine engine;
-
-  bool           resize    = false;
 
   ~tk_context()
   {
@@ -41,7 +38,7 @@ struct tk_context
 static tk_context* tk_ctx = {};
 extern struct ui_context ui_ctx;
 
-void tk::init_tk_context(std::string_view title, uint32_t width, uint32_t height)
+void tk_init(std::string_view title, uint32_t width, uint32_t height)
 {
   tk_ctx = new tk_context();
 
@@ -52,59 +49,67 @@ void tk::init_tk_context(std::string_view title, uint32_t width, uint32_t height
   // TODO: currently only use main window for entire ui
   ui::get_ctx()->window_extent = { width, height };
   ui::get_ctx()->engine        = &tk_ctx->engine;
+  ui::get_ctx()->window        = &tk_ctx->window;
 }
 
-auto tk::get_main_window_extent() -> glm::vec2
+void tk_poll_events()
 {
-  uint32_t width, height;
-  tk_ctx->window.get_framebuffer_size(width, height);
-  return { width, height };
+  poll_events();
 }
 
-bool tk::tk_resize()
+auto get_main_window_extent() -> glm::vec2
 {
+  return tk_ctx->window.get_framebuffer_size();
+}
+
+auto tk_event_process() -> type::window
+{
+  using enum type::window;
+
+  auto& win = tk_ctx->window;
   auto ui_ctx = ui::get_ctx();
 
-  // update window size
-  uint32_t width, height;
-  tk_ctx->window.get_framebuffer_size(width, height);
-  ui_ctx->window_extent = { width, height };
+  if (win.is_closed())
+    return closed;
 
-  if (tk_ctx->resize)
+  ui_ctx->window_extent = win.get_framebuffer_size();
+  
+  if (ui_ctx->window_extent.x == 0 || ui_ctx->window_extent.y == 0)
   {
-    if (width == 0 || height == 0)
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    return suspended;
+  }
+  
+  if (win.is_resized())
+  {
+    if (ui_ctx->window_extent.x == 0 || ui_ctx->window_extent.y == 0)
     {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      return true;
+      return suspended;
     }
     tk_ctx->engine.resize_swapchain();
-    tk_ctx->resize = false;
   }
-  return false;
+
+  if (win.is_minimized())
+  {
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    return suspended;
+  }
+
+  return running;
 }
 
-void tk::tk_render()
+void tk_render()
 {
-  // render ui
   tk_ctx->engine.render_begin();
   ui::render();
   tk_ctx->engine.render_end();
-
-  ui::get_ctx()->event_type = {};
 }
 
-void tk::tk_set_resize()
-{
-  tk_ctx->resize = true;
-}
-
-void tk::tk_set_event(SDL_Event* event)
-{
-  ui::get_ctx()->event_type = event->type;
-}
-
-void tk::tk_quit()
+void tk_destroy()
 {
   delete ui::get_ctx();
   delete tk_ctx;
+}
+
 }

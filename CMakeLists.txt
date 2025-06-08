@@ -20,20 +20,8 @@ if(WIN32)
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
-set(SDL_SHARED ON)
-set(SDL_STATIC OFF)
-set(SDL_TEST_LIBRARY OFF)
-set(SDL_AUDIO OFF)
-set(SDL_VIDEO ON)
-set(SDL_GPU OFF)
-set(SDL_RENDER OFF)
-set(SDL_CAMERA OFF)
-set(SDL_JOYSTICK OFF)
-set(SDL_HAPTIC OFF)
-set(SDL_HIDAPI OFF)
-set(SDL_POWER OFF)
-set(SDL_SENSOR OFF)
-set(SDL_DIALOG OFF)
+set(GLFW_BUILD_DOCS OFF)
+set(GLFW_INSTALL OFF)
 
 set(MSDF_ATLAS_BUILD_STANDALONE OFF)
 set(MSDF_ATLAS_USE_VCPKG OFF)
@@ -41,14 +29,13 @@ set(MSDF_ATLAS_USE_SKIA OFF)
 set(MSDFGEN_DISABLE_PNG ON)
 
 add_subdirectory(vendor/glm)
-add_subdirectory(vendor/SDL)
+add_subdirectory(vendor/glfw)
 add_subdirectory(vendor/vma)
 add_subdirectory(vendor/freetype)
 
 # when generator not vs, rc files will be built fail
 if (NOT "${CMAKE_GENERATOR}" MATCHES "Visual Studio")
   file(WRITE vendor/freetype/src/base/ftver.rc "")
-  file(WRITE vendor/sdl/src/core/windows/version.rc "")
 endif()
 
 # msdfgen only have find_package(Freetype::Freetype)
@@ -70,16 +57,14 @@ add_library(tk SHARED ${SOURCE})
 target_include_directories(tk
   PUBLIC
     interface
-    ${glm_SOURCE_DIR}
   PRIVATE
     include
     ${Vulkan_INCLUDE_DIRS}
 )
 
 target_link_libraries(tk
-  PUBLIC
-    SDL3::SDL3-shared
   PRIVATE
+    glfw
     ${Vulkan_LIBRARIES}
     GPUOpen::VulkanMemoryAllocator
     msdf-atlas-gen
@@ -90,10 +75,11 @@ target_link_directories(tk
     ${Vulkan_LIBRARIES}
 )
 
-target_compile_definitions(tk PUBLIC
-  SHARED_TK
-  GLM_FORCE_DEPTH_ZERO_TO_ONE
-  GLM_FORCE_RADIANS
+target_compile_definitions(tk
+  PRIVATE
+    SHARED_TK
+    GLM_FORCE_DEPTH_ZERO_TO_ONE
+    GLM_FORCE_RADIANS
 )
 
 ################################################################################

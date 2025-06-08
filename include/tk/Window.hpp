@@ -9,16 +9,21 @@
 
 #pragma once
 
-#include <vulkan/vulkan.h>
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
 
+#include "tk/type.hpp"
 #include <vector>
 #include <string_view>
 
-struct SDL_Window;
-
-#define GET_DPI_IMPL 0
+#include <glm/glm.hpp>
 
 namespace tk {
+
+  inline void poll_events()
+  {
+    glfwPollEvents();
+  }
 
   class Window
   {
@@ -36,22 +41,39 @@ namespace tk {
 
     auto show() -> Window&;
 
-    auto create_surface(VkInstance instance)                     const -> VkSurfaceKHR;
-    void get_framebuffer_size(uint32_t& width, uint32_t& height) const;
-    void get_screen_size(uint32_t& width, uint32_t& height)      const;
-    auto is_closed()                                             const -> int;
+    auto create_surface(VkInstance instance) const -> VkSurfaceKHR;
+
+    auto get_framebuffer_size() const -> glm::vec2;
     
     static void process_events();
     static auto get_vulkan_instance_extensions() -> std::vector<const char*>;
 
     auto get() const noexcept { return _window; }
 
-#if GET_DPI_IMPL
-    auto get_dpi() const noexcept -> uint32_t;
-#endif
+    auto get_cursor_position() const noexcept -> glm::vec2;
+
+    auto get_mouse_state() const noexcept -> type::mouse;
+
+    auto is_closed() const noexcept
+    {
+      return glfwWindowShouldClose(_window);
+    }
+
+    auto is_resized() noexcept -> bool;
+
+    auto is_minimized() const noexcept
+    {
+      return glfwGetWindowAttrib(_window, GLFW_ICONIFIED);
+    }
+
+    auto is_maximized() const noexcept
+    {
+      return glfwGetWindowAttrib(_window, GLFW_MAXIMIZED);
+    }
 
   private:
-    SDL_Window* _window;
+    GLFWwindow* _window{};
+    uint32_t    _width{}, _height{};
   };
 
 }

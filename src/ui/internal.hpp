@@ -22,22 +22,20 @@ struct Layout
 {
   std::string_view name;
   glm::vec2        pos;
-  //std::vector<graphics_engine::ShapeInfo> shape_infos;
 };
 
 struct ui_context
 {
-  bool               begining = {};
+  bool               begining{};
   std::queue<Layout> layouts;
   // TODO: currently, only single main window is being use
   glm::vec2          window_extent;
 
-  graphics_engine::GraphicsEngine* engine = {};
+  graphics_engine::GraphicsEngine* engine{};
+  Window*                          window{};
 
   std::vector<glm::vec2> points;
   std::vector<graphics_engine::ShapeInfo> shape_infos;
-
-  uint32_t event_type{};
 
   std::unordered_map<std::string, std::vector<Widget>>      states;
   std::unordered_map<std::string, std::vector<std::string>> call_stack;

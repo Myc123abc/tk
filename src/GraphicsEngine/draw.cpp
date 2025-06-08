@@ -2,10 +2,11 @@
 #include "tk/ErrorHandling.hpp"
 #include "tk/GraphicsEngine/vk_extension.hpp"
 
-#include <SDL3/SDL_events.h>
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace tk { namespace graphics_engine {
+
+auto get_cursor_position() -> glm::vec2;
 
 auto GraphicsEngine::frame_begin() -> FrameResource*
 {
@@ -201,15 +202,13 @@ void GraphicsEngine::render(uint32_t offset, uint32_t num)
 {
   auto cmd = get_current_frame().cmd;
 
-  uint32_t w, h;
-  _window->get_framebuffer_size(w, h);
   auto pc = PushConstant_SDF
   {
     .address       = _buffers[_current_frame].address(),
     // this offset is not byte offset, is float offset
     .offset        = offset,
     .num           = num,
-    .window_extent = { w, h },  
+    .window_extent = _window->get_framebuffer_size(),
   };
 
   vkCmdPushConstants(cmd, _sdf_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);

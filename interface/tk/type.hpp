@@ -22,4 +22,17 @@ namespace tk { namespace type {
     min,
   };
 
+  enum class mouse
+  {
+    left_down,
+    left_up,
+  };
+
+  enum class window
+  {
+    running,
+    closed,
+    suspended,
+  };
+
 }}

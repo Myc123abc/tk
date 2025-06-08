@@ -15,3 +15,6 @@ glslc -fshader-stage=vertex   shader/text_render.vert -o shader/text_render_vert
 glslc -fshader-stage=fragment shader/text_render.frag -o shader/text_render_frag.spv
 copy .\shader\text_render_vert.spv .\build\example\shader\text_render_vert.spv
 copy .\shader\text_render_frag.spv .\build\example\shader\text_render_frag.spv
+
+copy .\build\tk.dll .\build\example\
+copy .\build\tk.pdb .\build\example\
