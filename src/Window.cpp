@@ -17,10 +17,16 @@ auto Window::init(std::string_view title, uint32_t width, uint32_t height) -> Wi
   _width  = width;
   _height = height;
 
+#ifdef _WIN32
+  // use branch unblock_events_windows_move_resize of mmozeiko/glfw
+  glfwInitHint(GLFW_WIN32_MESSAGES_IN_FIBER, GLFW_TRUE);
+#endif
   glfwInit();
+
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
   glfwWindowHint(GLFW_VISIBLE , GLFW_FALSE);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+
   _window = glfwCreateWindow(width, height, title.data(), nullptr, nullptr);
   throw_if(!_window, "failed to create window");
 

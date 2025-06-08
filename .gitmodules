@@ -17,4 +17,4 @@
 [submodule "vendor/glfw"]
 	path = vendor/glfw
 	url = https://github.com/mmozeiko/glfw.git
-	branch = unblock_events_window_move_resize
+	branch = unblock_events_windows_move_resize

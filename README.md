@@ -15,7 +15,7 @@ TODO:
 ## Third Party
 * https://github.com/g-truc/glm (MIT)
 * https://github.com/KhronosGroup/Vulkan-Headers (Apache-2.0)
-* https://github.com/libsdl-org/SDL (Zlib)
+* https://github.com/mmozeiko/glfw (Zlib)
 * https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator (MIT)
 * https://iquilezles.org/articles/distfunctions2d/ (MIT)
 * https://www.shadertoy.com/view/ftdGDB (MIT)
