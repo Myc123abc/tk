@@ -4,13 +4,14 @@
 
 #pragma once
 
+#include "../config.hpp"
 #include <glm/glm.hpp>
 #include <chrono>
 #include <vector>
 
 namespace tk { namespace ui {
 
-class LerpPoint
+class TK_API LerpPoint
 {
 public:
   LerpPoint(glm::vec2 start, glm::vec2 end, uint32_t time)
@@ -49,7 +50,7 @@ struct LerpInfo
   uint32_t  stage = {};
 };
 
-class LerpPoints
+class TK_API LerpPoints
 {
 public:
   LerpPoints(std::vector<LerpInfo> const& infos)

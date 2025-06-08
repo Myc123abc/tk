@@ -48,37 +48,37 @@ void log(Level level, std::format_string<Args...> fmt, Args&&... args)
 }
 
 template <typename T>
-inline void error(T const& msg)
+void error(T const& msg)
 {
   log(Level::error, msg);
 }
 
 template <typename... Args>
-inline void error(std::format_string<Args...> fmt, Args&&... args)
+void error(std::format_string<Args...> fmt, Args&&... args)
 {
   log(Level::error, std::format(fmt, std::forward<Args>(args)...));
 }
 
 template <typename T>
-inline void info(T const& msg)
+void info(T const& msg)
 {
   log(Level::info, msg);
 }
 
 template <typename... Args>
-inline void info(std::format_string<Args...> fmt, Args&&... args)
+void info(std::format_string<Args...> fmt, Args&&... args)
 {
   log(Level::info, std::format(fmt, std::forward<Args>(args)...));
 }
 
 template <typename T>
-inline void warn(T const& msg)
+void warn(T const& msg)
 {
   log(Level::warn, msg);
 }
 
 template <typename... Args>
-inline void warn(std::format_string<Args...> fmt, Args&&... args)
+void warn(std::format_string<Args...> fmt, Args&&... args)
 {
   log(Level::warn, std::format(fmt, std::forward<Args>(args)...));
 }

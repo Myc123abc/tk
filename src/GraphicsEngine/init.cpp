@@ -45,7 +45,8 @@ void GraphicsEngine::init(Window& window)
 
 void GraphicsEngine::destroy()
 {
-  vkDeviceWaitIdle(_device);
+  if (_device)
+    vkDeviceWaitIdle(_device);
   _destructors.clear();
   Device_Extensions.clear();
 }

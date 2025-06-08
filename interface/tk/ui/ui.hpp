@@ -13,6 +13,7 @@
 
 #pragma once
 
+#include "../config.hpp"
 #include "tk/type.hpp"
 
 #include <glm/glm.hpp>
@@ -31,13 +32,13 @@ namespace tk { namespace ui {
 * @param name name of layout, must unique (TODO: in multi-window, can same)
 * @param pos position of the window (TODO: currently, we only have a signle main window)
 */
-void begin(std::string_view name, glm::vec2 const& pos);
-inline void begin(std::string_view name, float x, float y) { begin(name, { x, y }); }
+TK_API void begin(std::string_view name, glm::vec2 const& pos);
+TK_API inline void begin(std::string_view name, float x, float y) { begin(name, { x, y }); }
 
 /**
 * end a layout
 */
-void end();
+TK_API void end();
 
 ////////////////////////////////////////////////////////////////////////////////
 //                                Shape
@@ -50,7 +51,7 @@ void end();
  * @param color color of shape (RGBA)
  * @param thickness thickness of shape (line thickness always 1 pixel)
  */
-void shape(type::shape type, std::vector<glm::vec2> const& points, uint32_t color, uint32_t thickness = 0);
+TK_API void shape(type::shape type, std::vector<glm::vec2> const& points, uint32_t color, uint32_t thickness = 0);
 
 /**
  * draw line
@@ -58,7 +59,7 @@ void shape(type::shape type, std::vector<glm::vec2> const& points, uint32_t colo
  * @param p1 end point
  * @param color
  */
-inline void line(glm::vec2 p0, glm::vec2 p1, uint32_t color = 0xffffffff)
+TK_API inline void line(glm::vec2 p0, glm::vec2 p1, uint32_t color = 0xffffffff)
 { 
   if (p0 != p1) shape(type::shape::line, { p0, p1 }, color);
 }
@@ -70,7 +71,7 @@ inline void line(glm::vec2 p0, glm::vec2 p1, uint32_t color = 0xffffffff)
  * @param color rgba
  * @param thickness
  */
-inline void rectangle(glm::vec2 const& left_upper, glm::vec2 const& right_down, uint32_t color, uint32_t thickness = 0)
+TK_API inline void rectangle(glm::vec2 const& left_upper, glm::vec2 const& right_down, uint32_t color, uint32_t thickness = 0)
 { 
   shape(type::shape::rectangle, { left_upper, right_down }, color, thickness);
 }
@@ -83,7 +84,7 @@ inline void rectangle(glm::vec2 const& left_upper, glm::vec2 const& right_down, 
  * @param color rgba
  * @param thickness
  */
-inline void triangle(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint32_t color, uint32_t thickness = 0)
+TK_API inline void triangle(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint32_t color, uint32_t thickness = 0)
 { 
   shape(type::shape::triangle, { p0, p1, p2 }, color, thickness);
 }
@@ -94,7 +95,7 @@ inline void triangle(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& 
  * @param color rgba
  * @param thickness
  */
-inline void polygon(std::vector<glm::vec2> const& points, uint32_t color, uint32_t thickness = 0)
+TK_API inline void polygon(std::vector<glm::vec2> const& points, uint32_t color, uint32_t thickness = 0)
 { 
   shape(type::shape::polygon, points, color, thickness);
 }
@@ -106,7 +107,7 @@ inline void polygon(std::vector<glm::vec2> const& points, uint32_t color, uint32
  * @param color
  * @param thickness
  */
-void circle(glm::vec2 const& center, float radius, uint32_t color, uint32_t thickness = 0);
+TK_API void circle(glm::vec2 const& center, float radius, uint32_t color, uint32_t thickness = 0);
 
 /**
  * draw quadratic bezier
@@ -115,7 +116,7 @@ void circle(glm::vec2 const& center, float radius, uint32_t color, uint32_t thic
  * @param p2
  * @param color rgba
  */
-inline void bezier(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint32_t color = 0xffffffff)
+TK_API inline void bezier(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint32_t color = 0xffffffff)
 { 
   shape(type::shape::bezier, { p0, p1, p2 }, color);
 }
@@ -124,8 +125,8 @@ inline void bezier(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2
  * start path shape, can only use line and bezier now.
  * and set_operation can only use with path_begin
  */
-void path_begin();
-void path_end(uint32_t color, uint32_t thickness = 0);
+TK_API void path_begin();
+TK_API void path_end(uint32_t color, uint32_t thickness = 0);
 
 ////////////////////////////////////////////////////////////////////////////////
 //                                UI
@@ -139,7 +140,7 @@ void path_end(uint32_t color, uint32_t thickness = 0);
  * for path shape, can only be used with path_begin
  * @param op operator for current shape with next shape
  */
-void set_operation(type::shape_op op);
+TK_API void set_operation(type::shape_op op);
 
 /**
  * button, can be clicked
@@ -150,7 +151,7 @@ void set_operation(type::shape_op op);
  * @param thickness thickness of button's shape
  * @return true if button is clicked
  */
-bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> const& data, uint32_t color, uint32_t thickness = 0);
+TK_API bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> const& data, uint32_t color, uint32_t thickness = 0);
 
 /**
  * create a clickable rectangle area
@@ -158,6 +159,6 @@ bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> con
  * @param pos0 position on left upper
  * @param pos1 position on right lower
  */
-bool click_area(std::string_view name, glm::vec2 const& pos0, glm::vec2 const& pos1);
+TK_API bool click_area(std::string_view name, glm::vec2 const& pos0, glm::vec2 const& pos1);
 
 }}
