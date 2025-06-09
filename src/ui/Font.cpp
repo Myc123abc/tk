@@ -1,4 +1,4 @@
-#include "tk/ui/Font.hpp"
+#include "Font.hpp"
 #include "tk/ErrorHandling.hpp"
 
 #include <msdfgen.h>

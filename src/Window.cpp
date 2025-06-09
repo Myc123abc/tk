@@ -40,6 +40,14 @@ auto Window::init(std::string_view title, uint32_t width, uint32_t height) -> Wi
   _window = glfwCreateWindow(width, height, title.data(), nullptr, nullptr);
   throw_if(!_window, "failed to create window");
 
+  // put window to center
+  int count;
+  auto monitors = glfwGetMonitors(&count);
+  auto video_mode = glfwGetVideoMode(monitors[0]);
+  int monitor_x, monitor_y;
+  glfwGetMonitorPos(monitors[0], &monitor_x, &monitor_y);
+  glfwSetWindowPos(_window, monitor_x + (video_mode->width - width) / 2, monitor_y + (video_mode->height - height) / 2);
+
   init_key_states();
 
   return *this;
