@@ -5,6 +5,16 @@
 
 namespace tk {
 
+void Window::init_key_states()
+{
+  using enum type::key;
+  _key_states = 
+  {
+    { q,     {} },
+    { space, {} },
+  };
+}
+
 auto Window::init(std::string_view title, uint32_t width, uint32_t height) -> Window&
 {
   // HACK: expand to multi-windows manage
@@ -30,7 +40,7 @@ auto Window::init(std::string_view title, uint32_t width, uint32_t height) -> Wi
   _window = glfwCreateWindow(width, height, title.data(), nullptr, nullptr);
   throw_if(!_window, "failed to create window");
 
-  glfwSetWindowUserPointer(_window, this);
+  init_key_states();
 
   return *this;
 }
@@ -93,6 +103,65 @@ auto Window::get_mouse_state() const noexcept -> type::mouse
 {
   auto res = glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT);
   return res == GLFW_PRESS ? type::mouse::left_down : type::mouse::left_up;
+}
+
+auto map_key(type::key k) noexcept -> int
+{
+  using enum type::key;
+  switch (k)
+  {
+  case q:     return GLFW_KEY_Q;
+  case space: return GLFW_KEY_SPACE;
+  };
+  assert(true);
+  return -1;
+}
+
+auto Window::get_key(type::key k) noexcept -> type::key_state
+{
+  using enum type::key_state;
+
+  auto  state     = glfwGetKey(_window, map_key(k));
+  auto& key_state = _key_states.at(k);
+  auto  now       = std::chrono::high_resolution_clock::now();
+
+  if (key_state.state == release)
+  {
+    if (state == GLFW_RELEASE)
+      return release;
+    else
+    {
+      key_state.state      = press;
+      key_state.start_time = now;
+      key_state.last_time  = now;
+      return press;
+    }
+  }
+  else
+  {
+    if (state == GLFW_RELEASE)
+    {
+      key_state.state = release;
+      return release;
+    }
+    else
+    {
+      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - key_state.start_time).count();
+      if (duration < _key_start_repeat_time)
+      {
+        return repeate_wait;
+      }
+      
+      duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - key_state.last_time).count();
+      if (duration > _key_repeat_interval)
+      {
+        key_state.last_time = now;
+        return press;
+      }
+    }
+  }
+  assert(true);
+  return {};
 }
 
 }

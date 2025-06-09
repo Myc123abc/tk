@@ -30,4 +30,6 @@ namespace tk
   TK_API void tk_render();
   
   TK_API void tk_destroy();
+
+  TK_API auto tk_get_key(type::key k) -> type::key_state;
 }

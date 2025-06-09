@@ -32,7 +32,7 @@ namespace tk { namespace ui {
 * @param name name of layout, must unique (TODO: in multi-window, can same)
 * @param pos position of the window (TODO: currently, we only have a signle main window)
 */
-TK_API void begin(std::string_view name, glm::vec2 const& pos);
+TK_API void begin(std::string_view name, glm::vec2 const& pos = {});
 TK_API inline void begin(std::string_view name, float x, float y) { begin(name, { x, y }); }
 
 /**

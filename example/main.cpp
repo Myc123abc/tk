@@ -7,34 +7,64 @@
 #include "tk/log.hpp"
 
 #include <chrono>
-#include <thread>
 
 auto playback_pos0 = glm::vec2(5, 5);
 auto playback_pos1 = playback_pos0 + glm::vec2(12.5 * 1.414, 12.5);
 auto playback_pos2 = playback_pos0 + glm::vec2(0, 25);
 auto playback_btn  = PlayBackButton("playback_btn", playback_pos0, playback_pos1, playback_pos2, 0xffffffff, 1);
+bool click = {};
 
+auto event_process() -> type::window;
 void render();
 
 int main()
 {
-  // init main window and engine
-  tk_init("tk", 200, 200);
-
-  while (true)
+  try
   {
-    tk_poll_events();
-    auto res = tk_event_process();
-    if (res == type::window::closed)
-      break;
-    else if (res == type::window::suspended)
-      continue;
+    // init main window and engine
+    tk_init("tk", 200, 200);
 
-    render();
-    tk_render();
+    while (true)
+    {
+      tk_poll_events();
+
+      auto res = tk_event_process();
+      if (res == type::window::closed)
+        break;
+      else if (res == type::window::suspended)
+        continue;
+
+      if (event_process() == type::window::closed)
+        break;
+      render();
+
+      tk_render();
+    }
+
+    tk_destroy();
+  }
+  catch (std::exception const& e)
+  {
+    log::error(e.what());
+    exit(EXIT_FAILURE);
+  }
+}
+
+auto event_process() -> type::window
+{
+  using enum type::window;
+  using enum type::key;
+  using enum type::key_state;
+
+  if (tk_get_key(q) == press)
+    return closed;
+  if (tk_get_key(space) == press)
+  {
+    click = !click;
+    playback_btn.click();
   }
 
-  tk_destroy();
+  return running;
 }
 
 void render()
@@ -53,10 +83,8 @@ void render()
 
     // playback button
     playback_btn.render();
-    static bool click = {};
     if (playback_btn.button())
     {
-      //log::info("click");
       click = !click;
     }
     if (click)

@@ -13,8 +13,11 @@
 #include <GLFW/glfw3.h>
 
 #include "tk/type.hpp"
+
 #include <vector>
 #include <string_view>
+#include <unordered_map>
+#include <chrono>
 
 #include <glm/glm.hpp>
 
@@ -71,9 +74,26 @@ namespace tk {
       return glfwGetWindowAttrib(_window, GLFW_MAXIMIZED);
     }
 
+    auto get_key(type::key k) noexcept -> type::key_state;
+
+    void set_key_start_repeat_time(uint32_t time) noexcept { _key_start_repeat_time = time; }
+    void set_key_repeat_interval(uint32_t time)   noexcept { _key_repeat_interval = time;   }
+
   private:
     GLFWwindow* _window{};
     uint32_t    _width{}, _height{};
+
+    struct KeyState
+    {
+      std::chrono::high_resolution_clock::time_point start_time;
+      std::chrono::high_resolution_clock::time_point last_time;
+      type::key_state state{ type::key_state::release };
+    };
+    std::unordered_map<type::key, KeyState> _key_states;
+    uint32_t _key_start_repeat_time{ 400 };
+    uint32_t _key_repeat_interval{ 80 };
+  
+    void init_key_states();
   };
 
 }

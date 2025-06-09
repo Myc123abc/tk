@@ -42,6 +42,7 @@ void end()
 void render()
 {
   auto ctx = get_ctx();
+  if (ctx->shape_infos.empty()) return;
   assert(ctx->engine && ctx->shape_infos.back().op == type::shape_op::mix);
 
   ctx->engine->update(ctx->points, ctx->shape_infos);
@@ -86,7 +87,9 @@ void shape(type::shape type, std::vector<glm::vec2> const& points, uint32_t colo
   }
 
   // promise use ui::begin() and ui::path_begin() if use
-  assert(ctx->begining && ctx->path_begining ? type == line_partition || type == bezier_partition : true);
+  throw_if(!ctx->begining, "failed to draw shape, need ui::begin()");
+  if (ctx->path_begining)
+    throw_if(type != line_partition && type != bezier_partition, "failed to draw path, only support line and bezier");
   
   // get layout position
   auto& pos = ctx->layouts.back().pos;
@@ -113,7 +116,8 @@ void shape(type::shape type, std::vector<glm::vec2> const& points, uint32_t colo
 void circle(glm::vec2 const& center, float radius, uint32_t color, uint32_t thickness)
 {
   auto ctx = get_ctx();
-  assert(ctx->begining && ctx->path_begining == false);
+  throw_if(!ctx->begining || ctx->path_begining,
+           "failed to draw circle, need ui::begin() or cannot draw in ui::path_begin()");
   
   auto& pos = ctx->layouts.back().pos;
 

@@ -35,4 +35,17 @@ namespace tk { namespace type {
     suspended,
   };
 
+  enum class key
+  {
+    space,
+    q,
+  };
+
+  enum class key_state
+  {
+    press,
+    repeate_wait,
+    release,
+  };
+
 }}

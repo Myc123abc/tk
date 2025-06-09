@@ -18,8 +18,8 @@ void LerpPoint::run()
     _reentry       = true;
     _start_time    = std::chrono::high_resolution_clock::now();
     _reentry_start = _now;
-    _reentry_time  = _rate * _time;
     _reentry_end   = _start;
+    _reentry_time  = _time * glm::distance(_now, _start) / _distance;
     std::swap(_start, _end);
   }
   else
@@ -34,7 +34,10 @@ void LerpPoint::render()
     if (_reentry)
     {
       auto duration = static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - _start_time).count());
-      _rate = glm::clamp(duration / _reentry_time, 0.0, 1.0);
+      if (_reentry_time == 0)
+        _rate = 1.0;
+      else
+        _rate = glm::clamp(duration / _reentry_time, 0.0, 1.0);
       _now = util::lerp(_reentry_start, _reentry_end, _rate);
       if (_rate == 1.0)
       {
@@ -79,7 +82,7 @@ void LerpPoints::run()
     _reentry       = true;
     _reentry_start = _now;
     _reentry_end   = _it->start;
-    _renetry_time  = _rate * _it->time;
+    _reentry_time  = _it->time * glm::distance(_now, _it->start) / _it->distance;
 
     for (uint32_t i = 0, j = _infos.size() - 1; i < _infos.size() / 2; ++i, --j)
     {
@@ -108,7 +111,10 @@ void LerpPoints::render()
     if (_reentry)
     {
       auto duration = static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - _start_time).count());
-      _rate  = glm::clamp(duration / _renetry_time, 0.0, 1.0);
+      if (_reentry_time == 0)
+        _rate = 1.0;
+      else
+        _rate  = glm::clamp(duration / _reentry_time, 0.0, 1.0);
       _now   = util::lerp(_reentry_start, _reentry_end, _rate);
       _stage = _it->stage;
       if (_rate == 1.0)

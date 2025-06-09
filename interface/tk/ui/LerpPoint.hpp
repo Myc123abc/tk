@@ -15,7 +15,7 @@ class TK_API LerpPoint
 {
 public:
   LerpPoint(glm::vec2 start, glm::vec2 end, uint32_t time)
-    : _start(start), _end(end), _now(start), _time(time) {}
+    : _start(start), _end(end), _now(start), _time(time), _distance(glm::distance(start, end)) {}
 
   enum class status
   {
@@ -37,17 +37,19 @@ private:
   double    _rate   = {};
   decltype(std::chrono::high_resolution_clock::now()) _start_time;
 
-  bool                  _reentry      = {};
-  glm::vec2             _reentry_start, _reentry_end;
-  uint32_t              _reentry_time = {};
+  float     _distance{};
+  bool      _reentry      = {};
+  glm::vec2 _reentry_start, _reentry_end;
+  uint32_t  _reentry_time = {};
 };
 
 struct LerpInfo
 {
   glm::vec2 start;
   glm::vec2 end;
-  uint32_t  time  = {};
-  uint32_t  stage = {};
+  uint32_t  time{};
+  uint32_t  stage{};
+  double    distance{};
 };
 
 class TK_API LerpPoints
@@ -57,7 +59,11 @@ public:
     :_infos(infos), _now(infos.begin()->start), _it(_infos.begin())
   {
     for (auto i = 0; i < _infos.size(); ++i)
-      _infos[i].stage = i;
+    {
+      auto& info = _infos[i];
+      info.distance = glm::distance(info.start, info.end);
+      info.stage = i;
+    }
   }
 
   void run();
@@ -79,15 +85,15 @@ private:
   glm::vec2                _now;
   std::vector<LerpInfo>    _infos;
   decltype(_infos.begin()) _it;
-  status                   _status = status::unrun;
+  status                   _status{ status::unrun };
   decltype(std::chrono::high_resolution_clock::now()) _start_time;
-  double                   _rate = {};
+  double                   _rate {};
 
-  bool      _reentry       = {};
+  bool      _reentry{};
   glm::vec2 _reentry_start, _reentry_end;
-  uint32_t  _renetry_time  = {};
+  uint32_t  _reentry_time{};
 
-  uint32_t  _stage = {};
+  uint32_t  _stage{};
 };
 
 }}

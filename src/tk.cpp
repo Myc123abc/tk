@@ -99,6 +99,11 @@ auto tk_event_process() -> type::window
   return running;
 }
 
+auto tk_get_key(type::key k) -> type::key_state
+{
+  return tk_ctx->window.get_key(k);
+}
+
 void tk_render()
 {
   tk_ctx->engine.render_begin();
