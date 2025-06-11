@@ -22,7 +22,7 @@ int main()
   try
   {
     // init main window and engine
-    tk_init("tk", 200, 200);
+    tk_init("tk", 208, 208);
 
     while (true)
     {
@@ -79,7 +79,11 @@ void render()
     ui::begin("AudioPlayer", 0, 0);
 
     // background
-    ui::rectangle({ 0, 0 }, tk::get_main_window_extent(), 0x282C34FF);
+    //ui::rectangle({ 0, 0 }, tk::get_main_window_extent(), 0x282C34FF);
+    ui::rectangle({ 0, 0 }, tk::get_main_window_extent(), 0x000000ff);
+
+    ui::end();
+    return;
 
     // playback button
     playback_btn.render();

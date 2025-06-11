@@ -15,9 +15,6 @@
 
 #include <span>
 
-// TODO: these should be delete after implement text rendering based on msdf-atlas-gen
-#define FREETYPE_USE 0
-
 namespace tk { namespace graphics_engine {
 
   struct ShapeInfo
@@ -95,22 +92,22 @@ namespace tk { namespace graphics_engine {
     // common resources
     //
     // HACK: expand to multi-windows manage, use WindowManager in future.
-    Window*                      _window          = {};
-    VkInstance                   _instance        = {};
-    VkDebugUtilsMessengerEXT     _debug_messenger = {};
-    VkSurfaceKHR                 _surface         = {};
-    VkPhysicalDevice             _physical_device = {};
+    Window*                      _window{};
+    VkInstance                   _instance{};
+    VkDebugUtilsMessengerEXT     _debug_messenger{};
+    VkSurfaceKHR                 _surface{};
+    VkPhysicalDevice             _physical_device{};
     Device                       _device;
-    VkQueue                      _graphics_queue  = {};
-    VkQueue                      _present_queue   = {};
-    VkSwapchainKHR               _swapchain       = {};
+    VkQueue                      _graphics_queue{};
+    VkQueue                      _present_queue{};
+    VkSwapchainKHR               _swapchain{};
     std::vector<Image>           _swapchain_images;
     CommandPool                  _command_pool;
     MemoryAllocator              _mem_alloc;
     DestructorStack              _destructors;
 
-    static constexpr auto    Vulkan_Version    = VK_API_VERSION_1_4;
-    std::vector<const char*> Device_Extensions = 
+    static constexpr auto    Vulkan_Version{ VK_API_VERSION_1_4 };
+    std::vector<const char*> Device_Extensions
     {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
       VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
@@ -123,14 +120,14 @@ namespace tk { namespace graphics_engine {
     struct FrameResource
     {
       Command     cmd;
-      VkFence     fence       = {};
-      VkSemaphore acquire_sem = {};
-      VkSemaphore submit_sem  = {};
+      VkFence     fence{};
+      VkSemaphore acquire_sem{};
+      VkSemaphore submit_sem{};
     };
     std::vector<FrameResource> _frames;
     std::vector<VkSemaphore>   _submit_sems;
-    uint32_t                   _current_frame                 = {};
-    uint32_t                   _current_swapchain_image_index = {};
+    uint32_t                   _current_frame{};
+    uint32_t                   _current_swapchain_image_index{};
     auto get_current_frame()           noexcept -> FrameResource& { return _frames[_current_frame]; }
     auto get_current_swapchain_image() noexcept -> Image&         { return _swapchain_images[_current_swapchain_image_index]; }
 
@@ -142,27 +139,25 @@ namespace tk { namespace graphics_engine {
     PipelineLayout _sdf_pipeline_layout;
     void render_sdf();
 
-    static constexpr uint32_t Buffer_Size = 1024 * 1024;
+    static constexpr uint32_t Buffer_Size{ 1024 * 1024 };
     std::vector<Buffer> _buffers;
     void create_buffer();
 
     struct PushConstant_SDF
     {
-      VkDeviceAddress address = {};
-      uint32_t        offset  = {}; // offset of shape infos
-      uint32_t        num     = {}; // number of shape infos
+      VkDeviceAddress address{};
+      uint32_t        offset{}; // offset of shape infos
+      uint32_t        num{};    // number of shape infos
       glm::vec2       window_extent;
     };
 
     //
     // Text Render
     //
-    VkSampler  _sampler = {};
-#if FREETYPE_USE
-    FT_Library _ft_lib  = {};
-    FT_Face    _ft_face = {};
-    Image      _ft_image;
-    Buffer     _descriptor_buffer;
+    VkSampler _sampler{};
+    Image     _font_atlas_image;
+    void load_font();
+    Buffer            _descriptor_buffer;
     PipelineLayout   _text_render_pipeline_layout;
     DescriptorLayout _text_render_destriptor_layout;
     Shader           _text_render_vert, _text_render_frag;
@@ -170,7 +165,6 @@ namespace tk { namespace graphics_engine {
     {
       glm::vec4 color;
     };
-#endif
   };
 
 }}

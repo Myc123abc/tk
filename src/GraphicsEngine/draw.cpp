@@ -175,18 +175,16 @@ void GraphicsEngine::render_end()
 
   auto stages = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
 
-#if FREETYPE_USE
   // TODO: tmp, test, render text
   auto shaders = std::vector<VkShaderEXT>{ _text_render_vert, _text_render_frag };
   graphics_engine::vkCmdBindShadersEXT(frame.cmd, stages.size(), stages.data(), shaders.data());
   bind_descriptor_buffer(frame.cmd, _descriptor_buffer.address(), VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT, _text_render_pipeline_layout, VK_PIPELINE_BIND_POINT_GRAPHICS);
   auto pc = PushConstant_text_render
   {
-    .color = glm::vec4(0.0, 1.0, 0.0, 1.0),
+    .color = glm::vec4(1.0, 1.0, 1.0, 1.0),
   };
-  vkCmdPushConstants(frame.cmd, _sdf_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+  vkCmdPushConstants(frame.cmd, _text_render_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
   vkCmdDraw(frame.cmd, 3, 1, 0, 0);
-#endif
 
   graphics_engine::vkCmdBindShadersEXT(frame.cmd, stages.size(), stages.data(), nullptr);
   vkCmdEndRendering(frame.cmd);

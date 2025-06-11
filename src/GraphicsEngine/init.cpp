@@ -2,11 +2,12 @@
 #include "init-util.hpp"
 #include "tk/GraphicsEngine/vk_extension.hpp"
 
-#include "../ui/Font.hpp"
-
 #include <ranges>
 #include <set>
 #include <print>
+
+#include <msdf-atlas-gen/msdf-atlas-gen.h>
+#include <thread>
 
 namespace tk { namespace graphics_engine { 
 
@@ -37,8 +38,7 @@ void GraphicsEngine::init(Window& window)
   create_buffer();
   create_sdf_rendering_resource();
 
-  ui::Font font;
-  font.init("resources/SourceCodePro-Regular.ttf");
+  load_font();
 
   _window->show();
 }
@@ -567,5 +567,140 @@ void GraphicsEngine::load_font()
   });
 }
 #endif
+
+// from imgui_draw.cpp
+// 0x0020, 0x00FF Basic Latin + Latin Supplement
+auto get_char_set()
+{
+  auto beg = 0x0020;
+  auto end = 0x00ff;
+
+  msdf_atlas::Charset char_set;
+  for (; beg <= end; ++beg)
+    char_set.add(beg);
+  return char_set;
+}
+
+auto get_packer()
+{
+  msdf_atlas::TightAtlasPacker packer;
+  packer.setDimensionsConstraint(msdf_atlas::DimensionsConstraint::MULTIPLE_OF_FOUR_SQUARE);
+  packer.setSpacing(0);
+  packer.setMinimumScale(32.0);
+  packer.setPixelRange(2.0);
+  packer.setUnitRange(0.0);
+  packer.setMiterLimit(1.0);
+  packer.setOriginPixelAlignment(false, true);
+  packer.setInnerUnitPadding(0);
+  packer.setOuterUnitPadding(0);
+  packer.setInnerPixelPadding(0);
+  packer.setOuterPixelPadding(0);
+  return packer;
+}
+
+// TODO: another thread to load font
+void GraphicsEngine::load_font()
+{
+  auto path = "resources/SourceCodePro-Regular.ttf";
+
+  // init freetype
+  auto ft = msdfgen::initializeFreetype();
+  throw_if(!ft, "failed to init freetype");
+
+  // load font
+  auto font = loadFont(ft, path);
+  throw_if(!font, "failed to load font {}", path);
+
+  // load valid glyphs of character range (some characters maybe not in current font)
+  std::vector<msdf_atlas::GlyphGeometry> glyphs;
+  auto font_geo = msdf_atlas::FontGeometry(&glyphs);
+  //font_geo.loadCharset(font, 1.0, get_char_set());
+  font_geo.loadCharset(font, 1.0, msdf_atlas::Charset::ASCII, false, false);
+  
+  // pack
+  auto packer = get_packer();
+  throw_if(packer.pack(glyphs.data(), glyphs.size()), "failed to pack glyphs");
+  int width, height;
+  packer.getDimensions(width, height);
+  auto em_size     = packer.getScale();
+  auto pixel_range = packer.getPixelRange();
+
+  // edge coloring
+  for (auto& glyph : glyphs)
+    glyph.edgeColoring(msdfgen::edgeColoringInkTrap, 3.0, 0);
+  
+  // set attribute of generator
+  msdf_atlas::GeneratorAttributes attr;
+  attr.config.overlapSupport = true;
+  attr.scanlinePass = true;
+
+  // config generator
+  msdf_atlas::ImmediateAtlasGenerator<float, 4, msdf_atlas::mtsdfGenerator, msdf_atlas::BitmapAtlasStorage<float, 4>> generator(width, height);
+  generator.setAttributes(attr);
+  generator.setThreadCount(std::thread::hardware_concurrency() / 2);
+  generator.generate(glyphs.data(), glyphs.size());
+
+  // generate
+  auto bitmap = (msdfgen::BitmapConstRef<float, 4>)generator.atlasStorage();
+
+  // create image
+  _font_atlas_image = _mem_alloc.create_image(VK_FORMAT_R32G32B32A32_SFLOAT, { (uint32_t)bitmap.width, (uint32_t)bitmap.height, 1 }, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+
+    // upload buffer
+  auto byte_size = bitmap.width * bitmap.height * 4 * 4;
+  auto buf       = _mem_alloc.create_buffer(byte_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+
+  // copy 
+  buf.append((void*)bitmap.pixels, byte_size);
+
+  // copy to image
+  auto cmd = _command_pool.create_command().begin();
+  copy(cmd, buf, _font_atlas_image);
+  _font_atlas_image.set_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  cmd.end().submit_wait_free(_command_pool, _graphics_queue);
+  
+  // destroy upload buffer
+  buf.destroy();
+
+  // destroy resources
+  destroyFont(font);
+  deinitializeFreetype(ft);
+
+  // shader
+  auto pc = VkPushConstantRange
+  {
+    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+    .size       = sizeof(PushConstant_text_render),
+  };
+
+  _text_render_destriptor_layout = _device.create_descriptor_layout(
+  {
+    { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, _font_atlas_image.view(), _sampler }
+  });
+
+  _descriptor_buffer = _mem_alloc.create_buffer(_text_render_destriptor_layout.size(), VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT  | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT , VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+
+  _text_render_destriptor_layout.update_descriptors(_descriptor_buffer);
+
+  _device.create_shaders(
+  {
+    { _text_render_vert, VK_SHADER_STAGE_VERTEX_BIT,   "shader/text_render_vert.spv", { _text_render_destriptor_layout }, { pc } },
+    { _text_render_frag, VK_SHADER_STAGE_FRAGMENT_BIT, "shader/text_render_frag.spv", { _text_render_destriptor_layout }, { pc } },
+  }, true);
+
+  // create pipeline layout
+  _text_render_pipeline_layout = _device.create_pipeline_layout({ _text_render_destriptor_layout }, { pc });
+
+  // destroy resources
+  _destructors.push([&]
+  {
+    _descriptor_buffer.destroy();
+    _text_render_destriptor_layout.destroy();
+    _text_render_pipeline_layout.destroy();
+    _text_render_frag.destroy();
+    _text_render_vert.destroy();
+    _font_atlas_image.destroy();
+  });
+}
 
 } }
