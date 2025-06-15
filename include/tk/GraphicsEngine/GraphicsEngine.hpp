@@ -12,6 +12,7 @@
 #include "tk/type.hpp"
 
 #include <glm/glm.hpp>
+#include <msdf-atlas-gen/msdf-atlas-gen.h>
 
 #include <span>
 
@@ -54,6 +55,14 @@ namespace tk { namespace graphics_engine {
     //
     void resize_swapchain();
 
+    
+    auto frame_begin() -> bool;
+    void frame_end();
+
+    void text_render_begin();
+    void text_render();
+    void text_render_end();
+
     void render_begin();
     void update(std::span<glm::vec2> points, std::span<ShapeInfo> infos);
     void render(uint32_t offset, uint32_t num);
@@ -82,10 +91,6 @@ namespace tk { namespace graphics_engine {
 
     // rendering
     void set_pipeline_state(Command const& cmd);
-
-    struct FrameResource;
-    auto frame_begin() -> FrameResource*; 
-    void frame_end();
 
   private:
     //
@@ -148,23 +153,29 @@ namespace tk { namespace graphics_engine {
       VkDeviceAddress address{};
       uint32_t        offset{}; // offset of shape infos
       uint32_t        num{};    // number of shape infos
-      glm::vec2       window_extent;
+      glm::vec2       window_extent{};
     };
 
     //
-    // Text Render
+    // Text Rendering
     //
     VkSampler _sampler{};
-    Image     _font_atlas_image;
+    Image     _font_atlas_image; // TODO: expand multi-font-atlases
     void load_font();
     Buffer            _descriptor_buffer;
-    PipelineLayout   _text_render_pipeline_layout;
-    DescriptorLayout _text_render_destriptor_layout;
-    Shader           _text_render_vert, _text_render_frag;
-    struct PushConstant_text_render
+    PipelineLayout   _text_rendering_pipeline_layout;
+    DescriptorLayout _text_rendering_destriptor_layout;
+    Shader           _text_rendering_vert, _text_rendering_frag;
+    struct PushConstant_text_rendering
     {
-      glm::vec4 color;
+      glm::vec4 pos; // position of glyph in framebuffer
+      glm::vec4 uv;  // coordinate of glyph in font atlas
     };
-  };
 
+    msdf_atlas::FontGeometry               _font_geo;
+    std::vector<msdf_atlas::GlyphGeometry> _glyphs;
+    glm::vec2 _font_atlas_extent{};
+
+    Image _text_rendering_image;
+  };
 }}

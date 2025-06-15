@@ -96,7 +96,7 @@ namespace tk { namespace graphics_engine {
     Image() = default;
     Image(MemoryAllocator* allocator, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage);
     Image(VkImage handle, VkImageView view, VkExtent2D const& extent, VkFormat format)
-      : _handle(handle), _view(view), _extent({ extent.width, extent.height }), _format(format) {}
+      : _handle(handle), _view(view), _extent({ extent.width, extent.height, 1 }), _format(format) {}
 
     void destroy();
 

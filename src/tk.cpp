@@ -106,9 +106,20 @@ auto tk_get_key(type::key k) -> type::key_state
 
 void tk_render()
 {
-  tk_ctx->engine.render_begin();
+  auto& engine = tk_ctx->engine;
+
+  if (!engine.frame_begin())
+    return;
+
+  engine.text_render_begin();
+  engine.text_render();
+  engine.text_render_end();
+
+  engine.render_begin();
   ui::render();
-  tk_ctx->engine.render_end();
+  engine.render_end();
+
+  engine.frame_end();
 }
 
 void tk_destroy()

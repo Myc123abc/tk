@@ -8,7 +8,7 @@ namespace tk { namespace graphics_engine {
 
 auto get_cursor_position() -> glm::vec2;
 
-auto GraphicsEngine::frame_begin() -> FrameResource*
+auto GraphicsEngine::frame_begin() -> bool
 {
   auto* frame = &get_current_frame();
 
@@ -19,7 +19,7 @@ auto GraphicsEngine::frame_begin() -> FrameResource*
 
   auto res = vkAcquireNextImageKHR(_device, _swapchain, UINT64_MAX, frame->acquire_sem, VK_NULL_HANDLE, &_current_swapchain_image_index);
   if (res == VK_ERROR_OUT_OF_DATE_KHR)
-    return nullptr;
+    return false;
   else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
     throw_if(true, "failed to acquire swapechain image");
   frame->submit_sem = _submit_sems[_current_swapchain_image_index];
@@ -33,12 +33,14 @@ auto GraphicsEngine::frame_begin() -> FrameResource*
   };
   vkBeginCommandBuffer(frame->cmd, &beg_info);
 
-  return frame;
+  set_pipeline_state(frame->cmd);
+
+  return true;
 }
 
 void GraphicsEngine::frame_end()
 {
-  auto frame = get_current_frame();
+  auto& frame = get_current_frame();
 
   get_current_swapchain_image().set_layout(frame.cmd, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
   
@@ -94,12 +96,9 @@ void GraphicsEngine::frame_end()
 
 void GraphicsEngine::render_begin()
 {
-  auto frame = frame_begin();
-  if (frame == nullptr) return;
+  auto& frame = get_current_frame();
 
-  set_pipeline_state(frame->cmd);
-
-  get_current_swapchain_image().set_layout(frame->cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  get_current_swapchain_image().set_layout(frame.cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   
   auto color_attachment = VkRenderingAttachmentInfo
   {
@@ -117,11 +116,11 @@ void GraphicsEngine::render_begin()
     .colorAttachmentCount = 1,
     .pColorAttachments    = &color_attachment,
   };
-  vkCmdBeginRendering(frame->cmd, &rendering);
+  vkCmdBeginRendering(frame.cmd, &rendering);
 
   auto stages  = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
   auto shaders = std::vector<VkShaderEXT>{ _sdf_vert, _sdf_frag };
-  graphics_engine::vkCmdBindShadersEXT(frame->cmd, stages.size(), stages.data(), shaders.data());
+  graphics_engine::vkCmdBindShadersEXT(frame.cmd, stages.size(), stages.data(), shaders.data());
 }
 
 void GraphicsEngine::set_pipeline_state(Command const& cmd)
@@ -147,7 +146,8 @@ void GraphicsEngine::set_pipeline_state(Command const& cmd)
   VkRect2D scissor{ .extent = get_current_swapchain_image().extent2D(), };
   vkCmdSetViewportWithCount(cmd, 1, &viewport);
   vkCmdSetScissorWithCount(cmd, 1, &scissor);
-  vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+  // TODO: need to change to use triangle list with indices
+  vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
   vkCmdSetPrimitiveRestartEnable(cmd, VK_FALSE);
   graphics_engine::vkCmdSetVertexInputEXT(cmd, 0, nullptr, 0, nullptr);
   VkBool32 color_blend_enables{ VK_TRUE };
@@ -171,24 +171,8 @@ void GraphicsEngine::set_pipeline_state(Command const& cmd)
 
 void GraphicsEngine::render_end()
 {
-  auto frame = get_current_frame();
-
-  auto stages = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
-
-  // TODO: tmp, test, render text
-  auto shaders = std::vector<VkShaderEXT>{ _text_render_vert, _text_render_frag };
-  graphics_engine::vkCmdBindShadersEXT(frame.cmd, stages.size(), stages.data(), shaders.data());
-  bind_descriptor_buffer(frame.cmd, _descriptor_buffer.address(), VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT, _text_render_pipeline_layout, VK_PIPELINE_BIND_POINT_GRAPHICS);
-  auto pc = PushConstant_text_render
-  {
-    .color = glm::vec4(1.0, 1.0, 1.0, 1.0),
-  };
-  vkCmdPushConstants(frame.cmd, _text_render_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
-  vkCmdDraw(frame.cmd, 3, 1, 0, 0);
-
-  graphics_engine::vkCmdBindShadersEXT(frame.cmd, stages.size(), stages.data(), nullptr);
+  auto& frame = get_current_frame();
   vkCmdEndRendering(frame.cmd);
-  frame_end();
 }
 
 void GraphicsEngine::update(std::span<glm::vec2> points, std::span<ShapeInfo> infos)
@@ -198,7 +182,7 @@ void GraphicsEngine::update(std::span<glm::vec2> points, std::span<ShapeInfo> in
 
 void GraphicsEngine::render(uint32_t offset, uint32_t num)
 {
-  auto cmd = get_current_frame().cmd;
+  auto& cmd = get_current_frame().cmd;
 
   auto pc = PushConstant_SDF
   {
@@ -211,7 +195,87 @@ void GraphicsEngine::render(uint32_t offset, uint32_t num)
 
   vkCmdPushConstants(cmd, _sdf_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
 
-  vkCmdDraw(cmd, 3, 1, 0, 0);
+  vkCmdDraw(cmd, 4, 1, 0, 0);
 }
+
+void GraphicsEngine::text_render_begin()
+{
+  auto& frame = get_current_frame();
+
+  _text_rendering_image.set_layout(frame.cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  
+  auto color_attachment = VkRenderingAttachmentInfo
+  {
+    .sType              = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+    .imageView          = _text_rendering_image.view(),
+    .imageLayout        = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    .loadOp             = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+    .storeOp            = VK_ATTACHMENT_STORE_OP_STORE,
+  };
+  auto rendering = VkRenderingInfo
+  {
+    .sType                = VK_STRUCTURE_TYPE_RENDERING_INFO,
+    .renderArea           = { .extent = _text_rendering_image.extent2D(), },
+    .layerCount           = 1,
+    .colorAttachmentCount = 1,
+    .pColorAttachments    = &color_attachment,
+  };
+  vkCmdBeginRendering(frame.cmd, &rendering);
+
+  auto stages  = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
+  auto shaders = std::vector<VkShaderEXT>{ _text_rendering_vert, _text_rendering_frag };
+  graphics_engine::vkCmdBindShadersEXT(frame.cmd, stages.size(), stages.data(), shaders.data());
+}
+
+void GraphicsEngine::text_render()
+{
+  auto& frame = get_current_frame();
+
+  // TODO: tmp, test, render text
+  auto metrics = _font_geo.getMetrics();
+  //auto scale = 1.0 / (metrics.ascenderY - metrics.descenderY);
+  auto glyph   = _font_geo.getGlyph('g');
+  
+  double al, ab, ar, at;
+  glyph->getQuadAtlasBounds(al, ab, ar, at);
+  double pl, pb, pr, pt;
+  glyph->getQuadPlaneBounds(pl, pb, pr, pt);
+  auto glyph_pos = glm::vec4(pl, -pb, pr, -pt);
+  
+  auto window_extent = _window->get_framebuffer_size();
+
+  auto pos  = glm::vec2(0, 60);
+  auto size = 32.f; // TODO: use emSize to scale glyph size
+
+  auto distance = pos - window_extent / glm::vec2(2);
+  auto move = distance / window_extent * glm::vec2(2);
+
+  auto scale = _font_atlas_extent / window_extent;
+  
+  glyph_pos.x *= scale.x;
+  glyph_pos.y *= scale.y;
+  glyph_pos.z *= scale.x;
+  glyph_pos.w *= scale.y;
+  glyph_pos.x += move.x;
+  glyph_pos.y += move.y;
+  glyph_pos.z += move.x;
+  glyph_pos.w += move.y;
+
+  bind_descriptor_buffer(frame.cmd, _descriptor_buffer.address(), VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT, _text_rendering_pipeline_layout, VK_PIPELINE_BIND_POINT_GRAPHICS);
+  auto pc = PushConstant_text_rendering
+  {
+    .pos = glyph_pos,
+    .uv   = { al / _font_atlas_extent.x, ab / _font_atlas_extent.y, ar / _font_atlas_extent.x, at / _font_atlas_extent.y },
+  };
+  vkCmdPushConstants(frame.cmd, _text_rendering_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+  vkCmdDraw(frame.cmd, 4, 1, 0, 0);
+}
+
+void GraphicsEngine::text_render_end()
+{
+  auto& frame = get_current_frame();
+  vkCmdEndRendering(frame.cmd);
+}
+
 
 } }

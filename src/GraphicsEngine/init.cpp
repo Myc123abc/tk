@@ -6,7 +6,6 @@
 #include <set>
 #include <print>
 
-#include <msdf-atlas-gen/msdf-atlas-gen.h>
 #include <thread>
 
 namespace tk { namespace graphics_engine { 
@@ -416,6 +415,11 @@ void GraphicsEngine::resize_swapchain()
   auto old_swapchain = _swapchain;
   create_swapchain(old_swapchain);
   vkDestroySwapchainKHR(_device, old_swapchain, nullptr);
+
+  // resize text rendering image
+  _text_rendering_image.destroy();
+  _text_rendering_image = _mem_alloc.create_image(_swapchain_images[0].format(), _swapchain_images[0].extent3D(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+  // TODO: also need update descriptor buffer when use text rendering image in sdf render pass
 }
 
 void GraphicsEngine::create_sdf_rendering_resource()
@@ -612,21 +616,23 @@ void GraphicsEngine::load_font()
   throw_if(!font, "failed to load font {}", path);
 
   // load valid glyphs of character range (some characters maybe not in current font)
-  std::vector<msdf_atlas::GlyphGeometry> glyphs;
-  auto font_geo = msdf_atlas::FontGeometry(&glyphs);
+  _font_geo = msdf_atlas::FontGeometry(&_glyphs);
   //font_geo.loadCharset(font, 1.0, get_char_set());
-  font_geo.loadCharset(font, 1.0, msdf_atlas::Charset::ASCII, false, false);
+  _font_geo.loadCharset(font, 1.0, msdf_atlas::Charset::ASCII, false, false);
   
   // pack
   auto packer = get_packer();
-  throw_if(packer.pack(glyphs.data(), glyphs.size()), "failed to pack glyphs");
+  throw_if(packer.pack(_glyphs.data(), _glyphs.size()), "failed to pack glyphs");
   int width, height;
   packer.getDimensions(width, height);
+  _font_atlas_extent.x = width;
+  _font_atlas_extent.y = height;
   auto em_size     = packer.getScale();
   auto pixel_range = packer.getPixelRange();
 
+  // TODO: use msdf_atlas::Workload for msdfgen::edgeColoringByDistance
   // edge coloring
-  for (auto& glyph : glyphs)
+  for (auto& glyph : _glyphs)
     glyph.edgeColoring(msdfgen::edgeColoringInkTrap, 3.0, 0);
   
   // set attribute of generator
@@ -638,7 +644,7 @@ void GraphicsEngine::load_font()
   msdf_atlas::ImmediateAtlasGenerator<float, 4, msdf_atlas::mtsdfGenerator, msdf_atlas::BitmapAtlasStorage<float, 4>> generator(width, height);
   generator.setAttributes(attr);
   generator.setThreadCount(std::thread::hardware_concurrency() / 2);
-  generator.generate(glyphs.data(), glyphs.size());
+  generator.generate(_glyphs.data(), _glyphs.size());
 
   // generate
   auto bitmap = (msdfgen::BitmapConstRef<float, 4>)generator.atlasStorage();
@@ -670,35 +676,39 @@ void GraphicsEngine::load_font()
   auto pc = VkPushConstantRange
   {
     .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-    .size       = sizeof(PushConstant_text_render),
+    .size       = sizeof(PushConstant_text_rendering),
   };
 
-  _text_render_destriptor_layout = _device.create_descriptor_layout(
+  _text_rendering_destriptor_layout = _device.create_descriptor_layout(
   {
     { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, _font_atlas_image.view(), _sampler }
   });
 
-  _descriptor_buffer = _mem_alloc.create_buffer(_text_render_destriptor_layout.size(), VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT  | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT , VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+  _descriptor_buffer = _mem_alloc.create_buffer(_text_rendering_destriptor_layout.size(), VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT  | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT , VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 
-  _text_render_destriptor_layout.update_descriptors(_descriptor_buffer);
+  _text_rendering_destriptor_layout.update_descriptors(_descriptor_buffer);
 
   _device.create_shaders(
   {
-    { _text_render_vert, VK_SHADER_STAGE_VERTEX_BIT,   "shader/text_render_vert.spv", { _text_render_destriptor_layout }, { pc } },
-    { _text_render_frag, VK_SHADER_STAGE_FRAGMENT_BIT, "shader/text_render_frag.spv", { _text_render_destriptor_layout }, { pc } },
+    { _text_rendering_vert, VK_SHADER_STAGE_VERTEX_BIT,   "shader/text_rendering_vert.spv", { _text_rendering_destriptor_layout }, { pc } },
+    { _text_rendering_frag, VK_SHADER_STAGE_FRAGMENT_BIT, "shader/text_rendering_frag.spv", { _text_rendering_destriptor_layout }, { pc } },
   }, true);
 
   // create pipeline layout
-  _text_render_pipeline_layout = _device.create_pipeline_layout({ _text_render_destriptor_layout }, { pc });
+  _text_rendering_pipeline_layout = _device.create_pipeline_layout({ _text_rendering_destriptor_layout }, { pc });
+
+  // text rendering image
+  _text_rendering_image = _mem_alloc.create_image(_swapchain_images[0].format(), _swapchain_images[0].extent3D(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
   // destroy resources
   _destructors.push([&]
   {
+    _text_rendering_image.destroy();
     _descriptor_buffer.destroy();
-    _text_render_destriptor_layout.destroy();
-    _text_render_pipeline_layout.destroy();
-    _text_render_frag.destroy();
-    _text_render_vert.destroy();
+    _text_rendering_destriptor_layout.destroy();
+    _text_rendering_pipeline_layout.destroy();
+    _text_rendering_frag.destroy();
+    _text_rendering_vert.destroy();
     _font_atlas_image.destroy();
   });
 }
