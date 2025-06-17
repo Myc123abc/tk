@@ -627,8 +627,8 @@ void GraphicsEngine::load_font()
   packer.getDimensions(width, height);
   _font_atlas_extent.x = width;
   _font_atlas_extent.y = height;
-  auto em_size     = packer.getScale();
-  auto pixel_range = packer.getPixelRange();
+  _em_size = packer.getScale();
+  //auto pixel_range = packer.getPixelRange();
 
   // TODO: use msdf_atlas::Workload for msdfgen::edgeColoringByDistance
   // edge coloring

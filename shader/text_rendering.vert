@@ -7,6 +7,8 @@
 // TODO: Currently, only single font. We need expand to multi-font-atlas processing in future.
 //
 
+// TODO: should i convert to uv image? because directly text image, in sdf also need sample
+
 #version 460
 
 #include "text_rendering.h"

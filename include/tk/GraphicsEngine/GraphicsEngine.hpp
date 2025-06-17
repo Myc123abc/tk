@@ -176,6 +176,7 @@ namespace tk { namespace graphics_engine {
     std::vector<msdf_atlas::GlyphGeometry> _glyphs;
     glm::vec2 _font_atlas_extent{};
 
-    Image _text_rendering_image;
+    Image  _text_rendering_image;
+    double _em_size{};
   };
 }}

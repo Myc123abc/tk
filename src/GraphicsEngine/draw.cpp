@@ -227,44 +227,44 @@ void GraphicsEngine::text_render_begin()
   graphics_engine::vkCmdBindShadersEXT(frame.cmd, stages.size(), stages.data(), shaders.data());
 }
 
+auto get_pixel_coord(glm::vec2 const& x, glm::vec2 const& window_extent)
+{
+  return (x + glm::vec2(1)) / glm::vec2(2) * window_extent;
+}
+
 void GraphicsEngine::text_render()
 {
   auto& frame = get_current_frame();
 
   // TODO: tmp, test, render text
   auto metrics = _font_geo.getMetrics();
-  //auto scale = 1.0 / (metrics.ascenderY - metrics.descenderY);
-  auto glyph   = _font_geo.getGlyph('g');
+  auto glyph   = _font_geo.getGlyph('T');
   
   double al, ab, ar, at;
   glyph->getQuadAtlasBounds(al, ab, ar, at);
   double pl, pb, pr, pt;
   glyph->getQuadPlaneBounds(pl, pb, pr, pt);
-  auto glyph_pos = glm::vec4(pl, -pb, pr, -pt);
   
   auto window_extent = _window->get_framebuffer_size();
+  auto pos  = glm::vec2(0, 0);
+  auto size = 12.f;
 
-  auto pos  = glm::vec2(0, 60);
-  auto size = 32.f; // TODO: use emSize to scale glyph size
+  auto ascender = -metrics.ascenderY;
+  auto move = glm::vec2(0) - glm::vec2(0, ascender);
 
-  auto distance = pos - window_extent / glm::vec2(2);
-  auto move = distance / window_extent * glm::vec2(2);
-
-  auto scale = _font_atlas_extent / window_extent;
-  
-  glyph_pos.x *= scale.x;
-  glyph_pos.y *= scale.y;
-  glyph_pos.z *= scale.x;
-  glyph_pos.w *= scale.y;
-  glyph_pos.x += move.x;
-  glyph_pos.y += move.y;
-  glyph_pos.z += move.x;
-  glyph_pos.w += move.y;
+  auto min = glm::vec2(pl, -pt);
+  auto max = glm::vec2(pr, -pb);
+  min += move;
+  max += move;
+  min *= _em_size;
+  max *= _em_size;
+  min = min / window_extent * glm::vec2(2) - glm::vec2(1);
+  max = max / window_extent * glm::vec2(2) - glm::vec2(1);
 
   bind_descriptor_buffer(frame.cmd, _descriptor_buffer.address(), VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT, _text_rendering_pipeline_layout, VK_PIPELINE_BIND_POINT_GRAPHICS);
   auto pc = PushConstant_text_rendering
   {
-    .pos = glyph_pos,
+    .pos  = { min.x, max.y, max.x, min.y },
     .uv   = { al / _font_atlas_extent.x, ab / _font_atlas_extent.y, ar / _font_atlas_extent.x, at / _font_atlas_extent.y },
   };
   vkCmdPushConstants(frame.cmd, _text_rendering_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);

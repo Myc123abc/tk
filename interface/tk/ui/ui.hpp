@@ -66,14 +66,14 @@ TK_API inline void line(glm::vec2 p0, glm::vec2 p1, uint32_t color = 0xffffffff)
 
 /**
  * draw rectangle
- * @param left_upper left upper corner
- * @param right_down right down corner
+ * @param left_top left upper corner
+ * @param right_bottom right down corner
  * @param color rgba
  * @param thickness
  */
-TK_API inline void rectangle(glm::vec2 const& left_upper, glm::vec2 const& right_down, uint32_t color, uint32_t thickness = 0)
+TK_API inline void rectangle(glm::vec2 const& left_top, glm::vec2 const& right_bottom, uint32_t color, uint32_t thickness = 0)
 { 
-  shape(type::shape::rectangle, { left_upper, right_down }, color, thickness);
+  shape(type::shape::rectangle, { left_top, right_bottom }, color, thickness);
 }
 
 /**
