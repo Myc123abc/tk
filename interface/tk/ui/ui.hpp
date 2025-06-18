@@ -128,6 +128,15 @@ TK_API inline void bezier(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 co
 TK_API void path_begin();
 TK_API void path_end(uint32_t color, uint32_t thickness = 0);
 
+/**
+ * draw text
+ * @param text
+ * @param pos left top of text
+ * @param size
+ * @param color
+ */
+TK_API void text(std::string_view text, glm::vec2 const& pos, float size, uint32_t color);
+
 ////////////////////////////////////////////////////////////////////////////////
 //                                UI
 ////////////////////////////////////////////////////////////////////////////////

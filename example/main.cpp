@@ -92,15 +92,12 @@ void render()
       ui::circle({50, 50}, 10, 0x00ff00ff);
     }
 
-    // text
-    auto min = glm::vec2(2.92002106, 45.0158272);
-    auto max = glm::vec2(60.8799744, 124.329453);
-    ui::rectangle(min, max, 0xffffffff);
-    
     // playback progress
     auto playback_progree_pos = playback_pos1 + glm::vec2(5, 0);
     ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ 100, 3 }, 0x808080FF );
     ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ progress, 3 }, 0x0000FFFF );
+
+    ui::text("T", {0,0}, 32, 0xffffffff);
 
     ui::end();
   }

@@ -111,9 +111,10 @@ void tk_render()
   if (!engine.frame_begin())
     return;
 
-  engine.text_render_begin();
-  engine.text_render();
-  engine.text_render_end();
+  // TODO: another vec to storage glyphs and ui call text mask render then call render
+  engine.text_mask_render_begin();
+  ui::text_mask_render();
+  engine.text_mask_render_end();
 
   engine.render_begin();
   ui::render();

@@ -24,6 +24,8 @@ namespace tk { namespace graphics_engine {
     Buffer() = default;
     Buffer(MemoryAllocator* allocator, uint32_t size, VkBufferUsageFlags usages, VmaAllocationCreateFlags flags = 0);
 
+    auto descriptor_buffer_usages() const noexcept { return _descriptor_buffer_usages; }
+
     void destroy();
 
     auto handle()     const noexcept { return _handle;     }
@@ -33,6 +35,11 @@ namespace tk { namespace graphics_engine {
     auto allocator()  const noexcept { return _allocator;  }
     auto capacity()   const noexcept { return _capacity;   }
     auto size()       const noexcept { return _size;       }
+
+    // usefor descriptor buffer update, directly add size and tag
+    
+    auto add_size(uint32_t size) noexcept { _size += size; }
+    void add_tag(std::string_view tag);
 
     auto offset(std::string const& tag) const { return _offsets.at(tag); }
 
@@ -77,17 +84,15 @@ namespace tk { namespace graphics_engine {
     }
 
   private:
-    void add_tag(std::string_view tag);
-
-  private:
-    VmaAllocator    _allocator  = {};
-    VkBuffer        _handle     = {};
-    VmaAllocation   _allocation = {};
-    VkDeviceAddress _address    = {};
-    void*           _data       = {};
-    uint32_t        _capacity   = {};
-    uint32_t        _size       = {};
+    VmaAllocator    _allocator{};
+    VkBuffer        _handle{};
+    VmaAllocation   _allocation{};
+    VkDeviceAddress _address{};
+    void*           _data{};
+    uint32_t        _capacity{};
+    uint32_t        _size{};
     std::unordered_map<std::string, uint32_t> _offsets;
+    VkBufferUsageFlags _descriptor_buffer_usages{};
   };
 
   class Image

@@ -35,6 +35,8 @@ auto GraphicsEngine::frame_begin() -> bool
 
   set_pipeline_state(frame->cmd);
 
+  bind_descriptor_buffer(frame->cmd, _descriptor_buffer);
+
   return true;
 }
 
@@ -99,6 +101,7 @@ void GraphicsEngine::render_begin()
   auto& frame = get_current_frame();
 
   get_current_swapchain_image().set_layout(frame.cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  _text_mask_image.set_layout(frame.cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   
   auto color_attachment = VkRenderingAttachmentInfo
   {
@@ -193,29 +196,31 @@ void GraphicsEngine::render(uint32_t offset, uint32_t num)
     .window_extent = _window->get_framebuffer_size(),
   };
 
+  _sdf_descriptor_layout.bind(cmd);
+
   vkCmdPushConstants(cmd, _sdf_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
 
   vkCmdDraw(cmd, 4, 1, 0, 0);
 }
 
-void GraphicsEngine::text_render_begin()
+void GraphicsEngine::text_mask_render_begin()
 {
   auto& frame = get_current_frame();
 
-  _text_rendering_image.set_layout(frame.cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  _text_mask_image.set_layout(frame.cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   
   auto color_attachment = VkRenderingAttachmentInfo
   {
-    .sType              = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-    .imageView          = _text_rendering_image.view(),
-    .imageLayout        = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    .loadOp             = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-    .storeOp            = VK_ATTACHMENT_STORE_OP_STORE,
+    .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+    .imageView   = _text_mask_image.view(),
+    .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    .loadOp      = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+    .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
   };
   auto rendering = VkRenderingInfo
   {
     .sType                = VK_STRUCTURE_TYPE_RENDERING_INFO,
-    .renderArea           = { .extent = _text_rendering_image.extent2D(), },
+    .renderArea           = { .extent = _text_mask_image.extent2D(), },
     .layerCount           = 1,
     .colorAttachmentCount = 1,
     .pColorAttachments    = &color_attachment,
@@ -223,31 +228,22 @@ void GraphicsEngine::text_render_begin()
   vkCmdBeginRendering(frame.cmd, &rendering);
 
   auto stages  = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
-  auto shaders = std::vector<VkShaderEXT>{ _text_rendering_vert, _text_rendering_frag };
+  auto shaders = std::vector<VkShaderEXT>{ _text_mask_vert, _text_mask_frag };
   graphics_engine::vkCmdBindShadersEXT(frame.cmd, stages.size(), stages.data(), shaders.data());
 }
 
-auto get_pixel_coord(glm::vec2 const& x, glm::vec2 const& window_extent)
+auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size) -> std::pair<glm::vec4, glm::vec4>
 {
-  return (x + glm::vec2(1)) / glm::vec2(2) * window_extent;
-}
+  // TODO: currently, only use first glyph
+  auto ch = *text.begin();
 
-void GraphicsEngine::text_render()
-{
-  auto& frame = get_current_frame();
-
-  // TODO: tmp, test, render text
   auto metrics = _font_geo.getMetrics();
-  auto glyph   = _font_geo.getGlyph('T');
-  
+  auto glyph   = _font_geo.getGlyph(ch);
+
   double al, ab, ar, at;
   glyph->getQuadAtlasBounds(al, ab, ar, at);
   double pl, pb, pr, pt;
   glyph->getQuadPlaneBounds(pl, pb, pr, pt);
-  
-  auto window_extent = _window->get_framebuffer_size();
-  auto pos  = glm::vec2(0, 0);
-  auto size = 12.f;
 
   auto ascender = -metrics.ascenderY;
   auto move = glm::vec2(0) - glm::vec2(0, ascender);
@@ -258,24 +254,37 @@ void GraphicsEngine::text_render()
   max += move;
   min *= _em_size;
   max *= _em_size;
+
+  return { glm::vec4{ al, ab, ar, at }, glm::vec4{ min, max } };
+}
+
+void GraphicsEngine::text_mask_render(glm::vec4 a, glm::vec4 p)
+{
+  auto& frame = get_current_frame();
+  
+  auto min = glm::vec2(p.x, p.y);
+  auto max = glm::vec2(p.z, p.w);
+
+  // TODO: this can move to shader
+  auto window_extent = _window->get_framebuffer_size();
   min = min / window_extent * glm::vec2(2) - glm::vec2(1);
   max = max / window_extent * glm::vec2(2) - glm::vec2(1);
 
-  bind_descriptor_buffer(frame.cmd, _descriptor_buffer.address(), VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT, _text_rendering_pipeline_layout, VK_PIPELINE_BIND_POINT_GRAPHICS);
-  auto pc = PushConstant_text_rendering
+  _text_mask_destriptor_layout.bind(frame.cmd);
+
+  auto pc = PushConstant_text_mask
   {
     .pos  = { min.x, max.y, max.x, min.y },
-    .uv   = { al / _font_atlas_extent.x, ab / _font_atlas_extent.y, ar / _font_atlas_extent.x, at / _font_atlas_extent.y },
+    .uv   = { a.x / _font_atlas_extent.x, a.y / _font_atlas_extent.y, a.z / _font_atlas_extent.x, a.w / _font_atlas_extent.y },
   };
-  vkCmdPushConstants(frame.cmd, _text_rendering_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+  vkCmdPushConstants(frame.cmd, _text_mask_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
   vkCmdDraw(frame.cmd, 4, 1, 0, 0);
 }
 
-void GraphicsEngine::text_render_end()
+void GraphicsEngine::text_mask_render_end()
 {
   auto& frame = get_current_frame();
   vkCmdEndRendering(frame.cmd);
 }
 
-
-} }
+}}

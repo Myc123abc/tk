@@ -35,9 +35,8 @@ void GraphicsEngine::init(Window& window)
   create_sampler();
 
   create_buffer();
-  create_sdf_rendering_resource();
-
   load_font();
+  create_sdf_rendering_resource();
 
   _window->show();
 }
@@ -399,8 +398,11 @@ void GraphicsEngine::create_buffer()
   for (auto i = 0; i < _swapchain_images.size(); ++i)
     _buffers.emplace_back(_mem_alloc.create_buffer(Buffer_Size, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT));
   
+  _descriptor_buffer = _mem_alloc.create_buffer(1024, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT  | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT , VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+  
   _destructors.push([&]
   {
+    _descriptor_buffer.destroy();
     for (auto& buf : _buffers)
       buf.destroy();
   });
@@ -417,9 +419,11 @@ void GraphicsEngine::resize_swapchain()
   vkDestroySwapchainKHR(_device, old_swapchain, nullptr);
 
   // resize text rendering image
-  _text_rendering_image.destroy();
-  _text_rendering_image = _mem_alloc.create_image(_swapchain_images[0].format(), _swapchain_images[0].extent3D(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
-  // TODO: also need update descriptor buffer when use text rendering image in sdf render pass
+  _text_mask_image.destroy();
+  _text_mask_image = _mem_alloc.create_image(VK_FORMAT_R32_SFLOAT, _swapchain_images[0].extent3D(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+
+  // update descriptor layout which image descriptor also resized
+  _sdf_descriptor_layout.update();
 }
 
 void GraphicsEngine::create_sdf_rendering_resource()
@@ -431,19 +435,36 @@ void GraphicsEngine::create_sdf_rendering_resource()
     .size       = sizeof(PushConstant_SDF),
   };
 
+  // text mask image
+  _text_mask_image = _mem_alloc.create_image(VK_FORMAT_R32_SFLOAT, _swapchain_images[0].extent3D(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+
+  // create descriptor layout
+  _sdf_descriptor_layout = _device.create_descriptor_layout(
+  {
+    { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &_text_mask_image, _sampler }
+  });
+
+  // update descriptor layout to descriptor buffer
+  _sdf_descriptor_layout.upload(_descriptor_buffer, "sdf");
+
+  // create pipeline layout
+  _sdf_pipeline_layout = _device.create_pipeline_layout({ _sdf_descriptor_layout }, { pc });
+
+  // set pipeline layout and bind point for descriptor layout
+  _sdf_descriptor_layout.set(_sdf_pipeline_layout, VK_PIPELINE_BIND_POINT_GRAPHICS);
+
   // create shader
   _device.create_shaders(
   {
-    { _sdf_vert, VK_SHADER_STAGE_VERTEX_BIT,   "shader/SDF_vert.spv", {}, { pc } },
-    { _sdf_frag, VK_SHADER_STAGE_FRAGMENT_BIT, "shader/SDF_frag.spv", {}, { pc } },
+    { _sdf_vert, VK_SHADER_STAGE_VERTEX_BIT,   "shader/SDF_vert.spv", { _sdf_descriptor_layout }, { pc } },
+    { _sdf_frag, VK_SHADER_STAGE_FRAGMENT_BIT, "shader/SDF_frag.spv", { _sdf_descriptor_layout }, { pc } },
   }, true);
-
-  // create pipeline layout
-  _sdf_pipeline_layout = _device.create_pipeline_layout({}, { pc });
 
   // destroy resources
   _destructors.push([&]
   {
+    _text_mask_image.destroy();
+    _sdf_descriptor_layout.destroy();
     _sdf_pipeline_layout.destroy();
     _sdf_frag.destroy();
     _sdf_vert.destroy();
@@ -652,13 +673,14 @@ void GraphicsEngine::load_font()
   // create image
   _font_atlas_image = _mem_alloc.create_image(VK_FORMAT_R32G32B32A32_SFLOAT, { (uint32_t)bitmap.width, (uint32_t)bitmap.height, 1 }, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
-    // upload buffer
+  // upload buffer
   auto byte_size = bitmap.width * bitmap.height * 4 * 4;
   auto buf       = _mem_alloc.create_buffer(byte_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 
   // copy 
   buf.append((void*)bitmap.pixels, byte_size);
 
+  // TODO: use single command once in init
   // copy to image
   auto cmd = _command_pool.create_command().begin();
   copy(cmd, buf, _font_atlas_image);
@@ -676,39 +698,35 @@ void GraphicsEngine::load_font()
   auto pc = VkPushConstantRange
   {
     .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-    .size       = sizeof(PushConstant_text_rendering),
+    .size       = sizeof(PushConstant_text_mask),
   };
 
-  _text_rendering_destriptor_layout = _device.create_descriptor_layout(
+  _text_mask_destriptor_layout = _device.create_descriptor_layout(
   {
-    { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, _font_atlas_image.view(), _sampler }
+    { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &_font_atlas_image, _sampler }
   });
 
-  _descriptor_buffer = _mem_alloc.create_buffer(_text_rendering_destriptor_layout.size(), VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT  | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT , VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+  _text_mask_destriptor_layout.upload(_descriptor_buffer, "text mask");
 
-  _text_rendering_destriptor_layout.update_descriptors(_descriptor_buffer);
+  // create pipeline layout
+  _text_mask_pipeline_layout = _device.create_pipeline_layout({ _text_mask_destriptor_layout }, { pc });
+
+  // set pipeline layout and bind point for descriptor layout
+  _text_mask_destriptor_layout.set(_text_mask_pipeline_layout, VK_PIPELINE_BIND_POINT_GRAPHICS);
 
   _device.create_shaders(
   {
-    { _text_rendering_vert, VK_SHADER_STAGE_VERTEX_BIT,   "shader/text_rendering_vert.spv", { _text_rendering_destriptor_layout }, { pc } },
-    { _text_rendering_frag, VK_SHADER_STAGE_FRAGMENT_BIT, "shader/text_rendering_frag.spv", { _text_rendering_destriptor_layout }, { pc } },
+    { _text_mask_vert, VK_SHADER_STAGE_VERTEX_BIT,   "shader/text_mask_vert.spv", { _text_mask_destriptor_layout }, { pc } },
+    { _text_mask_frag, VK_SHADER_STAGE_FRAGMENT_BIT, "shader/text_mask_frag.spv", { _text_mask_destriptor_layout }, { pc } },
   }, true);
-
-  // create pipeline layout
-  _text_rendering_pipeline_layout = _device.create_pipeline_layout({ _text_rendering_destriptor_layout }, { pc });
-
-  // text rendering image
-  _text_rendering_image = _mem_alloc.create_image(_swapchain_images[0].format(), _swapchain_images[0].extent3D(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
   // destroy resources
   _destructors.push([&]
   {
-    _text_rendering_image.destroy();
-    _descriptor_buffer.destroy();
-    _text_rendering_destriptor_layout.destroy();
-    _text_rendering_pipeline_layout.destroy();
-    _text_rendering_frag.destroy();
-    _text_rendering_vert.destroy();
+    _text_mask_destriptor_layout.destroy();
+    _text_mask_pipeline_layout.destroy();
+    _text_mask_frag.destroy();
+    _text_mask_vert.destroy();
     _font_atlas_image.destroy();
   });
 }

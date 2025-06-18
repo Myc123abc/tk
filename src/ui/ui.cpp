@@ -54,6 +54,12 @@ void render()
   ctx->call_stack.clear();
 }
 
+void text_mask_render()
+{
+  auto ctx = get_ctx();
+  ctx->engine->text_mask_render(ctx->a, ctx->p);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //                                Shape
 ////////////////////////////////////////////////////////////////////////////////
@@ -166,6 +172,15 @@ void path_end(uint32_t color, uint32_t thickness)
   info.thickness = thickness;
   info.num       = ctx->shape_infos.size() - ctx->path_idx - 1;
   assert(info.num != 0);
+}
+
+void text(std::string_view text, glm::vec2 const& pos, float size, uint32_t color)
+{
+  auto ctx = get_ctx();
+  auto res = ctx->engine->parse_text(text, pos, size);
+  ctx->a = res.first;
+  ctx->p = res.second;
+  shape(type::shape::glyph, { glm::vec2(res.second.x, res.second.y), glm::vec2(res.second.z, res.second.w) }, color);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -323,6 +338,7 @@ bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> con
   case type::shape::path:
   case type::shape::line_partition:
   case type::shape::bezier_partition:
+  case type::shape::glyph:
     throw_if(false, "this type cannot use on button, please use ui::clickarea");
 
   case type::shape::triangle:

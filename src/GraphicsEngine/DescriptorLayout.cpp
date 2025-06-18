@@ -14,9 +14,13 @@ void DescriptorLayout::destroy() noexcept
 {
   assert(_device && _layout);
   vkDestroyDescriptorSetLayout(_device->get(), _layout, nullptr);
-  _device = nullptr;
-  _layout = VK_NULL_HANDLE;
-  _size   = 0;
+  _device          = {};
+  _layout          = {};
+  _size            = {};
+  _pipeline_layout = {};
+  _bind_point      = {};
+  _buffer          = {};
+  _tag             = {};
   _descriptors.clear();
 }
 
@@ -66,7 +70,7 @@ auto get_image_sampler_info(DescriptorInfo const& desc)
   return VkDescriptorImageInfo
   {
     .sampler     = desc.sampler,
-    .imageView   = desc.image_view,
+    .imageView   = desc.image->view(),
     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
   };
 }
@@ -75,19 +79,45 @@ auto get_storage_info(DescriptorInfo const& desc)
 {
   return VkDescriptorImageInfo
   {
-    .imageView   = desc.image_view,
+    .imageView   = desc.image->view(),
     .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
   };
 }
 
-void DescriptorLayout::update_descriptors(Buffer const& buffer)
+void DescriptorLayout::upload(Buffer& buffer, std::string_view tag)
 {
-  // TODO: single buffer need offset
-  auto ptr = reinterpret_cast<char*>(buffer.data());
+  _buffer = &buffer;
+  _ptr = reinterpret_cast<char*>(buffer.data()) + buffer.size();
+  buffer.add_tag(tag);
+  _tag = tag;
+  buffer.add_size(align_size(update(), _device->get_descriptor_buffer_info().descriptorBufferOffsetAlignment));
+}
 
+void bind_descriptor_buffer(Command& cmd, Buffer const& buffer)
+{
+  // bind descriptor buffer
+  VkDescriptorBufferBindingInfoEXT info
+  {
+    .sType   = VK_STRUCTURE_TYPE_DESCRIPTOR_BUFFER_BINDING_INFO_EXT,
+    .address = buffer.address(),
+    .usage   = buffer.descriptor_buffer_usages(),
+  };
+  vkCmdBindDescriptorBuffersEXT(cmd, 1, &info);
+}
+
+void DescriptorLayout::bind(Command& cmd)
+{
+  // set offset in buffer
+  VkDeviceSize offset{ _buffer->offset(_tag) };
+  uint32_t buffer_index{};
+  vkCmdSetDescriptorBufferOffsetsEXT(cmd, _bind_point, _pipeline_layout, 0, 1, &buffer_index, &offset);
+}
+
+auto DescriptorLayout::update() -> uint32_t
+{
   // put descriptors
-  size_t       data_size;
-  VkDeviceSize offset;
+  size_t       data_size{};
+  VkDeviceSize offset{};
   for (auto const& desc : _descriptors)
   {
     // get descriptor offset in layout
@@ -120,34 +150,12 @@ void DescriptorLayout::update_descriptors(Buffer const& buffer)
         break;
     }
 
-    vkGetDescriptorEXT(_device->get(), &get_info, data_size, ptr + offset);
+    // FIXME: multiple descriptor bindings maybe error, check vkGetDescriptorSetLayoutBindingOffsetEXT and vkGetDescriptorEXT
+    //        and maybe offset also need change
+    vkGetDescriptorEXT(_device->get(), &get_info, data_size, _ptr + offset);
+    offset += data_size;
   }
-}
-
-void bind_descriptor_buffer(Command& cmd, VkDeviceAddress address, VkBufferUsageFlags usage, VkPipelineLayout layout, VkPipelineBindPoint point)
-{
-  // bind descriptor buffer
-  VkDescriptorBufferBindingInfoEXT info
-  {
-    .sType   = VK_STRUCTURE_TYPE_DESCRIPTOR_BUFFER_BINDING_INFO_EXT,
-    .address = address,
-    .usage   = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT | usage,
-  };
-  vkCmdBindDescriptorBuffersEXT(cmd, 1, &info);
-
-  // set offset in buffer
-  VkDeviceSize offset{};
-  uint32_t buffer_index{};
-  vkCmdSetDescriptorBufferOffsetsEXT(cmd, point, layout, 0, 1, &buffer_index, &offset);
-}
-
-void DescriptorLayout::update_descriptor_image_views(std::vector<std::pair<uint32_t, VkImageView>> const& views)
-{
-  for (auto const& view : views)
-  {
-    assert(view.first < _descriptors.size());
-    _descriptors[view.first].image_view = view.second;
-  }
+  return offset;
 }
 
 }}

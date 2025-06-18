@@ -5,6 +5,8 @@
 layout(location = 0) in  vec2 uv;
 layout(location = 0) out vec4 col;
 
+layout(binding = 0) uniform sampler2D text_mask;
+
 struct ShapeInfo
 {
   uint type;
@@ -70,69 +72,69 @@ float get_distance_parition(ShapeInfo info)
 
 float get_distance(ShapeInfo info)
 {
-  float d;
   ++shape_info_idx;
-  if (info.type == Line)
+  switch (info.type)
   {
-    vec2 p0 = GetVec2(info.offset);
-    vec2 p1 = GetVec2(info.offset + 2);
-    d = sdSegment(uv, p0, p1);
-  }
-  else if (info.type == Rectangle)
-  {
-    vec2 p0 = GetVec2(info.offset);
-    vec2 p1 = GetVec2(info.offset + 2);
-    vec2 extent_div2 = (p1 - p0) * 0.5;
-    vec2 center = p0 + extent_div2;
-    d = sdBox(uv - center, extent_div2);
-  }
-  else if (info.type == Triangle)
-  {
-    vec2 p0 = GetVec2(info.offset);
-    vec2 p1 = GetVec2(info.offset + 2);
-    vec2 p2 = GetVec2(info.offset + 4);
-    d = sdTriangle(uv, p0, p1, p2);
-  }
-  else if (info.type == Polygon)
-  {
-    d = sdPolygon(info.offset, info.num, uv);
-  }
-  else if (info.type == Circle)
-  {
-    vec2  center = GetVec2(info.offset);
-    float radius = GetDataF(info.offset + 2);
-    d = sdCircle(uv - center, radius);
-  }
-  else if (info.type == Bezier)
-  {
-    vec2 p0 = GetVec2(info.offset);
-    vec2 p1 = GetVec2(info.offset + 2);
-    vec2 p2 = GetVec2(info.offset + 4);
-    d = sdBezier(uv, p0, p1, p2);
-  }
-  else if (info.type == Path)
-  {
-    d = -3.4028235e+38;
-    for (uint i = 0; i < info.num; ++i)
+    case Line:
     {
-      ShapeInfo partition_info = get_shape_info();
-      float partition_distance = get_distance_parition(partition_info);
-      float distance = max(d, partition_distance);
-      
-      // aliasing problem:
-      // when two line segment in same line, such as (0,0)(50,50) to (50,50)(100,100)
-      // max(d0,d1) will lead aliasing problem
-      // so use min(abs(d0),abs(d1)) to resolve
-      // well min's way can only use for 1-pixel case,
-      // so for filled and thickness wireform we use max still,
-      // and use min on bround, perfect! (I spent half day to resolve... my holiday...)
-      if (distance > 0.0)
-        d = min(abs(d), abs(partition_distance));
-      else
-        d = distance;
+      vec2 p0 = GetVec2(info.offset);
+      vec2 p1 = GetVec2(info.offset + 2);
+      return sdSegment(uv, p0, p1);
+    }
+    case Rectangle:
+    {
+      vec2 p0 = GetVec2(info.offset);
+      vec2 p1 = GetVec2(info.offset + 2);
+      vec2 extent_div2 = (p1 - p0) * 0.5;
+      vec2 center = p0 + extent_div2;
+      return sdBox(uv - center, extent_div2);
+    }
+    case Triangle:
+    {
+      vec2 p0 = GetVec2(info.offset);
+      vec2 p1 = GetVec2(info.offset + 2);
+      vec2 p2 = GetVec2(info.offset + 4);
+      return sdTriangle(uv, p0, p1, p2);
+    }
+    case Polygon:
+      return sdPolygon(info.offset, info.num, uv);
+    case Circle:
+    {
+      vec2  center = GetVec2(info.offset);
+      float radius = GetDataF(info.offset + 2);
+      return sdCircle(uv - center, radius);
+    }
+    case Bezier:
+    {
+      vec2 p0 = GetVec2(info.offset);
+      vec2 p1 = GetVec2(info.offset + 2);
+      vec2 p2 = GetVec2(info.offset + 4);
+      return sdBezier(uv, p0, p1, p2);
+    }
+    case Path:
+    {
+      float d = -3.4028235e+38;
+      for (uint i = 0; i < info.num; ++i)
+      {
+        ShapeInfo partition_info = get_shape_info();
+        float partition_distance = get_distance_parition(partition_info);
+        float distance = max(d, partition_distance);
+
+        // aliasing problem:
+        // when two line segment in same line, such as (0,0)(50,50) to (50,50)(100,100)
+        // max(d0,d1) will lead aliasing problem
+        // so use min(abs(d0),abs(d1)) to resolve
+        // well min's way can only use for 1-pixel case,
+        // so for filled and thickness wireform we use max still,
+        // and use min on bround, perfect! (I spent half day to resolve... my holiday...)
+        if (distance > 0.0)
+          d = min(abs(d), abs(partition_distance));
+        else
+          d = distance;
+      }
+      return d;
     }
   }
-  return d;
 }
 
 void main()
@@ -144,7 +146,15 @@ void main()
   while (shape_info_idx < pc.num)
   {
     ShapeInfo info = get_shape_info();
-    float     d    = get_distance(info);
+
+    if (info.type == Glyph)
+    {
+      ++shape_info_idx;
+      col = mix(col, info.color, texture(text_mask, uv));
+      continue;
+    }
+
+    float d = get_distance(info);
     
     if (info.op == Mix)
     {

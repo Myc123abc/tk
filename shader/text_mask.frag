@@ -1,9 +1,9 @@
 #version 460
 
-#include "text_rendering.h"
+#include "text_mask.h"
 
 layout(location = 0) in  vec2 uv;
-layout(location = 0) out vec4 color;
+layout(location = 0) out vec4 color; // I don't know why VK_FORMAT_R32_SFLOAT need vec4 to write result
 
 layout(binding = 0) uniform sampler2D font_atlas;
 
@@ -26,6 +26,5 @@ void main()
   float sd = median(msd.r, msd.g, msd.b);
   float screenPxDistance = screenPxRange() * (sd - 0.5);
   float opacity = clamp(screenPxDistance + 0.5, 0.0, 1.0);
-  // TODO: Add color in future, currently only white text.
-  color = mix(vec4(0), vec4(1), opacity);
+  color = vec4(opacity);
 }

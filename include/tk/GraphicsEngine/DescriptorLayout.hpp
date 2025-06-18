@@ -11,15 +11,15 @@ namespace tk { namespace graphics_engine {
 
   struct DescriptorInfo
   {
-    int                 binding    = -1;
-    VkDescriptorType    type       = VK_DESCRIPTOR_TYPE_MAX_ENUM;
-    VkShaderStageFlags  stages     = VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
-    VkImageView         image_view = VK_NULL_HANDLE;
-    VkSampler           sampler    = VK_NULL_HANDLE;
-    uint32_t            count      = 1;
+    int                 binding = -1;
+    VkDescriptorType    type    = VK_DESCRIPTOR_TYPE_MAX_ENUM;
+    VkShaderStageFlags  stages  = VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
+    Image*              image   = {};
+    VkSampler           sampler = {};
+    uint32_t            count   = 1;
   };
 
-  void bind_descriptor_buffer(Command& cmd, VkDeviceAddress address, VkBufferUsageFlags usage, VkPipelineLayout layout, VkPipelineBindPoint point);
+  void bind_descriptor_buffer(Command& cmd, Buffer const& buffer);
 
   class DescriptorLayout
   {
@@ -35,9 +35,17 @@ namespace tk { namespace graphics_engine {
 
     auto size() const noexcept { return _size; }
 
-    void update_descriptors(Buffer const& buffer);
+    void upload(Buffer& buffer, std::string_view tag);
 
-    void update_descriptor_image_views(std::vector<std::pair<uint32_t, VkImageView>> const& views);
+    auto update() -> uint32_t;
+
+    void bind(Command& cmd);
+
+    void set(VkPipelineLayout pipeline_layout, VkPipelineBindPoint bind_point) noexcept
+    {
+      _pipeline_layout = pipeline_layout;
+      _bind_point      = bind_point;
+    }
 
   private:
     friend class Device;
@@ -45,10 +53,15 @@ namespace tk { namespace graphics_engine {
     DescriptorLayout(class Device* device, std::vector<DescriptorInfo> const& layouts);
     
   private:
-    class Device*               _device = nullptr;
-    VkDescriptorSetLayout       _layout = VK_NULL_HANDLE;
-    VkDeviceSize                _size   = 0;
-    std::vector<DescriptorInfo> _descriptors;
+    class Device*                _device{};
+    VkDescriptorSetLayout        _layout{};
+    VkDeviceSize                 _size{};
+    std::vector<DescriptorInfo>  _descriptors;
+    VkPipelineLayout             _pipeline_layout{};
+    VkPipelineBindPoint          _bind_point{};
+    std::string                  _tag{};
+    Buffer*                      _buffer{};
+    char*                        _ptr{};
   };
 
 }}

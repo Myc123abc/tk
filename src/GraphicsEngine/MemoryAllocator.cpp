@@ -21,12 +21,18 @@ void Buffer::destroy()
   _data       = {};
   _capacity   = {};
   _size       = {};
+  _descriptor_buffer_usages = {};
 }
 
 Buffer::Buffer(MemoryAllocator* allocator, uint32_t size, VkBufferUsageFlags usages, VmaAllocationCreateFlags flags) 
 {
   _allocator = allocator->get();
   _capacity  = size;
+  
+  // TODO: expand other descriptor usages
+  _descriptor_buffer_usages = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT;
+  if (usages & VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT)
+    _descriptor_buffer_usages |= VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT;
   
   VkBufferCreateInfo buf_info
   {

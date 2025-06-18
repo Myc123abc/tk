@@ -11,7 +11,7 @@
 
 #version 460
 
-#include "text_rendering.h"
+#include "text_mask.h"
 
 layout(location = 0) out vec2 uv;
 

@@ -42,6 +42,9 @@ struct ui_context
 
   bool     path_begining = {};
   uint32_t path_idx      = {};
+
+  // TODO: tmp
+  glm::vec4 a, p;
 };
 
 inline auto get_ctx()
@@ -51,6 +54,7 @@ inline auto get_ctx()
 }
 
 void render();
+void text_mask_render();
 
 auto generate_id() -> uint32_t;
 

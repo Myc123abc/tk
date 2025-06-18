@@ -28,9 +28,10 @@ layout(push_constant) uniform PushConstant
 #define Path             6
 #define Line_Partition   7
 #define Bezier_Partition 8
+#define Glyph            9
 
-#define Mix       0
-#define Min       1
+#define Mix              0
+#define Min              1
 
 float sdSegment( in vec2 p, in vec2 a, in vec2 b )
 {
