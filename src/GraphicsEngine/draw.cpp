@@ -96,17 +96,16 @@ void GraphicsEngine::frame_end()
   _current_frame = ++_current_frame % _swapchain_images.size();
 }
 
-void GraphicsEngine::render_begin()
+void GraphicsEngine::render_begin(Image& image)
 {
-  auto& frame = get_current_frame();
+  auto& cmd = get_current_frame().cmd;
 
-  get_current_swapchain_image().set_layout(frame.cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  _text_mask_image.set_layout(frame.cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  image.set_layout(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   
   auto color_attachment = VkRenderingAttachmentInfo
   {
     .sType              = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-    .imageView          = get_current_swapchain_image().view(),
+    .imageView          = image.view(),
     .imageLayout        = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
     .loadOp             = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
     .storeOp            = VK_ATTACHMENT_STORE_OP_STORE,
@@ -114,16 +113,18 @@ void GraphicsEngine::render_begin()
   auto rendering = VkRenderingInfo
   {
     .sType                = VK_STRUCTURE_TYPE_RENDERING_INFO,
-    .renderArea           = { .extent = get_current_swapchain_image().extent2D(), },
+    .renderArea           = { .extent = image.extent2D(), },
     .layerCount           = 1,
     .colorAttachmentCount = 1,
     .pColorAttachments    = &color_attachment,
   };
-  vkCmdBeginRendering(frame.cmd, &rendering);
+  vkCmdBeginRendering(cmd, &rendering);
+}
 
-  auto stages  = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
-  auto shaders = std::vector<VkShaderEXT>{ _sdf_vert, _sdf_frag };
-  graphics_engine::vkCmdBindShadersEXT(frame.cmd, stages.size(), stages.data(), shaders.data());
+void GraphicsEngine::sdf_render_begin()
+{
+  _text_mask_image.set_layout(get_current_frame().cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  render_begin(get_current_swapchain_image());
 }
 
 void GraphicsEngine::set_pipeline_state(Command const& cmd)
@@ -178,12 +179,12 @@ void GraphicsEngine::render_end()
   vkCmdEndRendering(frame.cmd);
 }
 
-void GraphicsEngine::update(std::span<glm::vec2> points, std::span<ShapeInfo> infos)
+void GraphicsEngine::sdf_update(std::span<glm::vec2> points, std::span<ShapeInfo> infos)
 {
   _buffers[_current_frame].clear().append(points).append(infos);
 }
 
-void GraphicsEngine::render(uint32_t offset, uint32_t num)
+void GraphicsEngine::sdf_render(uint32_t offset, uint32_t num)
 {
   auto& cmd = get_current_frame().cmd;
 
@@ -196,40 +197,14 @@ void GraphicsEngine::render(uint32_t offset, uint32_t num)
     .window_extent = _window->get_framebuffer_size(),
   };
 
-  _sdf_descriptor_layout.bind(cmd);
-
-  vkCmdPushConstants(cmd, _sdf_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+  _sdf_render_pipeline.bind(cmd, pc);
 
   vkCmdDraw(cmd, 4, 1, 0, 0);
 }
 
 void GraphicsEngine::text_mask_render_begin()
 {
-  auto& frame = get_current_frame();
-
-  _text_mask_image.set_layout(frame.cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  
-  auto color_attachment = VkRenderingAttachmentInfo
-  {
-    .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-    .imageView   = _text_mask_image.view(),
-    .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    .loadOp      = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-    .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
-  };
-  auto rendering = VkRenderingInfo
-  {
-    .sType                = VK_STRUCTURE_TYPE_RENDERING_INFO,
-    .renderArea           = { .extent = _text_mask_image.extent2D(), },
-    .layerCount           = 1,
-    .colorAttachmentCount = 1,
-    .pColorAttachments    = &color_attachment,
-  };
-  vkCmdBeginRendering(frame.cmd, &rendering);
-
-  auto stages  = std::vector<VkShaderStageFlagBits>{ VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
-  auto shaders = std::vector<VkShaderEXT>{ _text_mask_vert, _text_mask_frag };
-  graphics_engine::vkCmdBindShadersEXT(frame.cmd, stages.size(), stages.data(), shaders.data());
+  render_begin(_text_mask_image);
 }
 
 auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size) -> std::pair<glm::vec4, glm::vec4>
@@ -265,26 +240,21 @@ void GraphicsEngine::text_mask_render(glm::vec4 a, glm::vec4 p)
   auto min = glm::vec2(p.x, p.y);
   auto max = glm::vec2(p.z, p.w);
 
-  // TODO: this can move to shader
+  // TODO: this can move to vertex shader
   auto window_extent = _window->get_framebuffer_size();
   min = min / window_extent * glm::vec2(2) - glm::vec2(1);
   max = max / window_extent * glm::vec2(2) - glm::vec2(1);
-
-  _text_mask_destriptor_layout.bind(frame.cmd);
 
   auto pc = PushConstant_text_mask
   {
     .pos  = { min.x, max.y, max.x, min.y },
     .uv   = { a.x / _font_atlas_extent.x, a.y / _font_atlas_extent.y, a.z / _font_atlas_extent.x, a.w / _font_atlas_extent.y },
   };
-  vkCmdPushConstants(frame.cmd, _text_mask_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
-  vkCmdDraw(frame.cmd, 4, 1, 0, 0);
-}
 
-void GraphicsEngine::text_mask_render_end()
-{
-  auto& frame = get_current_frame();
-  vkCmdEndRendering(frame.cmd);
+  _text_mask_render_pipeline.bind(frame.cmd, pc);
+
+  // TODO: move cmd draw on RenderPipeline
+  vkCmdDraw(frame.cmd, 4, 1, 0, 0);
 }
 
 }}

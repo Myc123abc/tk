@@ -1,6 +1,9 @@
 #include "tk/Window.hpp"
 #include "tk/ErrorHandling.hpp"
 
+// FIXME: tmp
+#include "tk/log.hpp"
+
 #include <cassert>
 
 namespace tk {
@@ -142,6 +145,7 @@ auto Window::get_key(type::key k) noexcept -> type::key_state
       key_state.state      = press;
       key_state.start_time = now;
       key_state.last_time  = now;
+      log::info("{}", 1);
       return press;
     }
   }
@@ -164,6 +168,7 @@ auto Window::get_key(type::key k) noexcept -> type::key_state
       if (duration > _key_repeat_interval)
       {
         key_state.last_time = now;
+        log::info("{}", 2);
         return press;
       }
     }

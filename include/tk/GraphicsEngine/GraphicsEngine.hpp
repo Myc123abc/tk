@@ -59,16 +59,16 @@ namespace tk { namespace graphics_engine {
     auto frame_begin() -> bool;
     void frame_end();
 
+    void render_end();
+
     // TODO: expand to multiple glyphs
     auto parse_text(std::string_view text, glm::vec2 const& pos, float size) -> std::pair<glm::vec4, glm::vec4>;
     void text_mask_render_begin();
     void text_mask_render(glm::vec4 a, glm::vec4 p);
-    void text_mask_render_end();
 
-    void render_begin();
-    void update(std::span<glm::vec2> points, std::span<ShapeInfo> infos);
-    void render(uint32_t offset, uint32_t num);
-    void render_end();
+    void sdf_render_begin();
+    void sdf_update(std::span<glm::vec2> points, std::span<ShapeInfo> infos);
+    void sdf_render(uint32_t offset, uint32_t num);
 
   private:
     //
@@ -93,6 +93,8 @@ namespace tk { namespace graphics_engine {
 
     // rendering
     void set_pipeline_state(Command const& cmd);
+    // TODO: expand which not need color attachemtn, such as compute pipeline?
+    void render_begin(Image& image);
 
   private:
     //
@@ -143,10 +145,7 @@ namespace tk { namespace graphics_engine {
     //
     // SDF rendering resources
     //
-    Shader           _sdf_vert;
-    Shader           _sdf_frag;
-    DescriptorLayout _sdf_descriptor_layout;
-    PipelineLayout   _sdf_pipeline_layout;
+    RenderPipeline _sdf_render_pipeline;
     void render_sdf();
 
     static constexpr uint32_t Buffer_Size{ 1024 * 1024 };
@@ -167,9 +166,7 @@ namespace tk { namespace graphics_engine {
     VkSampler _sampler{};
     Image     _font_atlas_image; // TODO: expand multi-font-atlases
     void load_font();
-    PipelineLayout   _text_mask_pipeline_layout;
-    DescriptorLayout _text_mask_destriptor_layout;
-    Shader           _text_mask_vert, _text_mask_frag;
+    RenderPipeline _text_mask_render_pipeline;
     struct PushConstant_text_mask
     {
       glm::vec4 pos; // position of glyph in framebuffer

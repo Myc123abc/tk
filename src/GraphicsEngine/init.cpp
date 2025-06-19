@@ -423,51 +423,33 @@ void GraphicsEngine::resize_swapchain()
   _text_mask_image = _mem_alloc.create_image(VK_FORMAT_R32_SFLOAT, _swapchain_images[0].extent3D(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
   // update descriptor layout which image descriptor also resized
-  _sdf_descriptor_layout.update();
+  _sdf_render_pipeline.update();
 }
 
 void GraphicsEngine::create_sdf_rendering_resource()
 {
-  // pushconstant
-  auto pc = VkPushConstantRange
-  {
-    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-    .size       = sizeof(PushConstant_SDF),
-  };
-
   // text mask image
   _text_mask_image = _mem_alloc.create_image(VK_FORMAT_R32_SFLOAT, _swapchain_images[0].extent3D(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
-  // create descriptor layout
-  _sdf_descriptor_layout = _device.create_descriptor_layout(
-  {
-    { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &_text_mask_image, _sampler }
-  });
-
-  // update descriptor layout to descriptor buffer
-  _sdf_descriptor_layout.upload(_descriptor_buffer, "sdf");
-
-  // create pipeline layout
-  _sdf_pipeline_layout = _device.create_pipeline_layout({ _sdf_descriptor_layout }, { pc });
-
-  // set pipeline layout and bind point for descriptor layout
-  _sdf_descriptor_layout.set(_sdf_pipeline_layout, VK_PIPELINE_BIND_POINT_GRAPHICS);
-
-  // create shader
-  _device.create_shaders(
-  {
-    { _sdf_vert, VK_SHADER_STAGE_VERTEX_BIT,   "shader/SDF_vert.spv", { _sdf_descriptor_layout }, { pc } },
-    { _sdf_frag, VK_SHADER_STAGE_FRAGMENT_BIT, "shader/SDF_frag.spv", { _sdf_descriptor_layout }, { pc } },
-  }, true);
+  _sdf_render_pipeline = _device.create_render_pipeline(
+    sizeof(PushConstant_SDF), 
+    {
+      // TODO: how to present font atlas on sdf frag, and then with sdf shapes
+      { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &_text_mask_image, _sampler }, 
+    },
+    _descriptor_buffer,
+    "sdf",
+    {
+      { VK_SHADER_STAGE_VERTEX_BIT,   "shader/SDF_vert.spv" },
+      { VK_SHADER_STAGE_FRAGMENT_BIT, "shader/SDF_frag.spv" },
+    }
+  );
 
   // destroy resources
   _destructors.push([&]
   {
     _text_mask_image.destroy();
-    _sdf_descriptor_layout.destroy();
-    _sdf_pipeline_layout.destroy();
-    _sdf_frag.destroy();
-    _sdf_vert.destroy();
+    _sdf_render_pipeline.destroy();
   });
 }
 
@@ -694,39 +676,23 @@ void GraphicsEngine::load_font()
   destroyFont(font);
   deinitializeFreetype(ft);
 
-  // shader
-  auto pc = VkPushConstantRange
-  {
-    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-    .size       = sizeof(PushConstant_text_mask),
-  };
-
-  _text_mask_destriptor_layout = _device.create_descriptor_layout(
-  {
-    { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &_font_atlas_image, _sampler }
-  });
-
-  _text_mask_destriptor_layout.upload(_descriptor_buffer, "text mask");
-
-  // create pipeline layout
-  _text_mask_pipeline_layout = _device.create_pipeline_layout({ _text_mask_destriptor_layout }, { pc });
-
-  // set pipeline layout and bind point for descriptor layout
-  _text_mask_destriptor_layout.set(_text_mask_pipeline_layout, VK_PIPELINE_BIND_POINT_GRAPHICS);
-
-  _device.create_shaders(
-  {
-    { _text_mask_vert, VK_SHADER_STAGE_VERTEX_BIT,   "shader/text_mask_vert.spv", { _text_mask_destriptor_layout }, { pc } },
-    { _text_mask_frag, VK_SHADER_STAGE_FRAGMENT_BIT, "shader/text_mask_frag.spv", { _text_mask_destriptor_layout }, { pc } },
-  }, true);
+  _text_mask_render_pipeline = _device.create_render_pipeline(
+    sizeof(PushConstant_text_mask),
+    {
+      { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &_font_atlas_image, _sampler }
+    },
+    _descriptor_buffer,
+    "text mask",
+    {
+      { VK_SHADER_STAGE_VERTEX_BIT,   "shader/text_mask_vert.spv" },
+      { VK_SHADER_STAGE_FRAGMENT_BIT, "shader/text_mask_frag.spv" },
+    }
+  );
 
   // destroy resources
   _destructors.push([&]
   {
-    _text_mask_destriptor_layout.destroy();
-    _text_mask_pipeline_layout.destroy();
-    _text_mask_frag.destroy();
-    _text_mask_vert.destroy();
+    _text_mask_render_pipeline.destroy();
     _font_atlas_image.destroy();
   });
 }

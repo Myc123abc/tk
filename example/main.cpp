@@ -60,6 +60,7 @@ auto event_process() -> type::window
     return closed;
   if (tk_get_key(space) == press)
   {
+    //log::info("press"); // FIXME: when press space, and same time resize window, the space is always be pressed!
     click = !click;
     playback_btn.click();
   }

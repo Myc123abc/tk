@@ -2,8 +2,8 @@ A game engine for making galgame, currently I need to learn many things.
 
 TODO:
 * msdf font rendering
-* ffmpeg play music
-* make a music player as example
+* ffmpeg with miniaudio play music
+* make a music player as example (use fftw for audio visualization, create own fftw repo for git submodule)
 * ffmpeg play video
 * make kanon in source code
 * read game engine architecture

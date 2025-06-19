@@ -45,8 +45,8 @@ void render()
   if (ctx->shape_infos.empty()) return;
   assert(ctx->engine && ctx->shape_infos.back().op == type::shape_op::mix);
 
-  ctx->engine->update(ctx->points, ctx->shape_infos);
-  ctx->engine->render(ctx->points.size() * 2, ctx->shape_infos.size());
+  ctx->engine->sdf_update(ctx->points, ctx->shape_infos);
+  ctx->engine->sdf_render(ctx->points.size() * 2, ctx->shape_infos.size());
   ctx->points.clear();
   ctx->shape_infos.clear();
 
