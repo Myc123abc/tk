@@ -43,6 +43,8 @@ void init(std::string_view title, uint32_t width, uint32_t height)
 
   tk_ctx->window.init(title, width, height);
   tk_ctx->engine.init(tk_ctx->window);
+  tk_ctx->window.set_resize_swapchain_fn([&] { tk_ctx->engine.resize_swapchain(); });
+  tk_ctx->window.set_get_swapchain_image_size([&] { return tk_ctx->engine.get_swapchain_image_size(); });
 
   // init ui context
   // TODO: currently only use main window for entire ui
@@ -72,15 +74,7 @@ auto event_process() -> type::window
   if (win.event_process() == closed)
     return closed;
 
-  if (win.is_resized())
-  {
-    auto size = win.get_framebuffer_size();
-    if (size.x == 0 || size.y == 0)
-      return suspend();
-    tk_ctx->engine.resize_swapchain();
-  }
-
-  return running;
+  return win.state();
 }
 
 void render()

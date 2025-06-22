@@ -54,7 +54,7 @@ namespace tk { namespace graphics_engine {
     // run
     //
     void resize_swapchain();
-
+    auto get_swapchain_image_size() -> glm::vec2;
     
     auto frame_begin() -> bool;
     void frame_end();

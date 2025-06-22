@@ -408,6 +408,13 @@ void GraphicsEngine::create_buffer()
   });
 }
 
+auto GraphicsEngine::get_swapchain_image_size() -> glm::vec2
+{
+  assert(!_swapchain_images.empty());
+  auto size{ _swapchain_images[0].extent2D() };
+  return { size.width, size.height };
+}
+
 void GraphicsEngine::resize_swapchain()
 {
   // wait GPU to handle finishing resource

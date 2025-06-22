@@ -7,6 +7,7 @@
 
 #include <vector>
 #include <string_view>
+#include <functional>
 
 #ifdef _WIN32
 #define NOMINMAX
@@ -28,21 +29,26 @@ public:
 
   auto create_vulkan_surface(VkInstance instance) const noexcept -> VkSurfaceKHR;
 
-  void show() const noexcept;
+  void show() noexcept;
 
   auto get_framebuffer_size() const noexcept -> glm::vec2;
 
   auto event_process() const noexcept -> type::window;
 
-  auto is_resized() const noexcept { return _is_resized; }
+  void set_resize_swapchain_fn(std::function<void()> const& f)           noexcept { resize_swapchain         = f; }
+  void set_get_swapchain_image_size(std::function<glm::vec2()> const& f) noexcept { get_swapchain_image_size = f; }
+
+  auto state() const noexcept { return _state; }
 
 private:
 #ifdef _WIN32
   friend LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param);
 
-  LPCWSTR ClassName{ L"main window" };
-  HWND    _handle{};
-  bool    _is_resized{};
+  LPCWSTR      ClassName{ L"main window" };
+  HWND         _handle{};
+  type::window _state{ type::window::suspended };
+  std::function<void()>      resize_swapchain; // TODO: resize swapchain should be in single window? a window a swapchain? is right?
+  std::function<glm::vec2()> get_swapchain_image_size;
 #endif
 };
 

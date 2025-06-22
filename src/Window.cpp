@@ -45,8 +45,23 @@ LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LP
   switch (msg)
   {
   case WM_SIZE:
-    window->_is_resized = true;
+  {
+    if (!window->get_swapchain_image_size || !window->resize_swapchain)
+      return 0;
+    auto swapchain_image_size{ window->get_swapchain_image_size() };
+    auto framebuffer_size{ window->get_framebuffer_size() };
+    if (swapchain_image_size != framebuffer_size)
+    {
+      if (framebuffer_size.x == 0 || framebuffer_size.y == 0)
+      {
+        window->_state = type::window::suspended;
+        return 0;
+      }
+      window->resize_swapchain();
+      window->_state = type::window::running;
+    }
     return 0;
+  }
 
   case WM_DESTROY:
     PostQuitMessage(0);
@@ -107,9 +122,10 @@ auto Window::create_vulkan_surface(VkInstance instance) const noexcept -> VkSurf
   return surface;
 }
 
-void Window::show() const noexcept
+void Window::show() noexcept
 {
   ShowWindow(_handle, SW_SHOWDEFAULT);
+  _state = type::window::running;
 }
 
 auto Window::get_framebuffer_size() const noexcept -> glm::vec2
