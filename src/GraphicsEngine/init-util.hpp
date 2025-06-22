@@ -83,7 +83,7 @@ inline auto check_layers_support(std::vector<std::string_view> const& layers)
 
 inline auto get_instance_extensions()
 {
-  std::vector<const char*> extensions;
+  std::vector<char const*> extensions;
 
   // instance extensions
   extensions.append_range(Window::get_vulkan_instance_extensions());

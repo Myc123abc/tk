@@ -1,99 +1,49 @@
-//
-// window class
-//
-// only can generate single window
-//
-// use SDL_GetDisplayContentScale can get display scale, and have SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED event
-// but I don't care scale ui. I want to keep ui size in different scale
-//
-
 #pragma once
-
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
 
 #include "tk/type.hpp"
 
+#include <vulkan/vulkan.h>
+#include <glm/glm.hpp>
+
 #include <vector>
 #include <string_view>
-#include <unordered_map>
-#include <chrono>
 
-#include <glm/glm.hpp>
+#ifdef _WIN32
+#define NOMINMAX
+#include <windows.h>
+#else
+#error only support win32 now
+#endif
 
 namespace tk {
 
-  inline void poll_events()
-  {
-    glfwPollEvents();
-  }
+class Window
+{
+public:
+  void init(std::string_view title, uint32_t width, uint32_t height);
 
-  class Window
-  {
-  public:
-    Window()  = default;
-    ~Window() = default;
+  void destroy() const noexcept;
 
-    Window(Window const&)            = delete;
-    Window(Window&&)                 = delete;
-    Window& operator=(Window const&) = delete;
-    Window& operator=(Window&&)      = delete;
+  static auto get_vulkan_instance_extensions() noexcept -> std::vector<char const*>;
 
-    auto init(std::string_view title, uint32_t width, uint32_t height) -> Window&;
-    void destroy() const;
+  auto create_vulkan_surface(VkInstance instance) const noexcept -> VkSurfaceKHR;
 
-    auto show() -> Window&;
+  void show() const noexcept;
 
-    auto create_surface(VkInstance instance) const -> VkSurfaceKHR;
+  auto get_framebuffer_size() const noexcept -> glm::vec2;
 
-    auto get_framebuffer_size() const -> glm::vec2;
-    
-    static void process_events();
-    static auto get_vulkan_instance_extensions() -> std::vector<const char*>;
+  auto event_process() const noexcept -> type::window;
 
-    auto get() const noexcept { return _window; }
+  auto is_resized() const noexcept { return _is_resized; }
 
-    auto get_cursor_position() const noexcept -> glm::vec2;
+private:
+#ifdef _WIN32
+  friend LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param);
 
-    auto get_mouse_state() const noexcept -> type::mouse;
-
-    auto is_closed() const noexcept
-    {
-      return glfwWindowShouldClose(_window);
-    }
-
-    auto is_resized() noexcept -> bool;
-
-    auto is_minimized() const noexcept
-    {
-      return glfwGetWindowAttrib(_window, GLFW_ICONIFIED);
-    }
-
-    auto is_maximized() const noexcept
-    {
-      return glfwGetWindowAttrib(_window, GLFW_MAXIMIZED);
-    }
-
-    auto get_key(type::key k) noexcept -> type::key_state;
-
-    void set_key_start_repeat_time(uint32_t time) noexcept { _key_start_repeat_time = time; }
-    void set_key_repeat_interval(uint32_t time)   noexcept { _key_repeat_interval = time;   }
-
-  private:
-    GLFWwindow* _window{};
-    uint32_t    _width{}, _height{};
-
-    struct KeyState
-    {
-      std::chrono::high_resolution_clock::time_point start_time;
-      std::chrono::high_resolution_clock::time_point last_time;
-      type::key_state state{ type::key_state::release };
-    };
-    std::unordered_map<type::key, KeyState> _key_states;
-    uint32_t _key_start_repeat_time{ 400 };
-    uint32_t _key_repeat_interval{ 80 };
-  
-    void init_key_states();
-  };
+  LPCWSTR ClassName{ L"main window" };
+  HWND    _handle{};
+  bool    _is_resized{};
+#endif
+};
 
 }

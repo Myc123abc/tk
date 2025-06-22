@@ -22,26 +22,24 @@ int main()
   try
   {
     // init main window and engine
-    tk_init("tk", 200, 200);
+    tk::init("tk", 200, 200);
 
     while (true)
     {
-      tk_poll_events();
-
-      auto res = tk_event_process();
+      auto res = tk::event_process();
       if (res == type::window::closed)
         break;
       else if (res == type::window::suspended)
         continue;
 
-      if (event_process() == type::window::closed)
+      if (::event_process() == type::window::closed)
         break;
-      render();
+      ::render();
 
-      tk_render();
+      tk::render();
     }
 
-    tk_destroy();
+    tk::destroy();
   }
   catch (std::exception const& e)
   {
@@ -55,15 +53,6 @@ auto event_process() -> type::window
   using enum type::window;
   using enum type::key;
   using enum type::key_state;
-
-  if (tk_get_key(q) == press)
-    return closed;
-  if (tk_get_key(space) == press)
-  {
-    //log::info("press"); // FIXME: when press space, and same time resize window, the space is always be pressed!
-    click = !click;
-    playback_btn.click();
-  }
 
   return running;
 }
@@ -80,7 +69,7 @@ void render()
     ui::begin("AudioPlayer", 0, 0);
 
     // background
-    ui::rectangle({ 0, 0 }, tk::get_main_window_extent(), 0x282C34FF);
+    ui::rectangle({ 0, 0 }, tk::get_window_size(), 0x282C34FF);
 
     // playback button
     playback_btn.render();

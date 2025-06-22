@@ -19,17 +19,15 @@ namespace tk
    * @param width width of main window
    * @param height height of main window
    */
-  TK_API void tk_init(std::string_view title, uint32_t width, uint32_t height);
+  TK_API void init(std::string_view title, uint32_t width, uint32_t height);
 
-  TK_API auto get_main_window_extent() -> glm::vec2;
+  TK_API auto get_window_size() -> glm::vec2;
 
-  TK_API void tk_poll_events();
+  TK_API auto event_process() -> type::window;
 
-  TK_API auto tk_event_process() -> type::window;
-
-  TK_API void tk_render();
+  TK_API void render();
   
-  TK_API void tk_destroy();
+  TK_API void destroy();
 
-  TK_API auto tk_get_key(type::key k) -> type::key_state;
+  TK_API auto get_key(type::key k) -> type::key_state;
 }

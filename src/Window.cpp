@@ -1,180 +1,137 @@
 #include "tk/Window.hpp"
 #include "tk/ErrorHandling.hpp"
 
-// FIXME: tmp
-#include "tk/log.hpp"
+#ifdef _WIN32
+#include <vulkan/vulkan_win32.h>
+#endif
 
-#include <cassert>
+namespace
+{
+#ifdef _WIN32
+
+template <typename... Args>
+inline void check(bool x, std::format_string<Args...> fmt, Args&&... args)
+{
+  tk::throw_if(!x, "[WIN32] {}: {}", std::format(fmt, std::forward<Args>(args)...), GetLastError());
+}
+
+auto to_wstring(std::string_view str) -> std::wstring
+{
+  int size = MultiByteToWideChar(CP_UTF8, 0, str.data(), str.size(), nullptr, 0);
+  std::wstring wstr(size, 0);
+  MultiByteToWideChar(CP_UTF8, 0, str.data(), str.size(), &wstr[0], size);
+  return wstr;
+}
+
+auto to_string(const wchar_t* wstr) -> std::string
+{
+  int size = WideCharToMultiByte(CP_UTF8, 0, wstr, -1, nullptr, 0, nullptr, nullptr);
+  std::string str(size - 1, 0);
+  WideCharToMultiByte(CP_UTF8, 0, wstr, -1, str.data(), size, nullptr, nullptr);
+  return str;
+}
+
+#endif
+
+}
 
 namespace tk {
 
-void Window::init_key_states()
-{
-  using enum type::key;
-  _key_states = 
-  {
-    { q,     {} },
-    { space, {} },
-  };
-}
-
-auto Window::init(std::string_view title, uint32_t width, uint32_t height) -> Window&
-{
-  // HACK: expand to multi-windows manage
-  static bool first = true;
-  assert(first);
-  if (first)  first = false;
-
-  assert(width > 0 && height > 0);
-
-  _width  = width;
-  _height = height;
-
 #ifdef _WIN32
-  // use branch unblock_events_windows_move_resize of mmozeiko/glfw
-  glfwInitHint(GLFW_WIN32_MESSAGES_IN_FIBER, GLFW_TRUE);
-#endif
-  glfwInit();
 
-  glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-  glfwWindowHint(GLFW_VISIBLE , GLFW_FALSE);
-  glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param)
+{
+  auto window = reinterpret_cast<Window*>(GetWindowLongPtr(handle, GWLP_USERDATA));
+  switch (msg)
+  {
+  case WM_SIZE:
+    window->_is_resized = true;
+    return 0;
 
-  _window = glfwCreateWindow(width, height, title.data(), nullptr, nullptr);
-  throw_if(!_window, "failed to create window");
+  case WM_DESTROY:
+    PostQuitMessage(0);
+    return 0;
 
-  // put window to center
-  int count;
-  auto monitors = glfwGetMonitors(&count);
-  auto video_mode = glfwGetVideoMode(monitors[0]);
-  int monitor_x, monitor_y;
-  glfwGetMonitorPos(monitors[0], &monitor_x, &monitor_y);
-  glfwSetWindowPos(_window, monitor_x + (video_mode->width - width) / 2, monitor_y + (video_mode->height - height) / 2);
-
-  init_key_states();
-
-  return *this;
+  case WM_SETCURSOR:
+    if (LOWORD(l_param) == HTCLIENT)
+    {
+      SetCursor(LoadCursor(nullptr, IDC_ARROW));
+      return TRUE;
+    }
+    break;
+  }
+  return DefWindowProcW(handle, msg, w_param, l_param);
 }
 
-void Window::destroy() const
+void Window::init(std::string_view title, uint32_t width, uint32_t height)
 {
-  glfwDestroyWindow(_window);
-  glfwTerminate();
+  // adjust width and height as client area
+  RECT rect{ 0, 0, static_cast<LONG>(width), static_cast<LONG>(height) };
+  check(AdjustWindowRectEx(&rect, WS_OVERLAPPEDWINDOW, FALSE, 0), "failed to adjust window rectangle");
+
+  // register class
+  WNDCLASSEXW wc{ sizeof(wc), CS_CLASSDC, window_process_callback, 0, 0, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, ClassName, nullptr };
+  check(RegisterClassExW(&wc), "failed to register class {}", to_string(ClassName));
+
+  // create window
+  _handle = ::CreateWindowW(wc.lpszClassName, to_wstring(title).c_str(), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, rect.right - rect.left, rect.bottom - rect.top, nullptr, nullptr, wc.hInstance, nullptr);
+  check(_handle, "failed to create window");
+
+  // set pointer in window
+  check(!SetWindowLongPtrW(_handle, GWLP_USERDATA, reinterpret_cast<LONG_PTR >(this)), "failed to set user pointer");
 }
 
-auto Window::show() -> Window&
+void Window::destroy() const noexcept
 {
-  glfwShowWindow(_window);
-  return *this;
+  assert(_handle);
+  check(!DestroyWindow(_handle), "failed to destroy window");
+  check(UnregisterClassW(ClassName, GetModuleHandle(nullptr)), "failed to unregister class {}", to_string(ClassName));
 }
 
-auto Window::create_surface(VkInstance instance) const -> VkSurfaceKHR
+auto Window::get_vulkan_instance_extensions() noexcept -> std::vector<char const*>
 {
-  VkSurfaceKHR surface;
-  throw_if(glfwCreateWindowSurface(instance, _window, nullptr, &surface) != VK_SUCCESS,
-           "failed to create vulkan surface");
+  return { "VK_KHR_surface", "VK_KHR_win32_surface" };
+}
+
+auto Window::create_vulkan_surface(VkInstance instance) const noexcept -> VkSurfaceKHR
+{
+  VkSurfaceKHR surface{};
+  VkWin32SurfaceCreateInfoKHR info
+  {
+    .sType     = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
+    .hinstance = GetModuleHandle(nullptr),
+    .hwnd      = _handle,
+  };
+  throw_if(vkCreateWin32SurfaceKHR(instance, &info, nullptr, &surface) != VK_SUCCESS,
+           "failed to create surface");
   return surface;
 }
 
-auto Window::get_framebuffer_size() const -> glm::vec2
+void Window::show() const noexcept
 {
-  int w, h;
-  glfwGetFramebufferSize(_window, &w, &h);
-  return { w, h };
+  ShowWindow(_handle, SW_SHOWDEFAULT);
 }
-    
-auto Window::is_resized() noexcept -> bool
+
+auto Window::get_framebuffer_size() const noexcept -> glm::vec2
 {
-  auto size = get_framebuffer_size();
-  if (_width != size.x || _height != size.y)
+  RECT rect{};
+  check(GetClientRect(_handle, &rect), "failed to get client rectangle");
+  return { rect.right - rect.left, rect.bottom - rect.top };
+}
+
+auto Window::event_process() const noexcept -> type::window
+{
+  MSG msg{};
+  while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
   {
-    _width  = size.x;
-    _height = size.y;
-    return true;
+    TranslateMessage(&msg);
+    DispatchMessageW(&msg);
+    if (msg.message == WM_QUIT)
+      return type::window::closed;
   }
-  return false;
+  return type::window::running;
 }
 
-auto Window::get_vulkan_instance_extensions() -> std::vector<const char*>
-{
-  uint32_t count;
-  auto ret = glfwGetRequiredInstanceExtensions(&count);
-  throw_if(!ret, "failed to get instance extensions of vulkan");
-  return std::vector(ret, ret + count);
-}
-
-auto Window::get_cursor_position() const noexcept -> glm::vec2
-{
-  double x, y;
-  glfwGetCursorPos(_window, &x, &y);
-  return { x, y };
-}
-
-auto Window::get_mouse_state() const noexcept -> type::mouse
-{
-  auto res = glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT);
-  return res == GLFW_PRESS ? type::mouse::left_down : type::mouse::left_up;
-}
-
-auto map_key(type::key k) noexcept -> int
-{
-  using enum type::key;
-  switch (k)
-  {
-  case q:     return GLFW_KEY_Q;
-  case space: return GLFW_KEY_SPACE;
-  };
-  assert(true);
-  return -1;
-}
-
-auto Window::get_key(type::key k) noexcept -> type::key_state
-{
-  using enum type::key_state;
-
-  auto  state     = glfwGetKey(_window, map_key(k));
-  auto& key_state = _key_states.at(k);
-  auto  now       = std::chrono::high_resolution_clock::now();
-
-  if (key_state.state == release)
-  {
-    if (state == GLFW_RELEASE)
-      return release;
-    else
-    {
-      key_state.state      = press;
-      key_state.start_time = now;
-      key_state.last_time  = now;
-      log::info("{}", 1);
-      return press;
-    }
-  }
-  else
-  {
-    if (state == GLFW_RELEASE)
-    {
-      key_state.state = release;
-      return release;
-    }
-    else
-    {
-      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - key_state.start_time).count();
-      if (duration < _key_start_repeat_time)
-      {
-        return repeate_wait;
-      }
-      
-      duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - key_state.last_time).count();
-      if (duration > _key_repeat_interval)
-      {
-        key_state.last_time = now;
-        log::info("{}", 2);
-        return press;
-      }
-    }
-  }
-  assert(true);
-  return {};
-}
+#endif
 
 }

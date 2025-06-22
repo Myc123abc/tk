@@ -10,7 +10,6 @@
 //
 
 #include "tk/tk.hpp"
-#include "tk/Window.hpp"
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
 #include "ui/internal.hpp"
 
@@ -38,7 +37,7 @@ struct tk_context
 static tk_context* tk_ctx = {};
 extern struct ui_context ui_ctx;
 
-void tk_init(std::string_view title, uint32_t width, uint32_t height)
+void init(std::string_view title, uint32_t width, uint32_t height)
 {
   tk_ctx = new tk_context();
 
@@ -52,59 +51,39 @@ void tk_init(std::string_view title, uint32_t width, uint32_t height)
   ui::get_ctx()->window        = &tk_ctx->window;
 }
 
-void tk_poll_events()
-{
-  poll_events();
-}
-
-auto get_main_window_extent() -> glm::vec2
+auto get_window_size() -> glm::vec2
 {
   return tk_ctx->window.get_framebuffer_size();
 }
 
-auto tk_event_process() -> type::window
+inline auto suspend() -> type::window
+{
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  return type::window::suspended;
+}
+
+auto event_process() -> type::window
 {
   using enum type::window;
 
   auto& win = tk_ctx->window;
   auto ui_ctx = ui::get_ctx();
 
-  if (win.is_closed())
+  if (win.event_process() == closed)
     return closed;
 
-  ui_ctx->window_extent = win.get_framebuffer_size();
-  
-  if (ui_ctx->window_extent.x == 0 || ui_ctx->window_extent.y == 0)
-  {
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    return suspended;
-  }
-  
   if (win.is_resized())
   {
-    if (ui_ctx->window_extent.x == 0 || ui_ctx->window_extent.y == 0)
-    {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      return suspended;
-    }
+    auto size = win.get_framebuffer_size();
+    if (size.x == 0 || size.y == 0)
+      return suspend();
     tk_ctx->engine.resize_swapchain();
-  }
-
-  if (win.is_minimized())
-  {
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    return suspended;
   }
 
   return running;
 }
 
-auto tk_get_key(type::key k) -> type::key_state
-{
-  return tk_ctx->window.get_key(k);
-}
-
-void tk_render()
+void render()
 {
   auto& engine = tk_ctx->engine;
 
@@ -123,7 +102,7 @@ void tk_render()
   engine.frame_end();
 }
 
-void tk_destroy()
+void destroy()
 {
   delete ui::get_ctx();
   delete tk_ctx;

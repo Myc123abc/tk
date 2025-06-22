@@ -52,11 +52,11 @@ public:
 
   auto button() -> bool
   {
-    if (ui::click_area("test", _left_upper, _right_lower))
-    {
-      click();
-      return true;
-    } 
+    //if (ui::click_area("test", _left_upper, _right_lower))
+    //{
+    //  click();
+    //  return true;
+    //} 
     return false;
   }
 

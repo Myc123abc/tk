@@ -20,16 +20,12 @@ if(WIN32)
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
-set(GLFW_BUILD_DOCS OFF)
-set(GLFW_INSTALL OFF)
-
 set(MSDF_ATLAS_BUILD_STANDALONE OFF)
 set(MSDF_ATLAS_USE_VCPKG OFF)
 set(MSDF_ATLAS_USE_SKIA OFF)
 set(MSDFGEN_DISABLE_PNG ON)
 
 add_subdirectory(vendor/glm)
-add_subdirectory(vendor/glfw)
 add_subdirectory(vendor/vma)
 add_subdirectory(vendor/freetype)
 
@@ -64,7 +60,6 @@ target_include_directories(tk
 
 target_link_libraries(tk
   PRIVATE
-    glfw
     ${Vulkan_LIBRARIES}
     GPUOpen::VulkanMemoryAllocator
     msdf-atlas-gen

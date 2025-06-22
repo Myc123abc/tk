@@ -112,7 +112,7 @@ void GraphicsEngine::create_debug_messenger()
 
 void GraphicsEngine::create_surface()
 {
-  _surface = _window->create_surface(_instance);
+  _surface = _window->create_vulkan_surface(_instance);
   _destructors.push([this] { vkDestroySurfaceKHR(_instance, _surface, nullptr); });
 }
 

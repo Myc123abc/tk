@@ -193,7 +193,7 @@ void set_operation(type::shape_op op)
   assert(ctx->begining);
   ctx->shape_infos.back().op = op;
 }
-
+#if 0
 auto get_bounding_rectangle(std::vector<glm::vec2> const& data) -> std::pair<glm::vec2, glm::vec2>
 {
   assert(data.size() > 1);
@@ -384,5 +384,5 @@ bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> con
 
   return false;
 }
-
+#endif
 }}

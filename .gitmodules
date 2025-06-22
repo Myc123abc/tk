@@ -14,7 +14,3 @@
 	path = vendor/freetype
 	url = https://gitlab.freedesktop.org/freetype/freetype.git
 	branch = master
-[submodule "vendor/glfw"]
-	path = vendor/glfw
-	url = https://github.com/mmozeiko/glfw.git
-	branch = unblock_events_windows_move_resize
