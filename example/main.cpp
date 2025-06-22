@@ -6,6 +6,7 @@
 #include "tk/tk.hpp"
 #include "tk/log.hpp"
 
+#include <thread>
 #include <chrono>
 
 auto playback_pos0 = glm::vec2(5, 5);
@@ -30,7 +31,10 @@ int main()
       if (res == type::window::closed)
         break;
       else if (res == type::window::suspended)
+      {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
         continue;
+      }
 
       if (::event_process() == type::window::closed)
         break;

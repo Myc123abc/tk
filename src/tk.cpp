@@ -73,7 +73,7 @@ auto event_process() -> type::window
 
   if (win.event_process() == closed)
     return closed;
-
+  
   return win.state();
 }
 

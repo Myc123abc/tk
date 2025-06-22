@@ -41,11 +41,23 @@ namespace tk {
 
 LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param)
 {
+  using enum tk::type::window;
+
   auto window = reinterpret_cast<Window*>(GetWindowLongPtr(handle, GWLP_USERDATA));
+  if (!window) return DefWindowProcW(handle, msg, w_param, l_param);
+
   switch (msg)
   {
   case WM_SIZE:
   {
+    if (w_param == SIZE_MINIMIZED)
+    {
+      window->_state = suspended;
+      return 0;
+    }
+    else if (w_param == SIZE_RESTORED)
+      window->_state = running;
+
     if (!window->get_swapchain_image_size || !window->resize_swapchain)
       return 0;
     auto swapchain_image_size{ window->get_swapchain_image_size() };
@@ -54,11 +66,11 @@ LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LP
     {
       if (framebuffer_size.x == 0 || framebuffer_size.y == 0)
       {
-        window->_state = type::window::suspended;
+        window->_state = suspended;
         return 0;
       }
       window->resize_swapchain();
-      window->_state = type::window::running;
+      window->_state = running;
     }
     return 0;
   }
