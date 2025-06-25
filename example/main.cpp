@@ -66,7 +66,7 @@ void render()
   static auto start_time = std::chrono::high_resolution_clock::now();
   auto now = std::chrono::high_resolution_clock::now();
   auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
-  auto progress = milliseconds % 10000 / 100;
+  auto progress = milliseconds % 1000 / 10;
   static bool paused = false;
 
   {

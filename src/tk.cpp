@@ -43,7 +43,7 @@ void init(std::string_view title, uint32_t width, uint32_t height)
 
   tk_ctx->window.init(title, width, height);
   tk_ctx->engine.init(tk_ctx->window);
-  tk_ctx->window.set_resize_swapchain_fn([&] { tk_ctx->engine.resize_swapchain(); });
+  tk_ctx->window.set_resize_swapchain([&] { tk_ctx->engine.resize_swapchain(); });
   tk_ctx->window.set_get_swapchain_image_size([&] { return tk_ctx->engine.get_swapchain_image_size(); });
 
   // init ui context
@@ -71,8 +71,7 @@ auto event_process() -> type::window
   auto& win = tk_ctx->window;
   auto ui_ctx = ui::get_ctx();
 
-  if (win.event_process() == closed)
-    return closed;
+  win.event_process();
   
   return win.state();
 }
@@ -82,7 +81,10 @@ void render()
   auto& engine = tk_ctx->engine;
 
   if (!engine.frame_begin())
+  {
+    ui::clear();
     return;
+  }
 
   // TODO: another vec to storage glyphs and ui call text mask render then call render
   engine.text_mask_render_begin();

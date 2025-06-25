@@ -33,15 +33,22 @@ public:
 
   auto get_framebuffer_size() const noexcept -> glm::vec2;
 
-  auto event_process() const noexcept -> type::window;
+  void event_process() const noexcept;
 
-  void set_resize_swapchain_fn(std::function<void()> const& f)           noexcept { resize_swapchain         = f; }
+  void set_resize_swapchain(std::function<void()> const& f)              noexcept { resize_swapchain         = f; }
   void set_get_swapchain_image_size(std::function<glm::vec2()> const& f) noexcept { get_swapchain_image_size = f; }
 
   auto state() const noexcept { return _state; }
 
-private:
+  auto get_mouse_position() const noexcept -> glm::vec2;
+
 #ifdef _WIN32
+private:
+  static void CALLBACK message_process(LPVOID) noexcept;
+  inline static LPVOID _main_fiber{};
+  inline static LPVOID _message_fiber{};
+
+private:
   friend LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param);
 
   LPCWSTR      ClassName{ L"main window" };

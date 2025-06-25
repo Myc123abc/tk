@@ -54,6 +54,7 @@ inline auto get_ctx()
 }
 
 void render();
+void clear();
 void text_mask_render();
 
 auto generate_id() -> uint32_t;

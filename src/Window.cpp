@@ -31,6 +31,8 @@ auto to_string(const wchar_t* wstr) -> std::string
   return str;
 }
 
+constexpr uint32_t Move_Timer{ 0 };
+
 #endif
 
 }
@@ -71,37 +73,71 @@ LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LP
       }
       window->resize_swapchain();
       window->_state = running;
+      SwitchToFiber(Window::_main_fiber);
     }
-    return 0;
   }
+  return 0;
 
   case WM_DESTROY:
+  {
     PostQuitMessage(0);
-    return 0;
+    window->_state = closed;
+  }
+  return 0;
 
   case WM_SETCURSOR:
+  {
     if (LOWORD(l_param) == HTCLIENT)
     {
       SetCursor(LoadCursor(nullptr, IDC_ARROW));
       return TRUE;
     }
-    break;
+  }
+  break;
+
+  case WM_ENTERSIZEMOVE:
+  {
+    SetTimer(handle, Move_Timer, 1, nullptr);
+  }
+  break;
+
+  case WM_EXITSIZEMOVE:
+  {
+    KillTimer(handle, Move_Timer);
+  }
+  break;
+
+  case WM_TIMER:
+  {
+    if (w_param == Move_Timer)
+      SwitchToFiber(Window::_main_fiber);
+  }
+  break;
   }
   return DefWindowProcW(handle, msg, w_param, l_param);
 }
 
 void Window::init(std::string_view title, uint32_t width, uint32_t height)
 {
-  // adjust width and height as client area
-  RECT rect{ 0, 0, static_cast<LONG>(width), static_cast<LONG>(height) };
-  check(AdjustWindowRectEx(&rect, WS_OVERLAPPEDWINDOW, FALSE, 0), "failed to adjust window rectangle");
+  static bool first{ true };
+  assert(first);
+  if (first) first = false;
+  // TODO: unprocess for multiple windows
+  _main_fiber = ConvertThreadToFiber(nullptr);
+  check(_main_fiber, "failed to convert thread to fiber");
+  _message_fiber = CreateFiber(0, &message_process, nullptr);
+  check(_message_fiber, "failed to create message fiber");
 
   // register class
-  WNDCLASSEXW wc{ sizeof(wc), CS_CLASSDC, window_process_callback, 0, 0, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, ClassName, nullptr };
+  WNDCLASSEXW wc{ sizeof(wc), CS_OWNDC | CS_VREDRAW | CS_HREDRAW, window_process_callback, 0, 0, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, ClassName, nullptr };
   check(RegisterClassExW(&wc), "failed to register class {}", to_string(ClassName));
 
+  // put window in center of screen
+  auto x = (GetSystemMetrics(SM_CXSCREEN) - width) / 2;
+  auto y = (GetSystemMetrics(SM_CYSCREEN) - height) / 2;
+
   // create window
-  _handle = ::CreateWindowW(wc.lpszClassName, to_wstring(title).c_str(), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, rect.right - rect.left, rect.bottom - rect.top, nullptr, nullptr, wc.hInstance, nullptr);
+  _handle = ::CreateWindowW(wc.lpszClassName, to_wstring(title).c_str(), WS_OVERLAPPEDWINDOW, x, y, width, height, nullptr, nullptr, wc.hInstance, nullptr);
   check(_handle, "failed to create window");
 
   // set pointer in window
@@ -111,6 +147,8 @@ void Window::init(std::string_view title, uint32_t width, uint32_t height)
 void Window::destroy() const noexcept
 {
   assert(_handle);
+  DeleteFiber(_message_fiber);
+  check(ConvertFiberToThread(), "failed to convert fiber to thread");
   check(!DestroyWindow(_handle), "failed to destroy window");
   check(UnregisterClassW(ClassName, GetModuleHandle(nullptr)), "failed to unregister class {}", to_string(ClassName));
 }
@@ -147,17 +185,31 @@ auto Window::get_framebuffer_size() const noexcept -> glm::vec2
   return { rect.right - rect.left, rect.bottom - rect.top };
 }
 
-auto Window::event_process() const noexcept -> type::window
+void Window::event_process() const noexcept
+{
+  SwitchToFiber(_message_fiber);
+}
+
+auto Window::get_mouse_position() const noexcept -> glm::vec2
+{
+  POINT pos{};
+  GetCursorPos(&pos);
+  ScreenToClient(_handle, &pos);
+  return { pos.x, pos.y };
+}
+
+void CALLBACK Window::message_process(LPVOID) noexcept
 {
   MSG msg{};
-  while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+  while (true)
   {
-    TranslateMessage(&msg);
-    DispatchMessageW(&msg);
-    if (msg.message == WM_QUIT)
-      return type::window::closed;
+    while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
+    {
+      TranslateMessage(&msg);
+      DispatchMessageW(&msg);
+    }
+    SwitchToFiber(_main_fiber);
   }
-  return type::window::running;
 }
 
 #endif

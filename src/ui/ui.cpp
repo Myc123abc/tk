@@ -39,6 +39,15 @@ void end()
   get_ctx()->begining = false;
 }
 
+void clear()
+{
+  auto ctx = get_ctx();
+  ctx->points.clear();
+  ctx->shape_infos.clear();
+  while (!ctx->layouts.empty()) ctx->layouts.pop();
+  ctx->call_stack.clear();
+}
+
 void render()
 {
   auto ctx = get_ctx();
@@ -47,11 +56,8 @@ void render()
 
   ctx->engine->sdf_update(ctx->points, ctx->shape_infos);
   ctx->engine->sdf_render(ctx->points.size() * 2, ctx->shape_infos.size());
-  ctx->points.clear();
-  ctx->shape_infos.clear();
 
-  while (!ctx->layouts.empty()) ctx->layouts.pop();
-  ctx->call_stack.clear();
+  clear();
 }
 
 void text_mask_render()
