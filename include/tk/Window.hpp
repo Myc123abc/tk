@@ -7,7 +7,8 @@
 
 #include <vector>
 #include <string_view>
-#include <functional>
+#include <unordered_map>
+#include <chrono>
 
 #ifdef _WIN32
 #define NOMINMAX
@@ -18,12 +19,15 @@
 
 namespace tk {
 
+namespace graphics_engine { class GraphicsEngine; }
+
 class Window
 {
 public:
   void init(std::string_view title, uint32_t width, uint32_t height);
+  void set_engine(graphics_engine::GraphicsEngine* engine) noexcept { _engine = engine; }
 
-  void destroy() const noexcept;
+  void destroy() const;
 
   static auto get_vulkan_instance_extensions() noexcept -> std::vector<char const*>;
 
@@ -35,12 +39,12 @@ public:
 
   void event_process() const noexcept;
 
-  void set_resize_swapchain(std::function<void()> const& f)              noexcept { resize_swapchain         = f; }
-  void set_get_swapchain_image_size(std::function<glm::vec2()> const& f) noexcept { get_swapchain_image_size = f; }
-
   auto state() const noexcept { return _state; }
 
   auto get_mouse_position() const noexcept -> glm::vec2;
+
+  void init_keys() noexcept;
+  auto get_key(type::key k) noexcept -> type::key_state;
 
 #ifdef _WIN32
 private:
@@ -54,9 +58,20 @@ private:
   LPCWSTR      ClassName{ L"main window" };
   HWND         _handle{};
   type::window _state{ type::window::suspended };
-  std::function<void()>      resize_swapchain; // TODO: resize swapchain should be in single window? a window a swapchain? is right?
-  std::function<glm::vec2()> get_swapchain_image_size;
 #endif
+
+private:
+  graphics_engine::GraphicsEngine* _engine{};
+
+  struct KeyState
+  {
+    std::chrono::high_resolution_clock::time_point start_time;
+    std::chrono::high_resolution_clock::time_point last_time;
+    type::key_state state{ type::key_state::release };
+  };
+  uint32_t _key_start_repeat_time{ 400 };
+  uint32_t _key_repeat_interval{ 80 };
+  std::unordered_map<type::key, KeyState> _keys;
 };
 
 }

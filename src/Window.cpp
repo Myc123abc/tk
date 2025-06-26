@@ -1,5 +1,6 @@
 #include "tk/Window.hpp"
 #include "tk/ErrorHandling.hpp"
+#include "tk/GraphicsEngine/GraphicsEngine.hpp"
 
 #ifdef _WIN32
 #include <vulkan/vulkan_win32.h>
@@ -52,6 +53,9 @@ LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LP
   {
   case WM_SIZE:
   {
+    if (window->_engine == nullptr)
+      break;
+
     if (w_param == SIZE_MINIMIZED)
     {
       window->_state = suspended;
@@ -60,9 +64,7 @@ LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LP
     else if (w_param == SIZE_RESTORED)
       window->_state = running;
 
-    if (!window->get_swapchain_image_size || !window->resize_swapchain)
-      return 0;
-    auto swapchain_image_size{ window->get_swapchain_image_size() };
+    auto swapchain_image_size{ window->_engine->get_swapchain_image_size() };
     auto framebuffer_size{ window->get_framebuffer_size() };
     if (swapchain_image_size != framebuffer_size)
     {
@@ -71,16 +73,15 @@ LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LP
         window->_state = suspended;
         return 0;
       }
-      window->resize_swapchain();
+      window->_engine->resize_swapchain();
       window->_state = running;
       SwitchToFiber(Window::_main_fiber);
     }
   }
   return 0;
 
-  case WM_DESTROY:
+  case WM_CLOSE:
   {
-    PostQuitMessage(0);
     window->_state = closed;
   }
   return 0;
@@ -98,12 +99,14 @@ LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LP
   case WM_ENTERSIZEMOVE:
   {
     SetTimer(handle, Move_Timer, 1, nullptr);
+    window->_engine->wait_fence(false);
   }
   break;
 
   case WM_EXITSIZEMOVE:
   {
     KillTimer(handle, Move_Timer);
+    window->_engine->wait_fence(true);
   }
   break;
 
@@ -113,8 +116,20 @@ LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LP
       SwitchToFiber(Window::_main_fiber);
   }
   break;
+
   }
   return DefWindowProcW(handle, msg, w_param, l_param);
+}
+
+void Window::init_keys() noexcept
+{
+  using enum type::key;
+
+  _keys =
+  {
+    { q,     {} },
+    { space, {} },
+  };
 }
 
 void Window::init(std::string_view title, uint32_t width, uint32_t height)
@@ -132,6 +147,12 @@ void Window::init(std::string_view title, uint32_t width, uint32_t height)
   WNDCLASSEXW wc{ sizeof(wc), CS_OWNDC | CS_VREDRAW | CS_HREDRAW, window_process_callback, 0, 0, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, ClassName, nullptr };
   check(RegisterClassExW(&wc), "failed to register class {}", to_string(ClassName));
 
+  // adjust width and height as client extent
+  RECT rect{ 0, 0, static_cast<int>(width), static_cast<int>(height) };
+  check(AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE), "failed to adjust window rectangle");
+  width  = rect.right  - rect.left;
+  height = rect.bottom - rect.top;
+  
   // put window in center of screen
   auto x = (GetSystemMetrics(SM_CXSCREEN) - width) / 2;
   auto y = (GetSystemMetrics(SM_CYSCREEN) - height) / 2;
@@ -142,14 +163,16 @@ void Window::init(std::string_view title, uint32_t width, uint32_t height)
 
   // set pointer in window
   check(!SetWindowLongPtrW(_handle, GWLP_USERDATA, reinterpret_cast<LONG_PTR >(this)), "failed to set user pointer");
+
+  init_keys();
 }
 
-void Window::destroy() const noexcept
+void Window::destroy() const
 {
   assert(_handle);
   DeleteFiber(_message_fiber);
   check(ConvertFiberToThread(), "failed to convert fiber to thread");
-  check(!DestroyWindow(_handle), "failed to destroy window");
+  check(DestroyWindow(_handle), "failed to destroy window");
   check(UnregisterClassW(ClassName, GetModuleHandle(nullptr)), "failed to unregister class {}", to_string(ClassName));
 }
 
@@ -210,6 +233,64 @@ void CALLBACK Window::message_process(LPVOID) noexcept
     }
     SwitchToFiber(_main_fiber);
   }
+}
+
+auto to_vk(type::key k) -> int
+{
+  using enum type::key;
+  switch (k)
+  {
+  case q:     return 'Q';
+  case space: return VK_SPACE;
+  }
+  throw_if(true, "not have this key");
+}
+
+auto Window::get_key(type::key k) noexcept -> type::key_state
+{
+  using enum type::key;
+  using enum type::key_state;
+
+  auto  key_state = GetKeyState(to_vk(k)) & 0x8000;
+  auto& key       = _keys[k];
+  auto  now       = std::chrono::high_resolution_clock::now();
+
+  if (key.state == release)
+  {
+    if (key_state == 0)
+      return release;
+    else
+    {
+      key.state      = press;
+      key.start_time = now;
+      key.last_time  = now;
+      return press;
+    }
+  }
+  else
+  {
+    if (key_state == 0)
+    {
+      key.state = release;
+      return release;
+    }
+    else
+    {
+      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - key.start_time).count();
+      if (duration < _key_start_repeat_time)
+      {
+        return repeate_wait;
+      }
+      duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - key.last_time).count();
+      if (duration > _key_repeat_interval)
+      {
+        key.last_time = now;
+        return press;
+      }
+    }
+  }
+  assert(true);
+  return {};
 }
 
 #endif

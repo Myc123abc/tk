@@ -27,14 +27,14 @@ struct tk_context
   Window         window;
   GraphicsEngine engine;
 
-  ~tk_context()
+  void destroy()
   {
     engine.destroy();
     window.destroy();
   }
 };
 
-static tk_context* tk_ctx = {};
+static tk_context* tk_ctx{};
 extern struct ui_context ui_ctx;
 
 void init(std::string_view title, uint32_t width, uint32_t height)
@@ -43,9 +43,8 @@ void init(std::string_view title, uint32_t width, uint32_t height)
 
   tk_ctx->window.init(title, width, height);
   tk_ctx->engine.init(tk_ctx->window);
-  tk_ctx->window.set_resize_swapchain([&] { tk_ctx->engine.resize_swapchain(); });
-  tk_ctx->window.set_get_swapchain_image_size([&] { return tk_ctx->engine.get_swapchain_image_size(); });
-
+  tk_ctx->window.set_engine(&tk_ctx->engine);
+  
   // init ui context
   // TODO: currently only use main window for entire ui
   ui::get_ctx()->window_extent = { width, height };
@@ -72,8 +71,13 @@ auto event_process() -> type::window
   auto ui_ctx = ui::get_ctx();
 
   win.event_process();
-  
+
   return win.state();
+}
+
+auto get_key(type::key k) -> type::key_state
+{
+  return tk_ctx->window.get_key(k);
 }
 
 void render()
@@ -101,6 +105,7 @@ void render()
 void destroy()
 {
   delete ui::get_ctx();
+  tk_ctx->destroy();
   delete tk_ctx;
 }
 

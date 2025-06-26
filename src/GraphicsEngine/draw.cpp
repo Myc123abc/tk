@@ -12,7 +12,7 @@ auto GraphicsEngine::frame_begin() -> bool
 {
   auto* frame = &get_current_frame();
 
-  if(vkWaitForFences(_device, 1, &frame->fence, VK_TRUE, 0) != VK_SUCCESS)
+  if(vkWaitForFences(_device, 1, &frame->fence, VK_TRUE, _wait_fence ? UINT_MAX : 0) != VK_SUCCESS)
     return false;
   throw_if(vkResetFences(_device, 1, &frame->fence) != VK_SUCCESS,
            "failed to reset fence");

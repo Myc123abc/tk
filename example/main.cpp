@@ -58,6 +58,16 @@ auto event_process() -> type::window
   using enum type::key;
   using enum type::key_state;
 
+  if (tk::get_key(q) == press)
+  {
+    return closed;
+  }
+  if (tk::get_key(space) == press)
+  {
+    click = !click;
+    playback_btn.click();
+  }
+
   return running;
 }
 

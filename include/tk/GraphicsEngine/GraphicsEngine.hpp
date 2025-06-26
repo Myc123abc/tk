@@ -50,6 +50,8 @@ namespace tk { namespace graphics_engine {
 
     void destroy();
 
+    void wait_fence(bool b) noexcept { _wait_fence = b; }
+
     //
     // run
     //
@@ -114,6 +116,8 @@ namespace tk { namespace graphics_engine {
     CommandPool                  _command_pool;
     MemoryAllocator              _mem_alloc;
     DestructorStack              _destructors;
+
+    bool _wait_fence{ true };
 
     static constexpr auto    Vulkan_Version{ VK_API_VERSION_1_4 };
     std::vector<const char*> Device_Extensions
