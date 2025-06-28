@@ -33,11 +33,50 @@ void end()
   get_ctx()->begining = false;
 }
 
+auto get_bounding_rectangle(std::vector<glm::vec2> const& data) -> std::pair<glm::vec2, glm::vec2>
+{
+  assert(data.size() > 1);
+
+  glm::vec2 min = data[0];
+  glm::vec2 max = data[0];
+
+  for (auto i = 1; i < data.size(); ++i)
+  {
+    auto& p = data[i];
+    if (p.x < min.x) min.x = p.x;
+    if (p.y < min.y) min.y = p.y;
+    if (p.x > max.x) max.x = p.x;
+    if (p.y > max.y) max.y = p.y;
+  }
+
+  return { min, max };
+}
+
+bool hit(glm::vec2 const& pos, std::vector<glm::vec2> const& data)
+{
+  if (data.empty()) return false;
+
+  // get bounding rectangle
+  auto win_pos = get_ctx()->last_layout->pos;
+  auto res     = get_bounding_rectangle(data);
+  auto min     = res.first  + win_pos;
+  auto max     = res.second + win_pos;
+
+  // detect whether mouse on button
+  if (pos.x > min.x && pos.y > min.y &&
+      pos.x < max.x && pos.y < max.y)
+    return true;
+  return false;
+}
+
 void clear()
 {
   auto ctx = get_ctx();
 
-  ctx->last_hovered_widget = ctx->current_hovered_widget;
+  if (hit(ctx->mouse_pos, ctx->current_hovered_widget_rect))
+    ctx->last_hovered_widget = ctx->current_hovered_widget;
+  else
+    ctx->last_hovered_widget = {};
 
   // clear frame resources
   ctx->points.clear();
@@ -222,40 +261,6 @@ void event_process()
   }
 }
 
-auto get_bounding_rectangle(std::vector<glm::vec2> const& data) -> std::pair<glm::vec2, glm::vec2>
-{
-  assert(data.size() > 1);
-
-  glm::vec2 min = data[0];
-  glm::vec2 max = data[0];
-
-  for (auto i = 1; i < data.size(); ++i)
-  {
-    auto& p = data[i];
-    if (p.x < min.x) min.x = p.x;
-    if (p.y < min.y) min.y = p.y;
-    if (p.x > max.x) max.x = p.x;
-    if (p.y > max.y) max.y = p.y;
-  }
-
-  return { min, max };
-}
-
-bool hit(glm::vec2 const& pos, std::vector<glm::vec2> const& data)
-{
-  // get bounding rectangle
-  auto win_pos = get_ctx()->last_layout->pos;
-  auto res     = get_bounding_rectangle(data);
-  auto min     = res.first  + win_pos;
-  auto max     = res.second + win_pos;
-
-  // detect whether mouse on button
-  if (pos.x > min.x && pos.y > min.y &&
-      pos.x < max.x && pos.y < max.y)
-    return true;
-  return false;
-}
-
 auto add_widget(std::string_view name)
 {
   auto& widgets = get_ctx()->last_layout->widgets;
@@ -275,6 +280,7 @@ auto update_current_hovered_widget(std::string_view name, std::vector<glm::vec2>
   {
     ctx->current_hovered_widget.first  = ctx->last_layout->name;
     ctx->current_hovered_widget.second = name;
+    ctx->current_hovered_widget_rect   = rect;
   }
 }
 
@@ -336,6 +342,13 @@ bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> con
   }
 
   return is_clicked(name, detect_data);
+}
+
+bool is_hover_on(std::string_view name)
+{
+  auto ctx = get_ctx();
+  return ctx->last_hovered_widget.first  == ctx->last_layout->name &&
+         ctx->last_hovered_widget.second == name;
 }
 
 }}

@@ -17,11 +17,8 @@ class PlayBackButton
 {
 public:
   PlayBackButton(std::string const& name, glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, uint32_t color, uint32_t thickness = 0, uint32_t time = 100)
-    : _color(color), _thickness(thickness)
+    : _name(name), _color(color), _thickness(thickness)
   {
-    _playback_btn_name = name + "playback";
-    _pasue_btn_name    = name + "pause";
-
     auto rect = glm::vec2(p1.x - p0.x, (p1.y - p0.y) * 2);
 
     _lps.reserve(10);
@@ -52,7 +49,7 @@ public:
 
   auto button() -> bool
   {
-    if (ui::click_area("playback_button", _left_upper, _right_lower))
+    if (ui::click_area(_name, _left_upper, _right_lower))
     {
       click();
       return true;
@@ -67,6 +64,12 @@ public:
     
     bool change = _lps[1].now().x != _lps[8].now().x;
     
+    static auto c = _color;
+    if (ui::is_hover_on(_name))
+      _color = 0xdcdcdcff;
+    else
+      _color = c;
+
     ui::path_begin();
     ui::set_operation(type::shape_op::min);
 
@@ -92,7 +95,7 @@ public:
 
 private:
   std::vector<LerpPoint> _lps;
-  std::string            _playback_btn_name, _pasue_btn_name;
+  std::string            _name;
   glm::vec2              _left_upper, _right_lower;
   uint32_t               _color;
   uint32_t               _thickness;

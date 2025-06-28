@@ -45,6 +45,7 @@ struct ui_context
   bool      click_finish{};
 
   std::pair<std::string, std::string> current_hovered_widget{};
+  std::vector<glm::vec2>              current_hovered_widget_rect{};
   std::pair<std::string, std::string> last_hovered_widget{};
 
   // TODO: tmp

@@ -163,7 +163,15 @@ TK_API bool button(std::string_view name, type::shape shape, std::vector<glm::ve
  * @param name name for id in layout (different layout can have same name widget)
  * @param pos0 position on left upper
  * @param pos1 position on right lower
+ * @return true if area is clicked
  */
 TK_API bool click_area(std::string_view name, glm::vec2 const& pos0, glm::vec2 const& pos1);
+
+/**
+ * judge whether hover on specific widget by name of current layer
+ * @param name name of widget of current layer
+ * @return true if hovering
+ */
+TK_API bool is_hover_on(std::string_view name);
 
 }}
