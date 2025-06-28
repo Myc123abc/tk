@@ -57,20 +57,12 @@ auto get_window_size() -> glm::vec2
   return tk_ctx->window.get_framebuffer_size();
 }
 
-inline auto suspend() -> type::window
-{
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  return type::window::suspended;
-}
-
 auto event_process() -> type::window
 {
-  using enum type::window;
-
   auto& win = tk_ctx->window;
-  auto ui_ctx = ui::get_ctx();
-
   win.event_process();
+
+  ui::event_process();
 
   return win.state();
 }

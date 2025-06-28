@@ -12,14 +12,6 @@ namespace tk { namespace ui {
 //                                  Misc
 ////////////////////////////////////////////////////////////////////////////////
 
-// FIXME: discard?
-auto generate_id() -> uint32_t
-{
-  static uint32_t id = 0;
-  assert(id < UINT32_MAX);
-  return ++id;
-}
-
 void begin(std::string_view name, glm::vec2 const& pos)
 {
   auto ctx = get_ctx();
@@ -27,10 +19,8 @@ void begin(std::string_view name, glm::vec2 const& pos)
   assert(ctx->begining == false);
   ctx->begining = true;
 
-  ctx->layouts.emplace(Layout{ name, pos });
-
-  ctx->states.try_emplace(name.data(), std::vector<Widget>());
-  ctx->call_stack.try_emplace(name.data(), std::vector<std::string>());
+  ctx->layouts.emplace(name, Layout{});
+  ctx->last_layout = &ctx->layouts[name.data()];
 }
 
 void end()
@@ -44,8 +34,8 @@ void clear()
   auto ctx = get_ctx();
   ctx->points.clear();
   ctx->shape_infos.clear();
-  while (!ctx->layouts.empty()) ctx->layouts.pop();
-  ctx->call_stack.clear();
+  ctx->layouts.clear();
+  ctx->click_finish = {};
 }
 
 void render()
@@ -67,7 +57,7 @@ void text_mask_render()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-//                                Shape
+//                               Draw Shape
 ////////////////////////////////////////////////////////////////////////////////
 
 auto convert_color_format(uint32_t color)
@@ -104,7 +94,7 @@ void shape(type::shape type, std::vector<glm::vec2> const& points, uint32_t colo
     throw_if(type != line_partition && type != bezier_partition, "failed to draw path, only support line and bezier");
   
   // get layout position
-  auto& pos = ctx->layouts.back().pos;
+  auto& pos = ctx->last_layout->pos;
 
   // start index of points
   uint32_t offset = ctx->points.size() * 2;
@@ -131,7 +121,7 @@ void circle(glm::vec2 const& center, float radius, uint32_t color, uint32_t thic
   throw_if(!ctx->begining || ctx->path_begining,
            "failed to draw circle, need ui::begin() or cannot draw in ui::path_begin()");
   
-  auto& pos = ctx->layouts.back().pos;
+  auto& pos = ctx->last_layout->pos;
 
   uint32_t offset = ctx->points.size() * 2;
 
@@ -189,17 +179,41 @@ void text(std::string_view text, glm::vec2 const& pos, float size, uint32_t colo
   shape(type::shape::glyph, { glm::vec2(res.second.x, res.second.y), glm::vec2(res.second.z, res.second.w) }, color);
 }
 
-////////////////////////////////////////////////////////////////////////////////
-//                                UI
-////////////////////////////////////////////////////////////////////////////////
-
 void set_operation(type::shape_op op)
 {
   auto ctx = get_ctx();
   assert(ctx->begining);
   ctx->shape_infos.back().op = op;
 }
-#if 0
+
+////////////////////////////////////////////////////////////////////////////////
+//                             Mouse Operation
+////////////////////////////////////////////////////////////////////////////////
+
+void event_process()
+{
+  using enum type::mouse_state;
+
+  auto ctx = get_ctx();
+
+  ctx->mouse_pos = ctx->window->get_mouse_position();
+
+  // mouse click
+  auto mouse_state = ctx->window->get_mouse_state();
+  static bool first_down{};
+  if (!first_down && mouse_state == left_down)
+  {
+    ctx->drag_start_pos = ctx->mouse_pos;
+    first_down          = true;
+  }
+  else if (first_down && mouse_state == left_up)
+  {
+    ctx->drag_end_pos = ctx->mouse_pos;
+    ctx->click_finish = true;
+    first_down        = false;
+  }
+}
+
 auto get_bounding_rectangle(std::vector<glm::vec2> const& data) -> std::pair<glm::vec2, glm::vec2>
 {
   assert(data.size() > 1);
@@ -219,121 +233,44 @@ auto get_bounding_rectangle(std::vector<glm::vec2> const& data) -> std::pair<glm
   return { min, max };
 }
 
-bool detect_mouse_on_button(std::vector<glm::vec2> const& data)
+bool hit(glm::vec2 const& pos, std::vector<glm::vec2> const& data)
 {
-  auto ctx = get_ctx();
   // get bounding rectangle
-  auto win_pos = get_ctx()->layouts.back().pos;
+  auto win_pos = get_ctx()->last_layout->pos;
   auto res     = get_bounding_rectangle(data);
   auto min     = res.first  + win_pos;
   auto max     = res.second + win_pos;
 
-  // get mouse pos
-  auto cursor_pos = ctx->window->get_cursor_position();
-
   // detect whether mouse on button
-  if (cursor_pos.x > min.x && cursor_pos.y > min.y &&
-      cursor_pos.x < max.x && cursor_pos.y < max.y)
-  {
+  if (pos.x > min.x && pos.y > min.y &&
+      pos.x < max.x && pos.y < max.y)
     return true;
-  }
   return false;
+}
+
+auto add_widget(std::string_view name)
+{
+  auto& widgets = get_ctx()->last_layout->widgets;
+
+  // promise widget name is unique for per layout
+  auto it = std::find_if(widgets.begin(), widgets.end(), [&](auto const& widget) { return widget.name == name; });
+  assert(it == widgets.end());
+  widgets.emplace_back(Widget{ name.data() });
+
+  return std::to_address(widgets.rbegin());
 }
 
 bool click_area(std::string_view name, glm::vec2 const& pos0, glm::vec2 const& pos1)
 {
-  auto ctx    = get_ctx();
-  auto& layout = ctx->layouts.back();
-
-  // detect whether already have same button
-  {
-    // get current layout's widgets name
-    auto& widgets = ctx->call_stack.at(layout.name.data());
-    // have same button throw exception
-    auto it = std::find_if(widgets.begin(), widgets.end(), [&](auto const& str) { return str == name; });
-    if (it == widgets.end())
-      widgets.emplace_back(name.data());
-    else
-      throw_if(true, "duplication button");
-  }
-
-  // get widgets of current layout
-  auto& widgets = ctx->states.at(layout.name.data());
-  auto it = std::find_if(widgets.begin(), widgets.end(), [&](auto const& widget) { return widget.name == name; });
-
-  Widget* widget{};
-
-  // not found, create the new widget
-  if (it == widgets.end())
-  {
-    widgets.emplace_back(Widget
-    {
-      .name        = name.data(),
-      .id          = generate_id(),
-      .first_click = false,
-    });
-    widget = &widgets.back();
-  }
-  else
-    widget = &*it;
-
-  auto detect_data = { pos0, { pos1.x, pos0.y }, pos1, { pos0.x, pos1.y } };
-  auto mouse_state = ctx->window->get_mouse_state();
-  if (mouse_state == type::mouse::left_down && detect_mouse_on_button(detect_data))
-  {
-    widget->first_click = true;
-    return false;
-  }
-
-  if (widget->first_click && mouse_state == type::mouse::left_up)
-  {
-    widget->first_click = false;
-    if (detect_mouse_on_button(detect_data))
-      return true;
-    else
-      return false;
-  }
-
-  return false;
+  add_widget(name);
+  auto ctx = get_ctx();
+  return ctx->click_finish ? hit(ctx->drag_start_pos, { pos0, pos1 }) &&
+                             hit(ctx->drag_end_pos,   { pos0, pos1 })
+                           : false;
 }
 
 bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> const& data, uint32_t color, uint32_t thickness)
 {
-  auto ctx    = get_ctx();
-  auto& layout = ctx->layouts.back();
-
-  // detect whether already have same button
-  {
-    // get current layout's widgets name
-    auto& widgets = ctx->call_stack.at(layout.name.data());
-    // have same button throw exception
-    auto it = std::find_if(widgets.begin(), widgets.end(), [&](auto const& str) { return str == name; });
-    if (it == widgets.end())
-      widgets.emplace_back(name.data());
-    else
-      throw_if(true, "duplication button");
-  }
-
-  // get widgets of current layout
-  auto& widgets = ctx->states.at(layout.name.data());
-  auto it = std::find_if(widgets.begin(), widgets.end(), [&](auto const& widget) { return widget.name == name; });
-
-  Widget* widget{};
-
-  // not found, create the new widget
-  if (it == widgets.end())
-  {
-    widgets.emplace_back(Widget
-    {
-      .name        = name.data(),
-      .id          = generate_id(),
-      .first_click = false,
-    });
-    widget = &widgets.back();
-  }
-  else
-    widget = &*it;
-
   // draw shape
   auto num = data.size();
   std::vector<glm::vec2> detect_data;
@@ -372,23 +309,12 @@ bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> con
     break;
   }
 
-  auto mouse_state = ctx->window->get_mouse_state();
-  if (mouse_state == type::mouse::left_down && detect_mouse_on_button(detect_data))
-  {
-    widget->first_click = true;
-    return false;
-  }
+  add_widget(name);
+  auto ctx = get_ctx();
 
-  if (widget->first_click && mouse_state == type::mouse::left_up)
-  {
-    widget->first_click = false;
-    if (detect_mouse_on_button(detect_data))
-      return true;
-    else
-      return false;
-  }
-
-  return false;
+  return ctx->click_finish ? hit(ctx->drag_start_pos, detect_data) &&
+                             hit(ctx->drag_end_pos,   detect_data)
+                           : false;
 }
-#endif
+
 }}

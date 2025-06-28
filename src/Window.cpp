@@ -221,6 +221,11 @@ auto Window::get_mouse_position() const noexcept -> glm::vec2
   return { pos.x, pos.y };
 }
 
+auto Window::get_mouse_state() const noexcept -> type::mouse_state
+{
+  return GetKeyState(VK_LBUTTON) & 0x8000 ? type::mouse_state::left_down : type::mouse_state::left_up;
+}
+
 void CALLBACK Window::message_process(LPVOID) noexcept
 {
   MSG msg{};

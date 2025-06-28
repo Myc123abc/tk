@@ -137,10 +137,6 @@ TK_API void path_end(uint32_t color, uint32_t thickness = 0);
  */
 TK_API void text(std::string_view text, glm::vec2 const& pos, float size, uint32_t color);
 
-////////////////////////////////////////////////////////////////////////////////
-//                                UI
-////////////////////////////////////////////////////////////////////////////////
-
 // TODO: not perfect design when handle path draw
 /**
  * set current shape mix operation with next shape.
@@ -150,6 +146,10 @@ TK_API void text(std::string_view text, glm::vec2 const& pos, float size, uint32
  * @param op operator for current shape with next shape
  */
 TK_API void set_operation(type::shape_op op);
+
+////////////////////////////////////////////////////////////////////////////////
+//                                UI
+////////////////////////////////////////////////////////////////////////////////
 
 /**
  * button, can be clicked

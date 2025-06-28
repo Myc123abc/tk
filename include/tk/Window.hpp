@@ -1,3 +1,12 @@
+//
+// window class
+//
+// TODO:
+// currenly, only implement win32, also need to implement wayland, android
+//
+// in win32, use fiber to avoid modal loop blocking main loop when move and resize.
+//
+
 #pragma once
 
 #include "tk/type.hpp"
@@ -42,12 +51,15 @@ public:
   auto state() const noexcept { return _state; }
 
   auto get_mouse_position() const noexcept -> glm::vec2;
+  auto get_mouse_state() const noexcept -> type::mouse_state;
 
   void init_keys() noexcept;
   auto get_key(type::key k) noexcept -> type::key_state;
 
 #ifdef _WIN32
 private:
+  // TODO: cpp coroutine will get better performance than win32 fiber,
+  //       and maybe have std::fiber in future
   static void CALLBACK message_process(LPVOID) noexcept;
   inline static LPVOID _main_fiber{};
   inline static LPVOID _message_fiber{};

@@ -24,7 +24,7 @@ namespace tk { namespace type {
     min,
   };
 
-  enum class mouse
+  enum class mouse_state
   {
     left_down,
     left_up,
