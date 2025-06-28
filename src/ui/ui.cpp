@@ -19,8 +19,12 @@ void begin(std::string_view name, glm::vec2 const& pos)
   assert(ctx->begining == false);
   ctx->begining = true;
 
-  ctx->layouts.emplace(name, Layout{});
-  ctx->last_layout = &ctx->layouts[name.data()];
+  ctx->layouts.emplace_back(Layout
+  {
+    .name = name.data(),
+    .pos  = pos,
+  });
+  ctx->last_layout = std::to_address(ctx->layouts.rbegin());
 }
 
 void end()
@@ -32,6 +36,10 @@ void end()
 void clear()
 {
   auto ctx = get_ctx();
+
+  ctx->last_hovered_widget = ctx->current_hovered_widget;
+
+  // clear frame resources
   ctx->points.clear();
   ctx->shape_infos.clear();
   ctx->layouts.clear();
@@ -46,7 +54,7 @@ void render()
 
   ctx->engine->sdf_update(ctx->points, ctx->shape_infos);
   ctx->engine->sdf_render(ctx->points.size() * 2, ctx->shape_infos.size());
-
+  
   clear();
 }
 
@@ -260,13 +268,31 @@ auto add_widget(std::string_view name)
   return std::to_address(widgets.rbegin());
 }
 
-bool click_area(std::string_view name, glm::vec2 const& pos0, glm::vec2 const& pos1)
+auto update_current_hovered_widget(std::string_view name, std::vector<glm::vec2> const& rect)
+{
+  auto ctx = get_ctx();
+  if (hit(ctx->mouse_pos, rect))
+  {
+    ctx->current_hovered_widget.first  = ctx->last_layout->name;
+    ctx->current_hovered_widget.second = name;
+  }
+}
+
+bool is_clicked(std::string_view name, std::vector<glm::vec2> const& data)
 {
   add_widget(name);
   auto ctx = get_ctx();
-  return ctx->click_finish ? hit(ctx->drag_start_pos, { pos0, pos1 }) &&
-                             hit(ctx->drag_end_pos,   { pos0, pos1 })
+  update_current_hovered_widget(name, data);
+  if (ctx->current_hovered_widget != ctx->last_hovered_widget)
+    return false;
+  return ctx->click_finish ? hit(ctx->drag_start_pos, data) &&
+                             hit(ctx->drag_end_pos,   data)
                            : false;
+}
+
+bool click_area(std::string_view name, glm::vec2 const& pos0, glm::vec2 const& pos1)
+{
+  return is_clicked(name, { pos0, pos1 });
 }
 
 bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> const& data, uint32_t color, uint32_t thickness)
@@ -309,12 +335,7 @@ bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> con
     break;
   }
 
-  add_widget(name);
-  auto ctx = get_ctx();
-
-  return ctx->click_finish ? hit(ctx->drag_start_pos, detect_data) &&
-                             hit(ctx->drag_end_pos,   detect_data)
-                           : false;
+  return is_clicked(name, detect_data);
 }
 
 }}

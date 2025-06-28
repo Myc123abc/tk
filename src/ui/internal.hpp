@@ -1,9 +1,3 @@
-//
-// TODO:
-// 1. implement shape cover mouse hit per layer
-// 2. implement layer cover mouse hit
-//
-
 #pragma once
 
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
@@ -12,7 +6,6 @@
 
 #include <vector>
 #include <string>
-#include <unordered_map>
 
 namespace tk { namespace ui {
 
@@ -23,6 +16,7 @@ struct Widget
 
 struct Layout
 {
+  std::string         name;
   glm::vec2           pos;
   std::vector<Widget> widgets;
 };
@@ -39,7 +33,7 @@ struct ui_context
   std::vector<glm::vec2>                  points;
   std::vector<graphics_engine::ShapeInfo> shape_infos;
 
-  std::unordered_map<std::string, Layout> layouts;
+  std::vector<Layout> layouts;
   Layout* last_layout{};
 
   bool     path_begining{};
@@ -49,6 +43,9 @@ struct ui_context
   glm::vec2 drag_start_pos{};
   glm::vec2 drag_end_pos{};
   bool      click_finish{};
+
+  std::pair<std::string, std::string> current_hovered_widget{};
+  std::pair<std::string, std::string> last_hovered_widget{};
 
   // TODO: tmp
   glm::vec4 a, p;

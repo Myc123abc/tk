@@ -5,10 +5,6 @@
 // for mouse handle, I only use a bound rectangle to detection for simply
 //
 // draw way use sdf
-// primitive:
-// 1. line segment
-// 2. circle
-// 3. oriented half plane (need points as counter clockwise)
 //
 
 #pragma once
