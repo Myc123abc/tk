@@ -157,8 +157,8 @@ void main()
     if (info.type == Glyph)
     {
       ++shape_info_idx;
-      //anti_aliasing_color = mix(col.rgb, info.color.rgb, texture(text_mask, uv));
-      //col = alpha_mix(anti_aliasing_color, col.a, info.color); // FIXME:
+      anti_aliasing_color = mix(col.rgb, info.color.rgb, texelFetch(text_mask, ivec2(uv), 0).x);
+      col = alpha_mix(anti_aliasing_color, info.color.a, col);
       continue;
     }
 

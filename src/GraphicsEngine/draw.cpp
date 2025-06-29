@@ -154,7 +154,7 @@ void GraphicsEngine::set_pipeline_state(Command const& cmd)
   vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
   vkCmdSetPrimitiveRestartEnable(cmd, VK_FALSE);
   graphics_engine::vkCmdSetVertexInputEXT(cmd, 0, nullptr, 0, nullptr);
-  VkBool32 color_blend_enables{ VK_TRUE };
+  VkBool32 color_blend_enables{ VK_FALSE };
   graphics_engine::vkCmdSetColorBlendEnableEXT(cmd, 0, 1, &color_blend_enables);
   if (color_blend_enables)
   {
