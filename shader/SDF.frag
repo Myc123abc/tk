@@ -20,7 +20,7 @@ const uint Shape_Info_Size = 9;
       uint shape_info_idx  = 0;
 #define GetShapeInfoOffset() (pc.offset + shape_info_idx * Shape_Info_Size)
 
-vec4 mix_color(vec4 color, vec4 background, float w, float d, uint t)
+vec3 mix_color(vec3 color, vec3 background, float w, float d, uint t)
 {
   float value;
   if (t == 0)
@@ -137,11 +137,18 @@ float get_distance(ShapeInfo info)
   }
 }
 
+vec4 alpha_mix(vec3 color, float alpha, vec4 background)
+{
+  return vec4(color * alpha + background.rgb * (1 - alpha),
+              alpha + background.a * (1 - alpha));
+}
+
 void main()
 {
   float w = length(vec2(dFdxFine(uv.x), dFdyFine(uv.y)));
   
-  col = vec4(0.0);
+  col = vec4(1.0);
+  vec3 anti_aliasing_color;
 
   while (shape_info_idx < pc.num)
   {
@@ -150,7 +157,8 @@ void main()
     if (info.type == Glyph)
     {
       ++shape_info_idx;
-      col = mix(col, info.color, texture(text_mask, uv));
+      //anti_aliasing_color = mix(col.rgb, info.color.rgb, texture(text_mask, uv));
+      //col = alpha_mix(anti_aliasing_color, col.a, info.color); // FIXME:
       continue;
     }
 
@@ -158,17 +166,19 @@ void main()
     
     if (info.op == Mix)
     {
-      col = mix_color(info.color, col, w, d, info.thickness);
+      anti_aliasing_color = mix_color(info.color.rgb, col.rgb, w, d, info.thickness);
+      col = alpha_mix(anti_aliasing_color, info.color.a, col);
     }
-    else if (info.op == Min)
+    else if (info.op == Min) // TODO: currently, don't know how to handle two color and thickness, so just use first one's color and thickness.
     {
       ShapeInfo next_info = get_shape_info();
       
       d = min(d, get_distance(next_info));
 
-      vec4 color = mix(info.color, next_info.color, smoothstep(0.0, w, d));
+      vec3 color = mix(info.color.rgb, next_info.color.rgb, smoothstep(0.0, w, d));
 
-      col = mix_color(color, col, w, d, info.thickness);
+      anti_aliasing_color = mix_color(color, col.rgb, w, d, info.thickness);
+      col = alpha_mix(anti_aliasing_color, info.color.a, col);
     }
   }
 }

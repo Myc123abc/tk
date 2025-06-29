@@ -47,7 +47,7 @@ TK_API void end();
  * @param color color of shape (RGBA)
  * @param thickness thickness of shape (line thickness always 1 pixel)
  */
-TK_API void shape(type::shape type, std::vector<glm::vec2> const& points, uint32_t color, uint32_t thickness = 0);
+TK_API void shape(type::shape type, std::vector<glm::vec2> const& points, uint32_t color = 0, uint32_t thickness = 0);
 
 /**
  * draw line
@@ -55,7 +55,7 @@ TK_API void shape(type::shape type, std::vector<glm::vec2> const& points, uint32
  * @param p1 end point
  * @param color
  */
-TK_API inline void line(glm::vec2 p0, glm::vec2 p1, uint32_t color = 0xffffffff)
+TK_API inline void line(glm::vec2 p0, glm::vec2 p1, uint32_t color = 0)
 { 
   if (p0 != p1) shape(type::shape::line, { p0, p1 }, color);
 }
@@ -67,7 +67,7 @@ TK_API inline void line(glm::vec2 p0, glm::vec2 p1, uint32_t color = 0xffffffff)
  * @param color rgba
  * @param thickness
  */
-TK_API inline void rectangle(glm::vec2 const& left_top, glm::vec2 const& right_bottom, uint32_t color, uint32_t thickness = 0)
+TK_API inline void rectangle(glm::vec2 const& left_top, glm::vec2 const& right_bottom, uint32_t color = 0, uint32_t thickness = 0)
 { 
   shape(type::shape::rectangle, { left_top, right_bottom }, color, thickness);
 }
@@ -80,7 +80,7 @@ TK_API inline void rectangle(glm::vec2 const& left_top, glm::vec2 const& right_b
  * @param color rgba
  * @param thickness
  */
-TK_API inline void triangle(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint32_t color, uint32_t thickness = 0)
+TK_API inline void triangle(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint32_t color = 0, uint32_t thickness = 0)
 { 
   shape(type::shape::triangle, { p0, p1, p2 }, color, thickness);
 }
@@ -91,7 +91,7 @@ TK_API inline void triangle(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 
  * @param color rgba
  * @param thickness
  */
-TK_API inline void polygon(std::vector<glm::vec2> const& points, uint32_t color, uint32_t thickness = 0)
+TK_API inline void polygon(std::vector<glm::vec2> const& points, uint32_t color = 0, uint32_t thickness = 0)
 { 
   shape(type::shape::polygon, points, color, thickness);
 }
@@ -103,7 +103,7 @@ TK_API inline void polygon(std::vector<glm::vec2> const& points, uint32_t color,
  * @param color
  * @param thickness
  */
-TK_API void circle(glm::vec2 const& center, float radius, uint32_t color, uint32_t thickness = 0);
+TK_API void circle(glm::vec2 const& center, float radius, uint32_t color = 0, uint32_t thickness = 0);
 
 /**
  * draw quadratic bezier
@@ -112,7 +112,7 @@ TK_API void circle(glm::vec2 const& center, float radius, uint32_t color, uint32
  * @param p2
  * @param color rgba
  */
-TK_API inline void bezier(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint32_t color = 0xffffffff)
+TK_API inline void bezier(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint32_t color = 0)
 { 
   shape(type::shape::bezier, { p0, p1, p2 }, color);
 }
@@ -122,7 +122,7 @@ TK_API inline void bezier(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 co
  * and set_operation can only use with path_begin
  */
 TK_API void path_begin();
-TK_API void path_end(uint32_t color, uint32_t thickness = 0);
+TK_API void path_end(uint32_t color = 0, uint32_t thickness = 0);
 
 /**
  * draw text
@@ -131,13 +131,13 @@ TK_API void path_end(uint32_t color, uint32_t thickness = 0);
  * @param size
  * @param color
  */
-TK_API void text(std::string_view text, glm::vec2 const& pos, float size, uint32_t color);
+TK_API void text(std::string_view text, glm::vec2 const& pos, float size, uint32_t color = 0);
 
 // TODO: not perfect design when handle path draw
 /**
  * set current shape mix operation with next shape.
  * the final shape operation must be mix (default).
- * the operator for two shapes only use thickness of first shape.
+ * the operator for two shapes only use thickness and color of first shape.
  * for path shape, can only be used with path_begin
  * @param op operator for current shape with next shape
  */

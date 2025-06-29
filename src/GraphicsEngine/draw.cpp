@@ -107,7 +107,7 @@ void GraphicsEngine::render_begin(Image& image)
     .sType              = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
     .imageView          = image.view(),
     .imageLayout        = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    .loadOp             = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+    .loadOp             = VK_ATTACHMENT_LOAD_OP_CLEAR,
     .storeOp            = VK_ATTACHMENT_STORE_OP_STORE,
   };
   auto rendering = VkRenderingInfo
