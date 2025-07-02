@@ -175,6 +175,7 @@ namespace tk { namespace graphics_engine {
     {
       glm::vec4 pos; // position of glyph in framebuffer
       glm::vec4 uv;  // coordinate of glyph in font atlas
+      glm::vec2 window_extent;
     };
 
     msdf_atlas::FontGeometry               _font_geo;

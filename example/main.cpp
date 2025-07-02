@@ -101,7 +101,7 @@ void render()
     ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ 100, 3 }, 0x808080FF );
     ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ progress, 3 }, 0x0000FFFF );
 
-    ui::text("T", {0,0}, 32, 0xffffffff);
+    ui::text("T", {50,-20}, 64, 0xffffffff);
 
     ui::end();
   }

@@ -7,8 +7,6 @@
 // TODO: Currently, only single font. We need expand to multi-font-atlas processing in future.
 //
 
-// TODO: should i convert to uv image? because directly text image, in sdf also need sample
-
 #version 460
 
 #include "text_mask.h"
@@ -17,12 +15,18 @@ layout(location = 0) out vec2 uv;
 
 void main()
 {
+  vec2 min = pc.pos.xy;
+  vec2 max = pc.pos.zw;
+
+  min = min / pc.window_extent * vec2(2) - vec2(1);
+  max = max / pc.window_extent * vec2(2) - vec2(1);
+
   vec2 vertices[] =
   {
-    { pc.pos.x, pc.pos.w },
-    { pc.pos.z, pc.pos.w },
-    { pc.pos.x, pc.pos.y },
-    { pc.pos.z, pc.pos.y },
+    min,
+    { max.x, min.y },
+    { min.x, max.y },
+    max,
   };
   gl_Position = vec4(vertices[gl_VertexIndex], 0, 1);
 

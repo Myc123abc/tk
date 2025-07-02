@@ -230,30 +230,29 @@ auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 const& pos, flo
   min *= _em_size;
   max *= _em_size;
 
-  return { glm::vec4{ al, ab, ar, at }, glm::vec4{ min, max } };
+  glm::vec4 p{ min, max };
+  auto scale = static_cast<float>(size / _em_size);
+  min *= scale;
+  max *= scale;
+  min += pos;
+  max += pos;
+
+  return { glm::vec4{ al, ab, ar, at }, glm::vec4{ min,  max }};
 }
 
 void GraphicsEngine::text_mask_render(glm::vec4 a, glm::vec4 p)
 {
   auto& frame = get_current_frame();
-  
-  auto min = glm::vec2(p.x, p.y);
-  auto max = glm::vec2(p.z, p.w);
-
-  // TODO: this can move to vertex shader
-  auto window_extent = _window->get_framebuffer_size();
-  min = min / window_extent * glm::vec2(2) - glm::vec2(1);
-  max = max / window_extent * glm::vec2(2) - glm::vec2(1);
 
   auto pc = PushConstant_text_mask
   {
-    .pos  = { min.x, max.y, max.x, min.y },
-    .uv   = { a.x / _font_atlas_extent.x, a.y / _font_atlas_extent.y, a.z / _font_atlas_extent.x, a.w / _font_atlas_extent.y },
+    .pos           = p,
+    .uv            = { a.x / _font_atlas_extent.x, a.y / _font_atlas_extent.y, a.z / _font_atlas_extent.x, a.w / _font_atlas_extent.y },
+    .window_extent = _window->get_framebuffer_size(),
   };
 
   _text_mask_render_pipeline.bind(frame.cmd, pc);
 
-  // TODO: move cmd draw on RenderPipeline
   vkCmdDraw(frame.cmd, 4, 1, 0, 0);
 }
 
