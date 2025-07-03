@@ -21,15 +21,19 @@ enum class Level
   warn,
 };
 
+#define Red(x)    "\e[31m" x "\e[0m"
+#define Green(x)  "\e[32m" x "\e[0m"
+#define Yellow(x) "\e[33m" x "\e[0m"
+
 template <typename T>
 void log(Level level, T const& msg)
 {
   if (level == Level::error)
-  std::println("[error] {}", msg);
+  std::println("[{}] {}", Red("error"), msg);
   else if (level == Level::info)
-  std::println("[info]  {}", msg);
+  std::println("[{}] {}", Green("info"), msg);
   else if (level == Level::warn)
-  std::println("[warn]  {}", msg);
+  std::println("[{}] {}", Yellow("warn"), msg);
   else
   assert(false);
 }
@@ -38,11 +42,11 @@ template <typename... Args>
 void log(Level level, std::format_string<Args...> fmt, Args&&... args)
 {
   if (level == Level::error)
-  std::println("[error] {}", fmt, std::forward<Args>(args)...);
+  std::println("[{}] {}", Red("error"), fmt, std::forward<Args>(args)...);
   else if (level == Level::info)
-  std::println("[info]  {}", fmt, std::forward<Args>(args)...);
+  std::println("[{}] {}", Green("info"), fmt, std::forward<Args>(args)...);
   else if (level == Level::warn)
-  std::println("[warn]  {}", fmt, std::forward<Args>(args)...);
+  std::println("[{}] {}", Yellow("warn"), fmt, std::forward<Args>(args)...);
   else
   assert(false);
 }
