@@ -46,7 +46,7 @@ void GraphicsEngine::destroy()
   if (_device)
     vkDeviceWaitIdle(_device);
   _destructors.clear();
-  Device_Extensions.clear();
+  _device_extensions.clear();
 }
 
 void GraphicsEngine::create_instance()
@@ -126,7 +126,7 @@ void GraphicsEngine::select_physical_device()
     if (score > 0)
     {
       auto queue_family_indices = get_queue_family_indices(device, _surface);
-      if (check_device_extensions_support(device, Device_Extensions) &&
+      if (check_device_extensions_support(device, _device_extensions) &&
           !get_swapchain_details(device, _surface).has_empty())
       {
         _physical_device = device;
@@ -211,11 +211,11 @@ void GraphicsEngine::create_device_and_get_queues()
     .pNext                   = &features2,
     .queueCreateInfoCount    = (uint32_t)queue_infos.size(),
     .pQueueCreateInfos       = queue_infos.data(),
-    .enabledExtensionCount   = (uint32_t)Device_Extensions.size(),
-    .ppEnabledExtensionNames = Device_Extensions.data(),
+    .enabledExtensionCount   = (uint32_t)_device_extensions.size(),
+    .ppEnabledExtensionNames = _device_extensions.data(),
   };
 #ifndef NDEBUG
-  print_enabled_extensions("device", Device_Extensions);
+  print_enabled_extensions("device", _device_extensions);
 #endif
 
   // create logical device
@@ -398,11 +398,13 @@ void GraphicsEngine::create_buffer()
   for (auto i = 0; i < _swapchain_images.size(); ++i)
     _buffers.emplace_back(_mem_alloc.create_buffer(Buffer_Size, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT));
   
-  _descriptor_buffer = _mem_alloc.create_buffer(1024, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT  | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT , VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+  if (config()->use_descriptor_buffer)
+    _descriptor_buffer = _mem_alloc.create_buffer(1024, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT  | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT , VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
   
   _destructors.push([&]
   {
-    _descriptor_buffer.destroy();
+    if (config()->use_descriptor_buffer)
+      _descriptor_buffer.destroy();
     for (auto& buf : _buffers)
       buf.destroy();
   });
@@ -435,9 +437,6 @@ void GraphicsEngine::resize_swapchain()
 
 void GraphicsEngine::create_sdf_rendering_resource()
 {
-  // text mask image
-  _text_mask_image = _mem_alloc.create_image(VK_FORMAT_R32_SFLOAT, _swapchain_images[0].extent3D(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
-
   _sdf_render_pipeline = _device.create_render_pipeline(
     sizeof(PushConstant_SDF), 
     {
@@ -449,7 +448,8 @@ void GraphicsEngine::create_sdf_rendering_resource()
     {
       { VK_SHADER_STAGE_VERTEX_BIT,   "shader/SDF_vert.spv" },
       { VK_SHADER_STAGE_FRAGMENT_BIT, "shader/SDF_frag.spv" },
-    }
+    },
+    _swapchain_images[0].format()
   );
 
   // destroy resources
@@ -578,6 +578,9 @@ void GraphicsEngine::load_font()
   destroyFont(font);
   deinitializeFreetype(ft);
 
+  // text mask image
+  _text_mask_image = _mem_alloc.create_image(VK_FORMAT_R32_SFLOAT, _swapchain_images[0].extent3D(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+
   _text_mask_render_pipeline = _device.create_render_pipeline(
     sizeof(PushConstant_text_mask),
     {
@@ -588,7 +591,8 @@ void GraphicsEngine::load_font()
     {
       { VK_SHADER_STAGE_VERTEX_BIT,   "shader/text_mask_vert.spv" },
       { VK_SHADER_STAGE_FRAGMENT_BIT, "shader/text_mask_frag.spv" },
-    }
+    },
+    _text_mask_image.format()
   );
 
   // destroy resources

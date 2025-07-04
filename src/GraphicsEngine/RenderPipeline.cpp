@@ -1,6 +1,6 @@
 #include "tk/GraphicsEngine/RenderPipeline.hpp"
 #include "tk/GraphicsEngine/Device.hpp"
-
+#include "tk/GraphicsEngine/config.hpp"
 // FIXME: tmp
 #include "tk/ErrorHandling.hpp"
 
@@ -8,13 +8,26 @@
 
 namespace tk { namespace graphics_engine {
 
+void RenderPipeline::destroy() noexcept
+{
+  if (_has_descriptor_layout)
+    _descriptor_layout.destroy();
+  _pipeline_layout.destroy();
+  if (config()->use_shader_object)
+    for (auto& shader : _shaders)
+      shader.destroy();
+  else
+    _pipeline.destroy();
+}
+
 RenderPipeline::RenderPipeline(
   Device&                            device,
   uint32_t                           push_constant_size,
   std::vector<DescriptorInfo> const& descriptors, 
   Buffer&                            descriptor_buffer, 
   std::string_view                   descriptor_layout_tag, // FIXME: find way to discard this
-  std::vector<std::pair<VkShaderStageFlagBits, std::string_view>> const& shaders)
+  std::vector<std::pair<VkShaderStageFlagBits, std::string_view>> const& shaders,
+  VkFormat format)
 {
   auto has_stage = [&](VkShaderStageFlagBits stage)
   {
@@ -46,19 +59,37 @@ RenderPipeline::RenderPipeline(
     _has_descriptor_layout = true;
 
     _descriptor_layout = device.create_descriptor_layout(descriptors);
-    _descriptor_layout.upload(descriptor_buffer, descriptor_layout_tag);
+    
+    if (config()->use_descriptor_buffer)
+      _descriptor_layout.upload(descriptor_buffer, descriptor_layout_tag);
 
     _pipeline_layout = device.create_pipeline_layout({ _descriptor_layout }, { pc });
 
-    _descriptor_layout.set(_pipeline_layout, _is_graphics_pipeline ? VK_PIPELINE_BIND_POINT_GRAPHICS : VK_PIPELINE_BIND_POINT_COMPUTE);
+    _bind_point = _is_graphics_pipeline ? VK_PIPELINE_BIND_POINT_GRAPHICS : VK_PIPELINE_BIND_POINT_COMPUTE;
+    _descriptor_layout.set(_pipeline_layout, _bind_point);
     
     if (_is_graphics_pipeline)
     {
-      device.create_shaders(
+      if (config()->use_shader_object)
       {
-        { _shaders[0], shaders[0].first, shaders[0].second.data(), { _descriptor_layout }, { pc } },
-        { _shaders[1], shaders[1].first, shaders[1].second.data(), { _descriptor_layout }, { pc } },
-      }, true);
+        device.create_shaders(
+        {
+          { _shaders[0], shaders[0].first, shaders[0].second.data(), { _descriptor_layout }, { pc } },
+          { _shaders[1], shaders[1].first, shaders[1].second.data(), { _descriptor_layout }, { pc } },
+        }, true);
+      }
+      else
+      {
+        auto vert = std::find_if(shaders.begin(), shaders.end(), [](auto const& info)
+        {
+          return info.first == VK_SHADER_STAGE_VERTEX_BIT;
+        });
+        auto frag = std::find_if(shaders.begin(), shaders.end(), [](auto const& info)
+        {
+          return info.first == VK_SHADER_STAGE_FRAGMENT_BIT;
+        });
+        _pipeline = device.create_pipeline(_pipeline_layout, vert->second, frag->second, { _descriptor_layout }, { pc }, format);
+      }
     }
 
     _vk_shaders.resize(shaders.size());

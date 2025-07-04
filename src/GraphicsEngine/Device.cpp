@@ -68,8 +68,6 @@ void Device::create_shaders(std::vector<ShaderCreateInfo> const& infos, bool lin
 
   throw_if(graphics_engine::vkCreateShadersEXT(_device, create_infos.size(), create_infos.data(), nullptr, shaders.data()) != VK_SUCCESS,
            "failed to create shaders");
-  throw_if(std::find_if(shaders.begin(), shaders.end(), [](auto shader) { return shader == VK_NULL_HANDLE; }) != shaders.end(),
-           "failed to create shaders");
 
   for (auto i = 0; i < infos.size(); ++i)
     infos[i].shader.set(_device, shaders[i]);

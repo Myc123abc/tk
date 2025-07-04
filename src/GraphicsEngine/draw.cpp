@@ -1,6 +1,7 @@
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
 #include "tk/ErrorHandling.hpp"
 #include "tk/GraphicsEngine/vk_extension.hpp"
+#include "tk/GraphicsEngine/config.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -35,7 +36,8 @@ auto GraphicsEngine::frame_begin() -> bool
 
   set_pipeline_state(frame->cmd);
 
-  bind_descriptor_buffer(frame->cmd, _descriptor_buffer);
+  if (config()->use_descriptor_buffer)
+    bind_descriptor_buffer(frame->cmd, _descriptor_buffer);
 
   return true;
 }
@@ -129,48 +131,58 @@ void GraphicsEngine::sdf_render_begin()
 
 void GraphicsEngine::set_pipeline_state(Command const& cmd)
 {
-  graphics_engine::vkCmdSetCullModeEXT(cmd, VK_CULL_MODE_BACK_BIT);
-  graphics_engine::vkCmdSetDepthWriteEnableEXT(cmd, VK_FALSE);
-  vkCmdSetRasterizerDiscardEnable(cmd, VK_FALSE);
-  vkCmdSetDepthTestEnable(cmd, VK_FALSE);
-  vkCmdSetStencilTestEnable(cmd, VK_FALSE);
-  vkCmdSetDepthBiasEnable(cmd, VK_FALSE);
-  graphics_engine::vkCmdSetPolygonModeEXT(cmd, VK_POLYGON_MODE_FILL);
-  graphics_engine::vkCmdSetRasterizationSamplesEXT(cmd, VK_SAMPLE_COUNT_1_BIT);
-  VkSampleMask sampler_mask{ 0b1 };
-  graphics_engine::vkCmdSetSampleMaskEXT(cmd, VK_SAMPLE_COUNT_1_BIT, &sampler_mask);
-  vkCmdSetFrontFace(cmd, VK_FRONT_FACE_CLOCKWISE);
-  graphics_engine::vkCmdSetAlphaToCoverageEnableEXT(cmd, VK_FALSE);
   VkViewport viewport
   {
     .width  = static_cast<float>(get_current_swapchain_image().extent3D().width),
     .height = static_cast<float>(get_current_swapchain_image().extent3D().height), 
     .maxDepth = 1.f,
   };
-  VkRect2D scissor{ .extent = get_current_swapchain_image().extent2D(), };
-  vkCmdSetViewportWithCount(cmd, 1, &viewport);
-  vkCmdSetScissorWithCount(cmd, 1, &scissor);
-  // TODO: need to change to use triangle list with indices
-  vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
-  vkCmdSetPrimitiveRestartEnable(cmd, VK_FALSE);
-  graphics_engine::vkCmdSetVertexInputEXT(cmd, 0, nullptr, 0, nullptr);
-  VkBool32 color_blend_enables{ VK_FALSE };
-  graphics_engine::vkCmdSetColorBlendEnableEXT(cmd, 0, 1, &color_blend_enables);
-  if (color_blend_enables)
+
+  if (config()->use_shader_object)
   {
-    VkColorBlendEquationEXT blend_op
+    graphics_engine::vkCmdSetCullModeEXT(cmd, VK_CULL_MODE_BACK_BIT);
+    graphics_engine::vkCmdSetDepthWriteEnableEXT(cmd, VK_FALSE);
+    vkCmdSetRasterizerDiscardEnable(cmd, VK_FALSE);
+    vkCmdSetDepthTestEnable(cmd, VK_FALSE);
+    vkCmdSetStencilTestEnable(cmd, VK_FALSE);
+    vkCmdSetDepthBiasEnable(cmd, VK_FALSE);
+    graphics_engine::vkCmdSetPolygonModeEXT(cmd, VK_POLYGON_MODE_FILL);
+    graphics_engine::vkCmdSetRasterizationSamplesEXT(cmd, VK_SAMPLE_COUNT_1_BIT);
+    VkSampleMask sampler_mask{ 0b1 };
+    graphics_engine::vkCmdSetSampleMaskEXT(cmd, VK_SAMPLE_COUNT_1_BIT, &sampler_mask);
+    vkCmdSetFrontFace(cmd, VK_FRONT_FACE_CLOCKWISE);
+    graphics_engine::vkCmdSetAlphaToCoverageEnableEXT(cmd, VK_FALSE);
+    VkRect2D scissor{ .extent = get_current_swapchain_image().extent2D(), };
+    vkCmdSetViewportWithCount(cmd, 1, &viewport);
+    vkCmdSetScissorWithCount(cmd, 1, &scissor);
+    // TODO: need to change to use triangle list with indices
+    vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+    vkCmdSetPrimitiveRestartEnable(cmd, VK_FALSE);
+    graphics_engine::vkCmdSetVertexInputEXT(cmd, 0, nullptr, 0, nullptr);
+    VkBool32 color_blend_enables{ VK_FALSE };
+    graphics_engine::vkCmdSetColorBlendEnableEXT(cmd, 0, 1, &color_blend_enables);
+    if (color_blend_enables)
     {
-      .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
-      .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-      .colorBlendOp        = VK_BLEND_OP_ADD,
-      .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
-      .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
-      .alphaBlendOp        = VK_BLEND_OP_ADD,
-    };
-    graphics_engine::vkCmdSetColorBlendEquationEXT(cmd, 0, 1, &blend_op);
+      VkColorBlendEquationEXT blend_op
+      {
+        .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+        .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+        .colorBlendOp        = VK_BLEND_OP_ADD,
+        .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+        .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+        .alphaBlendOp        = VK_BLEND_OP_ADD,
+      };
+      graphics_engine::vkCmdSetColorBlendEquationEXT(cmd, 0, 1, &blend_op);
+    }
+    VkColorComponentFlags color_write_mask{ VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT };
+    graphics_engine::vkCmdSetColorWriteMaskEXT(cmd, 0, 1, &color_write_mask);
   }
-  VkColorComponentFlags color_write_mask{ VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT };
-  graphics_engine::vkCmdSetColorWriteMaskEXT(cmd, 0, 1, &color_write_mask);
+  else
+  {
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+    VkRect2D scissor{ .extent = get_current_swapchain_image().extent2D(), };
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+  }
 }
 
 void GraphicsEngine::render_end()

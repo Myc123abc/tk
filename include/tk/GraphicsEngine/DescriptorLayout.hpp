@@ -62,6 +62,9 @@ namespace tk { namespace graphics_engine {
     std::string                  _tag{};
     Buffer*                      _buffer{};
     char*                        _ptr{};
+
+    VkDescriptorPool             _pool{};
+    VkDescriptorSet              _set{};
   };
 
 }}

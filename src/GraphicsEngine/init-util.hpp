@@ -3,6 +3,7 @@
 #include "tk/log.hpp"
 #include "tk/ErrorHandling.hpp"
 #include "tk/Window.hpp"
+#include "tk/GraphicsEngine/config.hpp"
 
 #include <map>
 #include <print>
@@ -218,19 +219,42 @@ inline auto print_supported_device_extensions(VkPhysicalDevice device)
   std::println();
 }
 
-inline auto check_device_extensions_support(VkPhysicalDevice device, std::vector<const char*> const& extensions)
+inline auto check_device_extensions_support(VkPhysicalDevice device, std::vector<char const*>& extensions)
 {
-  auto supported_extensions = get_supported_device_extensions(device);
+  std::vector<char const*> supported_extensions;
+
+  auto available_extensions = get_supported_device_extensions(device);
   for (auto extension : extensions) 
   {
-      auto it = std::find_if(supported_extensions.begin(), supported_extensions.end(),
+      auto it = std::find_if(available_extensions.begin(), available_extensions.end(),
                              [extension] (const auto& supported_extension)
                              {
                                return strcmp(extension, supported_extension.extensionName) == 0;
                              });
-      if (it == supported_extensions.end())
+      if (it == available_extensions.end())
+      {
+        if (strcmp(extension, VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME) == 0)
+        {
+          config()->use_descriptor_buffer = false;
+#ifndef NDEBUG
+          log::warn("descriptor buffer extension is not supported, fallback to descriptor pool and set");
+#endif
+          continue;
+        }
+        if (strcmp(extension, VK_EXT_SHADER_OBJECT_EXTENSION_NAME) == 0)
+        {
+          config()->use_shader_object = false;
+#ifndef NDEBUG
+          log::warn("shader object extension is not supported, fallback to pipeline");
+#endif
+          continue;
+        }
         return false;
+      }
+
+      supported_extensions.push_back(extension);
   }
+  extensions = std::move(supported_extensions);
   return true;
 }
 

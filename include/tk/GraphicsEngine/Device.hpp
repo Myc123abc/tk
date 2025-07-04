@@ -39,14 +39,20 @@ namespace tk { namespace graphics_engine {
       return { _device, descritptor_layouts, push_constants };
     }
 
+    auto create_pipeline(VkPipelineLayout layout, std::string_view vert, std::string_view frag, std::vector<VkDescriptorSetLayout> const& descritptor_layouts, std::vector<VkPushConstantRange> const& push_constants, VkFormat format) -> Pipeline
+    {
+      return { *this, layout, vert, frag, descritptor_layouts, push_constants, format };
+    }
+
     auto create_render_pipeline(
       uint32_t                           push_constant_size,
       std::vector<DescriptorInfo> const& descriptors, 
       Buffer&                            descriptor_buffer, 
       std::string_view                   descriptor_layout_tag, // FIXME: find way to discard this
-      std::vector<std::pair<VkShaderStageFlagBits, std::string_view>> const& shaders) -> RenderPipeline
+      std::vector<std::pair<VkShaderStageFlagBits, std::string_view>> const& shaders,
+      VkFormat format) -> RenderPipeline
     {
-      return  { *this, push_constant_size, descriptors, descriptor_buffer, descriptor_layout_tag, shaders };
+      return  { *this, push_constant_size, descriptors, descriptor_buffer, descriptor_layout_tag, shaders, format };
     }
 
     auto& get_descriptor_buffer_info() const noexcept { return _descriptor_buffer_info; }

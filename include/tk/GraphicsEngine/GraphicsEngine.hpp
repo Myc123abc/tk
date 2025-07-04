@@ -120,7 +120,7 @@ namespace tk { namespace graphics_engine {
     bool _wait_fence{ true };
 
     static constexpr auto    Vulkan_Version{ VK_API_VERSION_1_4 };
-    std::vector<const char*> Device_Extensions
+    std::vector<const char*> _device_extensions
     {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
       VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
