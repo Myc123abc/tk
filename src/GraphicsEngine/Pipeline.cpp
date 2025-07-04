@@ -2,6 +2,7 @@
 #include "tk/GraphicsEngine/Device.hpp"
 #include "tk/util.hpp"
 #include "tk/ErrorHandling.hpp"
+#include "tk/GraphicsEngine/config.hpp"
 
 namespace tk { namespace graphics_engine {
 
@@ -136,6 +137,8 @@ Pipeline::Pipeline(Device& device, VkPipelineLayout layout, std::string_view ver
     .pDynamicState       = &dynamic_state,
     .layout              = layout,
   };
+  if (config()->use_descriptor_buffer)
+    info.flags = VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
   throw_if(vkCreateGraphicsPipelines(device, nullptr, 1, &info, nullptr, &_pipeline) != VK_SUCCESS,
            "failed to create pipeline");
 
