@@ -395,8 +395,12 @@ void GraphicsEngine::create_frame_resources()
 void GraphicsEngine::create_buffer()
 {
   _buffers.reserve(_swapchain_images.size());
+  _glyphs_buffers.reserve(_swapchain_images.size());
   for (auto i = 0; i < _swapchain_images.size(); ++i)
+  {
     _buffers.emplace_back(_mem_alloc.create_buffer(Buffer_Size, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT));
+    _glyphs_buffers.emplace_back(_mem_alloc.create_buffer(Buffer_Size, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT));
+  }
   
   if (config()->use_descriptor_buffer)
     _descriptor_buffer = _mem_alloc.create_buffer(1024, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT  | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT , VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
@@ -405,8 +409,11 @@ void GraphicsEngine::create_buffer()
   {
     if (config()->use_descriptor_buffer)
       _descriptor_buffer.destroy();
-    for (auto& buf : _buffers)
-      buf.destroy();
+    for (auto i = 0; i < _swapchain_images.size(); ++i)
+    {
+      _buffers[i].destroy();
+      _glyphs_buffers[i].destroy();
+    }
   });
 }
 
@@ -522,8 +529,8 @@ void GraphicsEngine::load_font()
 
   // load valid glyphs of character range (some characters maybe not in current font)
   _font_geo = msdf_atlas::FontGeometry(&_glyphs);
-  //font_geo.loadCharset(font, 1.0, get_char_set());
-  _font_geo.loadCharset(font, 1.0, msdf_atlas::Charset::ASCII, false, false);
+  _font_geo.loadCharset(font, 1.0, get_char_set());
+  //_font_geo.loadCharset(font, 1.0, msdf_atlas::Charset::ASCII, false, false);
   
   // pack
   auto packer = get_packer();
@@ -532,8 +539,6 @@ void GraphicsEngine::load_font()
   packer.getDimensions(width, height);
   _font_atlas_extent.x = width;
   _font_atlas_extent.y = height;
-  _em_size = packer.getScale();
-  //auto pixel_range = packer.getPixelRange();
 
   // TODO: use msdf_atlas::Workload for msdfgen::edgeColoringByDistance
   // edge coloring
@@ -562,7 +567,7 @@ void GraphicsEngine::load_font()
   auto buf       = _mem_alloc.create_buffer(byte_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 
   // copy 
-  buf.append((void*)bitmap.pixels, byte_size);
+  buf.append(reinterpret_cast<void const*>(bitmap.pixels), byte_size);
 
   // TODO: use single command once in init
   // copy to image

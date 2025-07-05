@@ -63,7 +63,7 @@ Pipeline::Pipeline(Device& device, VkPipelineLayout layout, std::string_view ver
   VkPipelineInputAssemblyStateCreateInfo input_assembly_state
   { 
     .sType    = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-    .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP, // TODO: change to list
+    .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
   };
 
   VkPipelineViewportStateCreateInfo viewport_state

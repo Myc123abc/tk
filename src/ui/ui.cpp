@@ -100,7 +100,7 @@ void render()
 void text_mask_render()
 {
   auto ctx = get_ctx();
-  ctx->engine->text_mask_render(ctx->a, ctx->p);
+  ctx->engine->text_mask_render();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -221,8 +221,6 @@ void text(std::string_view text, glm::vec2 const& pos, float size, uint32_t colo
 {
   auto ctx = get_ctx();
   auto res = ctx->engine->parse_text(text, pos, size);
-  ctx->a = res.first;
-  ctx->p = res.second;
   shape(type::shape::glyph, { glm::vec2(res.second.x, res.second.y), glm::vec2(res.second.z, res.second.w) }, color);
 }
 

@@ -7,6 +7,8 @@ vec2 vertices[] =
   { -1, -1 },
   {  1, -1 },
   { -1,  1 },
+  { -1,  1 },
+  {  1, -1 },
   {  1,  1 },
 };
 
@@ -20,6 +22,8 @@ void main()
     { 0, 0 },
     { pc.window_extent.x, 0 },
     { 0, pc.window_extent.y },
+    { 0, pc.window_extent.y },
+    { pc.window_extent.x, 0 },
     pc.window_extent,
   };
   uv = uvs[gl_VertexIndex];

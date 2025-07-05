@@ -137,7 +137,7 @@ void DescriptorLayout::upload(Buffer& buffer, std::string_view tag)
 {
   _buffer = &buffer;
   _ptr = reinterpret_cast<char*>(buffer.data()) + buffer.size();
-  buffer.add_tag(tag);
+  buffer.add_tag(tag.data());
   _tag = tag;
   buffer.add_size(align_size(update(), _device->get_descriptor_buffer_info().descriptorBufferOffsetAlignment));
 }

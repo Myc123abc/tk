@@ -64,12 +64,12 @@ Buffer::Buffer(MemoryAllocator* allocator, uint32_t size, VkBufferUsageFlags usa
   }
 }
 
-void Buffer::add_tag(std::string_view tag)
+void Buffer::add_tag(std::string const& tag)
 {
   throw_if(_offsets.emplace(tag, _size).second == false, "already have tag {}", tag);
 }
 
-auto Buffer::append(void* data, uint32_t size) -> Buffer&
+auto Buffer::append(void const* data, uint32_t size) -> Buffer&
 {
   auto total_size = _size + size;
   throw_if(total_size > _capacity, "exceeding capcity");

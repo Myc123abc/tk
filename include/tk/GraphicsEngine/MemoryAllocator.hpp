@@ -9,12 +9,15 @@
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
 
-#include <span>
 #include <unordered_map>
-#include <string_view>
 #include <string>
+#include <ranges>
 
 namespace tk { namespace graphics_engine {
+
+  template <typename T>
+  concept NotContainer = 
+    !std::ranges::range<T> && std::is_trivially_copyable_v<T>;
 
   class MemoryAllocator;
 
@@ -39,7 +42,7 @@ namespace tk { namespace graphics_engine {
     // usefor descriptor buffer update, directly add size and tag
     
     auto add_size(uint32_t size) noexcept { _size += size; }
-    void add_tag(std::string_view tag);
+    void add_tag(std::string const& tag);
 
     auto offset(std::string const& tag) const { return _offsets.at(tag); }
 
@@ -50,37 +53,50 @@ namespace tk { namespace graphics_engine {
       return *this;
     }
 
-    auto append(void* data, uint32_t size) -> Buffer&;
-    auto append(std::string_view tag, void* data, uint32_t size) -> Buffer&
+    auto append(void const* data, uint32_t size) -> Buffer&;
+    auto append(std::string const& tag, void const* data, uint32_t size) -> Buffer&
     {
       add_tag(tag);
       return append(data, size);
     }
 
-    template <typename T>
+    template <NotContainer T>
     auto append(T const& value) -> Buffer&
     {
       append(&value, sizeof(T));
       return *this;
     }
-    template <typename T>
-    auto append(std::string_view tag, T const& value) -> Buffer&
+    template <NotContainer T>
+    auto append(std::string const& tag, T const& value) -> Buffer&
     {
       add_tag(tag);
       return append(value);
     }
 
-    template <typename T>
-    auto append(std::span<T> values) -> Buffer&
+    template <std::ranges::range R>
+    requires (std::is_trivially_copyable_v<std::ranges::range_value_t<R>>)
+    auto append_range(R&& values) -> Buffer&
     {
-      append(values.data(), values.size() * sizeof(T));
+      using T = std::ranges::range_value_t<R>;
+
+      if constexpr (std::ranges::sized_range<R>)
+      {
+        auto count = std::ranges::size(values);
+        if (count)
+          append(std::ranges::data(values), count * sizeof(T));
+      } 
+      else
+        for (T const& val : values)
+          append(&val, sizeof(T));
       return *this;
     }
-    template <typename T>
-    auto append(std::string_view tag, std::span<T> values) -> Buffer&
+
+    template <std::ranges::range R>
+    requires (std::is_trivially_copyable_v<std::ranges::range_value_t<R>>)
+    auto append_range(std::string const& tag, std::span<R> values) -> Buffer&
     {
       add_tag(tag);
-      return append(values);
+      return append_range(values);
     }
 
   private:

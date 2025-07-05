@@ -66,7 +66,7 @@ namespace tk { namespace graphics_engine {
     // TODO: expand to multiple glyphs
     auto parse_text(std::string_view text, glm::vec2 const& pos, float size) -> std::pair<glm::vec4, glm::vec4>;
     void text_mask_render_begin();
-    void text_mask_render(glm::vec4 a, glm::vec4 p);
+    void text_mask_render();
 
     void sdf_render_begin();
     void sdf_update(std::span<glm::vec2> points, std::span<ShapeInfo> infos);
@@ -173,9 +173,8 @@ namespace tk { namespace graphics_engine {
     RenderPipeline _text_mask_render_pipeline;
     struct PushConstant_text_mask
     {
-      glm::vec4 pos; // position of glyph in framebuffer
-      glm::vec4 uv;  // coordinate of glyph in font atlas
-      glm::vec2 window_extent;
+      VkDeviceAddress buffer{};
+      glm::vec2       window_extent{};
     };
 
     msdf_atlas::FontGeometry               _font_geo;
@@ -183,6 +182,14 @@ namespace tk { namespace graphics_engine {
     glm::vec2 _font_atlas_extent{};
 
     Image  _text_mask_image;
-    double _em_size{};
+    std::vector<Buffer> _glyphs_buffers;
+
+    struct Vertex
+    {
+      glm::vec2 pos{};
+      glm::vec2 uv{};
+    };
+    std::vector<Vertex>   _vertices;
+    std::vector<uint16_t> _indices;
   };
 }}

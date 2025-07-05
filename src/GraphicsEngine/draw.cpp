@@ -155,8 +155,7 @@ void GraphicsEngine::set_pipeline_state(Command const& cmd)
     VkRect2D scissor{ .extent = get_current_swapchain_image().extent2D(), };
     vkCmdSetViewportWithCount(cmd, 1, &viewport);
     vkCmdSetScissorWithCount(cmd, 1, &scissor);
-    // TODO: need to change to use triangle list with indices
-    vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+    vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
     vkCmdSetPrimitiveRestartEnable(cmd, VK_FALSE);
     graphics_engine::vkCmdSetVertexInputEXT(cmd, 0, nullptr, 0, nullptr);
     VkBool32 color_blend_enables{ VK_FALSE };
@@ -193,7 +192,7 @@ void GraphicsEngine::render_end()
 
 void GraphicsEngine::sdf_update(std::span<glm::vec2> points, std::span<ShapeInfo> infos)
 {
-  _buffers[_current_frame].clear().append(points).append(infos);
+  _buffers[_current_frame].clear().append_range(points).append_range(infos);
 }
 
 void GraphicsEngine::sdf_render(uint32_t offset, uint32_t num)
@@ -211,7 +210,7 @@ void GraphicsEngine::sdf_render(uint32_t offset, uint32_t num)
 
   _sdf_render_pipeline.bind(cmd, pc);
 
-  vkCmdDraw(cmd, 4, 1, 0, 0);
+  vkCmdDraw(cmd, 6, 1, 0, 0);
 }
 
 void GraphicsEngine::text_mask_render_begin()
@@ -232,40 +231,66 @@ auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 const& pos, flo
   double pl, pb, pr, pt;
   glyph->getQuadPlaneBounds(pl, pb, pr, pt);
 
-  auto ascender = -metrics.ascenderY;
-  auto move = glm::vec2(0) - glm::vec2(0, ascender);
+  auto move = glm::vec2(0, metrics.ascenderY);
 
   auto min = glm::vec2(pl, -pt);
   auto max = glm::vec2(pr, -pb);
   min += move;
   max += move;
-  min *= _em_size;
-  max *= _em_size;
-
-  glm::vec4 p{ min, max };
-  auto scale = static_cast<float>(size / _em_size);
-  min *= scale;
-  max *= scale;
+  min *= size;
+  max *= size;
   min += pos;
   max += pos;
+
+  al /= _font_atlas_extent.x;
+  ab /= _font_atlas_extent.y;
+  ar /= _font_atlas_extent.x;
+  at /= _font_atlas_extent.y;
+
+  _vertices.append_range(std::vector<Vertex>
+  {
+    { min,              { al, at } },
+    { { max.x, min.y }, { ar, at } },
+    { { min.x, max.y }, { al, ab } },
+    { max,              { ar, ab } },
+  });
+
+  _indices.append_range(std::vector<uint16_t>
+  {
+    0, 1, 2,
+    2, 1, 3,
+  });
 
   return { glm::vec4{ al, ab, ar, at }, glm::vec4{ min,  max }};
 }
 
-void GraphicsEngine::text_mask_render(glm::vec4 a, glm::vec4 p)
+void GraphicsEngine::text_mask_render()
 {
-  auto& frame = get_current_frame();
+  // update
+  auto& buffer = _glyphs_buffers[_current_frame];
+  buffer.clear();
+
+  buffer.append_range(_vertices);
+  auto offset = buffer.size();
+  buffer.append_range(_indices);
+
+  _vertices.clear();
+  _indices.clear();
+
+  vkCmdBindIndexBuffer(get_current_frame().cmd, buffer.handle(), offset, VK_INDEX_TYPE_UINT16);
+
+  // draw
+  auto& cmd = get_current_frame().cmd;
 
   auto pc = PushConstant_text_mask
   {
-    .pos           = p,
-    .uv            = { a.x / _font_atlas_extent.x, a.y / _font_atlas_extent.y, a.z / _font_atlas_extent.x, a.w / _font_atlas_extent.y },
+    .buffer        = buffer.address(),
     .window_extent = _window->get_framebuffer_size(),
   };
 
-  _text_mask_render_pipeline.bind(frame.cmd, pc);
+  _text_mask_render_pipeline.bind(cmd, pc);
 
-  vkCmdDraw(frame.cmd, 4, 1, 0, 0);
+  vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
 }
 
 }}
