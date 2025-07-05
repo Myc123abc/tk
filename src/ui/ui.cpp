@@ -219,9 +219,9 @@ void path_end(uint32_t color, uint32_t thickness)
 
 void text(std::string_view text, glm::vec2 const& pos, float size, uint32_t color)
 {
-  auto ctx = get_ctx();
-  auto res = ctx->engine->parse_text(text, pos, size);
-  shape(type::shape::glyph, { glm::vec2(res.second.x, res.second.y), glm::vec2(res.second.z, res.second.w) }, color);
+  auto ctx    = get_ctx();
+  auto extent = ctx->engine->parse_text(text, pos, size);
+  shape(type::shape::text, { extent.first, extent.second }, color);
 }
 
 void set_operation(type::shape_op op)
@@ -311,7 +311,7 @@ bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> con
   case type::shape::path:
   case type::shape::line_partition:
   case type::shape::bezier_partition:
-  case type::shape::glyph:
+  case type::shape::text:
     throw_if(false, "this type cannot use on button, please use ui::clickarea");
 
   case type::shape::triangle:

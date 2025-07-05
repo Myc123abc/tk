@@ -143,6 +143,13 @@ vec4 alpha_mix(vec3 color, float alpha, vec4 background)
               alpha + background.a * (1 - alpha));
 }
 
+/*
+TODO:
+  Performance Optimization
+    implement cpu shape cull
+    BVH area control per tile necessary the number of shape handling (CPU or compute shader implementation)
+*/
+
 void main()
 {
   float w = length(vec2(dFdxFine(uv.x), dFdyFine(uv.y)));
@@ -154,7 +161,7 @@ void main()
   {
     ShapeInfo info = get_shape_info();
 
-    if (info.type == Glyph)
+    if (info.type == Text)
     {
       ++shape_info_idx;
       anti_aliasing_color = mix(col.rgb, info.color.rgb, texelFetch(text_mask, ivec2(uv), 0).x);

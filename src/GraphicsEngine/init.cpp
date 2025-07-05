@@ -531,7 +531,7 @@ void GraphicsEngine::load_font()
   _font_geo = msdf_atlas::FontGeometry(&_glyphs);
   _font_geo.loadCharset(font, 1.0, get_char_set());
   //_font_geo.loadCharset(font, 1.0, msdf_atlas::Charset::ASCII, false, false);
-  
+
   // pack
   auto packer = get_packer();
   throw_if(packer.pack(_glyphs.data(), _glyphs.size()), "failed to pack glyphs");

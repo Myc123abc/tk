@@ -1,7 +1,7 @@
 A game engine for making galgame, currently I need to learn many things.
 
 TODO:
-* msdf font rendering
+* freetype not read GPOS for kerning, you can use HarfBuzz.
 * ffmpeg with miniaudio play music
 * make a music player as example (use fftw for audio visualization, create own fftw repo for git submodule)
 * ffmpeg play video

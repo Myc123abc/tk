@@ -28,7 +28,7 @@ layout(push_constant) uniform PushConstant
 #define Path             6
 #define Line_Partition   7
 #define Bezier_Partition 8
-#define Glyph            9
+#define Text             9
 
 #define Mix              0
 #define Min              1

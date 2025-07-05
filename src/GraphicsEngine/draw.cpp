@@ -5,6 +5,7 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+
 namespace tk { namespace graphics_engine {
 
 auto get_cursor_position() -> glm::vec2;
@@ -158,7 +159,7 @@ void GraphicsEngine::set_pipeline_state(Command const& cmd)
     vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
     vkCmdSetPrimitiveRestartEnable(cmd, VK_FALSE);
     graphics_engine::vkCmdSetVertexInputEXT(cmd, 0, nullptr, 0, nullptr);
-    VkBool32 color_blend_enables{ VK_FALSE };
+    VkBool32 color_blend_enables{ VK_TRUE };
     graphics_engine::vkCmdSetColorBlendEnableEXT(cmd, 0, 1, &color_blend_enables);
     if (color_blend_enables)
     {
@@ -218,50 +219,65 @@ void GraphicsEngine::text_mask_render_begin()
   render_begin(_text_mask_image);
 }
 
-auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size) -> std::pair<glm::vec4, glm::vec4>
+auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size) -> std::pair<glm::vec2, glm::vec2>
 {
-  // TODO: currently, only use first glyph
-  auto ch = *text.begin();
+  glm::vec2 text_min, text_max;
 
-  auto metrics = _font_geo.getMetrics();
-  auto glyph   = _font_geo.getGlyph(ch);
-
-  double al, ab, ar, at;
-  glyph->getQuadAtlasBounds(al, ab, ar, at);
-  double pl, pb, pr, pt;
-  glyph->getQuadPlaneBounds(pl, pb, pr, pt);
-
-  auto move = glm::vec2(0, metrics.ascenderY);
-
-  auto min = glm::vec2(pl, -pt);
-  auto max = glm::vec2(pr, -pb);
-  min += move;
-  max += move;
-  min *= size;
-  max *= size;
-  min += pos;
-  max += pos;
-
-  al /= _font_atlas_extent.x;
-  ab /= _font_atlas_extent.y;
-  ar /= _font_atlas_extent.x;
-  at /= _font_atlas_extent.y;
-
-  _vertices.append_range(std::vector<Vertex>
+  auto metrics  = _font_geo.getMetrics();
+  auto move     = glm::vec2(0, metrics.ascenderY);
+  auto position = pos;
+  for (auto i = 0, idx = 0; i < text.size(); ++i, idx += 4)
   {
-    { min,              { al, at } },
-    { { max.x, min.y }, { ar, at } },
-    { { min.x, max.y }, { al, ab } },
-    { max,              { ar, ab } },
-  });
+    auto glyph = _font_geo.getGlyph(text[i]);
 
-  _indices.append_range(std::vector<uint16_t>
-  {
-    0, 1, 2,
-    2, 1, 3,
-  });
+    double al, ab, ar, at;
+    glyph->getQuadAtlasBounds(al, ab, ar, at);
+    double pl, pb, pr, pt;
+    glyph->getQuadPlaneBounds(pl, pb, pr, pt);
 
-  return { glm::vec4{ al, ab, ar, at }, glm::vec4{ min,  max }};
+    auto min = glm::vec2(pl, -pt);
+    auto max = glm::vec2(pr, -pb);
+    min += move;
+    max += move;
+    min *= size;
+    max *= size;
+    min += position;
+    max += position;
+
+    if (i == 0)
+      text_min = min;
+    if (i == text.size() - 1)
+      text_max = max;
+
+    if (i < text.size() - 1)
+    {
+      double advance;
+      throw_if(_font_geo.getAdvance(advance, text[i], text[i + 1]) == false,
+               "failed to get advance between {} and {}", text[i], text[i + 1]);
+      position.x += advance * size;
+    }
+
+    al /= _font_atlas_extent.x;
+    ab /= _font_atlas_extent.y;
+    ar /= _font_atlas_extent.x;
+    at /= _font_atlas_extent.y;
+
+    _vertices.append_range(std::vector<Vertex>
+    {
+      { min,              { al, at } },
+      { { max.x, min.y }, { ar, at } },
+      { { min.x, max.y }, { al, ab } },
+      { max,              { ar, ab } },
+    });
+
+    _indices.append_range(std::vector<uint16_t>
+    {
+      static_cast<uint16_t>(idx + 0), static_cast<uint16_t>(idx + 1), static_cast<uint16_t>(idx + 2),
+      static_cast<uint16_t>(idx + 2), static_cast<uint16_t>(idx + 1), static_cast<uint16_t>(idx + 3),
+    });
+  }
+
+  return { text_min, text_max };
 }
 
 void GraphicsEngine::text_mask_render()
@@ -273,9 +289,6 @@ void GraphicsEngine::text_mask_render()
   buffer.append_range(_vertices);
   auto offset = buffer.size();
   buffer.append_range(_indices);
-
-  _vertices.clear();
-  _indices.clear();
 
   vkCmdBindIndexBuffer(get_current_frame().cmd, buffer.handle(), offset, VK_INDEX_TYPE_UINT16);
 
@@ -290,7 +303,10 @@ void GraphicsEngine::text_mask_render()
 
   _text_mask_render_pipeline.bind(cmd, pc);
 
-  vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
+  vkCmdDrawIndexed(cmd, _indices.size(), 1, 0, 0, 0);
+
+  _vertices.clear();
+  _indices.clear();
 }
 
 }}
