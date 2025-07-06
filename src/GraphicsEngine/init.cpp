@@ -6,8 +6,6 @@
 #include <set>
 #include <print>
 
-#include <thread>
-
 namespace tk { namespace graphics_engine { 
 
 void GraphicsEngine::init(Window& window)
@@ -484,90 +482,22 @@ void GraphicsEngine::create_sampler()
   _destructors.push([&] { vkDestroySampler(_device, _sampler, nullptr); });
 }
 
-// from imgui_draw.cpp
-// 0x0020, 0x00FF Basic Latin + Latin Supplement
-auto get_char_set()
-{
-  auto beg = 0x0020;
-  auto end = 0x00ff;
-
-  msdf_atlas::Charset char_set;
-  for (; beg <= end; ++beg)
-    char_set.add(beg);
-  return char_set;
-}
-
-auto get_packer()
-{
-  msdf_atlas::TightAtlasPacker packer;
-  packer.setDimensionsConstraint(msdf_atlas::DimensionsConstraint::MULTIPLE_OF_FOUR_SQUARE);
-  packer.setSpacing(0);
-  packer.setMinimumScale(32.0);
-  packer.setPixelRange(2.0);
-  packer.setUnitRange(0.0);
-  packer.setMiterLimit(1.0);
-  packer.setOriginPixelAlignment(false, true);
-  packer.setInnerUnitPadding(0);
-  packer.setOuterUnitPadding(0);
-  packer.setInnerPixelPadding(0);
-  packer.setOuterPixelPadding(0);
-  return packer;
-}
-
 // TODO: another thread to load font
 void GraphicsEngine::load_font()
 {
   auto path = "resources/SourceCodePro-Regular.ttf";
 
-  // init freetype
-  auto ft = msdfgen::initializeFreetype();
-  throw_if(!ft, "failed to init freetype");
-
-  // load font
-  auto font = loadFont(ft, path);
-  throw_if(!font, "failed to load font {}", path);
-
-  // load valid glyphs of character range (some characters maybe not in current font)
-  _font_geo = msdf_atlas::FontGeometry(&_glyphs);
-  _font_geo.loadCharset(font, 1.0, get_char_set());
-  //_font_geo.loadCharset(font, 1.0, msdf_atlas::Charset::ASCII, false, false);
-
-  // pack
-  auto packer = get_packer();
-  throw_if(packer.pack(_glyphs.data(), _glyphs.size()), "failed to pack glyphs");
-  int width, height;
-  packer.getDimensions(width, height);
-  _font_atlas_extent.x = width;
-  _font_atlas_extent.y = height;
-
-  // TODO: use msdf_atlas::Workload for msdfgen::edgeColoringByDistance
-  // edge coloring
-  for (auto& glyph : _glyphs)
-    glyph.edgeColoring(msdfgen::edgeColoringInkTrap, 3.0, 0);
-  
-  // set attribute of generator
-  msdf_atlas::GeneratorAttributes attr;
-  attr.config.overlapSupport = true;
-  attr.scanlinePass = true;
-
-  // config generator
-  msdf_atlas::ImmediateAtlasGenerator<float, 4, msdf_atlas::mtsdfGenerator, msdf_atlas::BitmapAtlasStorage<float, 4>> generator(width, height);
-  generator.setAttributes(attr);
-  generator.setThreadCount(std::thread::hardware_concurrency() / 2);
-  generator.generate(_glyphs.data(), _glyphs.size());
-
-  // generate
-  auto bitmap = (msdfgen::BitmapConstRef<float, 4>)generator.atlasStorage();
+  auto bitmap = _text_engine.load_font(path);
 
   // create image
-  _font_atlas_image = _mem_alloc.create_image(VK_FORMAT_R32G32B32A32_SFLOAT, { (uint32_t)bitmap.width, (uint32_t)bitmap.height, 1 }, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+  _font_atlas_image = _mem_alloc.create_image(VK_FORMAT_R32G32B32A32_SFLOAT, { bitmap.width, bitmap.height, 1 }, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
   // upload buffer
   auto byte_size = bitmap.width * bitmap.height * 4 * 4;
   auto buf       = _mem_alloc.create_buffer(byte_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 
   // copy 
-  buf.append(reinterpret_cast<void const*>(bitmap.pixels), byte_size);
+  buf.append(bitmap.data.data(), byte_size);
 
   // TODO: use single command once in init
   // copy to image
@@ -578,10 +508,6 @@ void GraphicsEngine::load_font()
   
   // destroy upload buffer
   buf.destroy();
-
-  // destroy resources
-  destroyFont(font);
-  deinitializeFreetype(ft);
 
   // text mask image
   _text_mask_image = _mem_alloc.create_image(VK_FORMAT_R32_SFLOAT, _swapchain_images[0].extent3D(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);

@@ -10,9 +10,7 @@
 #include "CommandPool.hpp"
 #include "Device.hpp"
 #include "tk/type.hpp"
-
-#include <glm/glm.hpp>
-#include <msdf-atlas-gen/msdf-atlas-gen.h>
+#include "TextEngine.hpp"
 
 #include <span>
 
@@ -167,6 +165,7 @@ namespace tk { namespace graphics_engine {
     //
     // Text Rendering
     //
+    TextEngine _text_engine;
     VkSampler _sampler{};
     Image     _font_atlas_image; // TODO: expand multi-font-atlases
     void load_font();
@@ -177,18 +176,9 @@ namespace tk { namespace graphics_engine {
       glm::vec2       window_extent{};
     };
 
-    msdf_atlas::FontGeometry               _font_geo;
-    std::vector<msdf_atlas::GlyphGeometry> _glyphs;
-    glm::vec2 _font_atlas_extent{};
-
     Image  _text_mask_image;
     std::vector<Buffer> _glyphs_buffers;
 
-    struct Vertex
-    {
-      glm::vec2 pos{};
-      glm::vec2 uv{};
-    };
     std::vector<Vertex>   _vertices;
     std::vector<uint16_t> _indices;
   };

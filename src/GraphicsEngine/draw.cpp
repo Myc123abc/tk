@@ -221,63 +221,7 @@ void GraphicsEngine::text_mask_render_begin()
 
 auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size) -> std::pair<glm::vec2, glm::vec2>
 {
-  glm::vec2 text_min, text_max;
-
-  auto metrics  = _font_geo.getMetrics();
-  auto move     = glm::vec2(0, metrics.ascenderY);
-  auto position = pos;
-  for (auto i = 0, idx = 0; i < text.size(); ++i, idx += 4)
-  {
-    auto glyph = _font_geo.getGlyph(text[i]);
-
-    double al, ab, ar, at;
-    glyph->getQuadAtlasBounds(al, ab, ar, at);
-    double pl, pb, pr, pt;
-    glyph->getQuadPlaneBounds(pl, pb, pr, pt);
-
-    auto min = glm::vec2(pl, -pt);
-    auto max = glm::vec2(pr, -pb);
-    min += move;
-    max += move;
-    min *= size;
-    max *= size;
-    min += position;
-    max += position;
-
-    if (i == 0)
-      text_min = min;
-    if (i == text.size() - 1)
-      text_max = max;
-
-    if (i < text.size() - 1)
-    {
-      double advance;
-      throw_if(_font_geo.getAdvance(advance, text[i], text[i + 1]) == false,
-               "failed to get advance between {} and {}", text[i], text[i + 1]);
-      position.x += advance * size;
-    }
-
-    al /= _font_atlas_extent.x;
-    ab /= _font_atlas_extent.y;
-    ar /= _font_atlas_extent.x;
-    at /= _font_atlas_extent.y;
-
-    _vertices.append_range(std::vector<Vertex>
-    {
-      { min,              { al, at } },
-      { { max.x, min.y }, { ar, at } },
-      { { min.x, max.y }, { al, ab } },
-      { max,              { ar, ab } },
-    });
-
-    _indices.append_range(std::vector<uint16_t>
-    {
-      static_cast<uint16_t>(idx + 0), static_cast<uint16_t>(idx + 1), static_cast<uint16_t>(idx + 2),
-      static_cast<uint16_t>(idx + 2), static_cast<uint16_t>(idx + 1), static_cast<uint16_t>(idx + 3),
-    });
-  }
-
-  return { text_min, text_max };
+  return _text_engine.parse_text(text, pos, size, _vertices, _indices);
 }
 
 void GraphicsEngine::text_mask_render()

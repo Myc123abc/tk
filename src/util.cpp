@@ -38,4 +38,48 @@ auto lerp(std::vector<glm::vec2> const& a, std::vector<glm::vec2> const& b, floa
   return res;
 }
 
+auto to_u32string(std::string_view str) -> std::u32string
+{
+  std::u32string result;
+  size_t i = 0;
+  while (i < str.size())
+  {
+    uint32_t codepoint = 0;
+    unsigned char c = str[i];
+    if (c < 0x80) 
+    {
+      codepoint = c;
+      ++i;
+    }
+    else if ((c >> 5) == 0x6 && i + 1 < str.size())
+    {
+      codepoint = ((c & 0x1F) << 6) |
+                  (str[i + 1] & 0x3F);
+      i += 2;
+    } 
+    else if ((c >> 4) == 0xE && i + 2 < str.size()) 
+    {
+      codepoint = ((c & 0x0F) << 12) |
+                  ((str[i + 1] & 0x3F) << 6) |
+                  (str[i + 2] & 0x3F);
+      i += 3;
+    } 
+    else if ((c >> 3) == 0x1E && i + 3 < str.size()) 
+    {
+      codepoint = ((c & 0x07) << 18) |
+                  ((str[i + 1] & 0x3F) << 12) |
+                  ((str[i + 2] & 0x3F) << 6) |
+                  (str[i + 3] & 0x3F);
+      i += 4;
+    } 
+    else 
+    {
+      ++i;
+      continue;
+    }
+    result.push_back(codepoint);
+  }
+  return result;
+}
+
 }}
