@@ -1,11 +1,57 @@
 #include "tk/GraphicsEngine/TextEngine.hpp"
 #include "tk/ErrorHandling.hpp"
 #include "tk/util.hpp"
+#include "tk/log.hpp"
 
 #include <thread>
+#include <fstream>
 
 namespace
 {
+
+////////////////////////////////////////////////////////////////////////////////
+//                            Binary File
+////////////////////////////////////////////////////////////////////////////////
+
+struct alignas(4) Header
+{
+  char     magic[5] = "MSDF";
+  uint32_t width{};
+  uint32_t height{};
+  uint32_t channel{};
+};
+
+void write_msdf_file(msdfgen::BitmapConstRef<float, 4> bitmap, std::string_view filename)
+{
+  Header header;
+  header.width   = bitmap.width;
+  header.height  = bitmap.height;
+  header.channel = 4;
+
+  std::ofstream out(filename.data(), std::ios::binary);
+  out.write(reinterpret_cast<char const*>(&header), sizeof(header));
+  out.write(reinterpret_cast<char const*>(bitmap.pixels), bitmap.width * bitmap.height * 4 * sizeof(float));
+}
+
+auto read_msdf_file(std::string_view filename)
+{
+  tk::graphics_engine::Bitmap bitmap;
+
+  std::ifstream in(filename.data(), std::ios::binary);
+  tk::throw_if(!in.is_open(), "failed to open {}", filename);
+
+  Header header;
+  in.read(reinterpret_cast<char*>(&header), sizeof(header));
+  tk::throw_if(strcmp(header.magic, "MSDF"), "{} is not a msdf file", filename);
+
+  bitmap.width  = header.width;
+  bitmap.height = header.height;
+
+  bitmap.data.resize(header.width * header.height * header.channel  );
+  in.read(reinterpret_cast<char*>(bitmap.data.data()), bitmap.data.size() * sizeof(float));
+
+  return bitmap;
+}
 
 // from imgui_draw.cpp
 // 0x0020, 0x00FF Basic Latin + Latin Supplement
@@ -66,37 +112,46 @@ auto TextEngine::load_font(std::filesystem::path const& path) -> Bitmap
   // pack
   auto packer = get_packer();
   throw_if(packer.pack(_glyphs.data(), _glyphs.size()), "failed to pack glyphs");
-  int width, height;
-  packer.getDimensions(width, height);
-
-  // TODO: use msdf_atlas::Workload for msdfgen::edgeColoringByDistance
-  // edge coloring
-  for (auto& glyph : _glyphs)
-    glyph.edgeColoring(msdfgen::edgeColoringInkTrap, 3.0, 0);
-
-  // set attribute of generator
-  msdf_atlas::GeneratorAttributes attr;
-  attr.config.overlapSupport = true;
-  attr.scanlinePass          = true;
-
-  // config generator
-  msdf_atlas::ImmediateAtlasGenerator<float, 4, msdf_atlas::mtsdfGenerator, msdf_atlas::BitmapAtlasStorage<float, 4>> generator(width, height);
-  generator.setAttributes(attr);
-  generator.setThreadCount(std::thread::hardware_concurrency() / 2);
-  generator.generate(_glyphs.data(), _glyphs.size());
-  
-  // generate bitmap
-  msdfgen::BitmapConstRef<float, 4> bitmap = generator.atlasStorage();
 
   Bitmap result;
-  result.data.resize(bitmap.width * bitmap.height * 4);
-  memcpy(result.data.data(), bitmap.pixels, result.data.size() * sizeof(float));
-  result.width  = bitmap.width;
-  result.height = bitmap.height;
+  auto msdf_file = std::format("resources/{}.msdf", path.stem().string());
+  if (std::filesystem::exists(msdf_file))
+    result = read_msdf_file(msdf_file);
+  else
+  {
+    int width, height;
+    packer.getDimensions(width, height);
 
-  _atlas_extent = { bitmap.width, bitmap.height };
+    // TODO: use msdf_atlas::Workload for msdfgen::edgeColoringByDistance
+    // edge coloring
+    for (auto& glyph : _glyphs)
+      glyph.edgeColoring(msdfgen::edgeColoringInkTrap, 3.0, 0);
 
-  msdfgen::saveTiff(bitmap, std::format("resources/{}.tiff", path.stem().string()).c_str());
+    // set attribute of generator
+    msdf_atlas::GeneratorAttributes attr;
+    attr.config.overlapSupport = true;
+    attr.scanlinePass          = true;
+
+    // config generator
+    msdf_atlas::ImmediateAtlasGenerator<float, 4, msdf_atlas::mtsdfGenerator, msdf_atlas::BitmapAtlasStorage<float, 4>> generator(width, height);
+    generator.setAttributes(attr);
+    generator.setThreadCount(std::thread::hardware_concurrency() / 2);
+    
+    log::info("generate msdf font atlas of {}", path.string());
+    generator.generate(_glyphs.data(), _glyphs.size());
+    
+    // generate bitmap
+    msdfgen::BitmapConstRef<float, 4> bitmap = generator.atlasStorage();
+
+    result.data.resize(bitmap.width * bitmap.height * 4);
+    memcpy(result.data.data(), bitmap.pixels, result.data.size() * sizeof(float));
+    result.width  = bitmap.width;
+    result.height = bitmap.height;
+
+    write_msdf_file(bitmap, msdf_file.c_str());
+  }
+
+  _atlas_extent = { result.width, result.height };
 
   // destroy font
   destroyFont(font);

@@ -4,4 +4,4 @@ out
 .vs
 shader/*.spv
 CMakeSettings.json
-resources/*.tiff
+resources/*.msdf
