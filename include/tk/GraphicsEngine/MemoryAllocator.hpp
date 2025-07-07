@@ -128,8 +128,8 @@ namespace tk { namespace graphics_engine {
     auto extent2D()   const noexcept { return VkExtent2D{ _extent.width, _extent.height }; }
     auto format()     const noexcept { return _format;     }
 
-    void set_layout(class Command const& cmd, VkImageLayout layout);
-    void clear(class Command const& cmd, VkClearColorValue value = {});
+    auto set_layout(class Command const& cmd, VkImageLayout layout)    -> Image&;
+    auto clear(class Command const& cmd, VkClearColorValue value = {}) -> Image&;
 
   private:
     VmaAllocator  _allocator  = {};

@@ -128,9 +128,9 @@ Image::Image(MemoryAllocator* allocator, VkFormat format, VkExtent3D extent, VkI
            "failed to create image view");
 }
 
-void Image::set_layout(class Command const& cmd, VkImageLayout layout)
+auto Image::set_layout(class Command const& cmd, VkImageLayout layout) -> Image&
 {
-  if (_layout == layout) return;
+  if (_layout == layout) return *this;
   VkImageMemoryBarrier2 barrier
   {
     .sType            = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
@@ -160,6 +160,7 @@ void Image::set_layout(class Command const& cmd, VkImageLayout layout)
   };
   vkCmdPipelineBarrier2(cmd, &dep_info);
   _layout = layout;
+  return *this;
 }
 
 void Image::destroy()
@@ -179,9 +180,9 @@ void Image::destroy()
   _layout     = VK_IMAGE_LAYOUT_UNDEFINED;
 }
 
-void Image::clear(class Command const& cmd, VkClearColorValue value)
+auto Image::clear(class Command const& cmd, VkClearColorValue value) -> Image&
 {
-  assert(_layout == VK_IMAGE_LAYOUT_GENERAL);
+  set_layout(cmd, VK_IMAGE_LAYOUT_GENERAL);
   VkImageSubresourceRange range
   {
     .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -189,6 +190,7 @@ void Image::clear(class Command const& cmd, VkClearColorValue value)
     .layerCount = VK_REMAINING_ARRAY_LAYERS,
   };
   vkCmdClearColorImage(cmd, _handle, VK_IMAGE_LAYOUT_GENERAL, &value, 1, &range);
+  return *this;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
