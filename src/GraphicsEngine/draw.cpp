@@ -126,7 +126,7 @@ void GraphicsEngine::render_begin(Image& image)
 
 void GraphicsEngine::sdf_render_begin()
 {
-  _text_mask_image.set_layout(get_current_frame().cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  _text_rgba_image.set_layout(get_current_frame().cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   render_begin(get_current_swapchain_image());
 }
 
@@ -216,7 +216,7 @@ void GraphicsEngine::sdf_render(uint32_t offset, uint32_t num)
 
 void GraphicsEngine::text_mask_render_begin()
 {
-  render_begin(_text_mask_image);
+  render_begin(_text_rgba_image);
 }
 
 auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size) -> std::pair<glm::vec2, glm::vec2>

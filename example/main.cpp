@@ -83,10 +83,10 @@ void render()
     ui::begin("AudioPlayer", 0, 0);
 
     // background
-    ui::rectangle({ 0, 0 }, tk::get_window_size(), 0x282C34FF);
+    //ui::rectangle({ 0, 0 }, tk::get_window_size(), 0x282C34FF);
 
     // playback button
-    playback_btn.render();
+    //playback_btn.render();
     if (playback_btn.button())
     {
       click = !click;
@@ -98,11 +98,21 @@ void render()
 
     // playback progress
     auto playback_progree_pos = playback_pos1 + glm::vec2(5, 0);
-    ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ 100, 3 }, 0x808080FF );
-    ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ progress, 3 }, 0x0000FFFF );
+    //ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ 100, 3 }, 0x808080FF );
+    //ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ progress, 3 }, 0x0000FFFF );
 
-    ui::text("asd", { 0, 30 }, 26.66, 0xffffffff);
-    ui::text("あasczあ", { 0, 60 }, 26.66, 0xffffffff);
+    /*
+    TODO:
+      1. change text_mask_image from R32 to R32G32
+        R32 -> signed distance
+        G32 -> RGBA
+        enable alpha mix
+        sdf render text use color from text_mask_image's G32
+      
+      2. text outline
+    */
+    ui::text("asd", { 0, 30 }, 26.66, 0xff0000ff);
+    ui::text("あasczあ", { 0, 35 }, 26.66, 0x00ff00ff);
 
     ui::end();
   }

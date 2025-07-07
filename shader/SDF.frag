@@ -82,6 +82,7 @@ float get_distance(ShapeInfo info)
       return sdSegment(uv, p0, p1);
     }
     case Rectangle:
+    case Text:
     {
       vec2 p0 = GetVec2(info.offset);
       vec2 p1 = GetVec2(info.offset + 2);
@@ -160,16 +161,15 @@ void main()
   while (shape_info_idx < pc.num)
   {
     ShapeInfo info = get_shape_info();
+    float     d    = get_distance(info);
 
     if (info.type == Text)
     {
-      ++shape_info_idx;
+      if (d > 0) continue;
       anti_aliasing_color = mix(col.rgb, info.color.rgb, texelFetch(text_mask, ivec2(uv), 0).x);
       col = alpha_mix(anti_aliasing_color, info.color.a, col);
       continue;
     }
-
-    float d = get_distance(info);
     
     if (info.op == Mix)
     {

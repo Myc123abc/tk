@@ -176,7 +176,7 @@ namespace tk { namespace graphics_engine {
       glm::vec2       window_extent{};
     };
 
-    Image  _text_mask_image;
+    Image  _text_rgba_image;
     std::vector<Buffer> _glyphs_buffers;
 
     std::vector<Vertex>   _vertices;

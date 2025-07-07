@@ -161,7 +161,7 @@ auto TextEngine::load_font(std::filesystem::path const& path) -> Bitmap
 
 auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices) -> std::pair<glm::vec2, glm::vec2>
 {
-  glm::vec2 text_min, text_max;
+  glm::vec2 text_min{ FLT_MAX, FLT_MAX }, text_max{ 0, 0 };
 
   auto metrics  = _font_geometry.getMetrics();
   auto move     = glm::vec2(0, metrics.ascenderY);
@@ -196,9 +196,11 @@ auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float s
     max += position;
 
     if (i == 0)
-      text_min = min;
+      text_min.x = min.x;
     if (i == u32str.size() - 1)
-      text_max = max;
+      text_max.x = max.x;
+    text_min.y = std::min(text_min.y, min.y);
+    text_max.y = std::max(text_max.y, max.y);
 
     if (i < u32str.size() - 1)
     {

@@ -7,6 +7,7 @@ struct Vertex
 {
   vec2  pos;
   vec2  uv;
+  vec4  color;
 };
 
 layout(std430, buffer_reference) readonly buffer Vertices 

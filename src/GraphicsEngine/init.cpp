@@ -433,8 +433,8 @@ void GraphicsEngine::resize_swapchain()
   vkDestroySwapchainKHR(_device, old_swapchain, nullptr);
 
   // resize text rendering image
-  _text_mask_image.destroy();
-  _text_mask_image = _mem_alloc.create_image(VK_FORMAT_R32_SFLOAT, _swapchain_images[0].extent3D(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+  _text_rgba_image.destroy();
+  _text_rgba_image = _mem_alloc.create_image(VK_FORMAT_R8G8B8A8_UNORM, _swapchain_images[0].extent3D(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
   // update descriptor layout which image descriptor also resized
   _sdf_render_pipeline.update();
@@ -445,8 +445,7 @@ void GraphicsEngine::create_sdf_rendering_resource()
   _sdf_render_pipeline = _device.create_render_pipeline(
     sizeof(PushConstant_SDF), 
     {
-      // TODO: how to present font atlas on sdf frag, and then with sdf shapes
-      { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &_text_mask_image, _sampler }, 
+      { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &_text_rgba_image, _sampler }, 
     },
     _descriptor_buffer,
     "sdf",
@@ -460,7 +459,6 @@ void GraphicsEngine::create_sdf_rendering_resource()
   // destroy resources
   _destructors.push([&]
   {
-    _text_mask_image.destroy();
     _sdf_render_pipeline.destroy();
   });
 }
@@ -509,8 +507,15 @@ void GraphicsEngine::load_font()
   // destroy upload buffer
   buf.destroy();
 
+  /*
+  TODO:
+    text_mask fragment:
+    text_rgba_image as color attachment
+    text_mask_image as write only image
+  */
+
   // text mask image
-  _text_mask_image = _mem_alloc.create_image(VK_FORMAT_R32_SFLOAT, _swapchain_images[0].extent3D(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+  _text_rgba_image = _mem_alloc.create_image(VK_FORMAT_R8G8B8A8_UNORM, _swapchain_images[0].extent3D(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
   _text_mask_render_pipeline = _device.create_render_pipeline(
     sizeof(PushConstant_text_mask),
@@ -523,12 +528,13 @@ void GraphicsEngine::load_font()
       { VK_SHADER_STAGE_VERTEX_BIT,   "shader/text_mask_vert.spv" },
       { VK_SHADER_STAGE_FRAGMENT_BIT, "shader/text_mask_frag.spv" },
     },
-    _text_mask_image.format()
+    _text_rgba_image.format()
   );
 
   // destroy resources
   _destructors.push([&]
   {
+    _text_rgba_image.destroy();
     _text_mask_render_pipeline.destroy();
     _font_atlas_image.destroy();
   });
