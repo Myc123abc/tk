@@ -220,8 +220,8 @@ void path_end(uint32_t color, uint32_t thickness)
 void text(std::string_view text, glm::vec2 const& pos, float size, uint32_t color)
 {
   auto ctx    = get_ctx();
-  auto extent = ctx->engine->parse_text(text, pos, size);
-  shape(type::shape::text, { extent.first, extent.second }, color);
+  auto extent = ctx->engine->parse_text(text, pos, size, convert_color_format(color));
+  shape(type::shape::text, { extent.first, extent.second });
 }
 
 void set_operation(type::shape_op op)

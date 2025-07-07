@@ -219,9 +219,9 @@ void GraphicsEngine::text_mask_render_begin()
   render_begin(_text_rgba_image);
 }
 
-auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size) -> std::pair<glm::vec2, glm::vec2>
+auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size, glm::vec4 const& color) -> std::pair<glm::vec2, glm::vec2>
 {
-  return _text_engine.parse_text(text, pos, size, _vertices, _indices);
+  return _text_engine.parse_text(text, pos, size, color, _vertices, _indices);
 }
 
 void GraphicsEngine::text_mask_render()

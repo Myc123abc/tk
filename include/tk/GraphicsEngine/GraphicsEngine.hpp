@@ -62,7 +62,7 @@ namespace tk { namespace graphics_engine {
     void render_end();
 
     // TODO: expand to multiple glyphs
-    auto parse_text(std::string_view text, glm::vec2 const& pos, float size) -> std::pair<glm::vec2, glm::vec2>;
+    auto parse_text(std::string_view text, glm::vec2 const& pos, float size, glm::vec4 const& color) -> std::pair<glm::vec2, glm::vec2>;
     void text_mask_render_begin();
     void text_mask_render();
 

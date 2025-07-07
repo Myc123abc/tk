@@ -159,7 +159,7 @@ auto TextEngine::load_font(std::filesystem::path const& path) -> Bitmap
   return result;
 }
 
-auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices) -> std::pair<glm::vec2, glm::vec2>
+auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size, glm::vec4 const& color, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices) -> std::pair<glm::vec2, glm::vec2>
 {
   glm::vec2 text_min{ FLT_MAX, FLT_MAX }, text_max{ 0, 0 };
 
@@ -221,10 +221,10 @@ auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float s
 
     vertices.append_range(std::vector<Vertex>
     {
-      { min,              { al, at } },
-      { { max.x, min.y }, { ar, at } },
-      { { min.x, max.y }, { al, ab } },
-      { max,              { ar, ab } },
+      { min,              { al, at }, color },
+      { { max.x, min.y }, { ar, at }, color },
+      { { min.x, max.y }, { al, ab }, color },
+      { max,              { ar, ab }, color },
     });
 
     indices.append_range(std::vector<uint16_t>
