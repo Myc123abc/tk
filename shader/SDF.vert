@@ -2,29 +2,24 @@
 
 #include "SDF.h"
 
-vec2 vertices[] =
-{
-  { -1, -1 },
-  {  1, -1 },
-  { -1,  1 },
-  { -1,  1 },
-  {  1, -1 },
-  {  1,  1 },
-};
-
 layout(location = 0) out vec2 uv;
+layout(location = 1) out vec4 color;
+
+vec4 to_vec4(uint x)
+{
+  float r = float((x >> 24) & 0xFF) / 255;
+  float g = float((x >> 16) & 0xFF) / 255;
+  float b = float((x >> 8 ) & 0xFF) / 255;
+  float a = float((x      ) & 0xFF) / 255;
+  return vec4(r, g, b, a);
+}
 
 void main()
 {
-  gl_Position = vec4(vertices[gl_VertexIndex], 0, 1);
-  vec2 uvs[] =
-  {
-    { 0, 0 },
-    { pc.window_extent.x, 0 },
-    { 0, pc.window_extent.y },
-    { 0, pc.window_extent.y },
-    { pc.window_extent.x, 0 },
-    pc.window_extent,
-  };
-  uv = uvs[gl_VertexIndex];
+  Vertex vertex = pc.vertices.data[gl_VertexIndex];
+
+  gl_Position = vec4(vertex.pos / pc.window_extent * vec2(2) - vec2(1), 0, 1);
+
+  uv    = vertex.uv;
+  color = to_vec4(vertex.color);
 }

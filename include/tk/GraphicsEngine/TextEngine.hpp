@@ -15,12 +15,7 @@ struct Bitmap
   uint32_t           height{};
 };
 
-struct Vertex
-{
-  glm::vec2 pos{};
-  glm::vec2 uv{};
-  glm::vec4 color{};
-};
+struct Vertex;
 
 class TextEngine
 {

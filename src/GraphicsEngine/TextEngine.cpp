@@ -2,6 +2,7 @@
 #include "tk/ErrorHandling.hpp"
 #include "tk/util.hpp"
 #include "tk/log.hpp"
+#include "tk/GraphicsEngine/GraphicsEngine.hpp"
 
 #include <thread>
 #include <fstream>
@@ -219,13 +220,13 @@ auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float s
     ar /= _atlas_extent.x;
     at /= _atlas_extent.y;
 
-    vertices.append_range(std::vector<Vertex>
-    {
-      { min,              { al, at }, color },
-      { { max.x, min.y }, { ar, at }, color },
-      { { min.x, max.y }, { al, ab }, color },
-      { max,              { ar, ab }, color },
-    });
+    //vertices.append_range(std::vector<Vertex>
+    //{
+    //  { min,              { al, at }, color },
+    //  { { max.x, min.y }, { ar, at }, color },
+    //  { { min.x, max.y }, { al, ab }, color },
+    //  { max,              { ar, ab }, color },
+    //});
 
     indices.append_range(std::vector<uint16_t>
     {

@@ -73,6 +73,10 @@ void clear()
 {
   auto ctx = get_ctx();
 
+  ctx->vertices.clear();
+  ctx->indices.clear();
+  ctx->index = {};
+
   if (hit(ctx->mouse_pos, ctx->current_hovered_widget_rect))
     ctx->last_hovered_widget = ctx->current_hovered_widget;
   else
@@ -88,11 +92,12 @@ void clear()
 void render()
 {
   auto ctx = get_ctx();
-  if (ctx->shape_infos.empty()) return;
-  assert(ctx->engine && ctx->shape_infos.back().op == type::shape_op::mix);
-
-  ctx->engine->sdf_update(ctx->points, ctx->shape_infos);
-  ctx->engine->sdf_render(ctx->points.size() * 2, ctx->shape_infos.size());
+  //if (ctx->shape_infos.empty()) return;
+  //assert(ctx->engine && ctx->shape_infos.back().op == type::shape_op::mix);
+  assert(ctx->engine);
+  //ctx->engine->sdf_update(ctx->points, ctx->shape_infos);
+  //ctx->engine->sdf_render(ctx->points.size() * 2, ctx->shape_infos.size());
+  ctx->engine->sdf_render(ctx->vertices, ctx->indices);
   
   clear();
 }
@@ -107,13 +112,28 @@ void text_mask_render()
 //                               Draw Shape
 ////////////////////////////////////////////////////////////////////////////////
 
-auto convert_color_format(uint32_t color)
+void rectangle(glm::vec2 const& left_top, glm::vec2 const& right_bottom, uint32_t color, uint32_t thickness)
 {
-  float r = float((color >> 24) & 0xFF) / 255;
-  float g = float((color >> 16) & 0xFF) / 255;
-  float b = float((color >> 8 ) & 0xFF) / 255;
-  float a = float((color      ) & 0xFF) / 255;
-  return glm::vec4(r, g, b, a);
+  auto ctx = get_ctx();
+
+  ctx->vertices.reserve(ctx->vertices.size() + 4);
+  ctx->vertices.append_range(std::vector<Vertex>
+  {
+    { left_top,                       {}, color },
+    { { right_bottom.x, left_top.y }, {}, color },
+    { right_bottom,                   {}, color },
+    { { left_top.x, right_bottom.y }, {}, color },
+  });
+
+  ctx->indices.reserve(ctx->indices.size() + 6);
+  ctx->indices.append_range(std::vector<uint16_t>
+  {
+    static_cast<uint16_t>(ctx->index + 0), static_cast<uint16_t>(ctx->index + 1), static_cast<uint16_t>(ctx->index + 2),
+    static_cast<uint16_t>(ctx->index + 2), static_cast<uint16_t>(ctx->index + 1), static_cast<uint16_t>(ctx->index + 3),
+  });
+  ctx->index += 4;
+
+  // TODO: put thickness in shape info
 }
 
 void shape(type::shape type, std::vector<glm::vec2> const& points, uint32_t color, uint32_t thickness)
@@ -157,7 +177,7 @@ void shape(type::shape type, std::vector<glm::vec2> const& points, uint32_t colo
     .type      = type,
     .offset    = offset,
     .num       = static_cast<uint32_t>(points.size()),
-    .color     = convert_color_format(color),
+    //.color     = convert_color_format(color),
     .thickness = thickness,
   });
 }
@@ -185,7 +205,7 @@ void circle(glm::vec2 const& center, float radius, uint32_t color, uint32_t thic
     .type      = type::shape::circle,
     .offset    = offset,
     .num       = 2,
-    .color     = convert_color_format(color),
+    //.color     = convert_color_format(color),
     .thickness = thickness,
   });
 }
@@ -211,7 +231,7 @@ void path_end(uint32_t color, uint32_t thickness)
   ctx->path_begining = false;
 
   auto& info     = ctx->shape_infos[ctx->path_idx];
-  info.color     = convert_color_format(color);
+  //info.color     = convert_color_format(color);
   info.thickness = thickness;
   info.num       = ctx->shape_infos.size() - ctx->path_idx - 1;
   assert(info.num != 0);
@@ -220,8 +240,8 @@ void path_end(uint32_t color, uint32_t thickness)
 void text(std::string_view text, glm::vec2 const& pos, float size, uint32_t color)
 {
   auto ctx    = get_ctx();
-  auto extent = ctx->engine->parse_text(text, pos, size, convert_color_format(color));
-  shape(type::shape::text, { extent.first, extent.second });
+  //auto extent = ctx->engine->parse_text(text, pos, size, convert_color_format(color));
+  //shape(type::shape::text, { extent.first, extent.second });
 }
 
 void set_operation(type::shape_op op)

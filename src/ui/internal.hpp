@@ -47,6 +47,10 @@ struct ui_context
   std::pair<std::string, std::string> current_hovered_widget{};
   std::vector<glm::vec2>              current_hovered_widget_rect{};
   std::pair<std::string, std::string> last_hovered_widget{};
+
+  std::vector<graphics_engine::Vertex> vertices;
+  std::vector<uint16_t> indices;
+  uint16_t              index{};
 };
 
 inline auto get_ctx()

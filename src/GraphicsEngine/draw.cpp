@@ -191,6 +191,7 @@ void GraphicsEngine::render_end()
   vkCmdEndRendering(frame.cmd);
 }
 
+#if 0
 void GraphicsEngine::sdf_update(std::span<glm::vec2> points, std::span<ShapeInfo> infos)
 {
   _buffers[_current_frame].clear().append_range(points).append_range(infos);
@@ -212,6 +213,36 @@ void GraphicsEngine::sdf_render(uint32_t offset, uint32_t num)
   _sdf_render_pipeline.bind(cmd, pc);
 
   vkCmdDraw(cmd, 6, 1, 0, 0);
+}
+#endif
+
+void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> indices)
+{
+  // get buffer and clear
+  auto& buffer = _buffers[_current_frame].clear();
+
+  // upload vertices to buffer
+  buffer.append_range(vertices);
+
+  // get offset of indices
+  auto offset = buffer.size();
+  // upload indices to buffer
+  buffer.append_range(_indices);
+  
+  auto& cmd = get_current_frame().cmd;
+
+  // bind index buffer
+  vkCmdBindIndexBuffer(cmd, buffer.handle(), offset, VK_INDEX_TYPE_UINT16);
+
+  auto pc = PushConstant_SDF
+  {
+    .address       = buffer.address(),
+    .window_extent = _window->get_framebuffer_size(),
+  };
+
+  _sdf_render_pipeline.bind(cmd, pc);
+
+  vkCmdDrawIndexed(cmd, indices.size(), 1, 0, 0, 0);
 }
 
 void GraphicsEngine::text_mask_render_begin()

@@ -26,6 +26,13 @@ namespace tk { namespace graphics_engine {
     type::shape_op op        = {};
   };
 
+  struct Vertex
+  {
+    glm::vec2 pos{};
+    glm::vec2 uv{};
+    uint32_t  color{};
+  };
+
   class GraphicsEngine
   {
   public:
@@ -67,8 +74,9 @@ namespace tk { namespace graphics_engine {
     void text_mask_render();
 
     void sdf_render_begin();
-    void sdf_update(std::span<glm::vec2> points, std::span<ShapeInfo> infos);
-    void sdf_render(uint32_t offset, uint32_t num);
+    //void sdf_update(std::span<glm::vec2> points, std::span<ShapeInfo> infos);
+    //void sdf_render(uint32_t offset, uint32_t num);
+    void sdf_render(std::span<Vertex> vertices, std::span<uint16_t> indices);
 
   private:
     //
@@ -157,8 +165,8 @@ namespace tk { namespace graphics_engine {
     struct PushConstant_SDF
     {
       VkDeviceAddress address{};
-      uint32_t        offset{}; // offset of shape infos
-      uint32_t        num{};    // number of shape infos
+      //uint32_t        offset{}; // offset of shape infos
+      //uint32_t        num{};    // number of shape infos
       glm::vec2       window_extent{};
     };
 

@@ -396,7 +396,7 @@ void GraphicsEngine::create_buffer()
   _glyphs_buffers.reserve(_swapchain_images.size());
   for (auto i = 0; i < _swapchain_images.size(); ++i)
   {
-    _buffers.emplace_back(_mem_alloc.create_buffer(Buffer_Size, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT));
+    _buffers.emplace_back(_mem_alloc.create_buffer(Buffer_Size, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT));
     _glyphs_buffers.emplace_back(_mem_alloc.create_buffer(Buffer_Size, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT));
   }
   
@@ -445,7 +445,7 @@ void GraphicsEngine::create_sdf_rendering_resource()
   _sdf_render_pipeline = _device.create_render_pipeline(
     sizeof(PushConstant_SDF), 
     {
-      { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &_text_rgba_image, _sampler }, 
+      //{ 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &_text_rgba_image, _sampler }, 
     },
     _descriptor_buffer,
     "sdf",
