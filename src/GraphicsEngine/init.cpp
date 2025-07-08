@@ -1,6 +1,7 @@
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
 #include "init-util.hpp"
 #include "tk/GraphicsEngine/vk_extension.hpp"
+#include "tk/GraphicsEngine/config.hpp"
 
 #include <ranges>
 #include <set>
@@ -179,16 +180,24 @@ void GraphicsEngine::create_device_and_get_queues()
   VkPhysicalDeviceDescriptorBufferFeaturesEXT descriptor_buffer_features
   {
     .sType            = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_FEATURES_EXT,
-    .pNext            = &shader_object_features,
     .descriptorBuffer = VK_TRUE,
   };
   VkPhysicalDeviceVulkan13Features features13
   { 
     .sType               = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
-    .pNext               = &descriptor_buffer_features, 
     .synchronization2    = VK_TRUE,
     .dynamicRendering    = VK_TRUE,
   };
+  if (config()->use_descriptor_buffer && config()->use_shader_object)
+  {
+    features13.pNext = &descriptor_buffer_features;
+    descriptor_buffer_features.pNext = &shader_object_features;
+  }
+  else if (config()->use_descriptor_buffer)
+    features13.pNext = &descriptor_buffer_features;
+  else if (config()->use_shader_object)
+    features13.pNext = &shader_object_features;
+
   VkPhysicalDeviceVulkan12Features features12
   { 
     .sType               = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,

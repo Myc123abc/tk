@@ -39,9 +39,9 @@ namespace tk { namespace graphics_engine {
       return { _device, descritptor_layouts, push_constants };
     }
 
-    auto create_pipeline(VkPipelineLayout layout, std::string_view vert, std::string_view frag, std::vector<VkDescriptorSetLayout> const& descritptor_layouts, std::vector<VkPushConstantRange> const& push_constants, VkFormat format) -> Pipeline
+    auto create_pipeline(VkPipelineLayout layout, std::string_view vert, std::string_view frag, VkFormat format) -> Pipeline
     {
-      return { *this, layout, vert, frag, descritptor_layouts, push_constants, format };
+      return { *this, layout, vert, frag, format };
     }
 
     auto create_render_pipeline(

@@ -83,7 +83,7 @@ void render()
     ui::begin("AudioPlayer", 0, 0);
 
     // background
-    //ui::rectangle({ 0, 0 }, tk::get_window_size(), 0x282C34FF);
+    ui::rectangle({ 0, 0 }, tk::get_window_size(), 0x282C34FF);
 
     // playback button
     //playback_btn.render();

@@ -20,7 +20,7 @@ public:
 private:
   friend class Device;
   // TODO: add compute shader process
-  Pipeline(Device& device, VkPipelineLayout layout, std::string_view vert, std::string_view frag, std::vector<VkDescriptorSetLayout> const& descritptor_layouts, std::vector<VkPushConstantRange> const& push_constants, VkFormat format);
+  Pipeline(Device& device, VkPipelineLayout layout, std::string_view vert, std::string_view frag, VkFormat format);
 
   auto create_shader_module(std::string_view shader) -> VkShaderModule;
 

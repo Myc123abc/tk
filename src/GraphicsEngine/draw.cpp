@@ -227,7 +227,7 @@ void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> 
   // get offset of indices
   auto offset = buffer.size();
   // upload indices to buffer
-  buffer.append_range(_indices);
+  buffer.append_range(indices);
   
   auto& cmd = get_current_frame().cmd;
 

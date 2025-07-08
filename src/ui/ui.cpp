@@ -115,21 +115,25 @@ void text_mask_render()
 void rectangle(glm::vec2 const& left_top, glm::vec2 const& right_bottom, uint32_t color, uint32_t thickness)
 {
   auto ctx = get_ctx();
+  
+  auto& pos = ctx->last_layout->pos;
+  auto  min = pos + left_top;
+  auto  max = pos + right_bottom;
 
   ctx->vertices.reserve(ctx->vertices.size() + 4);
   ctx->vertices.append_range(std::vector<Vertex>
   {
-    { left_top,                       {}, color },
-    { { right_bottom.x, left_top.y }, {}, color },
-    { right_bottom,                   {}, color },
-    { { left_top.x, right_bottom.y }, {}, color },
+    { min,              {}, color },
+    { { max.x, min.y }, {}, color },
+    { max,              {}, color },
+    { { min.x, max.y }, {}, color },
   });
 
   ctx->indices.reserve(ctx->indices.size() + 6);
   ctx->indices.append_range(std::vector<uint16_t>
   {
-    static_cast<uint16_t>(ctx->index + 0), static_cast<uint16_t>(ctx->index + 1), static_cast<uint16_t>(ctx->index + 2),
-    static_cast<uint16_t>(ctx->index + 2), static_cast<uint16_t>(ctx->index + 1), static_cast<uint16_t>(ctx->index + 3),
+    static_cast<uint16_t>(ctx->index + 0), static_cast<uint16_t>(ctx->index + 1), static_cast<uint16_t>(ctx->index + 3),
+    static_cast<uint16_t>(ctx->index + 3), static_cast<uint16_t>(ctx->index + 1), static_cast<uint16_t>(ctx->index + 2),
   });
   ctx->index += 4;
 

@@ -47,6 +47,7 @@ RenderPipeline::RenderPipeline(
     _shaders.resize(2);
   }
 
+  throw_if(push_constant_size == 0, "[RenderPipeline] unhandle push constant not use case");
   auto pc = VkPushConstantRange
   {
     .stageFlags = _is_graphics_pipeline ? static_cast<VkShaderStageFlags>(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -54,6 +55,9 @@ RenderPipeline::RenderPipeline(
     .size       = push_constant_size,
   };
 
+  _bind_point = _is_graphics_pipeline ? VK_PIPELINE_BIND_POINT_GRAPHICS : VK_PIPELINE_BIND_POINT_COMPUTE;
+
+  std::vector<VkDescriptorSetLayout> descritptor_layouts;
   if (!descriptors.empty())
   { 
     _has_descriptor_layout = true;
@@ -63,48 +67,45 @@ RenderPipeline::RenderPipeline(
     if (config()->use_descriptor_buffer)
       _descriptor_layout.upload(descriptor_buffer, descriptor_layout_tag);
 
-    _pipeline_layout = device.create_pipeline_layout({ _descriptor_layout }, { pc });
+    descritptor_layouts.emplace_back(_descriptor_layout);
+  }
 
-    _bind_point = _is_graphics_pipeline ? VK_PIPELINE_BIND_POINT_GRAPHICS : VK_PIPELINE_BIND_POINT_COMPUTE;
+  _pipeline_layout = device.create_pipeline_layout(descritptor_layouts, { pc });
+
+  if (_has_descriptor_layout)
     _descriptor_layout.set(_pipeline_layout, _bind_point);
     
-    if (_is_graphics_pipeline)
+  if (_is_graphics_pipeline)
+  {
+    if (config()->use_shader_object)
     {
-      if (config()->use_shader_object)
+      device.create_shaders(
       {
-        device.create_shaders(
-        {
-          { _shaders[0], shaders[0].first, shaders[0].second.data(), { _descriptor_layout }, { pc } },
-          { _shaders[1], shaders[1].first, shaders[1].second.data(), { _descriptor_layout }, { pc } },
-        }, true);
-      }
-      else
-      {
-        auto vert = std::find_if(shaders.begin(), shaders.end(), [](auto const& info)
-        {
-          return info.first == VK_SHADER_STAGE_VERTEX_BIT;
-        });
-        auto frag = std::find_if(shaders.begin(), shaders.end(), [](auto const& info)
-        {
-          return info.first == VK_SHADER_STAGE_FRAGMENT_BIT;
-        });
-        _pipeline = device.create_pipeline(_pipeline_layout, vert->second, frag->second, { _descriptor_layout }, { pc }, format);
-      }
+        { _shaders[0], shaders[0].first, shaders[0].second.data(), descritptor_layouts, { pc } },
+        { _shaders[1], shaders[1].first, shaders[1].second.data(), descritptor_layouts, { pc } },
+      }, true);
     }
-
-    _vk_shaders.resize(shaders.size());
-    _stages.resize(shaders.size());
-    for (auto i = 0; i < shaders.size(); ++i)
+    else
     {
-      _vk_shaders[i] = _shaders[i];
-      _stages[i] = shaders[i].first;
-      _stage |= shaders[i].first;
+      auto vert = std::find_if(shaders.begin(), shaders.end(), [](auto const& info)
+      {
+        return info.first == VK_SHADER_STAGE_VERTEX_BIT;
+      });
+      auto frag = std::find_if(shaders.begin(), shaders.end(), [](auto const& info)
+      {
+        return info.first == VK_SHADER_STAGE_FRAGMENT_BIT;
+      });
+      _pipeline = device.create_pipeline(_pipeline_layout, vert->second, frag->second, format);
     }
   }
-  else
+
+  _vk_shaders.resize(shaders.size());
+  _stages.resize(shaders.size());
+  for (auto i = 0; i < shaders.size(); ++i)
   {
-    // TODO:
-    throw_if(true, "[RenderPipeline] also need to handle no descriptor, no pushconstant cases");
+    _vk_shaders[i] = _shaders[i];
+    _stages[i] = shaders[i].first;
+    _stage |= shaders[i].first;
   }
 }
 

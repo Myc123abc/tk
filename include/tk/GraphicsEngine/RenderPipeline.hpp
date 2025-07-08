@@ -41,7 +41,7 @@ namespace tk { namespace graphics_engine {
       vkCmdPushConstants(cmd, _pipeline_layout, _stage, 0, sizeof(PushConstant), &pc);
     }
 
-    void update() { _descriptor_layout.update(); }
+    void update() { if (_has_descriptor_layout) _descriptor_layout.update(); }
 
   private:
     friend class Device;

@@ -83,9 +83,9 @@ void render()
   }
 
   // TODO: another vec to storage glyphs and ui call text mask render then call render
-  engine.text_mask_render_begin();
-  ui::text_mask_render();
-  engine.render_end();
+  //engine.text_mask_render_begin();
+  //ui::text_mask_render();
+  //engine.render_end();
 
   engine.sdf_render_begin();
   ui::render();
