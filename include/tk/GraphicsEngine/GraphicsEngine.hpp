@@ -16,6 +16,7 @@
 
 namespace tk { namespace graphics_engine {
 
+  // FIXME: discard
   struct ShapeInfo
   {
     type::shape    type      = {};
@@ -24,6 +25,13 @@ namespace tk { namespace graphics_engine {
     glm::vec4      color;
     uint32_t       thickness = {};
     type::shape_op op        = {};
+  };
+
+  struct ShapeProperty
+  {
+    type::shape        type{};
+    uint32_t           thickness{};
+    std::vector<float> values;
   };
 
   struct Vertex
@@ -77,7 +85,7 @@ namespace tk { namespace graphics_engine {
     void sdf_render_begin();
     //void sdf_update(std::span<glm::vec2> points, std::span<ShapeInfo> infos);
     //void sdf_render(uint32_t offset, uint32_t num);
-    void sdf_render(std::span<Vertex> vertices, std::span<uint16_t> indices);
+    void sdf_render(std::span<Vertex> vertices, std::span<uint16_t> indices, std::span<ShapeProperty> shape_properties);
 
   private:
     //
@@ -165,7 +173,8 @@ namespace tk { namespace graphics_engine {
 
     struct PushConstant_SDF
     {
-      VkDeviceAddress address{};
+      VkDeviceAddress vertices{};
+      VkDeviceAddress shape_properties{};
       //uint32_t        offset{}; // offset of shape infos
       //uint32_t        num{};    // number of shape infos
       glm::vec2       window_extent{};

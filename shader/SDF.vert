@@ -4,6 +4,7 @@
 
 layout(location = 0) out vec2 uv;
 layout(location = 1) out vec4 color;
+layout(location = 2) flat out uint offset;
 
 vec4 to_vec4(uint x)
 {
@@ -20,6 +21,7 @@ void main()
 
   gl_Position = vec4(vertex.pos / pc.window_extent * vec2(2) - vec2(1), 0, 1);
 
-  uv    = vertex.uv;
-  color = to_vec4(vertex.color);
+  uv     = vertex.uv;
+  color  = to_vec4(vertex.color);
+  offset = vertex.offset;
 }

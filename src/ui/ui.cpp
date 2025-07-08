@@ -76,6 +76,8 @@ void clear()
   ctx->vertices.clear();
   ctx->indices.clear();
   ctx->index = {};
+  ctx->shape_properties.clear();
+  ctx->shape_offset = {};
 
   if (hit(ctx->mouse_pos, ctx->current_hovered_widget_rect))
     ctx->last_hovered_widget = ctx->current_hovered_widget;
@@ -97,7 +99,7 @@ void render()
   assert(ctx->engine);
   //ctx->engine->sdf_update(ctx->points, ctx->shape_infos);
   //ctx->engine->sdf_render(ctx->points.size() * 2, ctx->shape_infos.size());
-  ctx->engine->sdf_render(ctx->vertices, ctx->indices);
+  ctx->engine->sdf_render(ctx->vertices, ctx->indices, ctx->shape_properties);
   
   clear();
 }
@@ -123,10 +125,10 @@ void rectangle(glm::vec2 const& left_top, glm::vec2 const& right_bottom, uint32_
   ctx->vertices.reserve(ctx->vertices.size() + 4);
   ctx->vertices.append_range(std::vector<Vertex>
   {
-    { min,              {}, color },
-    { { max.x, min.y }, {}, color },
-    { max,              {}, color },
-    { { min.x, max.y }, {}, color },
+    { min,              {}, color, ctx->shape_offset },
+    { { max.x, min.y }, {}, color, ctx->shape_offset },
+    { max,              {}, color, ctx->shape_offset },
+    { { min.x, max.y }, {}, color, ctx->shape_offset },
   });
 
   ctx->indices.reserve(ctx->indices.size() + 6);
@@ -137,7 +139,41 @@ void rectangle(glm::vec2 const& left_top, glm::vec2 const& right_bottom, uint32_
   });
   ctx->index += 4;
 
-  // TODO: put thickness in shape info
+  ctx->shape_properties.emplace_back(type::shape::rectangle, thickness);
+  ctx->shape_properties.back().values.append_range(std::vector<float>{ min.x, min.y, max.x, max.y });
+
+  ctx->shape_offset += 2 + ctx->shape_properties.back().values.size();
+}
+
+void circle(glm::vec2 const& center, float radius, uint32_t color, uint32_t thickness)
+{
+  auto ctx = get_ctx();
+  
+  auto& pos = ctx->last_layout->pos;
+  auto  min = pos + center - radius;
+  auto  max = pos + center + radius;
+
+  ctx->vertices.reserve(ctx->vertices.size() + 4);
+  ctx->vertices.append_range(std::vector<Vertex>
+  {
+    { { min.x - 1, min.y - 1 }, {}, color, ctx->shape_offset },
+    { { max.x + 1, min.y - 1 }, {}, color, ctx->shape_offset },
+    { { max.x + 1, max.y + 1 }, {}, color, ctx->shape_offset },
+    { { min.x - 1, max.y + 1 }, {}, color, ctx->shape_offset },
+  });
+
+  ctx->indices.reserve(ctx->indices.size() + 6);
+  ctx->indices.append_range(std::vector<uint16_t>
+  {
+    static_cast<uint16_t>(ctx->index + 0), static_cast<uint16_t>(ctx->index + 1), static_cast<uint16_t>(ctx->index + 3),
+    static_cast<uint16_t>(ctx->index + 3), static_cast<uint16_t>(ctx->index + 1), static_cast<uint16_t>(ctx->index + 2),
+  });
+  ctx->index += 4;
+
+  ctx->shape_properties.emplace_back(type::shape::circle, thickness);
+  ctx->shape_properties.back().values.append_range(std::vector<float>{ center.x, center.y, radius });
+
+  ctx->shape_offset += 2 + ctx->shape_properties.back().values.size();
 }
 
 void shape(type::shape type, std::vector<glm::vec2> const& points, uint32_t color, uint32_t thickness)
@@ -186,7 +222,7 @@ void shape(type::shape type, std::vector<glm::vec2> const& points, uint32_t colo
   });
 }
 
-void circle(glm::vec2 const& center, float radius, uint32_t color, uint32_t thickness)
+void circle2(glm::vec2 const& center, float radius, uint32_t color, uint32_t thickness)
 {
   auto ctx = get_ctx();
   throw_if(!ctx->begining || ctx->path_begining,

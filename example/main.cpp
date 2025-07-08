@@ -51,7 +51,7 @@ int main()
     exit(EXIT_FAILURE);
   }
 }
-
+glm::vec2 pos{50,50};
 auto event_process() -> type::window
 {
   using enum type::window;
@@ -64,6 +64,7 @@ auto event_process() -> type::window
   }
   if (tk::get_key(space) == press)
   {
+    pos+=5;
     click = !click;
     playback_btn.click();
   }
@@ -114,8 +115,9 @@ void render()
     //ui::text("H", { 0, 30 }, 26.66, 0xff0000ff);
     //ui::text("H", { 5, 30 }, 26.66, 0x00ff004f);
 
-    ui::rectangle({ 50, 50 }, { 100, 100 }, 0xffffffff, 1.f);
-    //ui::circle({ 50,50 }, 25, 0x000000ff);
+    ui::rectangle({ 50, 50 }, { 100, 100 }, 0xff0000ff);
+    //ui::rectangle({ 25, 25 }, { 75, 75 }, 0x00ff007f);
+    ui::circle(pos, 25, 0x00ff007f);
 
     ui::end();
   }

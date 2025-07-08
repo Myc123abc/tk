@@ -216,7 +216,7 @@ void GraphicsEngine::sdf_render(uint32_t offset, uint32_t num)
 }
 #endif
 
-void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> indices)
+void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> indices, std::span<ShapeProperty> shape_properties)
 {
   // get buffer and clear
   auto& buffer = _buffers[_current_frame].clear();
@@ -225,19 +225,38 @@ void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> 
   buffer.append_range(vertices);
 
   // get offset of indices
-  auto offset = buffer.size();
+  auto indices_offset = buffer.size();
   // upload indices to buffer
   buffer.append_range(indices);
+
+  // convert shape properties to binary data
+  uint32_t total_size{};
+  for (auto const& property : shape_properties)
+    total_size += 2 + property.values.size();
+  std::vector<uint32_t> data;
+  data.reserve(total_size);
+  for (auto const& property : shape_properties)
+  {
+    data.emplace_back(std::bit_cast<uint32_t>(property.type));
+    data.emplace_back(std::bit_cast<uint32_t>(property.thickness));
+    for (auto value : property.values)
+      data.emplace_back(std::bit_cast<uint32_t>(value));
+  }
+  // get offset of shape properties
+  auto shape_properties_offset = buffer.size();
+  // upload shape properties to buffer
+  buffer.append_range(data);
   
   auto& cmd = get_current_frame().cmd;
 
   // bind index buffer
-  vkCmdBindIndexBuffer(cmd, buffer.handle(), offset, VK_INDEX_TYPE_UINT16);
+  vkCmdBindIndexBuffer(cmd, buffer.handle(), indices_offset, VK_INDEX_TYPE_UINT16);
 
   auto pc = PushConstant_SDF
   {
-    .address       = buffer.address(),
-    .window_extent = _window->get_framebuffer_size(),
+    .vertices         = buffer.address(),
+    .shape_properties = buffer.address() + shape_properties_offset,
+    .window_extent    = _window->get_framebuffer_size(),
   };
 
   _sdf_render_pipeline.bind(cmd, pc);

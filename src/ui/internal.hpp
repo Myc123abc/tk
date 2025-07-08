@@ -51,6 +51,8 @@ struct ui_context
   std::vector<graphics_engine::Vertex> vertices;
   std::vector<uint16_t> indices;
   uint16_t              index{};
+  std::vector<graphics_engine::ShapeProperty> shape_properties;
+  uint32_t              shape_offset{};
 };
 
 inline auto get_ctx()
