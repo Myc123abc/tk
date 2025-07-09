@@ -114,13 +114,13 @@ void text_mask_render()
 //                               Draw Shape
 ////////////////////////////////////////////////////////////////////////////////
 
-void rectangle(glm::vec2 const& left_top, glm::vec2 const& right_bottom, uint32_t color, uint32_t thickness)
+void shape(type::shape type, std::vector<float> const& values, uint32_t color, uint32_t thickness, std::pair<glm::vec2, glm::vec2> const& box)
 {
   auto ctx = get_ctx();
   
   auto& pos = ctx->last_layout->pos;
-  auto  min = pos + left_top;
-  auto  max = pos + right_bottom;
+  auto  min = pos + box.first  - glm::vec2(1);
+  auto  max = pos + box.second + glm::vec2(1);
 
   ctx->vertices.reserve(ctx->vertices.size() + 4);
   ctx->vertices.append_range(std::vector<Vertex>
@@ -139,43 +139,48 @@ void rectangle(glm::vec2 const& left_top, glm::vec2 const& right_bottom, uint32_
   });
   ctx->index += 4;
 
-  ctx->shape_properties.emplace_back(type::shape::rectangle, thickness);
-  ctx->shape_properties.back().values.append_range(std::vector<float>{ min.x, min.y, max.x, max.y });
+  ctx->shape_properties.emplace_back(type, thickness);
+  ctx->shape_properties.back().values.append_range(values);
 
-  ctx->shape_offset += 2 + ctx->shape_properties.back().values.size();
+  ctx->shape_offset += 2 + values.size();
+}
+
+void line(glm::vec2 const& p0, glm::vec2 const& p1, uint32_t color)
+{
+  if (p0 != p1) shape(type::shape::line, { p0.x, p0.y, p1.x, p1.y }, color, 0, { p0, p1 });
+}
+
+void rectangle(glm::vec2 const& left_top, glm::vec2 const& right_bottom, uint32_t color, uint32_t thickness)
+{
+  shape(type::shape::rectangle, { left_top.x, left_top.y, right_bottom.x, right_bottom.y }, color, thickness, { left_top, right_bottom });
+}
+
+void triangle(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint32_t color, uint32_t thickness)
+{
+  shape(type::shape::triangle, { p0.x, p0.y, p1.x, p1.y, p2.x, p2.y }, color, thickness, get_bounding_rectangle({ p0, p1, p2 }));
+}
+
+void polygon(std::vector<glm::vec2> const& points, uint32_t color, uint32_t thickness)
+{
+  std::vector<float> data;
+  data.reserve(1 + points.size() * 2);
+  data.emplace_back(std::bit_cast<float>(static_cast<uint32_t>(points.size())));
+  for (auto const& point : points)
+    data.append_range(std::vector<float>{ point.x, point.y });
+  shape(type::shape::polygon, data, color, thickness, get_bounding_rectangle(points));
 }
 
 void circle(glm::vec2 const& center, float radius, uint32_t color, uint32_t thickness)
 {
-  auto ctx = get_ctx();
-  
-  auto& pos = ctx->last_layout->pos;
-  auto  min = pos + center - radius;
-  auto  max = pos + center + radius;
-
-  ctx->vertices.reserve(ctx->vertices.size() + 4);
-  ctx->vertices.append_range(std::vector<Vertex>
-  {
-    { { min.x - 1, min.y - 1 }, {}, color, ctx->shape_offset },
-    { { max.x + 1, min.y - 1 }, {}, color, ctx->shape_offset },
-    { { max.x + 1, max.y + 1 }, {}, color, ctx->shape_offset },
-    { { min.x - 1, max.y + 1 }, {}, color, ctx->shape_offset },
-  });
-
-  ctx->indices.reserve(ctx->indices.size() + 6);
-  ctx->indices.append_range(std::vector<uint16_t>
-  {
-    static_cast<uint16_t>(ctx->index + 0), static_cast<uint16_t>(ctx->index + 1), static_cast<uint16_t>(ctx->index + 3),
-    static_cast<uint16_t>(ctx->index + 3), static_cast<uint16_t>(ctx->index + 1), static_cast<uint16_t>(ctx->index + 2),
-  });
-  ctx->index += 4;
-
-  ctx->shape_properties.emplace_back(type::shape::circle, thickness);
-  ctx->shape_properties.back().values.append_range(std::vector<float>{ center.x, center.y, radius });
-
-  ctx->shape_offset += 2 + ctx->shape_properties.back().values.size();
+  shape(type::shape::circle, { center.x, center.y, radius }, color, thickness, { center - radius, center + radius });
 }
 
+void bezier(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint32_t color)
+{
+  shape(type::shape::bezier, { p0.x, p0.y, p1.x, p1.y, p2.x, p2.y }, color, 0, get_bounding_rectangle({ p0, p1, p2 }));
+}
+
+#if 0
 void shape(type::shape type, std::vector<glm::vec2> const& points, uint32_t color, uint32_t thickness)
 {
   using enum type::shape;
@@ -249,6 +254,7 @@ void circle2(glm::vec2 const& center, float radius, uint32_t color, uint32_t thi
     .thickness = thickness,
   });
 }
+#endif
 
 void path_begin()
 {

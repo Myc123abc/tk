@@ -51,7 +51,7 @@ int main()
     exit(EXIT_FAILURE);
   }
 }
-glm::vec2 pos{50,50};
+glm::vec2 pos{25,25};
 auto event_process() -> type::window
 {
   using enum type::window;
@@ -115,9 +115,16 @@ void render()
     //ui::text("H", { 0, 30 }, 26.66, 0xff0000ff);
     //ui::text("H", { 5, 30 }, 26.66, 0x00ff004f);
 
-    ui::rectangle({ 50, 50 }, { 100, 100 }, 0xff0000ff);
+    ui::rectangle({ 50, 50 }, { 100, 100 }, 0xffffffff);
     //ui::rectangle({ 25, 25 }, { 75, 75 }, 0x00ff007f);
-    ui::circle(pos, 25, 0x00ff007f);
+    ui::circle(pos, 25, 0x00ff00ff, 1);
+
+    ui::line({ 200, 200 }, { 150, 125 }, 0xff000070);
+
+    //ui::triangle({ 50, 50}, { 75, 25}, { 75, 75}, 0xff00ffff, 1);
+    //ui::polygon({{ 50, 50}, { 75, 25}, { 75, 75}}, 0xff0000ff, 1);
+
+    ui::bezier({ 50, 50}, { 75, 25}, { 75, 75}, 0xff00ffff);
 
     ui::end();
   }
