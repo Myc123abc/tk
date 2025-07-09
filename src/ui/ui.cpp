@@ -147,7 +147,7 @@ void shape(type::shape type, std::vector<float> const& values, uint32_t color, u
 
 void line(glm::vec2 const& p0, glm::vec2 const& p1, uint32_t color)
 {
-  if (p0 != p1) shape(type::shape::line, { p0.x, p0.y, p1.x, p1.y }, color, 0, { p0, p1 });
+  if (p0 != p1) shape(type::shape::line, { p0.x, p0.y, p1.x, p1.y }, color, 0, get_bounding_rectangle({ p0, p1 }));
 }
 
 void rectangle(glm::vec2 const& left_top, glm::vec2 const& right_bottom, uint32_t color, uint32_t thickness)
@@ -311,17 +311,16 @@ void event_process()
 
   // mouse click
   auto mouse_state = ctx->window->get_mouse_state();
-  static bool first_down{};
-  if (!first_down && mouse_state == left_down)
+  if (!ctx->first_down && mouse_state == left_down)
   {
     ctx->drag_start_pos = ctx->mouse_pos;
-    first_down          = true;
+    ctx->first_down     = true;
   }
-  else if (first_down && mouse_state == left_up)
+  else if (ctx->first_down && mouse_state == left_up)
   {
     ctx->drag_end_pos = ctx->mouse_pos;
     ctx->click_finish = true;
-    first_down        = false;
+    ctx->first_down   = false;
   }
 }
 

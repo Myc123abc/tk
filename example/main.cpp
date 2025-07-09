@@ -51,7 +51,7 @@ int main()
     exit(EXIT_FAILURE);
   }
 }
-glm::vec2 pos{25,25};
+
 auto event_process() -> type::window
 {
   using enum type::window;
@@ -63,8 +63,7 @@ auto event_process() -> type::window
     return closed;
   }
   if (tk::get_key(space) == press)
-  {
-    pos+=5;
+  { 
     click = !click;
     playback_btn.click();
   }
@@ -87,7 +86,7 @@ void render()
     ui::rectangle({ 0, 0 }, tk::get_window_size(), 0x282C34FF);
 
     // playback button
-    //playback_btn.render();
+    playback_btn.render();
     if (playback_btn.button())
     {
       click = !click;
@@ -99,9 +98,8 @@ void render()
 
     // playback progress
     auto playback_progree_pos = playback_pos1 + glm::vec2(5, 0);
-    //ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ 100, 3 }, 0x808080FF );
-    //ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ progress, 3 }, 0x0000FFFF );
-
+    ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ 100, 3 }, 0x808080FF );
+    ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ progress, 3 }, 0x0000FFFF );
     /*
     TODO:
       1. change text_mask_image from R32 to R32G32
@@ -114,18 +112,7 @@ void render()
     */
     //ui::text("H", { 0, 30 }, 26.66, 0xff0000ff);
     //ui::text("H", { 5, 30 }, 26.66, 0x00ff004f);
-
-    ui::rectangle({ 50, 50 }, { 100, 100 }, 0xffffffff);
-    //ui::rectangle({ 25, 25 }, { 75, 75 }, 0x00ff007f);
-    ui::circle(pos, 25, 0x00ff00ff, 1);
-
-    ui::line({ 200, 200 }, { 150, 125 }, 0xff000070);
-
-    //ui::triangle({ 50, 50}, { 75, 25}, { 75, 75}, 0xff00ffff, 1);
-    //ui::polygon({{ 50, 50}, { 75, 25}, { 75, 75}}, 0xff0000ff, 1);
-
-    ui::bezier({ 50, 50}, { 75, 25}, { 75, 75}, 0xff00ffff);
-
+    
     ui::end();
   }
 }
