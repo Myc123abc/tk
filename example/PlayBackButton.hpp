@@ -70,7 +70,7 @@ public:
     else
       _color = c;
 
-    //ui::path_begin();
+    ui::path_begin();
     //ui::set_operation(type::shape_op::min);
 
     ui::line(_lps[0], _lps[1], _color);
@@ -80,9 +80,9 @@ public:
       ui::line(_lps[1], _lps[2], _color);
     ui::line(_lps[2], _lps[3], _color);
     ui::line(_lps[3], _lps[0], _color);
-    //ui::path_end(_color, _thickness);
+    ui::path_end(_color, _thickness);
     
-    //ui::path_begin();
+    ui::path_begin();
     ui::line(_lps[4], _lps[5], _color);
     ui::line(_lps[5], _lps[6], _color);
     ui::line(_lps[6], _lps[7], _color);
@@ -90,7 +90,7 @@ public:
       ui::bezier(_lps[7], _lps[9], _lps[4], _color);
     else
       ui::line(_lps[7], _lps[4], _color);
-    //ui::path_end(_color, _thickness);
+    ui::path_end(_color, _thickness);
   }
 
 private:

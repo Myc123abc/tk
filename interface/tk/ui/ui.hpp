@@ -46,7 +46,7 @@ TK_API void end();
  * @param p1 end point
  * @param color
  */
-TK_API inline void line(glm::vec2 const& p0, glm::vec2 const& p1, uint32_t color = 0);
+TK_API void line(glm::vec2 const& p0, glm::vec2 const& p1, uint32_t color = 0);
 
 /**
  * draw rectangle
@@ -91,7 +91,7 @@ TK_API void circle(glm::vec2 const& center, float radius, uint32_t color = 0, ui
  * @param p2
  * @param color rgba
  */
-TK_API inline void bezier(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint32_t color = 0);
+TK_API void bezier(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint32_t color = 0);
 
 /*
  * start path shape, can only use line and bezier now.

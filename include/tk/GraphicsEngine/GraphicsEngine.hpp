@@ -39,7 +39,7 @@ namespace tk { namespace graphics_engine {
     glm::vec2 pos{};
     glm::vec2 uv{};
     uint32_t  color{};
-    uint32_t  padding{};
+    uint32_t  offset{};
   };
 
   class GraphicsEngine

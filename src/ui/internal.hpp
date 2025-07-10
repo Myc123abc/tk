@@ -36,8 +36,12 @@ struct ui_context
   std::vector<Layout> layouts;
   Layout* last_layout{};
 
-  bool     path_begining{};
-  uint32_t path_idx{};
+  bool                   path_begining{};
+  uint32_t               path_count{};
+  std::vector<glm::vec2> path_points;
+  uint32_t               path_index{};
+  uint32_t               path_color{};
+  uint32_t               path_offset{};
 
   glm::vec2 mouse_pos{};
   glm::vec2 drag_start_pos{};
