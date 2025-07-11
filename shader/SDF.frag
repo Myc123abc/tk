@@ -28,19 +28,12 @@ vec4 get_color(vec4 color, float w, float d, uint t)
   return vec4(color.rgb, color.a * alpha);
 }
 
-vec4 to_vec4(uint x)
-{
-  float r = float((x >> 24) & 0xFF) / 255;
-  float g = float((x >> 16) & 0xFF) / 255;
-  float b = float((x >> 8 ) & 0xFF) / 255;
-  float a = float((x      ) & 0xFF) / 255;
-  return vec4(r, g, b, a);
-}
+#define HeaderSize 7
 
-#define GetTypeAt(x) GetData(x + 0)
-#define GetP0At(x)   GetVec2(x + 4)
-#define GetP1At(x)   GetVec2(x + 6)
-#define GetP2At(x)   GetVec2(x + 8)
+#define GetTypeAt(x) GetData(x)
+#define GetP0At(x)   GetVec2(x + HeaderSize)
+#define GetP1At(x)   GetVec2(x + HeaderSize + 2)
+#define GetP2At(x)   GetVec2(x + HeaderSize + 4)
 
 #define GetPartitionP0At(x) GetVec2(x + 1)
 #define GetPartitionP1At(x) GetVec2(x + 3)
@@ -51,20 +44,19 @@ vec4 to_vec4(uint x)
 #define GetP1()   GetP1At(g_offset)
 #define GetP2()   GetP2At(g_offset)
 
-#define GetPolygonPointsBeginOffset() g_offset + 5
+#define GetPolygonPointsBeginOffset() g_offset + HeaderSize + 1
 
-#define GetFirstValue()  GetData(g_offset + 4)
-#define GetThirdValueF() GetDataF(g_offset + 6)
+#define GetFirstValue()  GetData(g_offset + HeaderSize)
+#define GetThirdValueF() GetDataF(g_offset + HeaderSize + 2)
 
-#define GetPathCount()             GetData(g_offset + 4)
-#define GetPathBeginOffset()       g_offset + 5
+#define GetPathCount()             GetData(g_offset + HeaderSize)
+#define GetPathBeginOffset()       g_offset + HeaderSize + 1
 #define GetLinePartitionOffset()   5
 #define GetBezierPartitionOffset() 7
 
-// TODO: move color to cpu?
-#define GetColor()     to_vec4(GetData(g_offset + 1))
-#define GetThickness() GetData(g_offset + 2)
-#define GetOperator()  GetData(g_offset + 3)
+#define GetColor()     GetVec4(g_offset + 1)
+#define GetThickness() GetData(g_offset + 5)
+#define GetOperator()  GetData(g_offset + 6)
 
 float get_distance_parition(inout uint beg)
 {

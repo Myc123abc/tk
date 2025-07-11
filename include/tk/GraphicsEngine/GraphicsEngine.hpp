@@ -30,10 +30,10 @@ namespace tk { namespace graphics_engine {
   // INFO: when change header fields, remebering also change header_field_count and emplace field data to device address in sdf_render function
   struct ShapeProperty
   {
-    inline static constexpr uint32_t header_field_count{ 4 };
+    inline static constexpr uint32_t header_field_count{ 7 };
 
     type::shape        type{};
-    uint32_t           color{};
+    glm::vec4          color{};
     uint32_t           thickness{};
     type::shape_op     op{};
     

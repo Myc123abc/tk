@@ -106,6 +106,15 @@ void text_mask_render()
   ctx->engine->text_mask_render();
 }
 
+auto to_vec4(uint32_t color)
+{
+  float r = float((color >> 24) & 0xFF) / 255;
+  float g = float((color >> 16) & 0xFF) / 255;
+  float b = float((color >> 8 ) & 0xFF) / 255;
+  float a = float((color      ) & 0xFF) / 255;
+  return glm::vec4(r, g, b, a);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //                               Draw Shape
 ////////////////////////////////////////////////////////////////////////////////
@@ -139,7 +148,7 @@ void add_vertices(std::pair<glm::vec2, glm::vec2> const& box, uint32_t offset)
 void add_shape_property(type::shape type, std::vector<float> const& values, uint32_t color, uint32_t thickness)
 {
   auto ctx = get_ctx();
-  ctx->shape_properties.emplace_back(type, color, thickness);
+  ctx->shape_properties.emplace_back(type, to_vec4(color), thickness);
   ctx->shape_properties.back().values.append_range(values);
   ctx->shape_offset += ShapeProperty::header_field_count + values.size();
 }

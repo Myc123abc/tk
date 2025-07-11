@@ -51,6 +51,12 @@ LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LP
 
   switch (msg)
   {
+  case WM_DESTROY:
+  {
+    PostQuitMessage(0);
+  }
+  return 0;
+  
   case WM_SIZE:
   {
     if (window->_engine == nullptr)
@@ -83,6 +89,8 @@ LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LP
   case WM_CLOSE:
   {
     window->_state = closed;
+    check(DestroyWindow(window->_handle), "failed to destroy window");
+    window->_handle = {};
   }
   return 0;
 
@@ -169,10 +177,10 @@ void Window::init(std::string_view title, uint32_t width, uint32_t height)
 
 void Window::destroy() const
 {
-  assert(_handle);
+  if (_handle)
+    check(DestroyWindow(_handle), "failed to destroy window");
   DeleteFiber(_message_fiber);
   check(ConvertFiberToThread(), "failed to convert fiber to thread");
-  check(DestroyWindow(_handle), "failed to destroy window");
   check(UnregisterClassW(ClassName, GetModuleHandle(nullptr)), "failed to unregister class {}", to_string(ClassName));
 }
 

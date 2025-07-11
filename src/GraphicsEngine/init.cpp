@@ -442,11 +442,11 @@ void GraphicsEngine::resize_swapchain()
   vkDestroySwapchainKHR(_device, old_swapchain, nullptr);
 
   // resize text rendering image
-  _text_rgba_image.destroy();
-  _text_rgba_image = _mem_alloc.create_image(VK_FORMAT_R8G8B8A8_UNORM, _swapchain_images[0].extent3D(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+  //_text_rgba_image.destroy();
+  //_text_rgba_image = _mem_alloc.create_image(VK_FORMAT_R8G8B8A8_UNORM, _swapchain_images[0].extent3D(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
   // update descriptor layout which image descriptor also resized
-  _sdf_render_pipeline.update();
+  //_sdf_render_pipeline.update();
 }
 
 void GraphicsEngine::create_sdf_rendering_resource()
@@ -524,27 +524,27 @@ void GraphicsEngine::load_font()
   */
 
   // text mask image
-  _text_rgba_image = _mem_alloc.create_image(VK_FORMAT_R8G8B8A8_UNORM, _swapchain_images[0].extent3D(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+  //_text_rgba_image = _mem_alloc.create_image(VK_FORMAT_R8G8B8A8_UNORM, _swapchain_images[0].extent3D(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
-  _text_mask_render_pipeline = _device.create_render_pipeline(
-    sizeof(PushConstant_text_mask),
-    {
-      { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &_font_atlas_image, _sampler }
-    },
-    _descriptor_buffer,
-    "text mask",
-    {
-      { VK_SHADER_STAGE_VERTEX_BIT,   "shader/text_mask_vert.spv" },
-      { VK_SHADER_STAGE_FRAGMENT_BIT, "shader/text_mask_frag.spv" },
-    },
-    _text_rgba_image.format()
-  );
+  //_text_mask_render_pipeline = _device.create_render_pipeline(
+  //  sizeof(PushConstant_text_mask),
+  //  {
+  //    { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &_font_atlas_image, _sampler }
+  //  },
+  //  _descriptor_buffer,
+  //  "text mask",
+  //  {
+  //    { VK_SHADER_STAGE_VERTEX_BIT,   "shader/text_mask_vert.spv" },
+  //    { VK_SHADER_STAGE_FRAGMENT_BIT, "shader/text_mask_frag.spv" },
+  //  },
+  //  _text_rgba_image.format()
+  //);
 
   // destroy resources
   _destructors.push([&]
   {
-    _text_rgba_image.destroy();
-    _text_mask_render_pipeline.destroy();
+    //_text_rgba_image.destroy();
+    //_text_mask_render_pipeline.destroy();
     _font_atlas_image.destroy();
   });
 }

@@ -8,8 +8,6 @@
 
 namespace tk { namespace graphics_engine {
 
-auto get_cursor_position() -> glm::vec2;
-
 auto GraphicsEngine::frame_begin() -> bool
 {
   auto* frame = &get_current_frame();
@@ -126,7 +124,6 @@ void GraphicsEngine::render_begin(Image& image)
 
 void GraphicsEngine::sdf_render_begin()
 {
-  _text_rgba_image.set_layout(get_current_frame().cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   render_begin(get_current_swapchain_image());
 }
 
@@ -191,31 +188,6 @@ void GraphicsEngine::render_end()
   vkCmdEndRendering(frame.cmd);
 }
 
-#if 0
-void GraphicsEngine::sdf_update(std::span<glm::vec2> points, std::span<ShapeInfo> infos)
-{
-  _buffers[_current_frame].clear().append_range(points).append_range(infos);
-}
-
-void GraphicsEngine::sdf_render(uint32_t offset, uint32_t num)
-{
-  auto& cmd = get_current_frame().cmd;
-
-  auto pc = PushConstant_SDF
-  {
-    .address       = _buffers[_current_frame].address(),
-    // this offset is not byte offset, is float offset
-    .offset        = offset,
-    .num           = num,
-    .window_extent = _window->get_framebuffer_size(),
-  };
-
-  _sdf_render_pipeline.bind(cmd, pc);
-
-  vkCmdDraw(cmd, 6, 1, 0, 0);
-}
-#endif
-
 void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> indices, std::span<ShapeProperty> shape_properties)
 {
   // get buffer and clear
@@ -238,7 +210,10 @@ void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> 
   for (auto const& property : shape_properties)
   {
     data.emplace_back(std::bit_cast<uint32_t>(property.type));
-    data.emplace_back(std::bit_cast<uint32_t>(property.color));
+    data.emplace_back(std::bit_cast<uint32_t>(property.color.r));
+    data.emplace_back(std::bit_cast<uint32_t>(property.color.g));
+    data.emplace_back(std::bit_cast<uint32_t>(property.color.b));
+    data.emplace_back(std::bit_cast<uint32_t>(property.color.a));
     data.emplace_back(std::bit_cast<uint32_t>(property.thickness));
     data.emplace_back(std::bit_cast<uint32_t>(property.op));
     for (auto value : property.values)
