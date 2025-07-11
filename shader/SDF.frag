@@ -3,8 +3,7 @@
 #include "SDF.h"
 
 layout(location = 0) in vec2 uv;
-layout(location = 1) in vec4 color;
-layout(location = 2) flat in uint offset;
+layout(location = 1) flat in uint offset;
 
 layout(location = 0) out vec4 out_color;
 
@@ -29,26 +28,43 @@ vec4 get_color(vec4 color, float w, float d, uint t)
   return vec4(color.rgb, color.a * alpha);
 }
 
+vec4 to_vec4(uint x)
+{
+  float r = float((x >> 24) & 0xFF) / 255;
+  float g = float((x >> 16) & 0xFF) / 255;
+  float b = float((x >> 8 ) & 0xFF) / 255;
+  float a = float((x      ) & 0xFF) / 255;
+  return vec4(r, g, b, a);
+}
+
 #define GetTypeAt(x) GetData(x + 0)
-#define GetP0At(x)   GetVec2(x + 3)
-#define GetP1At(x)   GetVec2(x + 5)
-#define GetP2At(x)   GetVec2(x + 7)
+#define GetP0At(x)   GetVec2(x + 4)
+#define GetP1At(x)   GetVec2(x + 6)
+#define GetP2At(x)   GetVec2(x + 8)
+
+#define GetPartitionP0At(x) GetVec2(x + 1)
+#define GetPartitionP1At(x) GetVec2(x + 3)
+#define GetPartitionP2At(x) GetVec2(x + 5)
 
 #define GetType() GetTypeAt(g_offset)
 #define GetP0()   GetP0At(g_offset)
 #define GetP1()   GetP1At(g_offset)
 #define GetP2()   GetP2At(g_offset)
 
-#define GetFirstValue()  GetData(g_offset + 3)
-#define GetThirdValueF() GetDataF(g_offset + 5)
+#define GetPolygonPointsBeginOffset() g_offset + 5
 
-#define GetPathCount()             GetData(g_offset + 3)
-#define GetPathBeginOffset()       g_offset + 4
-#define GetLinePartitionOffset()   7
-#define GetBezierPartitionOffset() 9
+#define GetFirstValue()  GetData(g_offset + 4)
+#define GetThirdValueF() GetDataF(g_offset + 6)
 
-#define GetThickness() GetData(g_offset + 1)
-#define GetOperator()  GetData(g_offset + 2)
+#define GetPathCount()             GetData(g_offset + 4)
+#define GetPathBeginOffset()       g_offset + 5
+#define GetLinePartitionOffset()   5
+#define GetBezierPartitionOffset() 7
+
+// TODO: move color to cpu?
+#define GetColor()     to_vec4(GetData(g_offset + 1))
+#define GetThickness() GetData(g_offset + 2)
+#define GetOperator()  GetData(g_offset + 3)
 
 float get_distance_parition(inout uint beg)
 {
@@ -56,16 +72,16 @@ float get_distance_parition(inout uint beg)
   {
     case Line_Partition:
     {
-      vec2 p0 = GetP0At(beg);
-      vec2 p1 = GetP1At(beg);
+      vec2 p0 = GetPartitionP0At(beg);
+      vec2 p1 = GetPartitionP1At(beg);
       beg += GetLinePartitionOffset();
       return sdf_line_partition(gl_FragCoord.xy, p0, p1);
     }
     case Bezier_Partition:
     {
-      vec2 p0 = GetP0At(beg);
-      vec2 p1 = GetP1At(beg);
-      vec2 p2 = GetP2At(beg);
+      vec2 p0 = GetPartitionP0At(beg);
+      vec2 p1 = GetPartitionP1At(beg);
+      vec2 p2 = GetPartitionP2At(beg);
       beg += GetBezierPartitionOffset();
       return sdf_bezier_partition(gl_FragCoord.xy, p0, p1, p2);
     }
@@ -99,7 +115,7 @@ float get_distance()
     }
     case Polygon:
     {
-      return sdPolygon(offset + 3, GetFirstValue(), gl_FragCoord.xy);
+      return sdPolygon(GetPolygonPointsBeginOffset(), GetFirstValue(), gl_FragCoord.xy);
     }
     case Circle:
     {
@@ -148,8 +164,6 @@ void main()
   float w = length(vec2(dFdxFine(gl_FragCoord.x), dFdyFine(gl_FragCoord.y)));
   float d = get_distance();
 
-  out_color = get_color(color, w, d, GetThickness());
-
   uint op = GetOperator();
   while (op != Mix)
   {
@@ -157,7 +171,8 @@ void main()
     {
       //g_offset += GetOffset();
       d = min(d, get_distance());
-      
     }
   }
+
+  out_color = get_color(GetColor(), w, d, GetThickness());
 }

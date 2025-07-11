@@ -8,6 +8,11 @@ glslc -fshader-stage=fragment shader/SDF.frag -o shader/SDF_frag.spv
 copy .\shader\SDF_vert.spv .\build\example\shader\SDF_vert.spv
 copy .\shader\SDF_frag.spv .\build\example\shader\SDF_frag.spv
 
+glslc -fshader-stage=vertex   shader/text_mask.vert -o shader/text_mask_vert.spv
+glslc -fshader-stage=fragment shader/text_mask.frag -o shader/text_mask_frag.spv
+copy .\shader\SDF_vert.spv .\build\example\shader\text_mask_vert.spv
+copy .\shader\SDF_frag.spv .\build\example\shader\text_mask_frag.spv
+
 md   .\build\example\resources
 copy .\resources\* .\build\example\resources\
 

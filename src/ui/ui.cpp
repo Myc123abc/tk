@@ -85,8 +85,6 @@ void clear()
     ctx->last_hovered_widget = {};
 
   // clear frame resources
-  ctx->points.clear();
-  ctx->shape_infos.clear();
   ctx->layouts.clear();
   ctx->click_finish = {};
 }
@@ -94,11 +92,9 @@ void clear()
 void render()
 {
   auto ctx = get_ctx();
-  //if (ctx->shape_infos.empty()) return;
+  if (ctx->shape_properties.empty()) return;
   //assert(ctx->engine && ctx->shape_infos.back().op == type::shape_op::mix);
   assert(ctx->engine);
-  //ctx->engine->sdf_update(ctx->points, ctx->shape_infos);
-  //ctx->engine->sdf_render(ctx->points.size() * 2, ctx->shape_infos.size());
   ctx->engine->sdf_render(ctx->vertices, ctx->indices, ctx->shape_properties);
   
   clear();
@@ -114,7 +110,7 @@ void text_mask_render()
 //                               Draw Shape
 ////////////////////////////////////////////////////////////////////////////////
 
-void add_vertices(std::pair<glm::vec2, glm::vec2> const& box, uint32_t color, uint32_t offset)
+void add_vertices(std::pair<glm::vec2, glm::vec2> const& box, uint32_t offset)
 {
   auto ctx = get_ctx();
   
@@ -125,10 +121,10 @@ void add_vertices(std::pair<glm::vec2, glm::vec2> const& box, uint32_t color, ui
   ctx->vertices.reserve(ctx->vertices.size() + 4);
   ctx->vertices.append_range(std::vector<Vertex>
   {
-    { min,              {}, color, offset },
-    { { max.x, min.y }, {}, color, offset },
-    { max,              {}, color, offset },
-    { { min.x, max.y }, {}, color, offset },
+    { min,              {}, offset },
+    { { max.x, min.y }, {}, offset },
+    { max,              {}, offset },
+    { { min.x, max.y }, {}, offset },
   });
 
   ctx->indices.reserve(ctx->indices.size() + 6);
@@ -140,18 +136,18 @@ void add_vertices(std::pair<glm::vec2, glm::vec2> const& box, uint32_t color, ui
   ctx->index += 4;
 }
 
-void add_shape_property(type::shape type, std::vector<float> const& values, uint32_t thickness = 0)
+void add_shape_property(type::shape type, std::vector<float> const& values, uint32_t color, uint32_t thickness)
 {
   auto ctx = get_ctx();
-  ctx->shape_properties.emplace_back(type, thickness);
+  ctx->shape_properties.emplace_back(type, color, thickness);
   ctx->shape_properties.back().values.append_range(values);
   ctx->shape_offset += ShapeProperty::header_field_count + values.size();
 }
 
 void shape(type::shape type, std::vector<float> const& values, uint32_t color, uint32_t thickness, std::pair<glm::vec2, glm::vec2> const& box)
 {
-  add_vertices(box, color, get_ctx()->shape_offset);
-  add_shape_property(type, values, thickness);
+  add_vertices(box, get_ctx()->shape_offset);
+  add_shape_property(type, values, color, thickness);
 }
 
 void line(glm::vec2 const& p0, glm::vec2 const& p1, uint32_t color)
@@ -163,7 +159,12 @@ void line(glm::vec2 const& p0, glm::vec2 const& p1, uint32_t color)
     {
       ++ctx->path_count;
       ctx->path_points.append_range(std::vector<glm::vec2>{ p0, p1 });
-      add_shape_property(type::shape::line_partition, { p0.x, p0.y, p1.x, p1.y });
+      ctx->paritions.reserve(ctx->paritions.size() + 5);
+      ctx->paritions.emplace_back(std::bit_cast<float>(type::shape::line_partition));
+      ctx->paritions.emplace_back(p0.x);
+      ctx->paritions.emplace_back(p0.y);
+      ctx->paritions.emplace_back(p1.x);
+      ctx->paritions.emplace_back(p1.y);
     }
     else
       shape(type::shape::line, { p0.x, p0.y, p1.x, p1.y }, color, 0, get_bounding_rectangle({ p0, p1 }));
@@ -206,87 +207,18 @@ void bezier(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint3
   {
     ++ctx->path_count;
     ctx->path_points.append_range(std::vector<glm::vec2>{ p0, p1, p2 });
-    add_shape_property(type::shape::bezier_partition, { p0.x, p0.y, p1.x, p1.y, p2.x, p2.y });
+    ctx->paritions.reserve(ctx->paritions.size() + 7);
+    ctx->paritions.emplace_back(std::bit_cast<float>(type::shape::bezier_partition));
+    ctx->paritions.emplace_back(p0.x);
+    ctx->paritions.emplace_back(p0.y);
+    ctx->paritions.emplace_back(p1.x);
+    ctx->paritions.emplace_back(p1.y);
+    ctx->paritions.emplace_back(p2.x);
+    ctx->paritions.emplace_back(p2.y);
   }
   else
     shape(type::shape::bezier, { p0.x, p0.y, p1.x, p1.y, p2.x, p2.y }, color, 0, get_bounding_rectangle({ p0, p1, p2 }));
 }
-
-#if 0
-void shape(type::shape type, std::vector<glm::vec2> const& points, uint32_t color, uint32_t thickness)
-{
-  using enum type::shape;
-
-  auto ctx = get_ctx();
-
-  // convert type when use path
-  if (ctx->path_begining)
-  {
-    if (type == line)
-    {
-      type = line_partition;
-    }
-    else if (type == bezier)
-    {
-      type = bezier_partition;
-    }
-  }
-
-  // promise use ui::begin() and ui::path_begin() if use
-  throw_if(!ctx->begining, "failed to draw shape, need ui::begin()");
-  if (ctx->path_begining)
-    throw_if(type != line_partition && type != bezier_partition, "failed to draw path, only support line and bezier");
-  
-  // get layout position
-  auto& pos = ctx->last_layout->pos;
-
-  // start index of points
-  uint32_t offset = ctx->points.size() * 2;
-
-  // add points
-  ctx->points.reserve(ctx->points.size() + points.size());
-  for (auto& point : points) 
-    ctx->points.emplace_back(pos + point);
-
-  // add shape info
-  ctx->shape_infos.emplace_back(ShapeInfo
-  {
-    .type      = type,
-    .offset    = offset,
-    .num       = static_cast<uint32_t>(points.size()),
-    //.color     = convert_color_format(color),
-    .thickness = thickness,
-  });
-}
-
-void circle2(glm::vec2 const& center, float radius, uint32_t color, uint32_t thickness)
-{
-  auto ctx = get_ctx();
-  throw_if(!ctx->begining || ctx->path_begining,
-           "failed to draw circle, need ui::begin() or cannot draw in ui::path_begin()");
-  
-  auto& pos = ctx->last_layout->pos;
-
-  uint32_t offset = ctx->points.size() * 2;
-
-  ctx->points.reserve(ctx->points.size() + 2);
-  ctx->points.append_range(std::vector<glm::vec2>
-  {
-    pos + center,
-    glm::vec2(radius), // TODO: just for simply, store vec2(radius) rather than radius because ctx->points is vector<vec2>
-  });
-
-  // add shape info
-  ctx->shape_infos.emplace_back(ShapeInfo
-  {
-    .type      = type::shape::circle,
-    .offset    = offset,
-    .num       = 2,
-    //.color     = convert_color_format(color),
-    .thickness = thickness,
-  });
-}
-#endif
 
 void path_begin()
 {
@@ -294,16 +226,10 @@ void path_begin()
   assert(ctx->begining && ctx->path_begining == false);
   ctx->path_begining = true;
   ctx->path_count = {};
-  ctx->path_index = ctx->shape_properties.size();
   ctx->path_points.clear();
   ctx->path_offset = ctx->shape_offset;
-  add_shape_property(type::shape::path, { 0 });
-  //ctx->path_idx = ctx->shape_infos.size();
-
-  //ctx->shape_infos.emplace_back(ShapeInfo
-  //{
-  //  .type = type::shape::path,
-  //});
+  ctx->paritions.clear();
+  ctx->paritions.emplace_back(0);
 }
 
 void path_end(uint32_t color, uint32_t thickness)
@@ -312,16 +238,10 @@ void path_end(uint32_t color, uint32_t thickness)
   assert(ctx->begining && ctx->path_begining);
   ctx->path_begining = false;
 
-  ctx->shape_properties[ctx->path_index].thickness = thickness;
-  ctx->shape_properties[ctx->path_index].values[0] = std::bit_cast<float>(ctx->path_count);
+  add_shape_property(type::shape::path, ctx->paritions, color, thickness);
+  ctx->shape_properties.back().values[0] = std::bit_cast<float>(ctx->path_count);
 
-  add_vertices(get_bounding_rectangle(ctx->path_points), color, ctx->path_offset);
-
-  //auto& info     = ctx->shape_infos[ctx->path_idx];
-  //info.color     = convert_color_format(color);
-  //info.thickness = thickness;
-  //info.num       = ctx->shape_infos.size() - ctx->path_idx - 1;
-  //assert(info.num != 0);
+  add_vertices(get_bounding_rectangle(ctx->path_points), ctx->path_offset);
 }
 
 void text(std::string_view text, glm::vec2 const& pos, float size, uint32_t color)

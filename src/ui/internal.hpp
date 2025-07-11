@@ -30,18 +30,17 @@ struct ui_context
   graphics_engine::GraphicsEngine* engine{};
   Window*                          window{};
 
-  std::vector<glm::vec2>                  points;
   std::vector<graphics_engine::ShapeInfo> shape_infos;
 
   std::vector<Layout> layouts;
-  Layout* last_layout{};
+  Layout*             last_layout{};
 
   bool                   path_begining{};
   uint32_t               path_count{};
   std::vector<glm::vec2> path_points;
-  uint32_t               path_index{};
   uint32_t               path_color{};
   uint32_t               path_offset{};
+  std::vector<float>     paritions{};
 
   glm::vec2 mouse_pos{};
   glm::vec2 drag_start_pos{};
@@ -53,11 +52,11 @@ struct ui_context
   std::vector<glm::vec2>              current_hovered_widget_rect{};
   std::pair<std::string, std::string> last_hovered_widget{};
 
-  std::vector<graphics_engine::Vertex> vertices;
-  std::vector<uint16_t> indices;
-  uint16_t              index{};
+  std::vector<graphics_engine::Vertex>        vertices;
+  std::vector<uint16_t>                       indices;
+  uint16_t                                    index{};
   std::vector<graphics_engine::ShapeProperty> shape_properties;
-  uint32_t              shape_offset{};
+  uint32_t                                    shape_offset{};
 };
 
 inline auto get_ctx()

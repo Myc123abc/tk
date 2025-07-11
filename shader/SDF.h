@@ -4,8 +4,8 @@ struct Vertex
 {
   vec2 pos;
   vec2 uv;
-  uint color;
   uint offset;
+  uint padding;
 };
 
 layout(std430, buffer_reference) readonly buffer Vertices 
@@ -16,11 +16,11 @@ layout(std430, buffer_reference) readonly buffer Vertices
 // TODO: min ( union )
 layout(std430, buffer_reference) readonly buffer ShapeProperties
 {
-  uint data[];  // shape type  |  thickness  |  operator  |  values
-                //   uint     |    uint     |    uint    |    ...
+  uint data[];  // shape type  |  color  |  thickness  |  operator  |  values
+                //   uint     |   uint  |     uint    |    uint    |    ...
 
-                //   path  |  thickness  |  operator |  count  |  partition type  |  values   |   ...
-                //  uint  |    uint     |    uint   |   uint  |       uint       |    ...    |   ...
+                //   path  |  color  |  thickness  |  operator |  count  |  partition type  |  values   |   ...
+                //  uint  |   uint  |     uint    |    uint   |   uint  |       uint       |    ...    |   ...
 };
 
 layout(push_constant) uniform PushConstant

@@ -27,11 +27,13 @@ namespace tk { namespace graphics_engine {
     type::shape_op op        = {};
   };
 
+  // INFO: when change header fields, remebering also change header_field_count and emplace field data to device address in sdf_render function
   struct ShapeProperty
   {
-    inline static constexpr uint32_t header_field_count{ 3 };
+    inline static constexpr uint32_t header_field_count{ 4 };
 
     type::shape        type{};
+    uint32_t           color{};
     uint32_t           thickness{};
     type::shape_op     op{};
     
@@ -42,8 +44,8 @@ namespace tk { namespace graphics_engine {
   {
     glm::vec2 pos{};
     glm::vec2 uv{};
-    uint32_t  color{};
     uint32_t  offset{};
+    uint32_t  padding{};
   };
 
   class GraphicsEngine

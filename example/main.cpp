@@ -112,8 +112,8 @@ void render()
       
       2. text outline
     */
-    ui::text("H", { 0, 30 }, 26.66, 0xff0000ff);
-    ui::text("H", { 5, 30 }, 26.66, 0x00ff004f);
+    //ui::text("H", { 0, 30 }, 26.66, 0xff0000ff);
+    //ui::text("H", { 5, 30 }, 26.66, 0x00ff004f);
     
     ui::end();
   }
