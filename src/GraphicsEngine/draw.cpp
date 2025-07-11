@@ -232,13 +232,14 @@ void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> 
   // convert shape properties to binary data
   uint32_t total_size{};
   for (auto const& property : shape_properties)
-    total_size += 2 + property.values.size();
+    total_size += ShapeProperty::header_field_count + property.values.size();
   std::vector<uint32_t> data;
   data.reserve(total_size);
   for (auto const& property : shape_properties)
   {
     data.emplace_back(std::bit_cast<uint32_t>(property.type));
     data.emplace_back(std::bit_cast<uint32_t>(property.thickness));
+    data.emplace_back(std::bit_cast<uint32_t>(property.op));
     for (auto value : property.values)
       data.emplace_back(std::bit_cast<uint32_t>(value));
   }

@@ -29,8 +29,12 @@ namespace tk { namespace graphics_engine {
 
   struct ShapeProperty
   {
+    inline static constexpr uint32_t header_field_count{ 3 };
+
     type::shape        type{};
     uint32_t           thickness{};
+    type::shape_op     op{};
+    
     std::vector<float> values;
   };
 

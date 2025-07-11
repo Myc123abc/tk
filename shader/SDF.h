@@ -16,11 +16,11 @@ layout(std430, buffer_reference) readonly buffer Vertices
 // TODO: min ( union )
 layout(std430, buffer_reference) readonly buffer ShapeProperties
 {
-  uint data[];  // shape type  |  thickness  |  values
-                //   uint     |    uint     |    ...
+  uint data[];  // shape type  |  thickness  |  operator  |  values
+                //   uint     |    uint     |    uint    |    ...
 
-                //   path  |  thickness  |  count  |  partition type  |  values   |   ...
-                //  uint  |    uint     |   uint  |       uint       |    ...    |   ...
+                //   path  |  thickness  |  operator |  count  |  partition type  |  values   |   ...
+                //  uint  |    uint     |    uint   |   uint  |       uint       |    ...    |   ...
 };
 
 layout(push_constant) uniform PushConstant
@@ -47,6 +47,9 @@ layout(push_constant) uniform PushConstant
 #define Line_Partition   7
 #define Bezier_Partition 8
 #define Glyph            9
+
+#define Mix              0
+#define Min              1
 
 ////////////////////////////////////////////////////////////////////////////////
 //                            SDF functions

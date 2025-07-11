@@ -96,6 +96,8 @@ void render()
       ui::circle({50, 50}, 10, 0x00ff00ff);
     }
 
+    ui::polygon({{50, 50}, {100, 75}, {75, 100}}, 0xffffffff);
+
     // playback progress
     auto playback_progree_pos = playback_pos1 + glm::vec2(5, 0);
     ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ 100, 3 }, 0x808080FF );
@@ -110,8 +112,8 @@ void render()
       
       2. text outline
     */
-    //ui::text("H", { 0, 30 }, 26.66, 0xff0000ff);
-    //ui::text("H", { 5, 30 }, 26.66, 0x00ff004f);
+    ui::text("H", { 0, 30 }, 26.66, 0xff0000ff);
+    ui::text("H", { 5, 30 }, 26.66, 0x00ff004f);
     
     ui::end();
   }

@@ -8,6 +8,8 @@ layout(location = 2) flat in uint offset;
 
 layout(location = 0) out vec4 out_color;
 
+uint g_offset;
+
 vec4 get_color(vec4 color, float w, float d, uint t)
 {
   float value;
@@ -27,23 +29,44 @@ vec4 get_color(vec4 color, float w, float d, uint t)
   return vec4(color.rgb, color.a * alpha);
 }
 
+#define GetTypeAt(x) GetData(x + 0)
+#define GetP0At(x)   GetVec2(x + 3)
+#define GetP1At(x)   GetVec2(x + 5)
+#define GetP2At(x)   GetVec2(x + 7)
+
+#define GetType() GetTypeAt(g_offset)
+#define GetP0()   GetP0At(g_offset)
+#define GetP1()   GetP1At(g_offset)
+#define GetP2()   GetP2At(g_offset)
+
+#define GetFirstValue()  GetData(g_offset + 3)
+#define GetThirdValueF() GetDataF(g_offset + 5)
+
+#define GetPathCount()             GetData(g_offset + 3)
+#define GetPathBeginOffset()       g_offset + 4
+#define GetLinePartitionOffset()   7
+#define GetBezierPartitionOffset() 9
+
+#define GetThickness() GetData(g_offset + 1)
+#define GetOperator()  GetData(g_offset + 2)
+
 float get_distance_parition(inout uint beg)
 {
-  switch (GetData(beg + 0))
+  switch (GetTypeAt(beg))
   {
     case Line_Partition:
     {
-      vec2 p0 = GetVec2(beg + 2);
-      vec2 p1 = GetVec2(beg + 4);
-      beg += 6;
+      vec2 p0 = GetP0At(beg);
+      vec2 p1 = GetP1At(beg);
+      beg += GetLinePartitionOffset();
       return sdf_line_partition(gl_FragCoord.xy, p0, p1);
     }
     case Bezier_Partition:
     {
-      vec2 p0 = GetVec2(beg + 2);
-      vec2 p1 = GetVec2(beg + 4);
-      vec2 p2 = GetVec2(beg + 6);
-      beg += 8;
+      vec2 p0 = GetP0At(beg);
+      vec2 p1 = GetP1At(beg);
+      vec2 p2 = GetP2At(beg);
+      beg += GetBezierPartitionOffset();
       return sdf_bezier_partition(gl_FragCoord.xy, p0, p1, p2);
     }
   }
@@ -51,51 +74,51 @@ float get_distance_parition(inout uint beg)
 
 float get_distance()
 {
-  switch (GetData(offset + 0))
+  switch (GetType())
   {
     case Line:
     {
-      vec2 p0 = GetVec2(offset + 2);
-      vec2 p1 = GetVec2(offset + 4);
+      vec2 p0 = GetP0();
+      vec2 p1 = GetP1();
       return sdSegment(gl_FragCoord.xy, p0, p1);
     }
     case Rectangle:
     {
-      vec2 p0 = GetVec2(offset + 2);
-      vec2 p1 = GetVec2(offset + 4);
+      vec2 p0 = GetP0();
+      vec2 p1 = GetP1();
       vec2 extent_div2 = (p1 - p0) * 0.5;
       vec2 center = p0 + extent_div2;
       return sdBox(gl_FragCoord.xy - center, extent_div2);
     }
     case Triangle:
     {
-      vec2 p0 = GetVec2(offset + 2);
-      vec2 p1 = GetVec2(offset + 4);
-      vec2 p2 = GetVec2(offset + 6);
+      vec2 p0 = GetP0();
+      vec2 p1 = GetP1();
+      vec2 p2 = GetP2();
       return sdTriangle(gl_FragCoord.xy, p0, p1, p2);
     }
     case Polygon:
     {
-      return sdPolygon(offset + 3, GetData(offset + 2), gl_FragCoord.xy);
+      return sdPolygon(offset + 3, GetFirstValue(), gl_FragCoord.xy);
     }
     case Circle:
     {
-      vec2  center = GetVec2(offset + 2);
-      float radius = GetDataF(offset + 4);
+      vec2  center = GetP0();
+      float radius = GetThirdValueF();
       return sdCircle(gl_FragCoord.xy - center, radius);
     }
     case Bezier:
     {
-      vec2 p0 = GetVec2(offset + 2);
-      vec2 p1 = GetVec2(offset + 4);
-      vec2 p2 = GetVec2(offset + 6);
+      vec2 p0 = GetP0();
+      vec2 p1 = GetP1();
+      vec2 p2 = GetP2();
       return sdBezier(gl_FragCoord.xy, p0, p1, p2);
     }
     case Path:
     {
       float d     = -3.4028235e+38;
-      uint  count = GetData(offset + 2);
-      uint  begin = offset + 3;
+      uint  count = GetPathCount();
+      uint  begin = GetPathBeginOffset();
       for (uint i = 0; i < count; ++i)
       {
         float partition_distance = get_distance_parition(begin);
@@ -120,8 +143,21 @@ float get_distance()
 
 void main()
 {
+  g_offset = offset;
+
   float w = length(vec2(dFdxFine(gl_FragCoord.x), dFdyFine(gl_FragCoord.y)));
   float d = get_distance();
 
-  out_color = get_color(color, w, d, GetData(offset + 1));
+  out_color = get_color(color, w, d, GetThickness());
+
+  uint op = GetOperator();
+  while (op != Mix)
+  {
+    if (op == Min)
+    {
+      //g_offset += GetOffset();
+      d = min(d, get_distance());
+      
+    }
+  }
 }

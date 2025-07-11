@@ -145,7 +145,7 @@ void add_shape_property(type::shape type, std::vector<float> const& values, uint
   auto ctx = get_ctx();
   ctx->shape_properties.emplace_back(type, thickness);
   ctx->shape_properties.back().values.append_range(values);
-  ctx->shape_offset += 2 + values.size();
+  ctx->shape_offset += ShapeProperty::header_field_count + values.size();
 }
 
 void shape(type::shape type, std::vector<float> const& values, uint32_t color, uint32_t thickness, std::pair<glm::vec2, glm::vec2> const& box)
