@@ -100,6 +100,10 @@ TK_API void bezier(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2
 TK_API void path_begin();
 TK_API void path_end(uint32_t color = 0, uint32_t thickness = 0);
 
+// get union of shapes
+TK_API void union_begin();
+TK_API void union_end(uint32_t color, uint32_t thickness = 0);
+
 /**
  * draw text
  * @param text

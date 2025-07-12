@@ -93,7 +93,7 @@ void render()
 {
   auto ctx = get_ctx();
   if (ctx->shape_properties.empty()) return;
-  //assert(ctx->engine && ctx->shape_infos.back().op == type::shape_op::mix);
+  assert(ctx->engine && ctx->shape_properties.back().op == type::shape_op::mix);
   assert(ctx->engine);
   ctx->engine->sdf_render(ctx->vertices, ctx->indices, ctx->shape_properties);
   
@@ -145,18 +145,28 @@ void add_vertices(std::pair<glm::vec2, glm::vec2> const& box, uint32_t offset)
   ctx->index += 4;
 }
 
-void add_shape_property(type::shape type, std::vector<float> const& values, uint32_t color, uint32_t thickness)
+void add_shape_property(type::shape type, std::vector<float> const& values, uint32_t color, uint32_t thickness, type::shape_op op = type::shape_op::mix)
 {
   auto ctx = get_ctx();
-  ctx->shape_properties.emplace_back(type, to_vec4(color), thickness);
+  ctx->shape_properties.emplace_back(type, to_vec4(color), thickness, op);
   ctx->shape_properties.back().values.append_range(values);
   ctx->shape_offset += ShapeProperty::header_field_count + values.size();
 }
 
 void shape(type::shape type, std::vector<float> const& values, uint32_t color, uint32_t thickness, std::pair<glm::vec2, glm::vec2> const& box)
 {
-  add_vertices(box, get_ctx()->shape_offset);
-  add_shape_property(type, values, color, thickness);
+  auto ctx = get_ctx();
+  auto op = type::shape_op::mix;
+  if (ctx->union_start)
+  {
+    if (ctx->op_points.empty())
+      ctx->op_offset = ctx->shape_offset;
+    ctx->op_points.append_range(std::vector<glm::vec2>{ box.first, box.second });
+    op = type::shape_op::min;
+  }
+  else
+    add_vertices(box, ctx->shape_offset);
+  add_shape_property(type, values, color, thickness, op);
 }
 
 void line(glm::vec2 const& p0, glm::vec2 const& p1, uint32_t color)
@@ -164,10 +174,14 @@ void line(glm::vec2 const& p0, glm::vec2 const& p1, uint32_t color)
   if (p0 != p1) 
   {
     auto ctx = get_ctx();
+    assert(ctx->begining);
     if (ctx->path_begining)
     {
       ++ctx->path_count;
-      ctx->path_points.append_range(std::vector<glm::vec2>{ p0, p1 });
+      if (ctx->union_start)
+        ctx->op_points.append_range(std::vector<glm::vec2>{ p0, p1 });
+      else
+        ctx->path_points.append_range(std::vector<glm::vec2>{ p0, p1 });
       ctx->paritions.reserve(ctx->paritions.size() + 5);
       ctx->paritions.emplace_back(std::bit_cast<float>(type::shape::line_partition));
       ctx->paritions.emplace_back(p0.x);
@@ -182,19 +196,22 @@ void line(glm::vec2 const& p0, glm::vec2 const& p1, uint32_t color)
 
 void rectangle(glm::vec2 const& left_top, glm::vec2 const& right_bottom, uint32_t color, uint32_t thickness)
 {
-  assert(!get_ctx()->path_begining);
+  auto ctx = get_ctx();
+  assert(ctx->begining && ctx->path_begining == false);
   shape(type::shape::rectangle, { left_top.x, left_top.y, right_bottom.x, right_bottom.y }, color, thickness, { left_top, right_bottom });
 }
 
 void triangle(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint32_t color, uint32_t thickness)
 {
-  assert(!get_ctx()->path_begining);
+  auto ctx = get_ctx();
+  assert(ctx->begining && ctx->path_begining == false);
   shape(type::shape::triangle, { p0.x, p0.y, p1.x, p1.y, p2.x, p2.y }, color, thickness, get_bounding_rectangle({ p0, p1, p2 }));
 }
 
 void polygon(std::vector<glm::vec2> const& points, uint32_t color, uint32_t thickness)
 {
-  assert(!get_ctx()->path_begining);
+  auto ctx = get_ctx();
+  assert(ctx->begining && ctx->path_begining == false);
   std::vector<float> data;
   data.reserve(1 + points.size() * 2);
   data.emplace_back(std::bit_cast<float>(static_cast<uint32_t>(points.size())));
@@ -205,17 +222,22 @@ void polygon(std::vector<glm::vec2> const& points, uint32_t color, uint32_t thic
 
 void circle(glm::vec2 const& center, float radius, uint32_t color, uint32_t thickness)
 {
-  assert(!get_ctx()->path_begining);
+  auto ctx = get_ctx();
+  assert(ctx->begining && ctx->path_begining == false);
   shape(type::shape::circle, { center.x, center.y, radius }, color, thickness, { center - radius, center + radius });
 }
 
 void bezier(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint32_t color)
 {
   auto ctx = get_ctx();
+  assert(ctx->begining);
   if (ctx->path_begining)
   {
     ++ctx->path_count;
-    ctx->path_points.append_range(std::vector<glm::vec2>{ p0, p1, p2 });
+    if (ctx->union_start)
+      ctx->op_points.append_range(std::vector<glm::vec2>{ p0, p1, p2 });
+    else
+      ctx->path_points.append_range(std::vector<glm::vec2>{ p0, p1, p2 });
     ctx->paritions.reserve(ctx->paritions.size() + 7);
     ctx->paritions.emplace_back(std::bit_cast<float>(type::shape::bezier_partition));
     ctx->paritions.emplace_back(p0.x);
@@ -239,6 +261,12 @@ void path_begin()
   ctx->path_offset = ctx->shape_offset;
   ctx->paritions.clear();
   ctx->paritions.emplace_back(0);
+
+  if (ctx->union_start)
+  {
+    if (ctx->op_points.empty())
+      ctx->op_offset = ctx->shape_offset;
+  }
 }
 
 void path_end(uint32_t color, uint32_t thickness)
@@ -250,7 +278,30 @@ void path_end(uint32_t color, uint32_t thickness)
   add_shape_property(type::shape::path, ctx->paritions, color, thickness);
   ctx->shape_properties.back().values[0] = std::bit_cast<float>(ctx->path_count);
 
-  add_vertices(get_bounding_rectangle(ctx->path_points), ctx->path_offset);
+  if (ctx->union_start)
+    ctx->shape_properties.back().op = type::shape_op::min;
+  else
+    add_vertices(get_bounding_rectangle(ctx->path_points), ctx->path_offset);
+}
+
+void union_begin()
+{
+  auto ctx = get_ctx();
+  assert(ctx->begining && ctx->path_begining == false && ctx->union_start == false);
+  ctx->union_start = true;
+}
+
+void union_end(uint32_t color, uint32_t thickness)
+{
+  auto ctx = get_ctx();
+  assert(ctx->begining && ctx->path_begining == false && ctx->union_start);
+  ctx->union_start = false;
+  add_vertices(get_bounding_rectangle(ctx->op_points), ctx->op_offset);
+  ctx->op_points.clear();
+  auto& shape = ctx->shape_properties.back();
+  shape.op        = type::shape_op::mix;
+  shape.color     = to_vec4(color);
+  shape.thickness = thickness;
 }
 
 void text(std::string_view text, glm::vec2 const& pos, float size, uint32_t color)

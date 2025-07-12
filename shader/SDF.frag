@@ -7,8 +7,6 @@ layout(location = 1) flat in uint offset;
 
 layout(location = 0) out vec4 out_color;
 
-uint g_offset;
-
 vec4 get_color(vec4 color, float w, float d, uint t)
 {
   float value;
@@ -30,103 +28,107 @@ vec4 get_color(vec4 color, float w, float d, uint t)
 
 #define HeaderSize 7
 
-#define GetTypeAt(x) GetData(x)
-#define GetP0At(x)   GetVec2(x + HeaderSize)
-#define GetP1At(x)   GetVec2(x + HeaderSize + 2)
-#define GetP2At(x)   GetVec2(x + HeaderSize + 4)
+#define GetType(x) GetData(x)
+#define GetP0(x)   GetVec2(x + HeaderSize)
+#define GetP1(x)   GetVec2(x + HeaderSize + 2)
+#define GetP2(x)   GetVec2(x + HeaderSize + 4)
 
-#define GetPartitionP0At(x) GetVec2(x + 1)
-#define GetPartitionP1At(x) GetVec2(x + 3)
-#define GetPartitionP2At(x) GetVec2(x + 5)
+#define GetPartitionP0(x) GetVec2(x + 1)
+#define GetPartitionP1(x) GetVec2(x + 3)
+#define GetPartitionP2(x) GetVec2(x + 5)
 
-#define GetType() GetTypeAt(g_offset)
-#define GetP0()   GetP0At(g_offset)
-#define GetP1()   GetP1At(g_offset)
-#define GetP2()   GetP2At(g_offset)
+#define GetPolygonPointsBeginOffset(x) x + HeaderSize + 1
 
-#define GetPolygonPointsBeginOffset() g_offset + HeaderSize + 1
+#define GetFirstValue(x)  GetData(x + HeaderSize)
+#define GetThirdValueF(x) GetDataF(x + HeaderSize + 2)
 
-#define GetFirstValue()  GetData(g_offset + HeaderSize)
-#define GetThirdValueF() GetDataF(g_offset + HeaderSize + 2)
-
-#define GetPathCount()             GetData(g_offset + HeaderSize)
-#define GetPathBeginOffset()       g_offset + HeaderSize + 1
+#define GetPathCount(x)            GetData(x + HeaderSize)
+#define GetPathBeginOffset(x)      x + HeaderSize + 1
 #define GetLinePartitionOffset()   5
 #define GetBezierPartitionOffset() 7
 
-#define GetColor()     GetVec4(g_offset + 1)
-#define GetThickness() GetData(g_offset + 5)
-#define GetOperator()  GetData(g_offset + 6)
+#define GetColor(x)     GetVec4(x + 1)
+#define GetThickness(x) GetData(x + 5)
+#define GetOperator(x)  GetData(x + 6)
 
 float get_distance_parition(inout uint beg)
 {
-  switch (GetTypeAt(beg))
+  switch (GetType(beg))
   {
     case Line_Partition:
     {
-      vec2 p0 = GetPartitionP0At(beg);
-      vec2 p1 = GetPartitionP1At(beg);
+      vec2 p0 = GetPartitionP0(beg);
+      vec2 p1 = GetPartitionP1(beg);
       beg += GetLinePartitionOffset();
       return sdf_line_partition(gl_FragCoord.xy, p0, p1);
     }
     case Bezier_Partition:
     {
-      vec2 p0 = GetPartitionP0At(beg);
-      vec2 p1 = GetPartitionP1At(beg);
-      vec2 p2 = GetPartitionP2At(beg);
+      vec2 p0 = GetPartitionP0(beg);
+      vec2 p1 = GetPartitionP1(beg);
+      vec2 p2 = GetPartitionP2(beg);
       beg += GetBezierPartitionOffset();
       return sdf_bezier_partition(gl_FragCoord.xy, p0, p1, p2);
     }
   }
 }
 
-float get_distance()
+float get_distance(inout uint local_offset)
 {
-  switch (GetType())
+  switch (GetType(local_offset))
   {
     case Line:
     {
-      vec2 p0 = GetP0();
-      vec2 p1 = GetP1();
+      vec2 p0 = GetP0(local_offset);
+      vec2 p1 = GetP1(local_offset);
+      local_offset += HeaderSize + 4;
       return sdSegment(gl_FragCoord.xy, p0, p1);
     }
     case Rectangle:
     {
-      vec2 p0 = GetP0();
-      vec2 p1 = GetP1();
+      vec2 p0 = GetP0(local_offset);
+      vec2 p1 = GetP1(local_offset);
       vec2 extent_div2 = (p1 - p0) * 0.5;
       vec2 center = p0 + extent_div2;
+      local_offset += HeaderSize + 4;
       return sdBox(gl_FragCoord.xy - center, extent_div2);
     }
     case Triangle:
     {
-      vec2 p0 = GetP0();
-      vec2 p1 = GetP1();
-      vec2 p2 = GetP2();
+      vec2 p0 = GetP0(local_offset);
+      vec2 p1 = GetP1(local_offset);
+      vec2 p2 = GetP2(local_offset);
+      local_offset += HeaderSize + 6;
       return sdTriangle(gl_FragCoord.xy, p0, p1, p2);
     }
     case Polygon:
     {
-      return sdPolygon(GetPolygonPointsBeginOffset(), GetFirstValue(), gl_FragCoord.xy);
+      uint beg_offset = GetPolygonPointsBeginOffset(local_offset);
+      uint count      = GetFirstValue(local_offset);
+      float d         = sdPolygon(beg_offset, count, gl_FragCoord.xy);
+      local_offset += HeaderSize + 1 + count * 2;
+      return d;
     }
     case Circle:
     {
-      vec2  center = GetP0();
-      float radius = GetThirdValueF();
+      vec2  center = GetP0(local_offset);
+      float radius = GetThirdValueF(local_offset);
+      local_offset += HeaderSize + 3;
       return sdCircle(gl_FragCoord.xy - center, radius);
     }
     case Bezier:
     {
-      vec2 p0 = GetP0();
-      vec2 p1 = GetP1();
-      vec2 p2 = GetP2();
+      vec2 p0 = GetP0(local_offset);
+      vec2 p1 = GetP1(local_offset);
+      vec2 p2 = GetP2(local_offset);
+      local_offset += HeaderSize + 6;
       return sdBezier(gl_FragCoord.xy, p0, p1, p2);
     }
     case Path:
     {
       float d     = -3.4028235e+38;
-      uint  count = GetPathCount();
-      uint  begin = GetPathBeginOffset();
+      uint  count = GetPathCount(local_offset);
+      uint  begin = GetPathBeginOffset(local_offset);
       for (uint i = 0; i < count; ++i)
       {
         float partition_distance = get_distance_parition(begin);
@@ -144,6 +146,7 @@ float get_distance()
         else
           d = distance;
       }
+      local_offset = begin;
       return d;
     }
   }
@@ -151,20 +154,25 @@ float get_distance()
 
 void main()
 {
-  g_offset = offset;
+  uint local_offset = offset;
 
   float w = length(vec2(dFdxFine(gl_FragCoord.x), dFdyFine(gl_FragCoord.y)));
-  float d = get_distance();
 
-  uint op = GetOperator();
+  out_color = GetColor(local_offset);
+  uint  t   = GetThickness(local_offset);
+  uint  op  = GetOperator(local_offset);
+  float d   = get_distance(local_offset);
+
   while (op != Mix)
   {
     if (op == Min)
     {
-      //g_offset += GetOffset();
-      d = min(d, get_distance());
+      op = GetOperator(local_offset);
+      out_color = GetColor(local_offset);
+      t = GetThickness(local_offset);
+      d = min(d, get_distance(local_offset));
     }
   }
 
-  out_color = get_color(GetColor(), w, d, GetThickness());
+  out_color = get_color(out_color, w, d, t);
 }

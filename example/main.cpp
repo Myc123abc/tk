@@ -98,6 +98,16 @@ void render()
 
     ui::polygon({{50, 50}, {100, 75}, {75, 100}}, 0xffffffff);
 
+    ui::union_begin();
+    ui::circle({50, 50}, 25);
+    ui::polygon({{0, 0}, {100, 75}, {75, 125}}, 0xffffffff);
+    ui::path_begin();
+    ui::bezier({0,25}, {75,50}, {0, 75});
+    ui::line({0,75},  {0, 25});
+    ui::path_end();
+    ui::circle({75, 75}, 25);
+    ui::union_end(0xffff00ff, 1);
+
     // playback progress
     auto playback_progree_pos = playback_pos1 + glm::vec2(5, 0);
     ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ 100, 3 }, 0x808080FF );

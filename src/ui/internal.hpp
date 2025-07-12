@@ -57,6 +57,10 @@ struct ui_context
   uint16_t                                    index{};
   std::vector<graphics_engine::ShapeProperty> shape_properties;
   uint32_t                                    shape_offset{};
+
+  std::vector<glm::vec2> op_points;
+  uint32_t               op_offset{};
+  bool                   union_start{};
 };
 
 inline auto get_ctx()
