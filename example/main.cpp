@@ -98,6 +98,9 @@ void render()
 
     ui::polygon({{50, 50}, {100, 75}, {75, 100}}, 0xffffffff);
 
+    ui::text("H", { 0, 30 }, 26.66, 0x000000ff);
+    ui::text("Hasdad打ｓas", { 5, 30 }, 26.66, 0xffffffff);
+
     ui::union_begin();
     ui::circle({50, 50}, 25);
     ui::polygon({{0, 0}, {100, 75}, {75, 125}}, 0xffffffff);
@@ -112,19 +115,7 @@ void render()
     auto playback_progree_pos = playback_pos1 + glm::vec2(5, 0);
     ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ 100, 3 }, 0x808080FF );
     ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ progress, 3 }, 0x0000FFFF );
-    /*
-    TODO:
-      1. change text_mask_image from R32 to R32G32
-        R32 -> signed distance
-        G32 -> RGBA
-        enable alpha mix
-        sdf render text use color from text_mask_image's G32
-      
-      2. text outline
-    */
-    //ui::text("H", { 0, 30 }, 26.66, 0xff0000ff);
-    //ui::text("H", { 5, 30 }, 26.66, 0x00ff004f);
-    
+
     ui::end();
   }
 }

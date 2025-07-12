@@ -7,6 +7,29 @@ layout(location = 1) flat in uint offset;
 
 layout(location = 0) out vec4 out_color;
 
+layout(binding = 0) uniform sampler2D font_atlas;
+
+////////////////////////////////////////////////////////////////////////////////
+//                              MSDF font rednering
+////////////////////////////////////////////////////////////////////////////////
+
+float median(float r, float g, float b) 
+{
+  return max(min(r, g), min(max(r, g), b));
+}
+
+float screenPxRange()
+{
+  const float pxRange = 2.0;
+  vec2 unitRange = vec2(pxRange)/vec2(textureSize(font_atlas, 0));
+  vec2 screenTexSize = vec2(1.0)/fwidth(uv);
+  return max(0.5*dot(unitRange, screenTexSize), 1.0);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//                                SDF shapes
+////////////////////////////////////////////////////////////////////////////////
+
 vec4 get_color(vec4 color, float w, float d, uint t)
 {
   float value;
@@ -152,10 +175,27 @@ float get_distance(inout uint local_offset)
   }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+//                             main function
+////////////////////////////////////////////////////////////////////////////////
+
 void main()
 {
   uint local_offset = offset;
 
+  // glyph process
+  if (GetType(local_offset) == Glyph)
+  {
+    vec3  msd = texture(font_atlas, uv).rgb;
+    float sd  = median(msd.r, msd.g, msd.b);
+    float screenPxDistance = screenPxRange() * (sd - 0.5);
+    float opacity = clamp(screenPxDistance + 0.5, 0.0, 1.0);
+    vec4  color = GetColor(local_offset);
+    out_color = vec4(color.rgb, color.a * opacity);
+    return;
+  }
+
+  // sdf process
   float w = length(vec2(dFdxFine(gl_FragCoord.x), dFdyFine(gl_FragCoord.y)));
 
   out_color = GetColor(local_offset);

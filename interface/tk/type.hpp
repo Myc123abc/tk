@@ -15,7 +15,7 @@ namespace tk { namespace type {
     line_partition,
     bezier_partition,
 
-    text,
+    glyph,
   };
 
   enum class shape_op

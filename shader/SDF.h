@@ -21,6 +21,10 @@ layout(std430, buffer_reference) readonly buffer ShapeProperties
 
                 //   path  |  color  |  thickness  |  operator |  count  |  partition type  |  values   |   ...
                 //  uint  |   vec4  |     uint    |    uint   |   uint  |       uint       |    ...    |   ...
+
+                // TODO: add outline
+                //  glyph  |  color
+                //  uint  |   vec4
 };
 
 layout(push_constant) uniform PushConstant

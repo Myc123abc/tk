@@ -402,11 +402,9 @@ void GraphicsEngine::create_frame_resources()
 void GraphicsEngine::create_buffer()
 {
   _buffers.reserve(_swapchain_images.size());
-  _glyphs_buffers.reserve(_swapchain_images.size());
   for (auto i = 0; i < _swapchain_images.size(); ++i)
   {
     _buffers.emplace_back(_mem_alloc.create_buffer(Buffer_Size, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT));
-    _glyphs_buffers.emplace_back(_mem_alloc.create_buffer(Buffer_Size, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT));
   }
   
   if (config()->use_descriptor_buffer)
@@ -419,7 +417,6 @@ void GraphicsEngine::create_buffer()
     for (auto i = 0; i < _swapchain_images.size(); ++i)
     {
       _buffers[i].destroy();
-      _glyphs_buffers[i].destroy();
     }
   });
 }
@@ -440,13 +437,6 @@ void GraphicsEngine::resize_swapchain()
   auto old_swapchain = _swapchain;
   create_swapchain(old_swapchain);
   vkDestroySwapchainKHR(_device, old_swapchain, nullptr);
-
-  // resize text rendering image
-  //_text_rgba_image.destroy();
-  //_text_rgba_image = _mem_alloc.create_image(VK_FORMAT_R8G8B8A8_UNORM, _swapchain_images[0].extent3D(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
-
-  // update descriptor layout which image descriptor also resized
-  //_sdf_render_pipeline.update();
 }
 
 void GraphicsEngine::create_sdf_rendering_resource()
@@ -454,7 +444,7 @@ void GraphicsEngine::create_sdf_rendering_resource()
   _sdf_render_pipeline = _device.create_render_pipeline(
     sizeof(PushConstant_SDF), 
     {
-      //{ 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &_text_rgba_image, _sampler }, 
+      { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &_font_atlas_image, _sampler }, 
     },
     _descriptor_buffer,
     "sdf",
@@ -489,7 +479,6 @@ void GraphicsEngine::create_sampler()
   _destructors.push([&] { vkDestroySampler(_device, _sampler, nullptr); });
 }
 
-// TODO: another thread to load font
 void GraphicsEngine::load_font()
 {
   auto path = "resources/SourceCodePro-Regular.ttf";
@@ -516,35 +505,9 @@ void GraphicsEngine::load_font()
   // destroy upload buffer
   buf.destroy();
 
-  /*
-  TODO:
-    text_mask fragment:
-    text_rgba_image as color attachment
-    text_mask_image as write only image
-  */
-
-  // text mask image
-  //_text_rgba_image = _mem_alloc.create_image(VK_FORMAT_R8G8B8A8_UNORM, _swapchain_images[0].extent3D(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
-
-  //_text_mask_render_pipeline = _device.create_render_pipeline(
-  //  sizeof(PushConstant_text_mask),
-  //  {
-  //    { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &_font_atlas_image, _sampler }
-  //  },
-  //  _descriptor_buffer,
-  //  "text mask",
-  //  {
-  //    { VK_SHADER_STAGE_VERTEX_BIT,   "shader/text_mask_vert.spv" },
-  //    { VK_SHADER_STAGE_FRAGMENT_BIT, "shader/text_mask_frag.spv" },
-  //  },
-  //  _text_rgba_image.format()
-  //);
-
   // destroy resources
   _destructors.push([&]
   {
-    //_text_rgba_image.destroy();
-    //_text_mask_render_pipeline.destroy();
     _font_atlas_image.destroy();
   });
 }

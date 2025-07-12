@@ -71,7 +71,6 @@ inline auto get_ctx()
 
 void render();
 void clear();
-void text_mask_render();
 
 void event_process();
 

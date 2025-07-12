@@ -100,12 +100,6 @@ void render()
   clear();
 }
 
-void text_mask_render()
-{
-  auto ctx = get_ctx();
-  ctx->engine->text_mask_render();
-}
-
 auto to_vec4(uint32_t color)
 {
   float r = float((color >> 24) & 0xFF) / 255;
@@ -145,7 +139,7 @@ void add_vertices(std::pair<glm::vec2, glm::vec2> const& box, uint32_t offset)
   ctx->index += 4;
 }
 
-void add_shape_property(type::shape type, std::vector<float> const& values, uint32_t color, uint32_t thickness, type::shape_op op = type::shape_op::mix)
+void add_shape_property(type::shape type, std::vector<float> const& values, uint32_t color, uint32_t thickness = 0, type::shape_op op = type::shape_op::mix)
 {
   auto ctx = get_ctx();
   ctx->shape_properties.emplace_back(type, to_vec4(color), thickness, op);
@@ -156,7 +150,7 @@ void add_shape_property(type::shape type, std::vector<float> const& values, uint
 void shape(type::shape type, std::vector<float> const& values, uint32_t color, uint32_t thickness, std::pair<glm::vec2, glm::vec2> const& box)
 {
   auto ctx = get_ctx();
-  auto op = type::shape_op::mix;
+  auto op  = type::shape_op::mix;
   if (ctx->union_start)
   {
     if (ctx->op_points.empty())
@@ -307,8 +301,10 @@ void union_end(uint32_t color, uint32_t thickness)
 void text(std::string_view text, glm::vec2 const& pos, float size, uint32_t color)
 {
   auto ctx    = get_ctx();
-  //auto extent = ctx->engine->parse_text(text, pos, size, convert_color_format(color));
-  //shape(type::shape::text, { extent.first, extent.second });
+  assert(ctx->begining && ctx->path_begining == false && ctx->union_start == false);
+  // TODO: currently, not use extent for a text. This can be use on ui text extent detect
+  auto extent = ctx->engine->parse_text(text, pos, size, to_vec4(color), ctx->vertices, ctx->indices, ctx->shape_offset, ctx->index);
+  add_shape_property(type::shape::glyph, {}, color);
 }
 
 void set_operation(type::shape_op op)
@@ -397,7 +393,7 @@ bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> con
   case type::shape::path:
   case type::shape::line_partition:
   case type::shape::bezier_partition:
-  case type::shape::text:
+  case type::shape::glyph:
     throw_if(false, "this type cannot use on button, please use ui::clickarea");
 
   case type::shape::triangle:

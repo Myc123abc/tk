@@ -241,43 +241,9 @@ void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> 
   vkCmdDrawIndexed(cmd, indices.size(), 1, 0, 0, 0);
 }
 
-void GraphicsEngine::text_mask_render_begin()
+auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size, glm::vec4 const& color, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices, uint32_t offset, uint16_t& idx) -> std::pair<glm::vec2, glm::vec2>
 {
-  render_begin(_text_rgba_image);
-}
-
-auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size, glm::vec4 const& color) -> std::pair<glm::vec2, glm::vec2>
-{
-  return _text_engine.parse_text(text, pos, size, color, _vertices, _indices);
-}
-
-void GraphicsEngine::text_mask_render()
-{
-  // update
-  auto& buffer = _glyphs_buffers[_current_frame];
-  buffer.clear();
-
-  buffer.append_range(_vertices);
-  auto offset = buffer.size();
-  buffer.append_range(_indices);
-
-  vkCmdBindIndexBuffer(get_current_frame().cmd, buffer.handle(), offset, VK_INDEX_TYPE_UINT16);
-
-  // draw
-  auto& cmd = get_current_frame().cmd;
-
-  auto pc = PushConstant_text_mask
-  {
-    .buffer        = buffer.address(),
-    .window_extent = _window->get_framebuffer_size(),
-  };
-
-  _text_mask_render_pipeline.bind(cmd, pc);
-
-  vkCmdDrawIndexed(cmd, _indices.size(), 1, 0, 0, 0);
-
-  _vertices.clear();
-  _indices.clear();
+  return _text_engine.parse_text(text, pos, size, color, vertices, indices, offset, idx);
 }
 
 }}

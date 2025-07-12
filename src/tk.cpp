@@ -13,9 +13,6 @@
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
 #include "ui/internal.hpp"
 
-#include <thread>
-#include <chrono>
-
 using namespace tk;
 using namespace tk::graphics_engine;
 
@@ -81,11 +78,6 @@ void render()
     ui::clear();
     return;
   }
-
-  // TODO: another vec to storage glyphs and ui call text mask render then call render
-  //engine.text_mask_render_begin();
-  //ui::text_mask_render();
-  //engine.render_end();
 
   engine.sdf_render_begin();
   ui::render();

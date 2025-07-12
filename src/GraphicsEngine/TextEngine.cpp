@@ -160,7 +160,7 @@ auto TextEngine::load_font(std::filesystem::path const& path) -> Bitmap
   return result;
 }
 
-auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size, glm::vec4 const& color, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices) -> std::pair<glm::vec2, glm::vec2>
+auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size, glm::vec4 const& color, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices, uint32_t offset, uint16_t& idx) -> std::pair<glm::vec2, glm::vec2>
 {
   glm::vec2 text_min{ FLT_MAX, FLT_MAX }, text_max{ 0, 0 };
 
@@ -168,7 +168,6 @@ auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float s
   auto move     = glm::vec2(0, metrics.ascenderY);
   auto position = pos;
   auto u32str   = util::to_u32string(text);
-  auto idx      = indices.empty() ? 0 : indices.back() + 1;
 
   static auto invalid_ch = '?';
 
@@ -220,13 +219,13 @@ auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float s
     ar /= _atlas_extent.x;
     at /= _atlas_extent.y;
 
-    //vertices.append_range(std::vector<Vertex>
-    //{
-    //  { min,              { al, at }, color },
-    //  { { max.x, min.y }, { ar, at }, color },
-    //  { { min.x, max.y }, { al, ab }, color },
-    //  { max,              { ar, ab }, color },
-    //});
+    vertices.append_range(std::vector<Vertex>
+    {
+      { min,              { al, at }, offset },
+      { { max.x, min.y }, { ar, at }, offset },
+      { { min.x, max.y }, { al, ab }, offset },
+      { max,              { ar, ab }, offset },
+    });
 
     indices.append_range(std::vector<uint16_t>
     {
