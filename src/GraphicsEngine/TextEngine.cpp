@@ -7,6 +7,13 @@
 #include <thread>
 #include <fstream>
 
+/*
+TODO:
+  add multiple fonts, move load font to example.cpp. (use charset overlap percent to choose charset for per font)
+  remove msdge-gen-atlas, only use msdfgen to custom atlas generate
+  dynamic load unloaded glyph, update atlas image descriptor for sdf fragment to location uv to right atlas
+*/
+
 namespace
 {
 
@@ -14,6 +21,7 @@ namespace
 //                            Binary File
 ////////////////////////////////////////////////////////////////////////////////
 
+// MSDF | width | height | channel | charset count | charset... | pixels...
 struct alignas(4) Header
 {
   char     magic[5] = "MSDF";
@@ -22,7 +30,7 @@ struct alignas(4) Header
   uint32_t channel{};
 };
 
-void write_msdf_file(msdfgen::BitmapConstRef<float, 4> bitmap, std::string_view filename)
+void write_msdf_file(msdfgen::BitmapConstRef<float, 4> bitmap, std::string_view filename, std::span<std::pair<uint32_t, uint32_t>> charset)
 {
   Header header;
   header.width   = bitmap.width;
@@ -30,41 +38,74 @@ void write_msdf_file(msdfgen::BitmapConstRef<float, 4> bitmap, std::string_view 
   header.channel = 4;
 
   std::ofstream out(filename.data(), std::ios::binary);
+
+  // write header
   out.write(reinterpret_cast<char const*>(&header), sizeof(header));
+
+  // write charset
+  auto count = charset.size();
+  out.write(reinterpret_cast<char const*>(&count), sizeof(uint32_t));
+  for (auto const& pair : charset)
+  {
+    out.write(reinterpret_cast<char const*>(&pair.first), sizeof(uint32_t));
+    out.write(reinterpret_cast<char const*>(&pair.second), sizeof(uint32_t));
+  }
+
+  // write pixels
   out.write(reinterpret_cast<char const*>(bitmap.pixels), bitmap.width * bitmap.height * 4 * sizeof(float));
 }
 
 auto read_msdf_file(std::string_view filename)
 {
-  tk::graphics_engine::Bitmap bitmap;
-
   std::ifstream in(filename.data(), std::ios::binary);
   tk::throw_if(!in.is_open(), "failed to open {}", filename);
 
+  // read header
   Header header;
   in.read(reinterpret_cast<char*>(&header), sizeof(header));
   tk::throw_if(strcmp(header.magic, "MSDF"), "{} is not a msdf file", filename);
 
+  // read charset
+  uint32_t count{};
+  in.read(reinterpret_cast<char*>(&count), sizeof(uint32_t));
+  std::vector<std::pair<uint32_t, uint32_t>> charset;
+  charset.reserve(count);
+  for (auto i = 0; i < count; ++i)
+  {
+    std::pair<uint32_t, uint32_t> pair;
+    in.read(reinterpret_cast<char*>(&pair.first), sizeof(uint32_t));
+    in.read(reinterpret_cast<char*>(&pair.second), sizeof(uint32_t));
+    charset.emplace_back(pair);
+  }
+
+  // read pixels
+  tk::graphics_engine::Bitmap bitmap;
   bitmap.width  = header.width;
   bitmap.height = header.height;
-
-  bitmap.data.resize(header.width * header.height * header.channel  );
+  bitmap.data.resize(header.width * header.height * header.channel);
   in.read(reinterpret_cast<char*>(bitmap.data.data()), bitmap.data.size() * sizeof(float));
 
-  return bitmap;
+  return std::pair{ bitmap, charset };
+}
+
+auto get_msdf_charset(std::span<std::pair<uint32_t, uint32_t>> charset)
+{
+  msdf_atlas::Charset msdf_charset;
+  for (auto const& pair : charset)
+    for (auto i = pair.first; i <= pair.second; ++i)
+      msdf_charset.add(i);
+  return msdf_charset;
 }
 
 // from imgui_draw.cpp
 // 0x0020, 0x00FF Basic Latin + Latin Supplement
-auto get_char_set()
+auto get_latin_charset()
 {
-  auto beg = 0x0020;
-  auto end = 0x00ff;
-
-  msdf_atlas::Charset char_set;
-  for (; beg <= end; ++beg)
-    char_set.add(beg);
-  return char_set;
+  std::vector<std::pair<uint32_t, uint32_t>> charset
+  {
+    { 0x0020, 0x00ff },
+  };
+  return std::pair{ get_msdf_charset(charset), charset };
 }
 
 auto get_packer()
@@ -90,34 +131,57 @@ namespace tk { namespace graphics_engine {
 
 TextEngine::TextEngine()
 {
-// init freetype
-  _ft = msdfgen::initializeFreetype();
-  throw_if(!_ft, "failed to init freetype");
+  throw_if(FT_Init_FreeType(&_ft_library), "failed to init freetype library");
+}
+
+void Font::destroy() const noexcept
+{
+  msdfgen::destroyFont(handle);
+  FT_Done_Face(face);
 }
 
 TextEngine::~TextEngine()
 {
-  deinitializeFreetype(_ft);
+  for (auto const& font : _fonts)
+    font.destroy();
+  FT_Done_FreeType(_ft_library);
 }
 
 auto TextEngine::load_font(std::filesystem::path const& path) -> Bitmap
 {
+  return _fonts.emplace_back(Font()).init(_ft_library, path);
+}
+
+auto Font::init(FT_Library ft, std::filesystem::path const& path) -> Bitmap
+{
   // load font
-  auto font = loadFont(_ft, path.string().c_str());
-  throw_if(!font, "failed to load font {}", path.string());
+  throw_if(FT_New_Face(ft, path.string().c_str(), 0, &face),
+           "failed to load font {}", path.string());
+  handle = msdfgen::adoptFreetypeFont(face);
+  throw_if(!handle, "failed to load font {}", path.string());
 
   // load glyphs and font geometry
-  _font_geometry = msdf_atlas::FontGeometry(&_glyphs);
-  _font_geometry.loadCharset(font, 1.0, msdf_atlas::Charset::ASCII);
+  geometry = msdf_atlas::FontGeometry(&glyphs);
+  // TODO: change to choose best charset for per font
+  auto charsets = get_latin_charset();
+  geometry.loadCharset(handle, 1.0, charsets.first);
+  loaded_charset = charsets.second;
 
   // pack
   auto packer = get_packer();
-  throw_if(packer.pack(_glyphs.data(), _glyphs.size()), "failed to pack glyphs");
+  throw_if(packer.pack(glyphs.data(), glyphs.size()), "failed to pack glyphs");
 
   Bitmap result;
   auto msdf_file = std::format("resources/{}.msdf", path.stem().string());
+
+  // load cached file if have
   if (std::filesystem::exists(msdf_file))
-    result = read_msdf_file(msdf_file);
+  {
+    auto res = read_msdf_file(msdf_file);
+    result         = res.first;
+    loaded_charset = res.second;
+  }
+  // otherwise generate atlas and cache file
   else
   {
     int width, height;
@@ -125,7 +189,7 @@ auto TextEngine::load_font(std::filesystem::path const& path) -> Bitmap
 
     // TODO: use msdf_atlas::Workload for msdfgen::edgeColoringByDistance
     // edge coloring
-    for (auto& glyph : _glyphs)
+    for (auto& glyph : glyphs)
       glyph.edgeColoring(msdfgen::edgeColoringInkTrap, 3.0, 0);
 
     // set attribute of generator
@@ -139,7 +203,7 @@ auto TextEngine::load_font(std::filesystem::path const& path) -> Bitmap
     generator.setThreadCount(std::thread::hardware_concurrency() / 2);
     
     log::info("generate msdf font atlas of {}", path.string());
-    generator.generate(_glyphs.data(), _glyphs.size());
+    generator.generate(glyphs.data(), glyphs.size());
     
     // generate bitmap
     msdfgen::BitmapConstRef<float, 4> bitmap = generator.atlasStorage();
@@ -149,22 +213,52 @@ auto TextEngine::load_font(std::filesystem::path const& path) -> Bitmap
     result.width  = bitmap.width;
     result.height = bitmap.height;
 
-    write_msdf_file(bitmap, msdf_file.c_str());
+    write_msdf_file(bitmap, msdf_file.c_str(), loaded_charset);
   }
 
-  _atlas_extent = { result.width, result.height };
-
-  // destroy font
-  destroyFont(font);
+  atlas_extent = { result.width, result.height };
 
   return result;
 }
 
+auto Font::contain(uint32_t glyph) -> bool
+{
+  for (auto const& pair : loaded_charset)
+  {
+    if (glyph >= pair.first && glyph <= pair.second)
+      return true;
+  }
+  return false;
+}
+
+auto TextEngine::load_unloaded_glyph(uint32_t glyph) -> bool
+{
+  // FIXME: tmp
+  auto& font = _fonts.back();
+  msdfgen::Shape shape;
+  if (FT_Get_Char_Index(font.face, glyph))
+  {
+    assert(false); // TODO: implement dynamic load glyph, also in multiple fonts
+    if (!msdfgen::loadGlyph(shape, font.handle, glyph, msdfgen::FONT_SCALING_EM_NORMALIZED))
+      return false;
+    shape.normalize();
+    msdfgen::edgeColoringSimple(shape, 3.0);
+    msdfgen::Bitmap<float, 4> mtsdf(32, 32);
+    msdfgen::SDFTransformation t(msdfgen::Projection(32.0, msdfgen::Vector2(0.125, 0.125)), msdfgen::Range(0.125));
+    msdfgen::generateMTSDF(mtsdf, shape, t);
+    return true;
+  }
+  return false;
+}
+
 auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size, bool italic, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices, uint32_t offset, uint16_t& idx) -> std::pair<glm::vec2, glm::vec2>
 {
+  // FIXME: tmp
+  auto& font = _fonts.back();
+
   glm::vec2 text_min{ FLT_MAX }, text_max{};
 
-  auto metrics  = _font_geometry.getMetrics();
+  auto metrics  = font.geometry.getMetrics();
   auto move     = glm::vec2(0, metrics.ascenderY);
   auto position = pos;
   auto u32str   = util::to_u32string(text);
@@ -174,11 +268,18 @@ auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float s
   for (auto i = 0; i < u32str.size(); ++i, idx += 4)
   {
     auto ch    = static_cast<uint32_t>(u32str[i]);
-    auto glyph = _font_geometry.getGlyph(ch);
+    auto glyph = font.geometry.getGlyph(ch);
     if (glyph == nullptr)
     {
-      ch    = invalid_ch;
-      glyph = _font_geometry.getGlyph(invalid_ch);
+      if (load_unloaded_glyph(ch)) // TODO: also do on next_ch
+      {
+        
+      }
+      else
+      {
+        ch    = invalid_ch;
+        glyph = font.geometry.getGlyph(invalid_ch);
+      }
     }
 
     double al, ab, ar, at;
@@ -199,18 +300,18 @@ auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float s
     {
       double advance;
       auto next_ch    = static_cast<uint32_t>(u32str[i + 1]);
-      auto next_glyph = _font_geometry.getGlyph(next_ch);
+      auto next_glyph = font.geometry.getGlyph(next_ch);
       if (next_glyph == nullptr)
         next_ch = invalid_ch;
-      throw_if(_font_geometry.getAdvance(advance, ch, next_ch) == false,
+      throw_if(font.geometry.getAdvance(advance, ch, next_ch) == false,
                "failed to get advance between {} and {}", ch, next_ch);
       position.x += advance * size;
     }
 
-    al /= _atlas_extent.x;
-    ab /= _atlas_extent.y;
-    ar /= _atlas_extent.x;
-    at /= _atlas_extent.y;
+    al /= font.atlas_extent.x;
+    ab /= font.atlas_extent.y;
+    ar /= font.atlas_extent.x;
+    at /= font.atlas_extent.y;
 
     auto p0 = min;
     auto p1 = glm::vec2{ max.x, min.y };
@@ -261,7 +362,7 @@ auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float s
     });
   }
 
-  return { pos, { text_max.x, (metrics.ascenderY - metrics.descenderY) * size + pos.y } };
+  return { pos, { text_max.x, metrics.lineHeight * size + pos.y } };
 }
 
 }}

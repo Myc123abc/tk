@@ -98,8 +98,8 @@ void render()
 
     ui::polygon({{50, 50}, {100, 75}, {75, 100}}, 0xffffffff);
 
-    ui::text("H", { 0, 30 }, 26.66, 0xff0000ff);
-    ui::text("Hasdad打ｓas", { 5, 30 }, 120, 0xffffffff, false, false, 0xffff00ff);
+    //ui::text("H", { 0, 30 }, 26.66, 0xff0000ff);
+    //ui::text("Hasdad打ｓas", { 5, 30 }, 120, 0xffffffff, false, false, 0xffff00ff);
 
     ui::union_begin();
     ui::circle({50, 50}, 25);
@@ -116,10 +116,14 @@ void render()
     ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ 100, 3 }, 0x808080FF );
     ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ progress, 3 }, 0x0000FFFF );
 
-    auto r1 = ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", { 0, 50 }, 120, 0x000000ff, false, false, 0xff0000ff);
-    auto r2 = ui::text("abcdefghijklmnopqrstuvwxyz", { 0, 50 }, 120, 0xffffffff, true, true);
-    ui::rectangle(r1.first, r1.second, 0xff0000ff, 3);
-    ui::rectangle(r2.first, r2.second, 0x00ff00ff, 3);
+    //auto r1 = ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", { 0, 50 }, 120, 0x000000ff, false, false, 0xff0000ff);
+    //auto r2 = ui::text("abcdefghijklmnopqrstuvwxyz", { 0, 50 }, 120, 0xffffffff, true, true);
+    //ui::rectangle(r1.first, r1.second, 0xff0000ff, 3);
+    //ui::rectangle(r2.first, r2.second, 0x00ff00ff, 3);
+
+    std::string str;
+    str.push_back(0x0021);
+    ui::text(str, {0,0}, 120, 0xffffffff);
 
     ui::end();
   }

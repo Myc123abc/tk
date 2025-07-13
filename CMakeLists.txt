@@ -57,6 +57,7 @@ target_include_directories(tk
     include
     ${Vulkan_INCLUDE_DIRS}
     vendor/glm
+    vendor/freetype/include
 )
 
 target_link_libraries(tk

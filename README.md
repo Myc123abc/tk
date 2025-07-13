@@ -1,7 +1,8 @@
+![Size](https://img.shields.io/github/languages/code-size/Myc123abc/Game-BreakOut)
+
 A game engine for making galgame, currently I need to learn many things.
 
 TODO:
-* freetype not read GPOS for kerning, you can use HarfBuzz.
 * ffmpeg with miniaudio play music
 * make a music player as example (use fftw for audio visualization, create own fftw repo for git submodule)
 * ffmpeg play video
@@ -11,6 +12,9 @@ TODO:
 * rich base function for galgame engine
 * consider extre advance feature like "real rain" in 魔法使いの夜
 * consider depth, 3D, light, particle effects, physics collision, etc.
+
+reserve:
+* freetype not read GPOS for kerning, you can use HarfBuzz.
 
 ## Third Party
 * https://github.com/g-truc/glm (MIT)

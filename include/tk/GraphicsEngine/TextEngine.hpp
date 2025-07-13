@@ -4,6 +4,10 @@
 #include <vector>
 
 #include <glm/glm.hpp>
+
+#include <ft2build.h>
+#include FT_FREETYPE_H
+
 #include <msdf-atlas-gen/msdf-atlas-gen.h>
 
 namespace tk { namespace graphics_engine {
@@ -17,6 +21,21 @@ struct Bitmap
 
 struct Vertex;
 
+struct Font
+{
+  auto init(FT_Library ft, std::filesystem::path const& path) ->Bitmap;
+  void destroy() const noexcept;
+
+  auto contain(uint32_t glyph) -> bool;
+
+  FT_Face                                    face{};
+  msdfgen::FontHandle*                       handle{};
+  msdf_atlas::FontGeometry                   geometry;
+  std::vector<msdf_atlas::GlyphGeometry>     glyphs;
+  glm::vec2                                  atlas_extent{};
+  std::vector<std::pair<uint32_t, uint32_t>> loaded_charset;
+};
+
 class TextEngine
 {
 public:
@@ -27,13 +46,11 @@ public:
 
   auto parse_text(std::string_view text, glm::vec2 const& pos, float size, bool italic, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices, uint32_t offset, uint16_t& idx) -> std::pair<glm::vec2, glm::vec2>;
 
-private:
-  msdfgen::FreetypeHandle* _ft{};
+  auto load_unloaded_glyph(uint32_t glyph) -> bool;
 
-  // TODO: make vector load multiple fonts
-  msdf_atlas::FontGeometry               _font_geometry;
-  std::vector<msdf_atlas::GlyphGeometry> _glyphs;
-  glm::vec2                              _atlas_extent{};
+private:
+  FT_Library _ft_library{};
+  std::vector<Font> _fonts{};
 };
 
 }}
