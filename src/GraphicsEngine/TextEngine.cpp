@@ -160,16 +160,8 @@ auto Font::init(FT_Library ft, std::filesystem::path const& path) -> Bitmap
   handle = msdfgen::adoptFreetypeFont(face);
   throw_if(!handle, "failed to load font {}", path.string());
 
-  // load glyphs and font geometry
   geometry = msdf_atlas::FontGeometry(&glyphs);
-  // TODO: change to choose best charset for per font
-  auto charsets = get_latin_charset();
-  geometry.loadCharset(handle, 1.0, charsets.first);
-  loaded_charset = charsets.second;
-
-  // pack
   auto packer = get_packer();
-  throw_if(packer.pack(glyphs.data(), glyphs.size()), "failed to pack glyphs");
 
   Bitmap result;
   auto msdf_file = std::format("resources/{}.msdf", path.stem().string());
@@ -180,10 +172,23 @@ auto Font::init(FT_Library ft, std::filesystem::path const& path) -> Bitmap
     auto res = read_msdf_file(msdf_file);
     result         = res.first;
     loaded_charset = res.second;
+    geometry.loadCharset(handle, 1.0, get_msdf_charset(loaded_charset));
+    // HACK: I don't know why must pack then geometry can load glyphs
+    //       if continue use msdf-gen-atlas, dynamic load also must call packer.pack
+    //       but I will replace to use msdfgen first
+    throw_if(packer.pack(glyphs.data(), glyphs.size()), "failed to pack glyphs");
   }
   // otherwise generate atlas and cache file
   else
   {
+    // TODO: change to choose best charset for per font
+    auto charsets = get_latin_charset();
+    geometry.loadCharset(handle, 1.0, charsets.first);
+    loaded_charset = charsets.second;
+
+    // pack
+    throw_if(packer.pack(glyphs.data(), glyphs.size()), "failed to pack glyphs");
+
     int width, height;
     packer.getDimensions(width, height);
 

@@ -479,6 +479,7 @@ void GraphicsEngine::create_sampler()
   _destructors.push([&] { vkDestroySampler(_device, _sampler, nullptr); });
 }
 
+// TODO: how to pre load multiple fonts
 void GraphicsEngine::load_font()
 {
   auto path = "resources/SourceCodePro-Regular.ttf";

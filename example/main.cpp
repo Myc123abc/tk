@@ -23,7 +23,10 @@ int main()
   try
   {
     // init main window and engine
-    tk::init("tk", 200, 200);
+    tk::init("tk", 200, 200,
+    {
+      "resources/SourceCodePro-Regular.ttf", // load fonts
+    });
 
     while (true)
     {

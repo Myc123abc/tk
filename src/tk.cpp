@@ -34,7 +34,7 @@ struct tk_context
 static tk_context* tk_ctx{};
 extern struct ui_context ui_ctx;
 
-void init(std::string_view title, uint32_t width, uint32_t height)
+void init(std::string_view title, uint32_t width, uint32_t height, std::vector<std::string_view> const& fonts)
 {
   tk_ctx = new tk_context();
 

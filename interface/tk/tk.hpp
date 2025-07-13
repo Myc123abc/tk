@@ -7,19 +7,22 @@
 #include "config.hpp"
 #include "tk/type.hpp"
 
+#include <vector>
 #include <string_view>
 
 #include <glm/glm.hpp>
 
 namespace tk
 {
+  // TODO: make more modular config engine, such as dynamic load fonts
   /**
    * initialize tk context
    * @param title title of main window
    * @param width width of main window
    * @param height height of main window
+   * @param fonts fonts for preload
    */
-  TK_API void init(std::string_view title, uint32_t width, uint32_t height);
+  TK_API void init(std::string_view title, uint32_t width, uint32_t height, std::vector<std::string_view> const& fonts);
 
   TK_API auto get_window_size() -> glm::vec2;
 
