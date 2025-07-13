@@ -311,13 +311,13 @@ void union_end(uint32_t color, uint32_t thickness)
   shape.thickness = thickness;
 }
 
-void text(std::string_view text, glm::vec2 const& pos, float size, uint32_t inner_color, uint32_t outer_color)
+auto text(std::string_view text, glm::vec2 const& pos, float size, uint32_t inner_color, bool italic, uint32_t outer_color) -> std::pair<glm::vec2, glm::vec2>
 {
   auto ctx    = get_ctx();
   assert(ctx->begining && ctx->path_begining == false && ctx->union_start == false);
-  // TODO: currently, not use extent for a text. This can be use on ui text extent detect
-  auto extent = ctx->engine->parse_text(text, pos, size, ctx->vertices, ctx->indices, ctx->shape_offset, ctx->index);
+  auto extent = ctx->engine->parse_text(text, pos, size, italic, ctx->vertices, ctx->indices, ctx->shape_offset, ctx->index);
   add_text_property(type::shape::glyph, inner_color, outer_color);
+  return extent;
 }
 
 void set_operation(type::shape_op op)

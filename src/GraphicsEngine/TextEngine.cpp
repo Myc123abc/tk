@@ -160,9 +160,9 @@ auto TextEngine::load_font(std::filesystem::path const& path) -> Bitmap
   return result;
 }
 
-auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices, uint32_t offset, uint16_t& idx) -> std::pair<glm::vec2, glm::vec2>
+auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size, bool italic, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices, uint32_t offset, uint16_t& idx) -> std::pair<glm::vec2, glm::vec2>
 {
-  glm::vec2 text_min{ FLT_MAX, FLT_MAX }, text_max{ 0, 0 };
+  glm::vec2 text_min{ FLT_MAX }, text_max{};
 
   auto metrics  = _font_geometry.getMetrics();
   auto move     = glm::vec2(0, metrics.ascenderY);
@@ -195,13 +195,6 @@ auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float s
     min += position;
     max += position;
 
-    if (i == 0)
-      text_min.x = min.x;
-    if (i == u32str.size() - 1)
-      text_max.x = max.x;
-    text_min.y = std::min(text_min.y, min.y);
-    text_max.y = std::max(text_max.y, max.y);
-
     if (i < u32str.size() - 1)
     {
       double advance;
@@ -219,12 +212,46 @@ auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float s
     ar /= _atlas_extent.x;
     at /= _atlas_extent.y;
 
+    auto p0 = min;
+    auto p1 = glm::vec2{ max.x, min.y };
+    auto p2 = glm::vec2{ min.x, max.y };
+    auto p3 = max;
+
+    auto italic_p0 = p0;
+    auto italic_p1 = p1;
+    auto italic_p2 = p2;
+    auto italic_p3 = p3;
+
+    static constexpr auto factor = 0.4;
+    auto italic_offset = italic_p3.y * factor;
+    italic_p0.x -= italic_p0.y * factor;
+    italic_p1.x -= italic_p1.y * factor;
+    italic_p2.x -= italic_p2.y * factor;
+    italic_p0.x += italic_offset;
+    italic_p1.x += italic_offset;
+    italic_p2.x += italic_offset;
+
+    //if (i == 0)
+    //  text_min.x = italic_p2.x;
+    if (i == u32str.size() - 1)
+      text_max.x = italic_p1.x;
+    //text_min.y = std::min(text_min.y, italic_p0.y);
+    //text_max.y = std::max(text_max.y, italic_p2.y);
+
+    if (italic)
+    {
+      p0 = italic_p0;
+      p1 = italic_p1;
+      p2 = italic_p2;
+      p3 = italic_p3;
+    }
+
     vertices.append_range(std::vector<Vertex>
     {
-      { min,              { al, at }, offset },
-      { { max.x, min.y }, { ar, at }, offset },
-      { { min.x, max.y }, { al, ab }, offset },
-      { max,              { ar, ab }, offset },
+      { p0, { al, at }, offset },
+      { p1, { ar, at }, offset },
+      { p2, { al, ab }, offset },
+      { p3, { ar, ab }, offset },
     });
 
     indices.append_range(std::vector<uint16_t>
@@ -234,7 +261,7 @@ auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float s
     });
   }
 
-  return { text_min, text_max };
+  return { pos, { text_max.x, (metrics.ascenderY - metrics.descenderY) * size + pos.y } };
 }
 
 }}

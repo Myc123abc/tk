@@ -110,9 +110,11 @@ TK_API void union_end(uint32_t color, uint32_t thickness = 0);
  * @param pos left top of text
  * @param size
  * @param inner_color
+ * @param italic
  * @param outer_color alpha not 0 then draw outline
+ * @return extent of text
  */
-TK_API void text(std::string_view text, glm::vec2 const& pos, float size, uint32_t inner_color, uint32_t outer_color = 0);
+TK_API auto text(std::string_view text, glm::vec2 const& pos, float size, uint32_t inner_color, bool italic = false, uint32_t outer_color = 0) -> std::pair<glm::vec2, glm::vec2>;
 
 ////////////////////////////////////////////////////////////////////////////////
 //                                UI

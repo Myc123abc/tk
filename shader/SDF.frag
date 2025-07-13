@@ -32,34 +32,6 @@ vec4 get_color(vec4 color, float w, float d, uint t)
   return vec4(color.rgb, color.a * alpha);
 }
 
-#define HeaderSize 7
-
-#define GetType(x) GetData(x)
-#define GetP0(x)   GetVec2(x + HeaderSize)
-#define GetP1(x)   GetVec2(x + HeaderSize + 2)
-#define GetP2(x)   GetVec2(x + HeaderSize + 4)
-
-#define GetPartitionP0(x) GetVec2(x + 1)
-#define GetPartitionP1(x) GetVec2(x + 3)
-#define GetPartitionP2(x) GetVec2(x + 5)
-
-#define GetPolygonPointsBeginOffset(x) x + HeaderSize + 1
-
-#define GetFirstValue(x)  GetData(x + HeaderSize)
-#define GetThirdValueF(x) GetDataF(x + HeaderSize + 2)
-
-#define GetPathCount(x)            GetData(x + HeaderSize)
-#define GetPathBeginOffset(x)      x + HeaderSize + 1
-#define GetLinePartitionOffset()   5
-#define GetBezierPartitionOffset() 7
-
-#define GetColor(x)     GetVec4(x + 1)
-#define GetThickness(x) GetData(x + 5)
-#define GetOperator(x)  GetData(x + 6)
-
-#define GetInnerColor(x) GetVec4(x + 1)
-#define GetOuterColor(x) GetVec4(x + 5)
-
 float get_distance_parition(inout uint beg)
 {
   switch (GetType(beg))

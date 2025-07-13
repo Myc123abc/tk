@@ -25,7 +25,7 @@ public:
 
   auto load_font(std::filesystem::path const& path) -> Bitmap;
 
-  auto parse_text(std::string_view text, glm::vec2 const& pos, float size, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices, uint32_t offset, uint16_t& idx) -> std::pair<glm::vec2, glm::vec2>;
+  auto parse_text(std::string_view text, glm::vec2 const& pos, float size, bool italic, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices, uint32_t offset, uint16_t& idx) -> std::pair<glm::vec2, glm::vec2>;
 
 private:
   msdfgen::FreetypeHandle* _ft{};
