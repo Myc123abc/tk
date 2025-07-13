@@ -147,6 +147,19 @@ void add_shape_property(type::shape type, std::vector<float> const& values, uint
   ctx->shape_offset += ShapeProperty::header_field_count + values.size();
 }
 
+// HACK: it's suck, enforcing outer_color byte data to ShapeProperty struct it's ungly!
+void add_text_property(type::shape type, uint32_t inner_color, uint32_t outer_color)
+{
+  auto ctx = get_ctx();
+  auto converted_outer_color = to_vec4(outer_color);
+  auto out_color_r = std::bit_cast<uint32_t>(converted_outer_color.r);
+  auto out_color_g = std::bit_cast<type::shape_op>(converted_outer_color.g);
+  ctx->shape_properties.emplace_back(type, to_vec4(inner_color), out_color_r, out_color_g);
+  auto values = std::vector<float>{ converted_outer_color.b, converted_outer_color.a };
+  ctx->shape_properties.back().values.append_range(values);
+  ctx->shape_offset += ShapeProperty::header_field_count + values.size();
+}
+
 void shape(type::shape type, std::vector<float> const& values, uint32_t color, uint32_t thickness, std::pair<glm::vec2, glm::vec2> const& box)
 {
   auto ctx = get_ctx();
@@ -298,13 +311,13 @@ void union_end(uint32_t color, uint32_t thickness)
   shape.thickness = thickness;
 }
 
-void text(std::string_view text, glm::vec2 const& pos, float size, uint32_t color)
+void text(std::string_view text, glm::vec2 const& pos, float size, uint32_t inner_color, uint32_t outer_color)
 {
   auto ctx    = get_ctx();
   assert(ctx->begining && ctx->path_begining == false && ctx->union_start == false);
   // TODO: currently, not use extent for a text. This can be use on ui text extent detect
-  auto extent = ctx->engine->parse_text(text, pos, size, to_vec4(color), ctx->vertices, ctx->indices, ctx->shape_offset, ctx->index);
-  add_shape_property(type::shape::glyph, {}, color);
+  auto extent = ctx->engine->parse_text(text, pos, size, ctx->vertices, ctx->indices, ctx->shape_offset, ctx->index);
+  add_text_property(type::shape::glyph, inner_color, outer_color);
 }
 
 void set_operation(type::shape_op op)

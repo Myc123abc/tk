@@ -160,7 +160,7 @@ auto TextEngine::load_font(std::filesystem::path const& path) -> Bitmap
   return result;
 }
 
-auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size, glm::vec4 const& color, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices, uint32_t offset, uint16_t& idx) -> std::pair<glm::vec2, glm::vec2>
+auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices, uint32_t offset, uint16_t& idx) -> std::pair<glm::vec2, glm::vec2>
 {
   glm::vec2 text_min{ FLT_MAX, FLT_MAX }, text_max{ 0, 0 };
 

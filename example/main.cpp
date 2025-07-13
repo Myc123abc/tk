@@ -98,18 +98,20 @@ void render()
 
     ui::polygon({{50, 50}, {100, 75}, {75, 100}}, 0xffffffff);
 
-    ui::text("H", { 0, 30 }, 26.66, 0x000000ff);
-    ui::text("Hasdad打ｓas", { 5, 30 }, 26.66, 0xffffffff);
+    ui::text("H", { 0, 30 }, 26.66, 0xff0000ff);
+    ui::text("Hasdad打ｓas", { 5, 30 }, 120, 0x000000ff, 0xffff00ff);
 
     ui::union_begin();
     ui::circle({50, 50}, 25);
-    ui::polygon({{0, 0}, {100, 75}, {75, 125}}, 0xffffffff);
+    ui::polygon({{0, 0}, {100, 75}, {75, 125}});
     ui::path_begin();
     ui::bezier({0,25}, {75,50}, {0, 75});
     ui::line({0,75},  {0, 25});
     ui::path_end();
     ui::circle({75, 75}, 25);
     ui::union_end(0xffff00ff, 1);
+
+    ui::rectangle({50,50}, {100,100}, 0x00ff00ff);
 
     // playback progress
     auto playback_progree_pos = playback_pos1 + glm::vec2(5, 0);

@@ -109,19 +109,10 @@ TK_API void union_end(uint32_t color, uint32_t thickness = 0);
  * @param text
  * @param pos left top of text
  * @param size
- * @param color
+ * @param inner_color
+ * @param outer_color alpha not 0 then draw outline
  */
-TK_API void text(std::string_view text, glm::vec2 const& pos, float size, uint32_t color = 0);
-
-// TODO: not perfect design when handle path draw
-/**
- * set current shape mix operation with next shape.
- * the final shape operation must be mix (default).
- * the operator for two shapes only use thickness and color of first shape.
- * for path shape, can only be used with path_begin
- * @param op operator for current shape with next shape
- */
-TK_API void set_operation(type::shape_op op);
+TK_API void text(std::string_view text, glm::vec2 const& pos, float size, uint32_t inner_color, uint32_t outer_color = 0);
 
 ////////////////////////////////////////////////////////////////////////////////
 //                                UI

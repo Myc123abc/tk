@@ -241,9 +241,9 @@ void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> 
   vkCmdDrawIndexed(cmd, indices.size(), 1, 0, 0, 0);
 }
 
-auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size, glm::vec4 const& color, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices, uint32_t offset, uint16_t& idx) -> std::pair<glm::vec2, glm::vec2>
+auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices, uint32_t offset, uint16_t& idx) -> std::pair<glm::vec2, glm::vec2>
 {
-  return _text_engine.parse_text(text, pos, size, color, vertices, indices, offset, idx);
+  return _text_engine.parse_text(text, pos, size, vertices, indices, offset, idx);
 }
 
 }}

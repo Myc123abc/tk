@@ -10,23 +10,6 @@ layout(location = 0) out vec4 out_color;
 layout(binding = 0) uniform sampler2D font_atlas;
 
 ////////////////////////////////////////////////////////////////////////////////
-//                              MSDF font rednering
-////////////////////////////////////////////////////////////////////////////////
-
-float median(float r, float g, float b) 
-{
-  return max(min(r, g), min(max(r, g), b));
-}
-
-float screenPxRange()
-{
-  const float pxRange = 2.0;
-  vec2 unitRange = vec2(pxRange)/vec2(textureSize(font_atlas, 0));
-  vec2 screenTexSize = vec2(1.0)/fwidth(uv);
-  return max(0.5*dot(unitRange, screenTexSize), 1.0);
-}
-
-////////////////////////////////////////////////////////////////////////////////
 //                                SDF shapes
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -73,6 +56,9 @@ vec4 get_color(vec4 color, float w, float d, uint t)
 #define GetColor(x)     GetVec4(x + 1)
 #define GetThickness(x) GetData(x + 5)
 #define GetOperator(x)  GetData(x + 6)
+
+#define GetInnerColor(x) GetVec4(x + 1)
+#define GetOuterColor(x) GetVec4(x + 5)
 
 float get_distance_parition(inout uint beg)
 {
@@ -176,8 +162,27 @@ float get_distance(inout uint local_offset)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+//                              MSDF font rednering
+////////////////////////////////////////////////////////////////////////////////
+
+float median(float r, float g, float b) 
+{
+  return max(min(r, g), min(max(r, g), b));
+}
+
+float screenPxRange()
+{
+  const float pxRange = 2.0;
+  vec2 unitRange = vec2(pxRange)/vec2(textureSize(font_atlas, 0));
+  vec2 screenTexSize = vec2(1.0)/fwidth(uv);
+  return max(0.5*dot(unitRange, screenTexSize), 1.0);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 //                             main function
 ////////////////////////////////////////////////////////////////////////////////
+
+// 斜线，加粗，多字体，圆角
 
 void main()
 {
@@ -186,12 +191,38 @@ void main()
   // glyph process
   if (GetType(local_offset) == Glyph)
   {
-    vec3  msd = texture(font_atlas, uv).rgb;
-    float sd  = median(msd.r, msd.g, msd.b);
-    float screenPxDistance = screenPxRange() * (sd - 0.5);
-    float opacity = clamp(screenPxDistance + 0.5, 0.0, 1.0);
-    vec4  color = GetColor(local_offset);
-    out_color = vec4(color.rgb, color.a * opacity);
+    vec4  mtsdf = texture(font_atlas, uv);
+    float d     = median(mtsdf.r, mtsdf.g, mtsdf.b);
+    //float d_sdf    = mtsdf.a;
+    // reference: https://www.redblobgames.com/x/2404-distance-field-effects/
+    //d_msdf         = min(d_msdf, d_sdf + 0.1); // HACK: to fix glitch in msdf near edges
+
+    vec4 inner_color = GetInnerColor(local_offset);
+    vec4 outer_color = GetOuterColor(local_offset);
+
+    const float outline_width = 0.5;
+    if (outline_width == 0.0 || outer_color.a == 0)
+    {   
+      float distance = screenPxRange() * (d - 0.5);
+      float alpha    = clamp(distance + 0.5, 0.0, 1.0);
+      out_color = vec4(inner_color.rgb, inner_color.a * alpha);
+      return;
+    }
+
+    // typically 0.5 is the threshold, >0.5 inside <0.5 outside
+    float width = screenPxRange();
+    float inner = width * (d - 0.5) + 0.5;
+    float outer = width * (d - 0.5 + outline_width) + 0.5;
+    
+    float inner_alpha = clamp(inner, 0.0, 1.0);
+    float outer_alpha = clamp(outer, 0.0, 1.0);
+
+    if (inner_color.a == 0)
+      inner_color = vec4(0);
+    else
+      inner_color = inner_color * inner_alpha;
+
+    out_color = inner_color + (outer_color * (outer_alpha - inner_alpha));
     return;
   }
 
