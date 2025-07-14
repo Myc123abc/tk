@@ -92,8 +92,6 @@ void render()
     playback_btn.render();
     if (playback_btn.button())
     {
-      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - ui::get_start_time()).count();
-      log::info("playback button clicked, duration: {} ms", duration);
       click = !click;
     }
     if (click)

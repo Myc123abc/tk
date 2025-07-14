@@ -1,21 +1,15 @@
 #include "tk/ui/ui.hpp"
 #include "internal.hpp"
 #include "tk/ErrorHandling.hpp"
-#include "tk/log.hpp"
+
 #include <cassert>
 
 #include <chrono>
 
-std::chrono::high_resolution_clock::time_point start{};
 
 using namespace tk::graphics_engine;
 
 namespace tk { namespace ui {
-
-  std::chrono::high_resolution_clock::time_point get_start_time()
-{
-return start;
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 //                                  Misc
@@ -341,20 +335,15 @@ void event_process()
 
   ctx->mouse_pos = ctx->window->get_mouse_position();
 
-  static auto cnt = 0;
-  if (cnt != 0) ++cnt;
   // mouse click
   auto mouse_state = ctx->window->get_mouse_state();
   if (!ctx->first_down && mouse_state == left_down)
   {
-    start = std::chrono::high_resolution_clock::now();
     ctx->drag_start_pos = ctx->mouse_pos;
     ctx->first_down     = true;
-    cnt = 1;
   }
   else if (ctx->first_down && mouse_state == left_up)
   {
-    tk::log::info("cnt {}", cnt);
     ctx->drag_end_pos = ctx->mouse_pos;
     ctx->click_finish = true;
     ctx->first_down   = false;
