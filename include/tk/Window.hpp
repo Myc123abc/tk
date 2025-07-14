@@ -18,6 +18,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <chrono>
+#include <queue>
 
 #ifdef _WIN32
 #define NOMINMAX
@@ -51,7 +52,7 @@ public:
   auto state() const noexcept { return _state; }
 
   auto get_mouse_position() const noexcept -> glm::vec2;
-  auto get_mouse_state() const noexcept -> type::mouse_state;
+  auto get_mouse_state() noexcept -> type::mouse_state;
 
   void init_keys() noexcept;
   auto get_key(type::key k) noexcept -> type::key_state;
@@ -70,6 +71,8 @@ private:
   LPCWSTR      ClassName{ L"main window" };
   HWND         _handle{};
   type::window _state{ type::window::suspended };
+
+  std::queue<type::mouse_state> _mouse_states;
 #endif
 
 private:

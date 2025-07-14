@@ -6,6 +6,7 @@
 #include <vulkan/vulkan_win32.h>
 #endif
 
+
 namespace
 {
 #ifdef _WIN32
@@ -125,6 +126,18 @@ LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LP
   }
   break;
 
+  case WM_LBUTTONDOWN:
+  {
+    window->_mouse_states.push(type::mouse_state::left_down);
+  }
+  break;
+
+  case WM_LBUTTONUP:
+  {
+    window->_mouse_states.push(type::mouse_state::left_up);
+  }
+  break;
+
   }
   return DefWindowProcW(handle, msg, w_param, l_param);
 }
@@ -229,9 +242,12 @@ auto Window::get_mouse_position() const noexcept -> glm::vec2
   return { pos.x, pos.y };
 }
 
-auto Window::get_mouse_state() const noexcept -> type::mouse_state
+auto Window::get_mouse_state() noexcept -> type::mouse_state
 {
-  return GetKeyState(VK_LBUTTON) & 0x8000 ? type::mouse_state::left_down : type::mouse_state::left_up;
+  if (_mouse_states.empty()) return type::mouse_state::left_up;
+  auto state = _mouse_states.front();
+  _mouse_states.pop();
+  return state;
 }
 
 void CALLBACK Window::message_process(LPVOID) noexcept

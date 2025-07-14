@@ -4,6 +4,7 @@
 
 #include <cassert>
 
+
 using namespace tk::graphics_engine;
 
 namespace tk { namespace ui {
