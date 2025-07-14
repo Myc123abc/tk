@@ -16,12 +16,15 @@
 
 #include <vector>
 #include <string_view>
+#include <chrono>
 
 namespace tk { namespace ui {
 
 ////////////////////////////////////////////////////////////////////////////////
 //                                  Misc
 ////////////////////////////////////////////////////////////////////////////////
+
+TK_API std::chrono::high_resolution_clock::time_point get_start_time();
 
 /**
 * start a new layout

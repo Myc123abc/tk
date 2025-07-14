@@ -6,6 +6,8 @@
 #include <vulkan/vulkan_win32.h>
 #endif
 
+#include "tk/log.hpp"
+
 namespace
 {
 #ifdef _WIN32
@@ -125,6 +127,18 @@ LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LP
   }
   break;
 
+  case WM_LBUTTONDOWN:
+  {
+    log::info("down===================================");
+  }
+  break;
+
+  case WM_LBUTTONUP:
+  {
+    log::info("up=====================================");
+  }
+  break;
+
   }
   return DefWindowProcW(handle, msg, w_param, l_param);
 }
@@ -231,6 +245,7 @@ auto Window::get_mouse_position() const noexcept -> glm::vec2
 
 auto Window::get_mouse_state() const noexcept -> type::mouse_state
 {
+  tk::log::info("state: {}", GetAsyncKeyState(VK_LBUTTON));
   return GetKeyState(VK_LBUTTON) & 0x8000 ? type::mouse_state::left_down : type::mouse_state::left_up;
 }
 
