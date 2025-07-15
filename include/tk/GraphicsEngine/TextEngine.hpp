@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <vector>
+#include <map>
 
 #include <glm/glm.hpp>
 
@@ -21,6 +22,15 @@ struct Bitmap
 
 struct Vertex;
 
+struct Glyph
+{
+  uint32_t               codepoint{};
+  uint32_t               index{}; // TODO: is it useful?
+  msdfgen::Shape         shape;
+  msdfgen::Shape::Bounds bounds;
+  double                 advance{};
+};
+
 struct Font
 {
   auto init(FT_Library ft, std::filesystem::path const& path) ->Bitmap;
@@ -28,12 +38,28 @@ struct Font
 
   auto contain(uint32_t glyph) -> bool;
 
+  static constexpr auto Default_Font_Units_Per_EM{ 2048.0 };
+
+private:
+  void load_font(FT_Library ft);
+  void load_metrics();
+  void load_charset();
+
+  double _scale{};
+  std::map<std::pair<uint32_t, uint32_t>, double> _kernings;
+
+public:
+  std::string                                name;
   FT_Face                                    face{};
   msdfgen::FontHandle*                       handle{};
-  msdf_atlas::FontGeometry                   geometry;
-  std::vector<msdf_atlas::GlyphGeometry>     glyphs;
-  glm::vec2                                  atlas_extent{};
+  msdfgen::FontMetrics                       metrics;
   std::vector<std::pair<uint32_t, uint32_t>> loaded_charset;
+  std::vector<Glyph>                         glyphs; // TODO: should I use map?
+  
+  // FIXME: discard
+  msdf_atlas::FontGeometry                   geometry;
+  std::vector<msdf_atlas::GlyphGeometry>     glyph_geos;
+  glm::vec2                                  atlas_extent{};
 };
 
 class TextEngine
@@ -49,7 +75,7 @@ public:
   auto load_unloaded_glyph(uint32_t glyph) -> bool;
 
 private:
-  FT_Library _ft_library{};
+  FT_Library        _ft{};
   std::vector<Font> _fonts{};
 };
 
