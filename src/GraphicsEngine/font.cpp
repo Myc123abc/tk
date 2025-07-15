@@ -6,6 +6,8 @@
 #include <fstream>
 #include <span>
 
+#include <hb-ft.h>
+
 // maybe i need delete msdf-atlas-gen.h, can avoid redefinition
 //#include <msdfgen/core/ShapeDistanceFinder.hpp>
 

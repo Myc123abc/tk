@@ -42,6 +42,7 @@ if(TARGET freetype AND NOT TARGET Freetype::Freetype)
 endif()
 
 add_subdirectory(vendor/msdf-atlas-gen)
+add_subdirectory(vendor/harfbuzz)
 
 ################################################################################
 #                               Build Static Library 
@@ -53,10 +54,10 @@ add_library(tk SHARED ${SOURCE})
 target_include_directories(tk
   PUBLIC
     interface
+    vendor/glm
   PRIVATE
     include
     ${Vulkan_INCLUDE_DIRS}
-    vendor/glm
     vendor/freetype/include
 )
 
@@ -65,6 +66,7 @@ target_link_libraries(tk
     ${Vulkan_LIBRARIES}
     GPUOpen::VulkanMemoryAllocator
     msdf-atlas-gen
+    harfbuzz
 )
 
 target_link_directories(tk
