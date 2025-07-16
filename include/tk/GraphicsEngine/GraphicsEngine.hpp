@@ -10,7 +10,7 @@
 #include "CommandPool.hpp"
 #include "Device.hpp"
 #include "tk/type.hpp"
-#include "TextEngine.hpp"
+#include "TextEngine/TextEngine.hpp"
 
 #include <span>
 

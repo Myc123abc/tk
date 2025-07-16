@@ -1,4 +1,4 @@
-#include "tk/GraphicsEngine/TextEngine.hpp"
+#include "tk/GraphicsEngine/TextEngine/TextEngine.hpp"
 #include "tk/ErrorHandling.hpp"
 #include "tk/log.hpp"
 
@@ -6,7 +6,6 @@
 #include <fstream>
 #include <span>
 
-#include <hb-ft.h>
 
 // maybe i need delete msdf-atlas-gen.h, can avoid redefinition
 //#include <msdfgen/core/ShapeDistanceFinder.hpp>
@@ -130,6 +129,7 @@ void Font::destroy() const noexcept
 {
   msdfgen::destroyFont(handle);
   FT_Done_Face(face);
+  hb_font_destroy(hb_font);
 }
 
 auto Font::init(FT_Library ft, std::filesystem::path const& path) -> Bitmap
@@ -137,6 +137,7 @@ auto Font::init(FT_Library ft, std::filesystem::path const& path) -> Bitmap
   name = path.string();
 
   load_font(ft);
+
   load_metrics();
   
   // TODO: only load my charset, not msdf_atlas::CharSet
@@ -214,8 +215,11 @@ void Font::load_font(FT_Library ft)
 {
   throw_if(FT_New_Face(ft, name.c_str(), 0, &face),
            "failed to load font {}", name);
+  throw_if(FT_Set_Pixel_Sizes(face, 0, Font_Size),
+           "failed to set em size of {}", name);           
   handle = msdfgen::adoptFreetypeFont(face);
   throw_if(!handle, "failed to load font {}", name);
+  hb_font = hb_ft_font_create(face, nullptr);
 }
 
 void Font::load_metrics()

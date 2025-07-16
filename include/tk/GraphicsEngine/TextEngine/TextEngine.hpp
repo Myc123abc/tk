@@ -6,9 +6,7 @@
 
 #include <glm/glm.hpp>
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
-
+#include <hb-ft.h>
 #include <msdf-atlas-gen/msdf-atlas-gen.h>
 
 namespace tk { namespace graphics_engine {
@@ -31,14 +29,17 @@ struct Glyph
   double                 advance{};
 };
 
-struct Font
+class TextEngine;
+class Font
 {
+public:
   auto init(FT_Library ft, std::filesystem::path const& path) ->Bitmap;
   void destroy() const noexcept;
 
   auto contain(uint32_t glyph) -> bool;
 
-  static constexpr auto Default_Font_Units_Per_EM{ 2048.0 };
+  inline static constexpr auto Default_Font_Units_Per_EM{ 2048.0 };
+  inline static constexpr auto Font_Size{ 32 };
 
 private:
   void load_font(FT_Library ft);
@@ -56,6 +57,8 @@ public:
   std::vector<std::pair<uint32_t, uint32_t>> loaded_charset;
   std::vector<Glyph>                         glyphs; // TODO: should I use map?
   
+  hb_font_t*                                 hb_font{};
+
   // FIXME: discard
   msdf_atlas::FontGeometry                   geometry;
   std::vector<msdf_atlas::GlyphGeometry>     glyph_geos;
@@ -74,9 +77,12 @@ public:
 
   auto load_unloaded_glyph(uint32_t glyph) -> bool;
 
+  inline auto empty() const noexcept { return _fonts.empty(); }
+
 private:
   FT_Library        _ft{};
   std::vector<Font> _fonts{};
+  hb_buffer_t*      _hb_buffer{};
 };
 
 }}

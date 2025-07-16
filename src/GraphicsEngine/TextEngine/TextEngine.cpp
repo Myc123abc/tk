@@ -1,4 +1,4 @@
-#include "tk/GraphicsEngine/TextEngine.hpp"
+#include "tk/GraphicsEngine/TextEngine/TextEngine.hpp"
 #include "tk/ErrorHandling.hpp"
 #include "tk/util.hpp"
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
@@ -15,10 +15,12 @@ namespace tk { namespace graphics_engine {
 TextEngine::TextEngine()
 {
   throw_if(FT_Init_FreeType(&_ft), "failed to init freetype library");
+  _hb_buffer = hb_buffer_create();
 }
 
 TextEngine::~TextEngine()
 {
+  hb_buffer_destroy(_hb_buffer);
   for (auto const& font : _fonts)
     font.destroy();
   FT_Done_FreeType(_ft);
@@ -53,6 +55,32 @@ auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float s
 {
   // FIXME: tmp
   auto& font = _fonts.back();
+
+  hb_buffer_reset(_hb_buffer);
+  hb_buffer_add_utf8(_hb_buffer, text.data(), -1, 0, -1);
+  hb_buffer_guess_segment_properties(_hb_buffer);
+  hb_shape(font.hb_font, _hb_buffer, nullptr, 0);
+
+  auto hb_len  = hb_buffer_get_length(_hb_buffer);
+  auto hb_info = hb_buffer_get_glyph_infos(_hb_buffer, nullptr);
+  auto hb_pos  = hb_buffer_get_glyph_positions(_hb_buffer, nullptr);
+
+  printf ("Raw buffer contents:\n");
+  for (unsigned int i = 0; i < hb_len; i++)
+  {
+    hb_codepoint_t gid   = hb_info[i].codepoint;
+    unsigned int cluster = hb_info[i].cluster;
+    double x_advance = hb_pos[i].x_advance / 64.;
+    double y_advance = hb_pos[i].y_advance / 64.;
+    double x_offset  = hb_pos[i].x_offset / 64.;
+    double y_offset  = hb_pos[i].y_offset / 64.;
+
+    char glyphname[32];
+    hb_font_get_glyph_name (font.hb_font, gid, glyphname, sizeof (glyphname));
+
+    printf ("glyph='%s'	cluster=%d	advance=(%g,%g)	offset=(%g,%g)\n",
+            glyphname, cluster, x_advance, y_advance, x_offset, y_offset);
+  }
 
   glm::vec2 text_min{ FLT_MAX }, text_max{};
 
