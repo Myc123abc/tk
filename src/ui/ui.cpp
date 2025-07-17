@@ -4,8 +4,6 @@
 
 #include <cassert>
 
-#include <chrono>
-
 
 using namespace tk::graphics_engine;
 
