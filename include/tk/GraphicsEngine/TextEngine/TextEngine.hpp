@@ -2,7 +2,7 @@
 
 #include <filesystem>
 #include <vector>
-#include <map>
+#include <unordered_map>
 
 #include <glm/glm.hpp>
 
@@ -47,7 +47,6 @@ private:
   void load_charset();
 
   double _scale{};
-  std::map<std::pair<uint32_t, uint32_t>, double> _kernings;
 
 public:
   std::string                                name;
@@ -78,6 +77,17 @@ public:
   auto load_unloaded_glyph(uint32_t glyph) -> bool;
 
   inline auto empty() const noexcept { return _fonts.empty(); }
+
+private:
+  struct TextInfo;
+  auto process_text(std::string_view text) -> TextInfo;
+
+  struct TextInfo
+  {
+    std::string            text;
+    std::vector<glm::vec2> advances;
+  };
+  std::unordered_map<std::string, TextInfo> _cached_texts;
 
 private:
   FT_Library        _ft{};

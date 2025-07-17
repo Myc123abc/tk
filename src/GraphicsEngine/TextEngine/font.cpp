@@ -216,7 +216,7 @@ void Font::load_font(FT_Library ft)
   throw_if(FT_New_Face(ft, name.c_str(), 0, &face),
            "failed to load font {}", name);
   throw_if(FT_Set_Pixel_Sizes(face, 0, Font_Size),
-           "failed to set em size of {}", name);           
+           "failed to set em size of {}", name);
   handle = msdfgen::adoptFreetypeFont(face);
   throw_if(!handle, "failed to load font {}", name);
   hb_font = hb_ft_font_create(face, nullptr);
@@ -282,25 +282,6 @@ void Font::load_charset()
       glyphs.emplace_back(glyph);
     }
   }
-
-  // TODO: use GPOS field in font judge whether need HarfBuzz
-  
-
-  // load kerning
-  // HACK： when many glyphs, twice for while lead proformance problem
-  //        freetype not load GPOS, use HarfBuzz to resolve
-  // TODO: dynamic load glyph also need load kerning
-  double advance{};
-  for (auto const& g0 : glyphs)
-  {
-    for (auto const& g1 : glyphs)
-    {
-      if (msdfgen::getKerning(advance, handle, msdfgen::GlyphIndex(g0.index), msdfgen::GlyphIndex(g1.index), msdfgen::FONT_SCALING_NONE) && advance)
-        _kernings[{ g0.index, g1.index }] = advance * _scale;
-    }
-  }
-  if (_kernings.empty())
-    log::warn("{} not have kerning", name);
 }
 
 auto Font::contain(uint32_t glyph) -> bool

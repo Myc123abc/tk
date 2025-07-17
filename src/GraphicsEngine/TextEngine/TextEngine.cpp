@@ -1,6 +1,5 @@
 #include "tk/GraphicsEngine/TextEngine/TextEngine.hpp"
 #include "tk/ErrorHandling.hpp"
-#include "tk/util.hpp"
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
 
 
@@ -9,6 +8,36 @@ TODO:
   add multiple fonts, move load font to example.cpp. (use charset overlap percent to choose charset for per font)
   dynamic load unloaded glyph, update atlas image descriptor for sdf fragment to location uv to right atlas
 */
+
+namespace
+{
+
+auto to_unicode(std::string_view str) -> std::pair<uint32_t, uint32_t>
+{
+  assert(!str.empty());
+  uint8_t ch = str[0];
+  if (ch < 0x80)
+    return { ch, 1 };
+  else if ((ch & 0xE0) == 0xC0)
+  {
+    assert(str.size() > 1);
+    return { (ch & 0x1F) << 6 | (str[1] & 0x3F), 2 };
+  }
+  else if ((ch & 0xF0) == 0xE0)
+  {
+    assert(str.size() > 2);
+    return { (ch & 0x0F) << 12 | (str[1] & 0x3F) << 6 | (str[2] & 0x3F), 3 };
+  }
+  else if ((ch & 0xF8) == 0xF0)
+  {
+    assert(str.size() > 3);
+    return { (str[0] & 0x07) << 18 | (str[1] & 0x3F) << 12 | (str[2] & 0x3F) << 6 | (str[3] & 0x3F), 4 };
+  }
+  assert(true);
+  return {};
+}
+
+}
 
 namespace tk { namespace graphics_engine {
 
@@ -56,56 +85,20 @@ auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float s
   // FIXME: tmp
   auto& font = _fonts.back();
 
-  hb_buffer_reset(_hb_buffer);
-  hb_buffer_add_utf8(_hb_buffer, text.data(), -1, 0, -1);
-  hb_buffer_guess_segment_properties(_hb_buffer);
-  hb_shape(font.hb_font, _hb_buffer, nullptr, 0);
-
-  auto hb_len  = hb_buffer_get_length(_hb_buffer);
-  auto hb_info = hb_buffer_get_glyph_infos(_hb_buffer, nullptr);
-  auto hb_pos  = hb_buffer_get_glyph_positions(_hb_buffer, nullptr);
-
-  printf ("Raw buffer contents:\n");
-  for (unsigned int i = 0; i < hb_len; i++)
-  {
-    hb_codepoint_t gid   = hb_info[i].codepoint;
-    unsigned int cluster = hb_info[i].cluster;
-    double x_advance = hb_pos[i].x_advance / 64.;
-    double y_advance = hb_pos[i].y_advance / 64.;
-    double x_offset  = hb_pos[i].x_offset / 64.;
-    double y_offset  = hb_pos[i].y_offset / 64.;
-
-    char glyphname[32];
-    hb_font_get_glyph_name (font.hb_font, gid, glyphname, sizeof (glyphname));
-
-    printf ("glyph='%s'	cluster=%d	advance=(%g,%g)	offset=(%g,%g)\n",
-            glyphname, cluster, x_advance, y_advance, x_offset, y_offset);
-  }
 
   glm::vec2 text_min{ FLT_MAX }, text_max{};
 
   auto move     = glm::vec2(0, font.metrics.ascenderY);
   auto position = pos;
-  auto u32str   = util::to_u32string(text);
-
+  auto scale    = size / Font::Font_Size;
   static auto invalid_ch = '?';
 
-  for (auto i = 0; i < u32str.size(); ++i, idx += 4)
+  auto info = process_text(text);
+  for (auto i = 0; i < info.text.size(); ++i, idx += 4)
   {
-    auto ch    = static_cast<uint32_t>(u32str[i]);
-    auto glyph = font.geometry.getGlyph(ch);
+    auto glyph = font.geometry.getGlyph(info.text[i]);
     if (glyph == nullptr)
-    {
-      if (load_unloaded_glyph(ch)) // TODO: also do on next_ch
-      {
-        
-      }
-      else
-      {
-        ch    = invalid_ch;
-        glyph = font.geometry.getGlyph(invalid_ch);
-      }
-    }
+      glyph = font.geometry.getGlyph(invalid_ch);
 
     double al, ab, ar, at;
     glyph->getQuadAtlasBounds(al, ab, ar, at);
@@ -120,18 +113,6 @@ auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float s
     max *= size;
     min += position;
     max += position;
-
-    if (i < u32str.size() - 1)
-    {
-      double advance;
-      auto next_ch    = static_cast<uint32_t>(u32str[i + 1]);
-      auto next_glyph = font.geometry.getGlyph(next_ch);
-      if (next_glyph == nullptr)
-        next_ch = invalid_ch;
-      throw_if(font.geometry.getAdvance(advance, ch, next_ch) == false,
-               "failed to get advance between {} and {}", ch, next_ch);
-      position.x += advance * size;
-    }
 
     al /= font.atlas_extent.x;
     ab /= font.atlas_extent.y;
@@ -159,7 +140,7 @@ auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float s
 
     //if (i == 0)
     //  text_min.x = italic_p2.x;
-    if (i == u32str.size() - 1)
+    if (i == info.text.size() - 1)
       text_max.x = italic_p1.x;
     //text_min.y = std::min(text_min.y, italic_p0.y);
     //text_max.y = std::max(text_max.y, italic_p2.y);
@@ -185,9 +166,73 @@ auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float s
       static_cast<uint16_t>(idx + 0), static_cast<uint16_t>(idx + 1), static_cast<uint16_t>(idx + 2),
       static_cast<uint16_t>(idx + 2), static_cast<uint16_t>(idx + 1), static_cast<uint16_t>(idx + 3),
     });
+
+    position += info.advances[i] * scale;
   }
 
   return { pos, { text_max.x, font.metrics.lineHeight * size + pos.y } };
+}
+
+/*
+ * 1. find which font can handle which characters
+ * 2. if the character can be handle with the font, but not be loaded,
+ *    load it and store in dynamic atlas
+ * 3. if the character not in any charset of fonts, replace it to '?'
+ */
+auto TextEngine::process_text(std::string_view text) -> TextInfo
+{
+  // cache raw str with text info
+  // text info has replaced text
+  // and other text info
+  auto res = _cached_texts.try_emplace(std::string(text));
+  if (res.second == false)
+  {
+    // TODO: return text info
+  }
+  else
+  { 
+    // replace unloaded glyph to ?
+    // change text to unicode text
+    // and iterate every unicode
+    // if not have charset of font contain it
+    // replace to ?
+    auto& info = res.first->second;
+    for (auto i = 0; i < text.size();)
+    {
+      auto pair = to_unicode(text.data() + i);
+
+      //auto script = hb_unicode_script(hb_unicode_funcs_get_default(), pair.first);
+
+      // TODO: 1.
+      auto& font = _fonts.back();
+
+      // TODO: 2.
+      // FIXME: discard msdf-atlas-gen
+
+      // get string replaced invalied glyph
+      if (font.geometry.getGlyph(pair.first) == nullptr)
+        info.text += '?';
+      else
+        info.text += pair.first;
+
+      i += pair.second;
+    }
+
+    // it should be some subtext for different font
+    auto& font = _fonts.back();
+    hb_buffer_reset(_hb_buffer);
+    hb_buffer_add_utf8(_hb_buffer, info.text.data(), -1, 0, -1);
+    hb_buffer_guess_segment_properties(_hb_buffer);
+    hb_shape(font.hb_font, _hb_buffer, nullptr, 0);
+
+    auto length      = hb_buffer_get_length(_hb_buffer);
+    auto glyph_infos = hb_buffer_get_glyph_infos(_hb_buffer, nullptr);
+    auto positions   = hb_buffer_get_glyph_positions(_hb_buffer, nullptr);
+    info.advances.reserve(length);
+    for (auto i = 0; i < length; ++i)
+      info.advances.emplace_back(positions[i].x_advance / 64, positions->y_advance / 64.);
+  }
+  return res.first->second;
 }
 
 }}
