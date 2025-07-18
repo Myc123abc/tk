@@ -85,7 +85,6 @@ auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float s
   // FIXME: tmp
   auto& font = _fonts.back();
 
-
   glm::vec2 text_min{ FLT_MAX }, text_max{};
 
   auto move     = glm::vec2(0, font.metrics.ascenderY);

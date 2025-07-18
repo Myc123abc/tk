@@ -163,9 +163,9 @@ void main()
   {
     vec4  mtsdf = texture(font_atlas, uv);
     float d     = median(mtsdf.r, mtsdf.g, mtsdf.b) + GetBold(local_offset);
-    //float d_sdf = mtsdf.a;
+
     // reference: https://www.redblobgames.com/x/2404-distance-field-effects/
-    //d_msdf = min(d_msdf, d_sdf + 0.1); // HACK: to fix glitch in msdf near edges
+    //d = min(d, mtsdf.a + 0.1); // HACK: to fix glitch in msdf near edges
 
     vec4 inner_color = GetInnerColor(local_offset);
     vec4 outer_color = GetOuterColor(local_offset);

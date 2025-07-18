@@ -263,12 +263,11 @@ void Font::load_charset()
 
       // load glyph
       Glyph glyph;
-      throw_if(!msdfgen::loadGlyph(glyph.shape, handle, index, msdfgen::FONT_SCALING_NONE, &glyph.advance) &&
+      throw_if(!msdfgen::loadGlyph(glyph.shape, handle, index, msdfgen::FONT_SCALING_NONE, nullptr) &&
                glyph.shape.validate(),
                "failed to load glyph (unicode : {})", i);
       glyph.codepoint = i;
       glyph.index     = index.getIndex();
-      glyph.advance  *= _scale;
       glyph.shape.normalize();
       glyph.bounds    = glyph.shape.getBounds();
 

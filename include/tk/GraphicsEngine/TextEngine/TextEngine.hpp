@@ -26,7 +26,6 @@ struct Glyph
   uint32_t               index{}; // TODO: is it useful?
   msdfgen::Shape         shape;
   msdfgen::Shape::Bounds bounds;
-  double                 advance{};
 };
 
 class TextEngine;

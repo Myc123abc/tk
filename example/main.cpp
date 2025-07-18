@@ -112,7 +112,8 @@ void render()
     ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ progress, 3 }, 0x0000FFFF );
 
     //auto r1 = ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", { 0, 50 }, 120, 0x000000ff, false, false, 0xff0000ff);
-    auto r2 = ui::text("中日E", { 0, 50 }, 120, 0xffffffff, false, false);
+    auto r1 = ui::text("abcdefghijklmnopqrstuvwxyz", { 0, 0 }, 120, 0xffffffff, false, false);
+    auto r2 = ui::text("abcdefghijklmnopqrstuvwxyz", { 0, r1.second.y }, 120, 0xffffffff, true, false);
     //ui::rectangle(r1.first, r1.second, 0xff0000ff, 3);
     //ui::rectangle(r2.first, r2.second, 0x00ff00ff, 3);
 
