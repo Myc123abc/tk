@@ -24,8 +24,6 @@ public:
   auto init(FT_Library ft, std::filesystem::path const& path) ->Bitmap;
   void destroy() const noexcept;
 
-  auto contain(uint32_t glyph) -> bool;
-
   inline static constexpr auto Font_Size{ 32 };
 
 private:
@@ -33,19 +31,26 @@ private:
 
   void load_font(FT_Library ft);
   void load_metrics();
+  auto get_charset() -> msdf_atlas::Charset;
+  void load_glyphs();
+
+  auto generate_atlas_cache(std::string_view filename) -> Bitmap;
+  void write_cache_file(msdfgen::BitmapConstRef<float, 4> bitmap, std::string_view filename);
+  auto read_cache_file(std::string_view filename) -> Bitmap;
 
 public:
-  std::string                                name;
-  FT_Face                                    face{};
-  msdfgen::FontHandle*                       handle{};
-  msdfgen::FontMetrics                       metrics;
-  std::vector<std::pair<uint32_t, uint32_t>> loaded_charset;
-  
-  hb_font_t*                                 hb_font{};
+  std::string          name;
+  FT_Face              face{};
+  msdfgen::FontHandle* handle{};
+  msdfgen::FontMetrics metrics;
+  hb_font_t*           hb_font{};
 
-  msdf_atlas::FontGeometry                   geometry;
-  std::vector<msdf_atlas::GlyphGeometry>     glyph_geos;
-  glm::vec2                                  atlas_extent{};
+  struct alignas(8) Glyph
+  {
+    double al{}, ab{}, ar{}, at{};
+    double pl{}, pb{}, pr{}, pt{};
+  };
+  std::unordered_map<char32_t, Glyph> glyphs;
 };
 
 struct Vertex;
@@ -69,7 +74,7 @@ private:
 
   struct TextInfo
   {
-    std::string            text;
+    std::u32string         text;
     std::vector<glm::vec2> advances;
   };
   std::unordered_map<std::string, TextInfo> _cached_texts;

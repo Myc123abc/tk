@@ -1,43 +1,13 @@
 #include "tk/GraphicsEngine/TextEngine/TextEngine.hpp"
 #include "tk/ErrorHandling.hpp"
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
-
+#include "tk/util.hpp"
 
 /*
 TODO:
   add multiple fonts, move load font to example.cpp. (use charset overlap percent to choose charset for per font)
   dynamic load unloaded glyph, update atlas image descriptor for sdf fragment to location uv to right atlas
 */
-
-namespace
-{
-
-auto to_unicode(std::string_view str) -> std::pair<uint32_t, uint32_t>
-{
-  assert(!str.empty());
-  uint8_t ch = str[0];
-  if (ch < 0x80)
-    return { ch, 1 };
-  else if ((ch & 0xE0) == 0xC0)
-  {
-    assert(str.size() > 1);
-    return { (ch & 0x1F) << 6 | (str[1] & 0x3F), 2 };
-  }
-  else if ((ch & 0xF0) == 0xE0)
-  {
-    assert(str.size() > 2);
-    return { (ch & 0x0F) << 12 | (str[1] & 0x3F) << 6 | (str[2] & 0x3F), 3 };
-  }
-  else if ((ch & 0xF8) == 0xF0)
-  {
-    assert(str.size() > 3);
-    return { (str[0] & 0x07) << 18 | (str[1] & 0x3F) << 12 | (str[2] & 0x3F) << 6 | (str[3] & 0x3F), 4 };
-  }
-  assert(true);
-  return {};
-}
-
-}
 
 namespace tk { namespace graphics_engine {
 
@@ -90,33 +60,20 @@ auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float s
   auto move     = glm::vec2(0, font.metrics.ascenderY);
   auto position = pos;
   auto scale    = size / Font::Font_Size;
-  static auto invalid_ch = '?';
 
   auto info = process_text(text);
   for (auto i = 0; i < info.text.size(); ++i, idx += 4)
   {
-    auto glyph = font.geometry.getGlyph(info.text[i]);
-    if (glyph == nullptr)
-      glyph = font.geometry.getGlyph(invalid_ch);
+    auto const glyph = font.glyphs.at(info.text[i]);
 
-    double al, ab, ar, at;
-    glyph->getQuadAtlasBounds(al, ab, ar, at);
-    double pl, pb, pr, pt;
-    glyph->getQuadPlaneBounds(pl, pb, pr, pt);
-
-    auto min = glm::vec2(pl, -pt);
-    auto max = glm::vec2(pr, -pb);
+    auto min = glm::vec2(glyph.pl, -glyph.pt);
+    auto max = glm::vec2(glyph.pr, -glyph.pb);
     min += move;
     max += move;
     min *= size;
     max *= size;
     min += position;
     max += position;
-
-    al /= font.atlas_extent.x;
-    ab /= font.atlas_extent.y;
-    ar /= font.atlas_extent.x;
-    at /= font.atlas_extent.y;
 
     auto p0 = min;
     auto p1 = glm::vec2{ max.x, min.y };
@@ -154,10 +111,10 @@ auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float s
 
     vertices.append_range(std::vector<Vertex>
     {
-      { p0, { al, at }, offset },
-      { p1, { ar, at }, offset },
-      { p2, { al, ab }, offset },
-      { p3, { ar, ab }, offset },
+      { p0, { glyph.al, glyph.at }, offset },
+      { p1, { glyph.ar, glyph.at }, offset },
+      { p2, { glyph.al, glyph.ab }, offset },
+      { p3, { glyph.ar, glyph.ab }, offset },
     });
 
     indices.append_range(std::vector<uint16_t>
@@ -198,7 +155,7 @@ auto TextEngine::process_text(std::string_view text) -> TextInfo
     auto& info = res.first->second;
     for (auto i = 0; i < text.size();)
     {
-      auto pair = to_unicode(text.data() + i);
+      auto pair = util::to_utf32(text.data() + i);
 
       //auto script = hb_unicode_script(hb_unicode_funcs_get_default(), pair.first);
 
@@ -209,7 +166,8 @@ auto TextEngine::process_text(std::string_view text) -> TextInfo
       // FIXME: discard msdf-atlas-gen
 
       // get string replaced invalied glyph
-      if (font.geometry.getGlyph(pair.first) == nullptr)
+      if (font.glyphs.find(pair.first) == font.glyphs.end())
+        // TODO: not directly replace to ?, first to check whether have font can dynamic load the glyph
         info.text += '?';
       else
         info.text += pair.first;
@@ -220,7 +178,7 @@ auto TextEngine::process_text(std::string_view text) -> TextInfo
     // it should be some subtext for different font
     auto& font = _fonts.back();
     hb_buffer_reset(_hb_buffer);
-    hb_buffer_add_utf8(_hb_buffer, info.text.data(), -1, 0, -1);
+    hb_buffer_add_utf32(_hb_buffer, reinterpret_cast<uint32_t*>(info.text.data()), info.text.size(), 0, -1);
     hb_buffer_guess_segment_properties(_hb_buffer);
     hb_shape(font.hb_font, _hb_buffer, nullptr, 0);
 

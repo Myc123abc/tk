@@ -156,7 +156,7 @@ void add_text_property(type::shape type, uint32_t inner_color, bool bold, uint32
   auto out_color_r = std::bit_cast<uint32_t>(converted_outer_color.r);
   auto out_color_g = std::bit_cast<type::shape_op>(converted_outer_color.g);
   ctx->shape_properties.emplace_back(type, to_vec4(inner_color), out_color_r, out_color_g);
-  auto values = std::vector<float>{ converted_outer_color.b, converted_outer_color.a, bold ? 0.5f : 0.f };
+  auto values = std::vector<float>{ converted_outer_color.b, converted_outer_color.a, bold ? .5f : 0.f };
   ctx->shape_properties.back().values.append_range(values);
   ctx->shape_offset += ShapeProperty::header_field_count + values.size();
 }

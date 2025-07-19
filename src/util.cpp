@@ -2,6 +2,7 @@
 #include "tk/ErrorHandling.hpp"
 
 #include <fstream>
+#include <algorithm>
 
 namespace tk { namespace util {
 
@@ -35,6 +36,38 @@ auto lerp(std::vector<glm::vec2> const& a, std::vector<glm::vec2> const& b, floa
   res.reserve(a.size());
   for (auto i = 0; i < a.size(); ++i)
     res.emplace_back(lerp(a[i], b[i], t));
+  return res;
+}
+
+auto to_utf32(std::string_view str) -> std::pair<uint32_t, uint32_t>
+{
+  assert(!str.empty());
+  uint8_t ch = str[0];
+  if (ch < 0x80)
+    return { ch, 1 };
+  else if ((ch & 0xE0) == 0xC0)
+  {
+    assert(str.size() > 1);
+    return { (ch & 0x1F) << 6 | (str[1] & 0x3F), 2 };
+  }
+  else if ((ch & 0xF0) == 0xE0)
+  {
+    assert(str.size() > 2);
+    return { (ch & 0x0F) << 12 | (str[1] & 0x3F) << 6 | (str[2] & 0x3F), 3 };
+  }
+  else if ((ch & 0xF8) == 0xF0)
+  {
+    assert(str.size() > 3);
+    return { (str[0] & 0x07) << 18 | (str[1] & 0x3F) << 12 | (str[2] & 0x3F) << 6 | (str[3] & 0x3F), 4 };
+  }
+  assert(true);
+  return {};
+}
+
+auto to_lower(std::string_view str) -> std::string
+{
+  std::string res(str.size(), '\0');
+  std::transform(str.begin(), str.end(), res.begin(), [](auto ch) { return std::tolower(ch); });
   return res;
 }
 

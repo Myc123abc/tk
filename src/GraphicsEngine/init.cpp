@@ -482,7 +482,7 @@ void GraphicsEngine::create_sampler()
 // TODO: how to pre load multiple fonts
 void GraphicsEngine::load_font()
 {
-  auto path = "resources/NotoSans-Regular.ttf";
+  auto path = "resources/NotoSansJP-Regular.ttf";
 
   auto bitmap = _text_engine.load_font(path);
 
