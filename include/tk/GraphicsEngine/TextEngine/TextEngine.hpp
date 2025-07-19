@@ -18,17 +18,6 @@ struct Bitmap
   uint32_t           height{};
 };
 
-struct Vertex;
-
-struct Glyph
-{
-  uint32_t               codepoint{};
-  uint32_t               index{}; // TODO: is it useful?
-  msdfgen::Shape         shape;
-  msdfgen::Shape::Bounds bounds;
-};
-
-class TextEngine;
 class Font
 {
 public:
@@ -37,15 +26,13 @@ public:
 
   auto contain(uint32_t glyph) -> bool;
 
-  inline static constexpr auto Default_Font_Units_Per_EM{ 2048.0 };
   inline static constexpr auto Font_Size{ 32 };
 
 private:
+  inline static constexpr auto Default_Font_Units_Per_EM{ 2048.0 };
+
   void load_font(FT_Library ft);
   void load_metrics();
-  void load_charset();
-
-  double _scale{};
 
 public:
   std::string                                name;
@@ -53,16 +40,15 @@ public:
   msdfgen::FontHandle*                       handle{};
   msdfgen::FontMetrics                       metrics;
   std::vector<std::pair<uint32_t, uint32_t>> loaded_charset;
-  std::vector<Glyph>                         glyphs; // TODO: should I use map?
   
   hb_font_t*                                 hb_font{};
 
-  // FIXME: discard
   msdf_atlas::FontGeometry                   geometry;
   std::vector<msdf_atlas::GlyphGeometry>     glyph_geos;
   glm::vec2                                  atlas_extent{};
 };
 
+struct Vertex;
 class TextEngine
 {
 public:
