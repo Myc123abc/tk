@@ -25,8 +25,7 @@ public:
   void destroy() const noexcept;
 
   inline static constexpr auto Font_Size{ 32 };
-  inline static constexpr auto Range{ 2.0 / Font::Font_Size };
-
+  
 private:
   void load_font(FT_Library ft);
   void load_metrics();
@@ -43,6 +42,8 @@ public:
   msdfgen::FontHandle* handle{};
   msdfgen::FontMetrics metrics;
   hb_font_t*           hb_font{};
+  double               scale{};
+  double               range{ 2.0 / Font::Font_Size };
 
   struct alignas(8) Glyph
   {

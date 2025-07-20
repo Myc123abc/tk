@@ -291,13 +291,14 @@ void Font::load_metrics()
 {
   throw_if(!msdfgen::getFontMetrics(metrics, handle, msdfgen::FONT_SCALING_NONE), 
            "failed to load metrics of {}", name);
-  auto scale = 1.0 / metrics.emSize;
-  metrics.emSize             *= scale;
+  range *= metrics.emSize;
+  scale = 1.0 / metrics.emSize;
   metrics.ascenderY          *= scale;
   metrics.descenderY         *= scale;
   metrics.lineHeight         *= scale;
   metrics.underlineY         *= scale;
   metrics.underlineThickness *= scale;
+  scale *= Font_Size;
 }
 
 auto Font::get_charset() -> msdf_atlas::Charset

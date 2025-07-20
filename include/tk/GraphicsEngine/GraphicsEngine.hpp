@@ -194,7 +194,7 @@ namespace tk { namespace graphics_engine {
     Image     _font_atlas_image; // TODO: expand multi-font-atlases
     Buffer    _font_atlas_buffer; // TODO: upload buffer shuold be shared
     void load_font();
-    inline static constexpr auto Font_Atlas_Width{ 32 * 2 };
-    inline static constexpr auto Font_Atlas_Height{ 32 * 1 };
+    inline static constexpr auto Font_Atlas_Width{ 1024 };
+    inline static constexpr auto Font_Atlas_Height{ 1024 };
   };
 }}

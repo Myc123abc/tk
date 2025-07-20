@@ -170,23 +170,21 @@ auto TextEngine::process_text(std::string_view text) -> TextInfo
       if (font.glyphs.find(pair.first) == font.glyphs.end())
       {
         msdfgen::Shape shape;
-        if (msdfgen::loadGlyph(shape, font.handle, pair.first, msdfgen::FONT_SCALING_EM_NORMALIZED))
+        if (msdfgen::loadGlyph(shape, font.handle, pair.first, msdfgen::FONT_SCALING_NONE))
         {
           shape.normalize();
           shape.inverseYAxis = true;
 
-          auto bounds = shape.getBounds(Font::Range);
+          auto bounds = shape.getBounds(font.range);
           glm::vec2 extent{ bounds.r - bounds.l, bounds.t - bounds.b };
           
-          auto big_one = std::max(extent.x, extent.y);
-          auto scale{ Font::Font_Size / big_one };
-          extent *= scale;
+          extent *= font.scale;
           extent.x = floor(extent.x);
           extent.y = floor(extent.y);
 
           msdfgen::edgeColoringInkTrap(shape, 3.0);
           msdfgen::Bitmap<float, 4> bitmap(extent.x, extent.y);
-          msdfgen::generateMTSDF(bitmap, shape, Font::Range, scale, { -bounds.l, -bounds.b });
+          msdfgen::generateMTSDF(bitmap, shape, font.range, font.scale, { -bounds.l, -bounds.b });
 
           auto pos    = _engine->get_atlas_glyph_pos();
           glm::vec4 a = { pos.x, pos.y + extent.y, pos.x + extent.x, pos.y };
@@ -199,7 +197,11 @@ auto TextEngine::process_text(std::string_view text) -> TextInfo
           // TODO: change to upload all unloaded glyphs in this frame
           _engine->upload_glyph(bitmap);
 
-          font.glyphs.emplace(pair.first, Font::Glyph{ a.x, a.y, a.z, a.w, bounds.l / big_one, bounds.b / big_one, bounds.r / big_one, bounds.t / big_one });
+          bounds.l /= font.metrics.emSize;
+          bounds.b /= font.metrics.emSize;
+          bounds.r /= font.metrics.emSize;
+          bounds.t /= font.metrics.emSize;
+          font.glyphs.emplace(pair.first, Font::Glyph{ a.x, a.y, a.z, a.w, bounds.l, bounds.b, bounds.r, bounds.t });
 
           info.text += pair.first;
         }
