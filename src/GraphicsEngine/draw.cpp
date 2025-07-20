@@ -246,4 +246,20 @@ auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 const& pos, flo
   return _text_engine.parse_text(text, pos, size, italic, vertices, indices, offset, idx);
 }
 
+void GraphicsEngine::upload_glyph(msdfgen::BitmapConstRef<float, 4> bitmap)
+{
+  auto byte_size = bitmap.height * bitmap.width * 4 * 4;
+  // TODO: don't repeatly upload loaded glyphs
+  _font_atlas_buffer.append(bitmap.pixels, byte_size);
+  auto cmd = _command_pool.create_command().begin();
+  copy(cmd, _font_atlas_buffer, 0, _font_atlas_image, {}, { (uint32_t)bitmap.width, (uint32_t)bitmap.height });
+  _font_atlas_image.set_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  cmd.end().submit_wait_free(_command_pool, _graphics_queue);
+
+  // TODO: just get single glyph's pos info
+  static glm::vec2 pos{};
+  pos.x += bitmap.width;
+  throw_if(pos.x > Font_Atlas_Width, "todo: newline for extre glyph");
+}
+
 }}

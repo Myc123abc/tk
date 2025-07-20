@@ -314,7 +314,7 @@ void union_end(uint32_t color, uint32_t thickness)
 
 auto text(std::string_view text, glm::vec2 const& pos, float size, uint32_t inner_color, bool italic, bool bold, uint32_t outer_color) -> std::pair<glm::vec2, glm::vec2>
 {
-  auto ctx    = get_ctx();
+  auto ctx = get_ctx();
   assert(ctx->begining && ctx->path_begining == false && ctx->union_start == false);
   auto extent = ctx->engine->parse_text(text, pos, size, italic, ctx->vertices, ctx->indices, ctx->shape_offset, ctx->index);
   add_text_property(type::shape::glyph, inner_color, bold, outer_color);

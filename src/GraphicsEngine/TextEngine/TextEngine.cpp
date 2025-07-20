@@ -11,7 +11,8 @@ TODO:
 
 namespace tk { namespace graphics_engine {
 
-TextEngine::TextEngine()
+TextEngine::TextEngine(GraphicsEngine* engine)
+  : _engine(engine)
 {
   throw_if(FT_Init_FreeType(&_ft), "failed to init freetype library");
   _hb_buffer = hb_buffer_create();
@@ -167,8 +168,47 @@ auto TextEngine::process_text(std::string_view text) -> TextInfo
 
       // get string replaced invalied glyph
       if (font.glyphs.find(pair.first) == font.glyphs.end())
-        // TODO: not directly replace to ?, first to check whether have font can dynamic load the glyph
-        info.text += '?';
+      {
+        msdfgen::Shape shape;
+        if (msdfgen::loadGlyph(shape, font.handle, pair.first, msdfgen::FONT_SCALING_EM_NORMALIZED))
+        {
+          shape.normalize();
+          shape.inverseYAxis = true;
+
+          auto bounds = shape.getBounds(Font::Range);
+          glm::vec2 extent{ bounds.r - bounds.l, bounds.t - bounds.b };
+          
+          auto big_one = std::max(extent.x, extent.y);
+          auto scale{ Font::Font_Size / big_one };
+          extent *= scale;
+          extent.x = floor(extent.x);
+          extent.y = floor(extent.y);
+
+          msdfgen::edgeColoringInkTrap(shape, 3.0);
+          msdfgen::Bitmap<float, 4> bitmap(extent.x, extent.y);
+          msdfgen::generateMTSDF(bitmap, shape, Font::Range, scale, { -bounds.l, -bounds.b });
+
+          auto pos    = _engine->get_atlas_glyph_pos();
+          glm::vec4 a = { pos.x, pos.y + extent.y, pos.x + extent.x, pos.y };
+          auto altas_extent = GraphicsEngine::get_atlas_extent();
+          a.x /= altas_extent.x;
+          a.y /= altas_extent.y;
+          a.z /= altas_extent.x;
+          a.w /= altas_extent.y;
+
+          // TODO: change to upload all unloaded glyphs in this frame
+          _engine->upload_glyph(bitmap);
+
+          font.glyphs.emplace(pair.first, Font::Glyph{ a.x, a.y, a.z, a.w, bounds.l / big_one, bounds.b / big_one, bounds.r / big_one, bounds.t / big_one });
+
+          info.text += pair.first;
+        }
+        else
+        {
+          // TODO: not directly replace to ?, first to check whether have font can dynamic load the glyph
+          info.text += '?'; // TODO: use my unique invalid symbol avoid font not have ? glyph
+        }
+      }
       else
         info.text += pair.first;
 

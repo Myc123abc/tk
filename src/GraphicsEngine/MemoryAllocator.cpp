@@ -291,6 +291,35 @@ void copy(Command const& cmd, Buffer const& src, Image& dst)
   vkCmdCopyBufferToImage2(cmd, &info);
 }
 
+void copy(Command const& cmd, Buffer const& src, uint32_t buffer_offset, Image& dst, VkOffset2D image_offset, VkExtent2D extent)
+{
+  dst.set_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  VkBufferImageCopy2 region
+  {
+    .sType             = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
+    .bufferOffset      = buffer_offset,
+    .bufferRowLength   = extent.width,
+    .bufferImageHeight = extent.height,
+    .imageSubresource  =
+    {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .layerCount = 1,
+    },
+    .imageOffset = { image_offset.x, image_offset.y, 0 },
+    .imageExtent = { extent.width,   extent.height,  1 },
+  };
+  VkCopyBufferToImageInfo2 info
+  {
+    .sType          = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2,
+    .srcBuffer      = src.handle(),
+    .dstImage       = dst.handle(),
+    .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    .regionCount    = 1,
+    .pRegions       = &region,
+  };
+  vkCmdCopyBufferToImage2(cmd, &info);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //                              Memory Allocator
 ////////////////////////////////////////////////////////////////////////////////

@@ -25,10 +25,9 @@ public:
   void destroy() const noexcept;
 
   inline static constexpr auto Font_Size{ 32 };
+  inline static constexpr auto Range{ 2.0 / Font::Font_Size };
 
 private:
-  inline static constexpr auto Default_Font_Units_Per_EM{ 2048.0 };
-
   void load_font(FT_Library ft);
   void load_metrics();
   auto get_charset() -> msdf_atlas::Charset;
@@ -54,10 +53,11 @@ public:
 };
 
 struct Vertex;
+class GraphicsEngine;
 class TextEngine
 {
 public:
-  TextEngine();
+  TextEngine(GraphicsEngine* engine);
   ~TextEngine();
 
   auto load_font(std::filesystem::path const& path) -> Bitmap;
@@ -80,6 +80,7 @@ private:
   std::unordered_map<std::string, TextInfo> _cached_texts;
 
 private:
+  GraphicsEngine*   _engine{};
   FT_Library        _ft{};
   std::vector<Font> _fonts{};
   hb_buffer_t*      _hb_buffer{};

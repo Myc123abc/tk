@@ -482,12 +482,24 @@ void GraphicsEngine::create_sampler()
 // TODO: how to pre load multiple fonts
 void GraphicsEngine::load_font()
 {
-  auto path = "resources/NotoSansJP-Regular.ttf";
+  auto path = "resources/NotoSansSC-Regular.ttf";
 
   auto bitmap = _text_engine.load_font(path);
 
+  // FIXME: tmp, use dynamic msdf generate, and should have multiple images
   // create image
-  _font_atlas_image = _mem_alloc.create_image(VK_FORMAT_R32G32B32A32_SFLOAT, { bitmap.width, bitmap.height, 1 }, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+  _font_atlas_image = _mem_alloc.create_image(VK_FORMAT_R32G32B32A32_SFLOAT, { Font_Atlas_Width, Font_Atlas_Height, 1 }, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+  {
+    auto byte_size     = Font_Atlas_Width * Font_Atlas_Height * 4 * 4;
+    _font_atlas_buffer = _mem_alloc.create_buffer(byte_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+  }
+  // destroy resources
+  _destructors.push([&]
+  {
+    _font_atlas_image.destroy();
+    _font_atlas_buffer.destroy();
+  });
+  return;
 
   // upload buffer
   auto byte_size = bitmap.width * bitmap.height * 4 * 4;
@@ -505,12 +517,6 @@ void GraphicsEngine::load_font()
   
   // destroy upload buffer
   buf.destroy();
-
-  // destroy resources
-  _destructors.push([&]
-  {
-    _font_atlas_image.destroy();
-  });
 }
 
 } }

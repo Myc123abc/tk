@@ -165,6 +165,8 @@ void copy(Command const& cmd, Image  const& src, Image const& dst);
  * @param dst image
  */
 void copy(Command const& cmd, Buffer const& src, Image& dst);
+// TODO: make pairs, multiple copy in once call
+void copy(Command const& cmd, Buffer const& src, uint32_t buffer_offset, Image& dst, VkOffset2D image_offset, VkExtent2D extent);
 
   class MemoryAllocator
   {

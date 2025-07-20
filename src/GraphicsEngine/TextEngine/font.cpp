@@ -144,6 +144,9 @@ auto Font::init(FT_Library ft, std::filesystem::path const& path) -> Bitmap
   load_font(ft);  
   load_metrics();
 
+  // dynamic msdf render, not use cached file
+  return {};
+
   auto cache_file = std::format("resources/{}.msdf", path.stem().string());
   if (std::filesystem::exists(cache_file))
     return read_cache_file(cache_file);
@@ -288,12 +291,6 @@ void Font::load_metrics()
 {
   throw_if(!msdfgen::getFontMetrics(metrics, handle, msdfgen::FONT_SCALING_NONE), 
            "failed to load metrics of {}", name);
-  if (metrics.emSize <= 0)
-  {
-    log::warn("emSize of {} is {}, default set to {}", name, metrics.emSize, Default_Font_Units_Per_EM);
-    metrics.emSize = Default_Font_Units_Per_EM;
-  }
-
   auto scale = 1.0 / metrics.emSize;
   metrics.emSize             *= scale;
   metrics.ascenderY          *= scale;
