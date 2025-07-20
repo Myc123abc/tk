@@ -264,54 +264,51 @@ void GraphicsEngine::upload_glyph(std::span<msdfgen::Bitmap<float, 4>> bitmaps)
     auto byte_size = bitmap.height * bitmap.width * 4 * 4;
     _font_atlas_buffer.append(bitmap.pixels, byte_size);
 
+    // get image offset
+    image_offset = { static_cast<int32_t>(_glyph_uvs[idx].x), static_cast<int32_t>(_glyph_uvs[idx].y) };
+    ++idx;
+
     // upload data of buffer to atlas
     copy(cmd, _font_atlas_buffer, buffer_offset, _font_atlas_image, image_offset, { (uint32_t)bitmap.width, (uint32_t)bitmap.height }); 
 
-    // offset
+    // set next buffer offset
     buffer_offset += byte_size;
-    ++idx;
-    image_offset = { static_cast<int32_t>(_glyph_uvs[idx].x), static_cast<int32_t>(_glyph_uvs[idx].y) };
   }
 
   _font_atlas_image.set_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   cmd.end().submit_wait_free(_command_pool, _graphics_queue);
-}
 
-auto GraphicsEngine::get_next_glyph_pos() noexcept -> glm::vec2
-{
   _glyph_uvs.clear();
-  _glyph_uvs.emplace_back(_next_glyph_pos);
-  return _next_glyph_pos;
 }
 
 // TODO:
 // get next glyph position by extent
 // if current atlas is full, create new atlas image and reset glyph position
-auto GraphicsEngine::get_next_glyph_pos(glm::vec2 const& extent) noexcept -> glm::vec2
+auto GraphicsEngine::get_glyph_pos(glm::vec2 const& extent) noexcept -> glm::vec2
 {
-  // get next position
-  auto pos = _next_glyph_pos;
-  pos.x += extent.x;
-
 repeat:
+  // get next position
+  auto max = _glyph_pos + extent;
+
   // directly can store
-  if (pos.x <= Font_Atlas_Width && pos.y + extent.y <= Font_Atlas_Height)
+  if (max.x <= Font_Atlas_Width && max.y <= Font_Atlas_Height)
   {
-    _glyph_uvs.emplace_back(pos);
-    _next_glyph_pos = pos;
+    _glyph_uvs.emplace_back(_glyph_pos);
+    auto origin = _glyph_pos;
+    _glyph_pos.x = max.x;
     // update max height of glyph on current line
     _max_glyph_height = std::max(_max_glyph_height, extent.y);
-    return _next_glyph_pos;
+    return origin;
   }
-  else if (pos.x > Font_Atlas_Width)
+  else if (max.x > Font_Atlas_Width)
   {
     // move to next line
-    pos.x = 0;
-    pos.y += _max_glyph_height;
+    _glyph_pos.x = 0;
+    _glyph_pos.y += _max_glyph_height;
     _max_glyph_height = 0;
     goto repeat;
   }
-  else if (pos.y + extent.y > Font_Atlas_Height)
+  else if (max.y > Font_Atlas_Height)
   {
     throw_if(true, "TODO: signel font altas image is full, create new one");
     goto repeat;

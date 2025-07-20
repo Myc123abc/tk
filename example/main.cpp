@@ -96,7 +96,10 @@ void render()
     ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ 100, 3 }, 0x808080FF );
     ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ progress, 3 }, 0x0000FFFF );
 
-    ui::text("abav骢bassd", { 0, 0 }, 120, 0xffffffff, false, false);
+    // TODO: space, invalid character, cache, mulitple atlases, multiple fonts
+    auto r1 = ui::text("あ", { 0, 0 }, 120, 0xffffffff, false, false);
+    //auto r1 = ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", { 0, 0 }, 120, 0xffffffff, false, false);
+    //ui::text("abcdefghijklmnopqrstuvwxyz", { 0, r1.second.y }, 120, 0xffffffff, false, false);
     //auto r1 = ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", { 0, 50 }, 120, 0x000000ff, false, false, 0xff0000ff);
     //auto r1 = ui::text("aaa きゃあ我是谁？XX骢 cas", { 0, 0 }, 120, 0xffffffff, false, false);
     //auto r2 = ui::text("aあcdefghijklmnopqrstuvwxyz", { 0, r1.second.y }, 120, 0xffffffff, true, false);

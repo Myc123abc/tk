@@ -488,7 +488,15 @@ void GraphicsEngine::load_font()
 
   // FIXME: tmp, use dynamic msdf generate, and should have multiple images
   // create image
-  _font_atlas_image = _mem_alloc.create_image(VK_FORMAT_R32G32B32A32_SFLOAT, { Font_Atlas_Width, Font_Atlas_Height, 1 }, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+  bool use_msdf_atlas = false;
+  //use_msdf_atlas = true;
+  if (!use_msdf_atlas)
+  {
+    bitmap.width = Font_Atlas_Width;
+    bitmap.height = Font_Atlas_Height;
+  }
+  //_font_atlas_image = _mem_alloc.create_image(VK_FORMAT_R32G32B32A32_SFLOAT, { Font_Atlas_Width, Font_Atlas_Height, 1 }, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+  _font_atlas_image = _mem_alloc.create_image(VK_FORMAT_R32G32B32A32_SFLOAT, { bitmap.width, bitmap.height, 1 }, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
   {
     auto byte_size     = Font_Atlas_Width * Font_Atlas_Height * 4 * 4;
     _font_atlas_buffer = _mem_alloc.create_buffer(byte_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
@@ -499,7 +507,10 @@ void GraphicsEngine::load_font()
     _font_atlas_image.destroy();
     _font_atlas_buffer.destroy();
   });
-  return;
+  if (!use_msdf_atlas)
+  {
+    return;
+  }
 
   // upload buffer
   auto byte_size = bitmap.width * bitmap.height * 4 * 4;

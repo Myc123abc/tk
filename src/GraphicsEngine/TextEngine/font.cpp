@@ -148,8 +148,8 @@ auto Font::init(FT_Library ft, std::filesystem::path const& path) -> Bitmap
   return {};
 
   auto cache_file = std::format("resources/{}.msdf", path.stem().string());
-  if (std::filesystem::exists(cache_file))
-    return read_cache_file(cache_file);
+  //if (std::filesystem::exists(cache_file))
+  //  return read_cache_file(cache_file);
   return generate_atlas_cache(cache_file);
 }
 
@@ -213,6 +213,7 @@ auto Font::generate_atlas_cache(std::string_view filename) -> Bitmap
     glyph.at /= bitmap.height;
     glyphs.emplace(geo.getCodepoint(), glyph);
   }
+  //glyphs.clear();
 
   // write to cache file
   write_cache_file(msdf_bitmap, filename.data());
@@ -292,13 +293,14 @@ void Font::load_metrics()
   throw_if(!msdfgen::getFontMetrics(metrics, handle, msdfgen::FONT_SCALING_NONE), 
            "failed to load metrics of {}", name);
   range *= metrics.emSize;
-  scale = 1.0 / metrics.emSize;
-  metrics.ascenderY          *= scale;
-  metrics.descenderY         *= scale;
-  metrics.lineHeight         *= scale;
-  metrics.underlineY         *= scale;
-  metrics.underlineThickness *= scale;
-  scale *= Font_Size;
+  geo_scale = 1.0 / metrics.emSize;
+  scale = Font_Size / metrics.emSize;
+  metrics.emSize             *= geo_scale;
+  metrics.ascenderY          *= geo_scale;
+  metrics.descenderY         *= geo_scale;
+  metrics.lineHeight         *= geo_scale;
+  metrics.underlineY         *= geo_scale;
+  metrics.underlineThickness *= geo_scale;
 }
 
 auto Font::get_charset() -> msdf_atlas::Charset

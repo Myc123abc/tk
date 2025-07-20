@@ -44,6 +44,7 @@ public:
   hb_font_t*           hb_font{};
   double               scale{};
   double               range{ 2.0 / Font_Size };
+  double               geo_scale{};
 
   struct alignas(8) Glyph
   {
@@ -64,8 +65,6 @@ public:
   auto load_font(std::filesystem::path const& path) -> Bitmap;
 
   auto parse_text(std::string_view text, glm::vec2 const& pos, float size, bool italic, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices, uint32_t offset, uint16_t& idx) -> std::pair<glm::vec2, glm::vec2>;
-
-  auto load_unloaded_glyph(uint32_t glyph) -> bool;
 
   inline auto empty() const noexcept { return _fonts.empty(); }
 
