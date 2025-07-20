@@ -246,20 +246,78 @@ auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 const& pos, flo
   return _text_engine.parse_text(text, pos, size, italic, vertices, indices, offset, idx);
 }
 
-void GraphicsEngine::upload_glyph(msdfgen::BitmapConstRef<float, 4> bitmap)
+void GraphicsEngine::upload_glyph(std::span<msdfgen::Bitmap<float, 4>> bitmaps)
 {
-  auto byte_size = bitmap.height * bitmap.width * 4 * 4;
-  // TODO: don't repeatly upload loaded glyphs
-  _font_atlas_buffer.append(bitmap.pixels, byte_size);
+  if (bitmaps.empty()) return;
+
+  _font_atlas_buffer.clear();
+  uint32_t   buffer_offset{};
+  uint32_t   idx{};
+  VkOffset2D image_offset{ static_cast<int32_t>(_glyph_uvs[idx].x), static_cast<int32_t>(_glyph_uvs[idx].y) };
   auto cmd = _command_pool.create_command().begin();
-  copy(cmd, _font_atlas_buffer, 0, _font_atlas_image, {}, { (uint32_t)bitmap.width, (uint32_t)bitmap.height });
+
+  // TODO: optimization, use tmp cpu buffer of atlas, copy bitmap to tmp buffer with padding, and copy tmp buffer data to atlas image,
+  //       also if tmp buffer data is not a rectangle, split it to mulitple rectangle then upload mulitple times.
+  for (msdfgen::BitmapConstRef<float, 4> bitmap : bitmaps)
+  {
+    // copy bitmap to buffer
+    auto byte_size = bitmap.height * bitmap.width * 4 * 4;
+    _font_atlas_buffer.append(bitmap.pixels, byte_size);
+
+    // upload data of buffer to atlas
+    copy(cmd, _font_atlas_buffer, buffer_offset, _font_atlas_image, image_offset, { (uint32_t)bitmap.width, (uint32_t)bitmap.height }); 
+
+    // offset
+    buffer_offset += byte_size;
+    ++idx;
+    image_offset = { static_cast<int32_t>(_glyph_uvs[idx].x), static_cast<int32_t>(_glyph_uvs[idx].y) };
+  }
+
   _font_atlas_image.set_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   cmd.end().submit_wait_free(_command_pool, _graphics_queue);
+}
 
-  // TODO: just get single glyph's pos info
-  static glm::vec2 pos{};
-  pos.x += bitmap.width;
-  throw_if(pos.x > Font_Atlas_Width, "todo: newline for extre glyph");
+auto GraphicsEngine::get_next_glyph_pos() noexcept -> glm::vec2
+{
+  _glyph_uvs.clear();
+  _glyph_uvs.emplace_back(_next_glyph_pos);
+  return _next_glyph_pos;
+}
+
+// TODO:
+// get next glyph position by extent
+// if current atlas is full, create new atlas image and reset glyph position
+auto GraphicsEngine::get_next_glyph_pos(glm::vec2 const& extent) noexcept -> glm::vec2
+{
+  // get next position
+  auto pos = _next_glyph_pos;
+  pos.x += extent.x;
+
+repeat:
+  // directly can store
+  if (pos.x <= Font_Atlas_Width && pos.y + extent.y <= Font_Atlas_Height)
+  {
+    _glyph_uvs.emplace_back(pos);
+    _next_glyph_pos = pos;
+    // update max height of glyph on current line
+    _max_glyph_height = std::max(_max_glyph_height, extent.y);
+    return _next_glyph_pos;
+  }
+  else if (pos.x > Font_Atlas_Width)
+  {
+    // move to next line
+    pos.x = 0;
+    pos.y += _max_glyph_height;
+    _max_glyph_height = 0;
+    goto repeat;
+  }
+  else if (pos.y + extent.y > Font_Atlas_Height)
+  {
+    throw_if(true, "TODO: signel font altas image is full, create new one");
+    goto repeat;
+  }
+  assert(true);
+  return {};
 }
 
 }}

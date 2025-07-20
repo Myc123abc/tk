@@ -88,10 +88,10 @@ namespace tk { namespace graphics_engine {
     void sdf_render_begin();
     void sdf_render(std::span<Vertex> vertices, std::span<uint16_t> indices, std::span<ShapeProperty> shape_properties);
 
-    // TODO: change to upload_glyphs
-    auto get_atlas_glyph_pos() -> glm::vec2 { return {}; }
+    auto get_next_glyph_pos() noexcept -> glm::vec2;
+    auto get_next_glyph_pos(glm::vec2 const& extent) noexcept -> glm::vec2;
     static constexpr auto get_atlas_extent() noexcept -> glm::vec2 { return { Font_Atlas_Width, Font_Atlas_Height }; }
-    void upload_glyph(msdfgen::BitmapConstRef<float, 4> bitmap);
+    void upload_glyph(std::span<msdfgen::Bitmap<float, 4>> bitmaps);
 
   private:
     //
@@ -196,5 +196,8 @@ namespace tk { namespace graphics_engine {
     void load_font();
     inline static constexpr auto Font_Atlas_Width{ 1024 };
     inline static constexpr auto Font_Atlas_Height{ 1024 };
+    glm::vec2 _next_glyph_pos{};
+    float     _max_glyph_height{};
+    std::vector<glm::vec2> _glyph_uvs; // use upload glyphs to atlas TODO: expand to multiple atlases
   };
 }}

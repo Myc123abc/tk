@@ -91,27 +91,12 @@ void render()
     // playback button
     playback_btn.render();
 
-    //ui::polygon({{50, 50}, {100, 75}, {75, 100}}, 0xffffffff);
-
-    //ui::text("H", { 0, 30 }, 26.66, 0xff0000ff);
-    //ui::text("AV", { 5, 30 }, 120, 0xffffffff, false, false, 0xffff00ff);
-
-    ui::union_begin();
-    ui::circle({50, 50}, 25);
-    ui::polygon({{0, 0}, {100, 75}, {75, 125}});
-    ui::path_begin();
-    ui::bezier({0,25}, {75,50}, {0, 75});
-    ui::line({0,75},  {0, 25});
-    ui::path_end();
-    ui::circle({75, 75}, 25);
-    ui::union_end(0xffff00ff, 1);
-
     // playback progress
     auto playback_progree_pos = playback_pos1 + glm::vec2(5, 0);
     ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ 100, 3 }, 0x808080FF );
     ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ progress, 3 }, 0x0000FFFF );
 
-    ui::text("骢", { 0, 0 }, 120, 0xffffffff);
+    ui::text("abav骢bassd", { 0, 0 }, 120, 0xffffffff, false, false);
     //auto r1 = ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", { 0, 50 }, 120, 0x000000ff, false, false, 0xff0000ff);
     //auto r1 = ui::text("aaa きゃあ我是谁？XX骢 cas", { 0, 0 }, 120, 0xffffffff, false, false);
     //auto r2 = ui::text("aあcdefghijklmnopqrstuvwxyz", { 0, r1.second.y }, 120, 0xffffffff, true, false);

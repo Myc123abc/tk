@@ -43,7 +43,7 @@ public:
   msdfgen::FontMetrics metrics;
   hb_font_t*           hb_font{};
   double               scale{};
-  double               range{ 2.0 / Font::Font_Size };
+  double               range{ 2.0 / Font_Size };
 
   struct alignas(8) Glyph
   {

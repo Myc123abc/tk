@@ -162,10 +162,12 @@ void main()
   if (GetType(local_offset) == Glyph)
   {
     vec4  mtsdf = texture(font_atlas, uv);
-    float d     = median(mtsdf.r, mtsdf.g, mtsdf.b) + GetBold(local_offset);
+    float d     = median(mtsdf.r, mtsdf.g, mtsdf.b);
 
     // reference: https://www.redblobgames.com/x/2404-distance-field-effects/
     //d = min(d, mtsdf.a + 0.1); // HACK: to fix glitch in msdf near edges
+
+    d += GetBold(local_offset);
 
     vec4 inner_color = GetInnerColor(local_offset);
     vec4 outer_color = GetOuterColor(local_offset);

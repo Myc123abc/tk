@@ -132,8 +132,6 @@ auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float s
 
 /*
  * 1. find which font can handle which characters
- * 2. if the character can be handle with the font, but not be loaded,
- *    load it and store in dynamic atlas
  * 3. if the character not in any charset of fonts, replace it to '?'
  */
 auto TextEngine::process_text(std::string_view text) -> TextInfo
@@ -153,61 +151,70 @@ auto TextEngine::process_text(std::string_view text) -> TextInfo
     // and iterate every unicode
     // if not have charset of font contain it
     // replace to ?
+    std::vector<msdfgen::Bitmap<float, 4>> bitmaps;
+    auto glyph_pos    = _engine->get_next_glyph_pos();
+    auto altas_extent = GraphicsEngine::get_atlas_extent();
+
     auto& info = res.first->second;
     for (auto i = 0; i < text.size();)
     {
       auto pair = util::to_utf32(text.data() + i);
 
-      //auto script = hb_unicode_script(hb_unicode_funcs_get_default(), pair.first);
-
       // TODO: 1.
       auto& font = _fonts.back();
 
-      // TODO: 2.
-      // FIXME: discard msdf-atlas-gen
-
-      // get string replaced invalied glyph
+      // check whether glyph is cached
       if (font.glyphs.find(pair.first) == font.glyphs.end())
       {
+        // not cached, generate glyph msdf bitmap
         msdfgen::Shape shape;
         if (msdfgen::loadGlyph(shape, font.handle, pair.first, msdfgen::FONT_SCALING_NONE))
         {
           shape.normalize();
-          shape.inverseYAxis = true;
+          msdfgen::edgeColoringInkTrap(shape, 3.0);
 
+          // get bounds of glyph and normalize extent
           auto bounds = shape.getBounds(font.range);
           glm::vec2 extent{ bounds.r - bounds.l, bounds.t - bounds.b };
-          
           extent *= font.scale;
           extent.x = floor(extent.x);
           extent.y = floor(extent.y);
 
-          msdfgen::edgeColoringInkTrap(shape, 3.0);
-          msdfgen::Bitmap<float, 4> bitmap(extent.x, extent.y);
-          msdfgen::generateMTSDF(bitmap, shape, font.range, font.scale, { -bounds.l, -bounds.b });
-
-          auto pos    = _engine->get_atlas_glyph_pos();
-          glm::vec4 a = { pos.x, pos.y + extent.y, pos.x + extent.x, pos.y };
-          auto altas_extent = GraphicsEngine::get_atlas_extent();
-          a.x /= altas_extent.x;
-          a.y /= altas_extent.y;
-          a.z /= altas_extent.x;
-          a.w /= altas_extent.y;
-
-          // TODO: change to upload all unloaded glyphs in this frame
-          _engine->upload_glyph(bitmap);
-
+          // store and generate bitmap
+          bitmaps.emplace_back(extent.x, extent.y);
+          msdfgen::generateMTSDF(bitmaps.back(), shape, font.range, font.scale, { -bounds.l, -bounds.b });
+          
+          // get and normalize atlas coordinate
+          glm::vec4 atlas_coord = { glyph_pos.x, glyph_pos.y, glyph_pos.x + extent.x, glyph_pos.y + extent.y };
+          atlas_coord.x += .5;
+          atlas_coord.y += .5;
+          atlas_coord.z -= .5;
+          atlas_coord.w -= .5;
+          atlas_coord.x /= altas_extent.x;
+          atlas_coord.y /= altas_extent.y;
+          atlas_coord.z /= altas_extent.x;
+          atlas_coord.w /= altas_extent.y;
+          // normalize bounds
           bounds.l /= font.metrics.emSize;
           bounds.b /= font.metrics.emSize;
           bounds.r /= font.metrics.emSize;
           bounds.t /= font.metrics.emSize;
-          font.glyphs.emplace(pair.first, Font::Glyph{ a.x, a.y, a.z, a.w, bounds.l, bounds.b, bounds.r, bounds.t });
+          
+          // cache glyph
+          font.glyphs.emplace(pair.first, Font::Glyph{ atlas_coord.x, atlas_coord.y, atlas_coord.z, atlas_coord.w, bounds.l, bounds.b, bounds.r, bounds.t });
 
+          // add glyph to text
           info.text += pair.first;
+
+          // get next glyph position
+          glyph_pos = _engine->get_next_glyph_pos(extent);
         }
         else
         {
-          // TODO: not directly replace to ?, first to check whether have font can dynamic load the glyph
+          // TODO:
+          // glyphs not exist in this font, find next font
+          // if all font not have this glyph, use invalid symbol glyph
+
           info.text += '?'; // TODO: use my unique invalid symbol avoid font not have ? glyph
         }
       }
@@ -216,6 +223,9 @@ auto TextEngine::process_text(std::string_view text) -> TextInfo
 
       i += pair.second;
     }
+
+    // upload unloaded glyphs
+    _engine->upload_glyph(bitmaps);
 
     // it should be some subtext for different font
     auto& font = _fonts.back();
