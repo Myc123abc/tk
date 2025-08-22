@@ -36,8 +36,6 @@ void GraphicsEngine::init(Window& window)
   create_buffer();
   load_font();
   create_sdf_rendering_resource();
-
-  _window->show();
 }
 
 void GraphicsEngine::destroy()

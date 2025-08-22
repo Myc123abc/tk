@@ -92,6 +92,8 @@ namespace tk { namespace graphics_engine {
     static constexpr auto get_atlas_extent() noexcept -> glm::vec2 { return { Font_Atlas_Width, Font_Atlas_Height }; }
     void upload_glyph(std::span<msdfgen::Bitmap<float, 4>> bitmaps);
 
+    void wait_device_complete() const noexcept { vkDeviceWaitIdle(_device); }
+
   private:
     //
     // initialize resources

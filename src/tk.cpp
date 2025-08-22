@@ -41,6 +41,9 @@ void init(std::string_view title, uint32_t width, uint32_t height, std::vector<s
   tk_ctx->window.init(title, width, height);
   tk_ctx->engine.init(tk_ctx->window);
   tk_ctx->window.set_engine(&tk_ctx->engine);
+
+  tk_ctx->window.set_state(type::window::running); // set running to avoid event process always jump the rendering
+                                                   // the first rendered frame will also show the window
   
   // init ui context
   // TODO: currently only use main window for entire ui
@@ -84,6 +87,13 @@ void render()
   engine.render_end();
 
   engine.frame_end();
+
+  static bool is_first_frame = true;
+  if (is_first_frame) {
+    tk_ctx->engine.wait_device_complete();
+    tk_ctx->window.show();
+    is_first_frame = false;
+  }
 }
 
 void destroy()

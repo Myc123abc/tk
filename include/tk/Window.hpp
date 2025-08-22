@@ -49,6 +49,7 @@ public:
 
   void event_process() const noexcept;
 
+  void set_state(type::window state) noexcept { _state = state; }
   auto state() const noexcept { return _state; }
 
   auto get_mouse_position() const noexcept -> glm::vec2;

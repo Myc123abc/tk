@@ -26,6 +26,12 @@ namespace tk
 
   TK_API auto get_window_size() -> glm::vec2;
 
+  /**
+   * must call tk::render after calling this function,
+   * because tk::render render first frame then set window visible.
+   * if not call tk::render, the window will not display and event_process will alway return type::window::running
+   * I do this just for display window the first frame content to avoid the possible temporary blank 
+   */
   TK_API auto event_process() -> type::window;
 
   TK_API void render();
