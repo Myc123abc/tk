@@ -1,274 +1,290 @@
 #include "tk/GraphicsEngine/TextEngine/TextEngine.hpp"
 #include "tk/ErrorHandling.hpp"
-#include "tk/GraphicsEngine/GraphicsEngine.hpp"
-#include "tk/util.hpp"
+#include "missing-glyph-sdf-bitmap.hpp"
+#include "hb-ft.h"
 
 
-/*
-TODO:
-  add multiple fonts, move load font to example.cpp. (use charset overlap percent to choose charset for per font)
-  dynamic load unloaded glyph, update atlas image descriptor for sdf fragment to location uv to right atlas
-*/
+#define check(x, msg) throw_if(x, "[TextEngine] {}", msg)
 
 namespace tk { namespace graphics_engine {
 
-TextEngine::TextEngine(GraphicsEngine* engine)
-  : _engine(engine)
+////////////////////////////////////////////////////////////////////////////////
+///                              Text Engine
+////////////////////////////////////////////////////////////////////////////////
+
+void TextEngine::init(MemoryAllocator& alloc)
 {
-  throw_if(FT_Init_FreeType(&_ft), "failed to init freetype library");
+  // initialize freetype
+  check(FT_Init_FreeType(&_ft), "failed to initialize");
+  
+  // create glyph atlas and buffer
+  _glyph_atlas = alloc.create_image(VK_FORMAT_R8_UNORM, Glyph_Atlas_Width, Glyph_Atlas_Height, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+  _glyph_atlas_buffer = alloc.create_buffer(Glyph_Atlas_Width * Glyph_Atlas_Height, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+
+  // create harffbuzz buffer
   _hb_buffer = hb_buffer_create();
 }
 
-TextEngine::~TextEngine()
+void TextEngine::destroy()
 {
   hb_buffer_destroy(_hb_buffer);
-  for (auto const& font : _fonts)
-    font.destroy();
-  FT_Done_FreeType(_ft);
+  _glyph_atlas_buffer.destroy();
+  _glyph_atlas.destroy();
+  for (auto& font: _fonts)
+    font.destory();
+  check(FT_Done_FreeType(_ft), "failed to destroy");
 }
 
-auto TextEngine::load_font(std::filesystem::path const& path) -> Bitmap
+void TextEngine::preload_glyphs(Command const& cmd)
 {
-  return _fonts.emplace_back(Font()).init(_ft, path);
+  calculate_write_position({ Missing_Glyph_Width, Missing_Glyph_Height });
+  upload_glyph(cmd, Missing_Glyph_Unicode, Missing_Glyph_SDF_Bitmap, { Missing_Glyph_Width, Missing_Glyph_Height }, Missing_Glyph_Left_Offset, Missing_Glyph_Up_Offset);
 }
 
-auto TextEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size, bool italic, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices, uint32_t offset, uint16_t& idx) -> std::pair<glm::vec2, glm::vec2>
+void TextEngine::calculate_write_position(glm::vec2 const& extent)
 {
-  // FIXME: tmp
-  auto& font = _fonts.back();
-
-  glm::vec2 text_min{ FLT_MAX }, text_max{};
-
-  auto move     = glm::vec2(0, font.metrics.ascenderY);
-  auto position = pos;
-  auto scale    = size / Font::Font_Size;
-
-  auto info = process_text(text);
-  for (auto i = 0; i < info.text.size(); ++i, idx += 4)
+  check(extent.x >= Glyph_Atlas_Width || extent.y >= Glyph_Atlas_Height,
+        "too big glyph sdf bitmap, cannot be stored in glyph atlas");
+again:
+  auto write_max_pos = _current_write_position + extent;
+  
+  if (write_max_pos.x < Glyph_Atlas_Width && write_max_pos.y < Glyph_Atlas_Height)
   {
-    auto const glyph = font.glyphs.at(info.text[i]);
+    _write_positions.emplace_back(_current_write_position);
+    _current_write_position.x = write_max_pos.x;
+    _current_line_max_glyph_height = std::max(_current_line_max_glyph_height, extent.y);
+    return;
+  }
+  else if (write_max_pos.x >= Glyph_Atlas_Width)
+  {
+    // move to next line
+    _current_write_position.x = 0;
+    _current_write_position.y += _current_line_max_glyph_height;
+    _current_line_max_glyph_height = {};
+    goto again;
+  }
+  else if (write_max_pos.y >= Glyph_Atlas_Height)
+  {
+    throw_if(true, "TODO: create new glyph atlas");
+    _current_write_position.y = {};
+    goto again;
+  }
+  assert(true);
+}
 
-    auto min = glm::vec2(glyph.pl, -glyph.pt);
-    auto max = glm::vec2(glyph.pr, -glyph.pb);
-    min += move;
-    max += move;
-    min *= size;
-    max *= size;
-    min += position;
-    max += position;
+void TextEngine::upload_glyph(Command const& cmd, uint32_t unicode, uint8_t const* data, glm::vec2 extent, float left_offset, float up_offset)
+{
+  // promise only one glyph to upload and not contain it
+  assert(_write_positions.size() == 1 && !_glyph_infos.contains(unicode));
+  // record glyph information
+  GlyphInfo info(_write_positions[0], extent, left_offset, up_offset);
 
-    auto p0 = min;
-    auto p1 = glm::vec2{ max.x, min.y };
-    auto p2 = glm::vec2{ min.x, max.y };
-    auto p3 = max;
+  // clear buffer
+  _glyph_atlas_buffer.clear();
+  // upload data to buffer
+  _glyph_atlas_buffer.append(data, extent.x * extent.y);
 
-    auto italic_p0 = p0;
-    auto italic_p1 = p1;
-    auto italic_p2 = p2;
-    auto italic_p3 = p3;
+  // copy glyph data from buffer to image
+  copy(cmd, _glyph_atlas_buffer, 0, _glyph_atlas, _write_positions[0], extent);
+  
+  // set image layout for read
+  _glyph_atlas.set_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-    static constexpr auto factor = 0.4;
-    auto italic_offset = italic_p3.y * factor;
-    italic_p0.x -= italic_p0.y * factor;
-    italic_p1.x -= italic_p1.y * factor;
-    italic_p2.x -= italic_p2.y * factor;
-    italic_p0.x += italic_offset;
-    italic_p1.x += italic_offset;
-    italic_p2.x += italic_offset;
+  // clear position information
+  _write_positions.clear();
 
-    //if (i == 0)
-    //  text_min.x = italic_p2.x;
-    if (i == info.text.size() - 1)
-      text_max.x = italic_p1.x;
-    //text_min.y = std::min(text_min.y, italic_p0.y);
-    //text_max.y = std::max(text_max.y, italic_p2.y);
+  // store glyph information
+  _glyph_infos.emplace(unicode, info);
+}
 
-    if (italic)
+void TextEngine::upload_glyphs(Command const& cmd, std::span<SDFBitmap> bitmaps)
+{
+  // consistence between bitmaps size and uv positions size
+  assert(!bitmaps.empty() && bitmaps.size() == _write_positions.size());
+
+  // clear buffer
+  _glyph_atlas_buffer.clear();
+
+  uint32_t buffer_offset{};
+  uint32_t index{};
+  for (auto const& bitmap : bitmaps)
+  {
+    // promise this is an uncached glyph
+    assert(!_glyph_infos.contains(bitmap.unicode));
+
+    auto byte_size = bitmap.extent.x * bitmap.extent.y;
+    
+    // get glyph information
+    GlyphInfo info(_write_positions[index], bitmap.extent, bitmap.left_offset, bitmap.up_offset);
+    // record glyph information
+    _glyph_infos.emplace(bitmap.unicode, info);
+
+    if (bitmap.valid())
     {
-      p0 = italic_p0;
-      p1 = italic_p1;
-      p2 = italic_p2;
-      p3 = italic_p3;
+      // copy glyph data to buffer
+      _glyph_atlas_buffer.append(bitmap.data.data(), byte_size);
+      // copy glyph from buffer to image
+      copy(cmd, _glyph_atlas_buffer, buffer_offset, _glyph_atlas, _write_positions[index], bitmap.extent);
     }
 
-    vertices.append_range(std::vector<Vertex>
-    {
-      { p0, { glyph.al, glyph.at }, offset },
-      { p1, { glyph.ar, glyph.at }, offset },
-      { p2, { glyph.al, glyph.ab }, offset },
-      { p3, { glyph.ar, glyph.ab }, offset },
-    });
-
-    indices.append_range(std::vector<uint16_t>
-    {
-      static_cast<uint16_t>(idx + 0), static_cast<uint16_t>(idx + 1), static_cast<uint16_t>(idx + 2),
-      static_cast<uint16_t>(idx + 2), static_cast<uint16_t>(idx + 1), static_cast<uint16_t>(idx + 3),
-    });
-
-    position += info.advances[i] * scale;
+    // move to next one
+    ++index;
+    buffer_offset += byte_size;
   }
 
-  return { pos, { text_max.x, font.metrics.lineHeight * size + pos.y } };
+  // set image layout for read
+  _glyph_atlas.set_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+  // clear stored uvs
+  _write_positions.clear();
 }
 
-struct Box
+void TextEngine::generate_sdf_bitmaps(Command const& cmd)
 {
-  double         rect_w{};
-  double         rect_h{};
-  msdfgen::Range range{};
-  double         scale{};
-  double         translate_x{};
-  double         translate_y{};
-};
+  // promise need to generate
+  assert(!_wait_generate_sdf_bitmap_glyphs.empty());
 
-auto tryPack(Font const& font, msdfgen::Shape::Bounds const& bounds, msdfgen::Shape const& shape, double scale) -> Box
-{
-  Box box;
-  box.scale = scale * font.geo_scale;
-  box.range = msdfgen::Range{ 2. / scale } / font.geo_scale;;
-  double l = bounds.l, b = bounds.b, r = bounds.r, t = bounds.t;
-  l += box.range.lower, b += box.range.lower;
-  r -= box.range.lower, t -= box.range.lower;
-  shape.boundMiters(l, b, r, t, -box.range.lower, 1, 1);
-  double w = box.scale*(r-l);
-  box.rect_w = (int) ceil(w)+1;
-  box.translate_x = -l+.5*(box.rect_w-w)/box.scale;
-  int sb = (int) floor(box.scale*b-.5);
-  int st = (int) ceil(box.scale*t+.5);
-  box.rect_h = st-sb;
-  box.translate_y = -sb/box.scale;
-  return box;
-}
+  std::vector<SDFBitmap> bitmaps;
+  bitmaps.reserve(_wait_generate_sdf_bitmap_glyphs.size());
+  _write_positions.reserve(_wait_generate_sdf_bitmap_glyphs.size());
 
-/*
- * 1. find which font can handle which characters
- * 3. if the character not in any charset of fonts, replace it to '?'
- */
-auto TextEngine::process_text(std::string_view text) -> TextInfo
-{
-  // cache raw str with text info
-  // text info has replaced text
-  // and other text info
-  auto res = _cached_texts.try_emplace(std::string(text));
-  if (res.second == false)
+  for (auto& [unicode, pair] : _wait_generate_sdf_bitmap_glyphs)
   {
-    // TODO: return text info
+    auto& [font, glyph_index] = pair;
+    // generate sdf bitmaps
+    bitmaps.emplace_back(font.generate_sdf_bitmap(glyph_index, unicode));
+    // calculate every bitmaps position in atlas
+    calculate_write_position(bitmaps.back().extent);
   }
-  else
-  { 
-    // replace unloaded glyph to ?
-    // change text to unicode text
-    // and iterate every unicode
-    // if not have charset of font contain it
-    // replace to ?
-    std::vector<msdfgen::Bitmap<float, 4>> bitmaps;
-    auto altas_extent = GraphicsEngine::get_atlas_extent();
 
-    auto& info = res.first->second;
-    for (auto i = 0; i < text.size();)
+  // upload to atlas
+  upload_glyphs(cmd, bitmaps);
+
+  _wait_generate_sdf_bitmap_glyphs.clear();
+}
+
+void TextEngine::load_font(std::string_view path)
+{
+  for (auto const& font : _fonts)
+    throw_if(font._name == path, "[TextEngine] {} is already exist", path);
+  _fonts.emplace_back(Font::create(_ft, path));
+
+  // TODO: if dynamic add new fonts, remove have missing glyphs' cached text and in next rendering reshaped by hurfbuzz
+}
+
+auto TextEngine::find_glyph(uint32_t unicode) -> std::optional<std::pair<Font, uint32_t>>
+{
+  // promise not generated
+  assert(!_glyph_infos.contains(unicode));
+  for (auto& font : _fonts)
+  {
+    auto glyph_index = font.find_glyph(unicode);
+    if (glyph_index)
     {
-      auto pair = util::to_utf32(text.data() + i);
+      return std::make_pair(font, glyph_index);
+    }
+  }
+  return {};
+}
 
-      // TODO: 1.
-      auto& font = _fonts.back();
+auto TextEngine::get_cached_glyph_info(uint32_t unicode) -> GlyphInfo*
+{
+  // promise cached
+  assert(_glyph_infos.contains(unicode) || _missing_glyphs.contains(unicode));
+  auto it = _glyph_infos.find(unicode);
+  if (it != _glyph_infos.end())
+    return &it->second;
+  return &_glyph_infos.at(Missing_Glyph_Unicode);
+}
 
-      // check whether glyph is cached
-      if (font.glyphs.find(pair.first) == font.glyphs.end())
+auto TextEngine::has_uncached_glyphs(std::u32string_view text) -> bool
+{
+  for (auto const& unicode : text)
+  {
+    if (!_glyph_infos.contains(unicode) && !_missing_glyphs.contains(unicode) && !_wait_generate_sdf_bitmap_glyphs.contains(unicode))
+    {
+      auto res = find_glyph(unicode);
+      if (res)
       {
-        // not cached, generate glyph msdf bitmap
-        msdfgen::Shape shape;
-        if (msdfgen::loadGlyph(shape, font.handle, pair.first, msdfgen::FONT_SCALING_NONE) && shape.validate())
-        {
-          if (shape.contours.empty())
-          {
-            // cache glyph
-            font.glyphs.emplace(pair.first, Font::Glyph{});
-            // add glyph to text
-            info.text += pair.first;
-            continue;
-          }
-
-          shape.normalize();
-          shape.inverseYAxis = true;
-          msdfgen::edgeColoringInkTrap(shape, 3.0);
-
-          // get bounds of glyph and normalize extent
-          auto bounds = shape.getBounds();
-          //glm::vec2 extent{ bounds.r - bounds.l, bounds.t - bounds.b };
-
-          // tryPack
-          auto box = tryPack(font, bounds, shape, Font::Font_Size);
-
-          //extent *= font.scale;
-          //extent.x = floor(extent.x);
-          //extent.y = floor(extent.y);
-
-          // store and generate bitmap
-          bitmaps.emplace_back(box.rect_w, box.rect_h);
-          msdfgen::generateMTSDF(bitmaps.back(), shape, box.range, box.scale, { box.translate_x, box.translate_y });
-          
-          // get and normalize atlas coordinate
-          auto glyph_pos = _engine->get_glyph_pos({ box.rect_w, box.rect_h });
-          //glm::vec4 atlas_coord = { glyph_pos.x, glyph_pos.y + extent.y, glyph_pos.x + extent.x, glyph_pos.y };
-          glm::vec4 atlas_coord{};
-          atlas_coord.x = glyph_pos.x + .5;
-          atlas_coord.y = glyph_pos.y + box.rect_h - .5;
-          atlas_coord.z = glyph_pos.x + box.rect_w - .5;
-          atlas_coord.w = glyph_pos.y + .5;
-          //atlas_coord.x += .5;
-          //atlas_coord.y -= .5;
-          //atlas_coord.z -= .5;
-          //atlas_coord.w += .5;
-          atlas_coord.x /= altas_extent.x;
-          atlas_coord.y /= altas_extent.y;
-          atlas_coord.z /= altas_extent.x;
-          atlas_coord.w /= altas_extent.y;
-          // normalize bounds
-          double invBoxScale = 1/box.scale;
-          bounds.l = font.geo_scale*(-box.translate_x+(+.5)*invBoxScale);
-          bounds.b = font.geo_scale*(-box.translate_y+(+.5)*invBoxScale);
-          bounds.r = font.geo_scale*(-box.translate_x+(+box.rect_w-.5)*invBoxScale);
-          bounds.t = font.geo_scale*(-box.translate_y+(+box.rect_h-.5)*invBoxScale);
-
-          // cache glyph
-          font.glyphs.emplace(pair.first, Font::Glyph{ atlas_coord.x, atlas_coord.y, atlas_coord.z, atlas_coord.w, bounds.l, bounds.b, bounds.r, bounds.t });
-
-          // add glyph to text
-          info.text += pair.first;
-        }
-        else
-        {
-          // TODO:
-          // glyphs not exist in this font, find next font
-          // if all font not have this glyph, use invalid symbol glyph
-
-          info.text += '?'; // TODO: use my unique invalid symbol avoid font not have ? glyph
-        }
+        _wait_generate_sdf_bitmap_glyphs.emplace(unicode, res.value());
       }
       else
-        info.text += pair.first;
-
-      i += pair.second;
+      {
+        _missing_glyphs.emplace(unicode); // TODO: can use for dynamic load font refind missing glyph,
+                                          // and reshape in cached text which have missing glyphs
+      }
     }
-
-    // upload unloaded glyphs
-    _engine->upload_glyph(bitmaps);
-
-    // it should be some subtext for different font
-    auto& font = _fonts.back();
-    hb_buffer_reset(_hb_buffer);
-    hb_buffer_add_utf32(_hb_buffer, reinterpret_cast<uint32_t*>(info.text.data()), info.text.size(), 0, -1);
-    hb_buffer_guess_segment_properties(_hb_buffer);
-    hb_shape(font.hb_font, _hb_buffer, nullptr, 0);
-
-    auto length      = hb_buffer_get_length(_hb_buffer);
-    auto glyph_infos = hb_buffer_get_glyph_infos(_hb_buffer, nullptr);
-    auto positions   = hb_buffer_get_glyph_positions(_hb_buffer, nullptr);
-    info.advances.reserve(length);
-    for (auto i = 0; i < length; ++i)
-      info.advances.emplace_back(positions[i].x_advance / 64, positions->y_advance / 64.);
   }
-  return res.first->second;
+  return !_wait_generate_sdf_bitmap_glyphs.empty();
+}
+
+auto TextEngine::calculate_positions(std::string_view text, glm::vec2 pos, float size) -> std::vector<glm::vec2>
+{
+  if (_cached_text_positions.contains(text.data())) return _cached_text_positions[text.data()];
+
+  hb_buffer_reset(_hb_buffer);
+  // TODO: promise text is same script and direction
+  hb_buffer_add_utf8(_hb_buffer, text.data(), -1, 0, -1);
+  // TODO: use icu or smt or else like suckless's one to set script, direction, language
+  hb_buffer_guess_segment_properties(_hb_buffer);
+  // TODO: select right font to shape
+  hb_shape(_fonts[0]._hb_font, _hb_buffer, nullptr, 0);
+
+  auto scale           = size / Font::Pixel_Size;
+  auto length          = hb_buffer_get_length(_hb_buffer);
+  auto glyph_infos     = hb_buffer_get_glyph_infos(_hb_buffer, nullptr);
+  auto glyph_positions = hb_buffer_get_glyph_positions(_hb_buffer, nullptr);
+  std::vector<glm::vec2> positions;
+  positions.reserve(length);
+  for (auto i = 0; i < length; ++i)
+  {
+    positions.emplace_back(pos);
+    pos.x += static_cast<float>(glyph_positions[i].x_advance) / 64 * scale;
+    pos.y += static_cast<float>(glyph_positions[i].y_advance) / 64 * scale;
+  }
+
+  _cached_text_positions.emplace(text.data(), positions);
+  return positions;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///                                 Font
+////////////////////////////////////////////////////////////////////////////////
+
+auto Font::create(FT_Library ft, std::string_view path) -> Font
+{
+  Font font;
+  font._name = path;
+  check(FT_New_Face(ft, path.data(), 0, &font._face), "failed to load font");
+  check(FT_Set_Pixel_Sizes(font._face, 0, Pixel_Size), "failed to set pixel size");
+  font._hb_font = hb_ft_font_create(font._face, nullptr);
+  return font;
+}
+
+void Font::destory()
+{
+  hb_font_destroy(_hb_font);
+  check(FT_Done_Face(_face), "failed to destroy font");
+}
+
+auto Font::find_glyph(uint32_t unicode) -> uint32_t
+{
+  return FT_Get_Char_Index(_face, unicode);
+}
+
+auto Font::generate_sdf_bitmap(uint32_t glyph_index, uint32_t unicode) -> SDFBitmap
+{
+  assert(glyph_index != 0);
+  check(FT_Load_Glyph(_face, glyph_index, FT_LOAD_RENDER), "failed to load glyph with render");
+  check(FT_Render_Glyph(_face->glyph, FT_RENDER_MODE_SDF), "failed to render sdf bitmap");
+  SDFBitmap bitmap;
+  bitmap.extent      = { _face->glyph->bitmap.width, _face->glyph->bitmap.rows };
+  bitmap.unicode     = unicode;
+  bitmap.left_offset = _face->glyph->bitmap_left;
+  bitmap.up_offset   = -_face->glyph->bitmap_top;
+  bitmap.data.resize(bitmap.extent.x * bitmap.extent.y);
+  memcpy(bitmap.data.data(), _face->glyph->bitmap.buffer, bitmap.data.size());
+  return bitmap;
 }
 
 }}

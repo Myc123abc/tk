@@ -322,6 +322,11 @@ auto Window::get_key(type::key k) noexcept -> type::key_state
   return {};
 }
 
+auto Window::get_dpi() const noexcept -> uint32_t
+{
+  return GetDpiForWindow(_handle);
+}
+
 #endif
 
 }

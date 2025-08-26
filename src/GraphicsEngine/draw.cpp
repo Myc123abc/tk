@@ -5,6 +5,8 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "tk/util.hpp"
+
 
 namespace tk { namespace graphics_engine {
 
@@ -243,77 +245,26 @@ void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> 
 
 auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size, bool italic, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices, uint32_t offset, uint16_t& idx) -> std::pair<glm::vec2, glm::vec2>
 {
-  return _text_engine.parse_text(text, pos, size, italic, vertices, indices, offset, idx);
-}
+  auto u32str    = util::to_u32string(text);
+  auto positions = _text_engine.calculate_positions(text, pos, size);
+  assert(u32str.size() == positions.size());
 
-void GraphicsEngine::upload_glyph(std::span<msdfgen::Bitmap<float, 4>> bitmaps)
-{
-  if (bitmaps.empty()) return;
-
-  _font_atlas_buffer.clear();
-  uint32_t   buffer_offset{};
-  uint32_t   idx{};
-  VkOffset2D image_offset{ static_cast<int32_t>(_glyph_uvs[idx].x), static_cast<int32_t>(_glyph_uvs[idx].y) };
-  auto cmd = _command_pool.create_command().begin();
-
-  // TODO: optimization, use tmp cpu buffer of atlas, copy bitmap to tmp buffer with padding, and copy tmp buffer data to atlas image,
-  //       also if tmp buffer data is not a rectangle, split it to mulitple rectangle then upload mulitple times.
-  for (msdfgen::BitmapConstRef<float, 4> bitmap : bitmaps)
+  // get some glyphs not cached
+  if (_text_engine.has_uncached_glyphs(u32str))
   {
-    // copy bitmap to buffer
-    auto byte_size = bitmap.height * bitmap.width * 4 * 4;
-    _font_atlas_buffer.append(bitmap.pixels, byte_size);
-
-    // get image offset
-    image_offset = { static_cast<int32_t>(_glyph_uvs[idx].x), static_cast<int32_t>(_glyph_uvs[idx].y) };
-    ++idx;
-
-    // upload data of buffer to atlas
-    copy(cmd, _font_atlas_buffer, buffer_offset, _font_atlas_image, image_offset, { (uint32_t)bitmap.width, (uint32_t)bitmap.height }); 
-
-    // set next buffer offset
-    buffer_offset += byte_size;
+    // upload them
+    auto cmd = _command_pool.create_command().begin();
+    _text_engine.generate_sdf_bitmaps(cmd);
+    cmd.end().submit_wait_free(_command_pool, _graphics_queue); // TODO: use Semaphores to replace wait
   }
 
-  _font_atlas_image.set_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  cmd.end().submit_wait_free(_command_pool, _graphics_queue);
-
-  _glyph_uvs.clear();
-}
-
-// TODO:
-// get next glyph position by extent
-// if current atlas is full, create new atlas image and reset glyph position
-auto GraphicsEngine::get_glyph_pos(glm::vec2 const& extent) noexcept -> glm::vec2
-{
-repeat:
-  // get next position
-  auto max = _glyph_pos + extent;
-
-  // directly can store
-  if (max.x <= Font_Atlas_Width && max.y <= Font_Atlas_Height)
+  // add vertices and indices
+  for (auto i = 0; i < u32str.size(); ++i)
   {
-    _glyph_uvs.emplace_back(_glyph_pos);
-    auto origin = _glyph_pos;
-    _glyph_pos.x = max.x;
-    // update max height of glyph on current line
-    _max_glyph_height = std::max(_max_glyph_height, extent.y);
-    return origin;
+    auto glyph_info = _text_engine.get_cached_glyph_info(u32str[i]);
+    vertices.append_range(glyph_info->get_vertices(positions[i], size, offset));
+    indices.append_range(GlyphInfo::get_indices(idx));
   }
-  else if (max.x > Font_Atlas_Width)
-  {
-    // move to next line
-    _glyph_pos.x = 0;
-    _glyph_pos.y += _max_glyph_height;
-    _max_glyph_height = 0;
-    goto repeat;
-  }
-  else if (max.y > Font_Atlas_Height)
-  {
-    throw_if(true, "TODO: signel font altas image is full, create new one");
-    goto repeat;
-  }
-  assert(true);
   return {};
 }
 

@@ -30,8 +30,6 @@ struct ui_context
   graphics_engine::GraphicsEngine* engine{};
   Window*                          window{};
 
-  std::vector<graphics_engine::ShapeInfo> shape_infos;
-
   std::vector<Layout> layouts;
   Layout*             last_layout{};
 

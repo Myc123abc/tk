@@ -58,6 +58,8 @@ public:
   void init_keys() noexcept;
   auto get_key(type::key k) noexcept -> type::key_state;
 
+  auto get_dpi() const noexcept -> uint32_t;
+
 #ifdef _WIN32
 private:
   // TODO: cpp coroutine will get better performance than win32 fiber,

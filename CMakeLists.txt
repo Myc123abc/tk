@@ -24,6 +24,7 @@ set(MSDF_ATLAS_BUILD_STANDALONE OFF)
 set(MSDF_ATLAS_USE_VCPKG OFF)
 set(MSDF_ATLAS_USE_SKIA OFF)
 set(MSDFGEN_DISABLE_PNG ON)
+set(FT_DISABLE_HARFBUZZ ON)
 
 add_subdirectory(vendor/glm)
 add_subdirectory(vendor/vma)

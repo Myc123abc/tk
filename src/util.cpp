@@ -64,6 +64,18 @@ auto to_utf32(std::string_view str) -> std::pair<uint32_t, uint32_t>
   return {};
 }
 
+auto to_u32string(std::string_view str) -> std::u32string
+{
+  std::u32string u32str;
+  for (auto i = 0; i < str.size();)
+  {
+    auto res = to_utf32(str.data() + i);
+    u32str.push_back(res.first);
+    i += res.second;
+  }
+  return u32str;
+}
+
 auto to_lower(std::string_view str) -> std::string
 {
   std::string res(str.size(), '\0');

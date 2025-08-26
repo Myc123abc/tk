@@ -8,6 +8,7 @@
 
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
+#include <glm/glm.hpp>
 
 #include <unordered_map>
 #include <string>
@@ -167,6 +168,12 @@ void copy(Command const& cmd, Image  const& src, Image const& dst);
 void copy(Command const& cmd, Buffer const& src, Image& dst);
 // TODO: make pairs, multiple copy in once call
 void copy(Command const& cmd, Buffer const& src, uint32_t buffer_offset, Image& dst, VkOffset2D image_offset, VkExtent2D extent);
+inline void copy(Command const& cmd, Buffer const& src, uint32_t buffer_offset, Image& dst, glm::vec2 image_offset, glm::vec2 extent)
+{
+  copy(cmd, src, buffer_offset, dst,
+    VkOffset2D{ static_cast<int32_t>(image_offset.x), static_cast<int32_t>(image_offset.y) },
+    VkExtent2D{ static_cast<uint32_t>(extent.x), static_cast<uint32_t>(extent.y) });
+}
 
   class MemoryAllocator
   {
@@ -187,7 +194,7 @@ void copy(Command const& cmd, Buffer const& src, uint32_t buffer_offset, Image& 
     auto device() const noexcept { return _device;    }
 
     auto create_buffer(uint32_t size, VkBufferUsageFlags usages, VmaAllocationCreateFlags flags = 0) { return Buffer(this, size, usages, flags);  }
-    auto create_image(VkFormat format, VkExtent3D extent, VkImageUsageFlags usage)                   { return Image(this, format, extent, usage); }
+    auto create_image(VkFormat format, uint32_t width, uint32_t height, VkImageUsageFlags usage) { return Image(this, format, { width, height, 1 }, usage); }
 
   private:
     VkDevice     _device    = VK_NULL_HANDLE;

@@ -134,23 +134,6 @@ float get_distance(inout uint local_offset)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-//                              MSDF font rednering
-////////////////////////////////////////////////////////////////////////////////
-
-float median(float r, float g, float b) 
-{
-  return max(min(r, g), min(max(r, g), b));
-}
-
-float screenPxRange()
-{
-  const float pxRange = 2.0;
-  vec2 unitRange = vec2(pxRange)/vec2(textureSize(font_atlas, 0));
-  vec2 screenTexSize = vec2(1.0)/fwidth(uv);
-  return max(0.5*dot(unitRange, screenTexSize), 1.0);
-}
-
-////////////////////////////////////////////////////////////////////////////////
 //                             main function
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -161,6 +144,15 @@ void main()
   // glyph process
   if (GetType(local_offset) == Glyph)
   {
+    // reference: https://www.shadertoy.com/view/llK3Wm
+    float d = texture(font_atlas, uv).r;
+    float s = d - 0.5;
+    float v = s / fwidth(s);
+    float a = clamp(v + 0.5, 0.0, 1.0);
+    out_color = vec4(1, 1, 1, a);
+    return;
+
+#if 0
     vec4  mtsdf = texture(font_atlas, uv);
     float d     = median(mtsdf.r, mtsdf.g, mtsdf.b);
 
@@ -196,6 +188,7 @@ void main()
 
     out_color = inner_color + (outer_color * (outer_alpha - inner_alpha));
     return;
+#endif
   }
 
   // sdf process

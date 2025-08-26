@@ -97,11 +97,17 @@ void render()
     ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ progress, 3 }, 0x0000FFFF );
 
     // TODO: space, invalid character, cache, mulitple atlases, multiple fonts
-    auto r1 = ui::text("あ", { 0, 0 }, 120, 0xffffffff, false, false);
+    auto baseline = glm::vec2{ 0, 150 };
+    auto r1 = ui::text("abcdefghijklmnopqrstuvwxyz", baseline, 32, 0xffffffff, false, false);
+    auto r2 = ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 50 }, 32, 0xffffffff, false, false);
+    auto r3 = ui::text("あいうえおかきくけこたちつてとなにぬねのまみむめもはひふへほかちくけこらりるれろやみむめもん", baseline + glm::vec2{ 0, 100 }, 32, 0xffffffff, false, false);
+    auto r4 = ui::text("アイウエオカキクケコタチツテトナニヌネノマミムメモハヒフヘホカチケケコラリルレロヤミムマモン", baseline + glm::vec2{ 0, 150 }, 32, 0xffffffff, false, false);
+    auto r5 = ui::text("我草，我真是服了啊，明天又要上班。害", baseline + glm::vec2{ 0, 200 }, 32, 0xffffffff, false, false);
+    //ui::line(baseline, { 1000, baseline.y }, 0x00ff00ff);
     // auto r1 = ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", { 0, 0 }, 120, 0xffffffff, false, false);
     // ui::text("abcdefghijklmnopqrstuvwxyz", { 0, r1.second.y }, 120, 0xffffffff, false, false);
     //auto r1 = ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", { 0, 50 }, 120, 0x000000ff, false, false, 0xff0000ff);
-    //auto r1 = ui::text("aaa きゃあ我是谁？XX骢 cas", { 0, 0 }, 120, 0xffffffff, false, false);
+    //auto r1 = ui::text("aaa きゃあ我是谁？XX骢 cas", { 0, 150 }, 120, 0xffffffff, false, false);
     //auto r2 = ui::text("aあcdefghijklmnopqrstuvwxyz", { 0, r1.second.y }, 120, 0xffffffff, true, false);
     //auto r2 = ui::text("aaa きゃあ我是谁？XX骢 cas", { 0, r1.second.y }, 120, 0xffffffff, false, true);
     //ui::rectangle(r1.first, r1.second, 0xff0000ff, 3);

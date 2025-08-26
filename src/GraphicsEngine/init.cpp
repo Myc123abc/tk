@@ -34,8 +34,10 @@ void GraphicsEngine::init(Window& window)
   create_sampler();
 
   create_buffer();
-  load_font();
+  init_text_engine();
   create_sdf_rendering_resource();
+
+  init_gpu_resource();
 }
 
 void GraphicsEngine::destroy()
@@ -442,7 +444,7 @@ void GraphicsEngine::create_sdf_rendering_resource()
   _sdf_render_pipeline = _device.create_render_pipeline(
     sizeof(PushConstant_SDF), 
     {
-      { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &_font_atlas_image, _sampler }, 
+      { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, _text_engine.get_glyph_atlas_pointer(), _sampler }, 
     },
     _descriptor_buffer,
     "sdf",
@@ -477,55 +479,22 @@ void GraphicsEngine::create_sampler()
   _destructors.push([&] { vkDestroySampler(_device, _sampler, nullptr); });
 }
 
-// TODO: how to pre load multiple fonts
-void GraphicsEngine::load_font()
+void GraphicsEngine::init_text_engine()
 {
-  auto path = "resources/NotoSansSC-Regular.ttf";
+  _text_engine.init(_mem_alloc);
+  _text_engine.load_font("resources/NotoSansJP-Regular.ttf");
+  _text_engine.load_font("resources/NotoSansSC-Regular.ttf");
+  _destructors.push([&] { _text_engine.destroy(); });
+}
 
-  auto bitmap = _text_engine.load_font(path);
-
-  // FIXME: tmp, use dynamic msdf generate, and should have multiple images
-  // create image
-  bool use_msdf_atlas = false;
-  //use_msdf_atlas = true;
-  if (!use_msdf_atlas)
-  {
-    bitmap.width = Font_Atlas_Width;
-    bitmap.height = Font_Atlas_Height;
-  }
-  //_font_atlas_image = _mem_alloc.create_image(VK_FORMAT_R32G32B32A32_SFLOAT, { Font_Atlas_Width, Font_Atlas_Height, 1 }, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
-  _font_atlas_image = _mem_alloc.create_image(VK_FORMAT_R32G32B32A32_SFLOAT, { bitmap.width, bitmap.height, 1 }, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
-  {
-    auto byte_size     = Font_Atlas_Width * Font_Atlas_Height * 4 * 4;
-    _font_atlas_buffer = _mem_alloc.create_buffer(byte_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-  }
-  // destroy resources
-  _destructors.push([&]
-  {
-    _font_atlas_image.destroy();
-    _font_atlas_buffer.destroy();
-  });
-  if (!use_msdf_atlas)
-  {
-    return;
-  }
-
-  // upload buffer
-  auto byte_size = bitmap.width * bitmap.height * 4 * 4;
-  auto buf       = _mem_alloc.create_buffer(byte_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-
-  // copy 
-  buf.append(bitmap.data.data(), byte_size);
-
-  // TODO: use single command once in init
-  // copy to image
+void GraphicsEngine::init_gpu_resource()
+{
   auto cmd = _command_pool.create_command().begin();
-  copy(cmd, buf, _font_atlas_image);
-  _font_atlas_image.set_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+  // preload glyphs
+  _text_engine.preload_glyphs(cmd);
+
   cmd.end().submit_wait_free(_command_pool, _graphics_queue);
-  
-  // destroy upload buffer
-  buf.destroy();
 }
 
 } }
