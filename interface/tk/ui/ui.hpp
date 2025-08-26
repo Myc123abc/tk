@@ -37,6 +37,21 @@ TK_API inline void begin(std::string_view name, float x, float y) { begin(name, 
 */
 TK_API void end();
 
+/**
+ * set bold size of text rendering.
+ */
+TK_API void set_text_bold_size(float size) noexcept;
+
+/**
+ * set italic factor of text rendering.
+ */
+TK_API void set_text_italic_factor(float factor) noexcept;
+
+/**
+ * set outline width of text rendering.
+ */
+TK_API void set_text_outline_width(float width) noexcept;
+
 ////////////////////////////////////////////////////////////////////////////////
 //                                Shape
 ////////////////////////////////////////////////////////////////////////////////

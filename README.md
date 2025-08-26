@@ -16,7 +16,7 @@ TODO:
 reserve:
 * freetype not read GPOS for kerning, you can use HarfBuzz.
 
-## Third Party
+## Reference
 * https://github.com/g-truc/glm (MIT)
 * https://github.com/KhronosGroup/Vulkan-Headers (Apache-2.0)
 * https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator (MIT)
@@ -28,4 +28,5 @@ reserve:
     Project (www.freetype.org).  All rights reserved.
    ```
 * https://github.com/harfbuzz/harfbuzz (Old MIT)
-* Some code in SDF.frag from https://computergraphics.stackexchange.com/ (CC BY-SA 4.0)
+* https://computergraphics.stackexchange.com/ (CC BY-SA 4.0)
+* https://www.redblobgames.com/x/2404-distance-field-effects/ (Apache-2.0)

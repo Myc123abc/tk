@@ -59,6 +59,10 @@ struct ui_context
   std::vector<glm::vec2> op_points;
   uint32_t               op_offset{};
   bool                   union_start{};
+
+  float bold_size{ .025f };
+  float italic_factor{ .4f };
+  float outline_width{ .05f };
 };
 
 inline auto get_ctx()

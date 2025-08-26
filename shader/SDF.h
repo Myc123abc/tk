@@ -22,8 +22,8 @@ layout(std430, buffer_reference) readonly buffer ShapeProperties
                 //   path  |  color  |  thickness  |  operator |  count  |  partition type  |  values   |   ...
                 //  uint  |   vec4  |     uint    |    uint   |   uint  |       uint       |    ...    |   ...
 
-                //  glyph  |  inner_color  |  outer_color  |  bold
-                //  uint  |      vec4     |     vec4      |   uint
+                //  glyph  |  inner_color  |  outer_color  |  bold   |  outline width
+                //  uint  |      vec4     |     vec4      |  float  |     float
 };
 
 layout(push_constant) uniform PushConstant
@@ -79,9 +79,10 @@ layout(push_constant) uniform PushConstant
 #define GetThickness(x) GetData(x + 5)
 #define GetOperator(x)  GetData(x + 6)
 
-#define GetInnerColor(x) GetVec4(x + 1)
-#define GetOuterColor(x) GetVec4(x + 5)
-#define GetBold(x)       GetDataF(x + 9)
+#define GetInnerColor(x)   GetVec4(x + 1)
+#define GetOuterColor(x)   GetVec4(x + 5)
+#define GetBold(x)         GetDataF(x + 9)
+#define GetOutlineWidht(x) GetDataF(x + 10)
 
 ////////////////////////////////////////////////////////////////////////////////
 //                            SDF functions

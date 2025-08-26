@@ -98,10 +98,15 @@ void render()
 
     // TODO: space, invalid character, cache, mulitple atlases, multiple fonts
     auto baseline = glm::vec2{ 0, 50 };
-    ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline, 32, 0xffffffff, false, true);
-    ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 75 }, 64, 0xffffffff, false, true);
-    ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 175 }, 128, 0xffffffff, false, true);
-    ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 375 }, 256, 0xffffffff, false, true);
+    
+    ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline, 32, 0xffffffff, false, false);
+    ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 30 }, 32, 0xffffffff, false, true);
+    //ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 60 }, 32, 0xffffff00, false, false, 0xff0000ff);
+    //ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 90 }, 32, 0xffffffff, false, false, 0xff000000);
+    ui::text("老妈马骢", baseline + glm::vec2{ 0, 150 }, 128, 0xffffffff, false, false, 0xff000000);
+    ui::text("老妈马骢", baseline + glm::vec2{ 0, 300 }, 128, 0xffffffff, false, true, 0xff000000);
+    //ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 175 }, 128, 0xffffffff, true, false);
+    //ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 375 }, 256, 0xffffffff, false, true, 0xff0000ff);
     //auto r1 = ui::text("abcdefghijklmnopqrstuvwxyz", baseline, 32, 0x00ff00ff, false, false);
     //auto r2 = ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 50 }, 32, 0xffffffff, false, true);
     //auto r3 = ui::text("あいうえおかきくけこたちつてとなにぬねのまみむめもはひふへほかちくけこらりるれろやみむめもん", baseline + glm::vec2{ 0, 100 }, 32, 0xffffffff, false, false);

@@ -101,13 +101,28 @@ void render()
   clear();
 }
 
-auto to_vec4(uint32_t color)
+auto to_vec4(uint32_t color) noexcept
 {
   float r = float((color >> 24) & 0xFF) / 255;
   float g = float((color >> 16) & 0xFF) / 255;
   float b = float((color >> 8 ) & 0xFF) / 255;
   float a = float((color      ) & 0xFF) / 255;
   return glm::vec4(r, g, b, a);
+}
+
+void set_text_bold_size(float size) noexcept
+{
+  get_ctx()->bold_size = size;
+}
+
+void set_text_italic_factor(float factor) noexcept
+{
+  get_ctx()->italic_factor = factor;
+}
+
+void set_text_outline_width(float width) noexcept
+{
+  get_ctx()->outline_width = width;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -156,7 +171,7 @@ void add_text_property(type::shape type, uint32_t inner_color, bool bold, uint32
   auto out_color_r = std::bit_cast<uint32_t>(converted_outer_color.r);
   auto out_color_g = std::bit_cast<type::shape_op>(converted_outer_color.g);
   ctx->shape_properties.emplace_back(type, to_vec4(inner_color), out_color_r, out_color_g);
-  auto values = std::vector<float>{ converted_outer_color.b, converted_outer_color.a, bold ? .1f : 0.f };
+  auto values = std::vector<float>{ converted_outer_color.b, converted_outer_color.a, bold ? ctx->bold_size : 0.f, ctx->outline_width };
   ctx->shape_properties.back().values.append_range(values);
   ctx->shape_offset += ShapeProperty::header_field_count + values.size();
 }
@@ -316,7 +331,7 @@ auto text(std::string_view text, glm::vec2 const& pos, float size, uint32_t inne
 {
   auto ctx = get_ctx();
   assert(ctx->begining && ctx->path_begining == false && ctx->union_start == false);
-  auto extent = ctx->engine->parse_text(text, pos, size, italic, ctx->vertices, ctx->indices, ctx->shape_offset, ctx->index);
+  auto extent = ctx->engine->parse_text(text, pos, size, italic ? ctx->italic_factor : 0.f, ctx->vertices, ctx->indices, ctx->shape_offset, ctx->index);
   add_text_property(type::shape::glyph, inner_color, bold, outer_color);
   return extent;
 }

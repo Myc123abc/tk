@@ -136,20 +136,32 @@ namespace tk { namespace graphics_engine {
       return size / Font::Pixel_Size;
     }
 
-    auto get_vertices(glm::vec2 pos, float size, uint32_t offset) const noexcept -> std::vector<Vertex>
+    auto get_vertices(glm::vec2 pos, float size, uint32_t offset, float italic_factor) const noexcept -> std::vector<Vertex>
     {
       // TODO: add vertical draw in future
       auto scale = get_scale(size);
-      auto pos_min_x = pos.x + left_offset * scale;
-      auto pos_min_y = pos.y + up_offset * scale;
-      auto pos_max_x = pos_min_x + extent.x * scale;
-      auto pos_max_y = pos_min_y + extent.y * scale;
+      auto p0 = glm::vec2{ pos.x + left_offset * scale, pos.y + up_offset * scale };
+      auto p1 = glm::vec2{ p0.x + extent.x * scale, p0.y };
+      auto p2 = glm::vec2{ p0.x, p0.y + extent.y * scale };
+      auto p3 = glm::vec2{ p1.x, p2.y };
+      
+      if (italic_factor > 0.f)
+      {
+        auto italic_offset = p3.y * italic_factor;
+        p0.x -= p0.y * italic_factor;
+        p1.x -= p1.y * italic_factor;
+        p2.x -= p2.y * italic_factor;
+        p0.x += italic_offset;
+        p1.x += italic_offset;
+        p2.x += italic_offset;
+      }
+
       return
       {
-        { { pos_min_x, pos_min_y }, { min_x, min_y }, offset },
-        { { pos_max_x, pos_min_y }, { max_x, min_y }, offset },
-        { { pos_min_x, pos_max_y }, { min_x, max_y }, offset },
-        { { pos_max_x, pos_max_y }, { max_x, max_y }, offset },
+        { p0, { min_x, min_y }, offset },
+        { p1, { max_x, min_y }, offset },
+        { p2, { min_x, max_y }, offset },
+        { p3, { max_x, max_y }, offset },
       };
     }
 

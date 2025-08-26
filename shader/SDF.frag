@@ -147,50 +147,28 @@ void main()
     // reference: https://computergraphics.stackexchange.com/questions/306/sharp-corners-with-signed-distance-fields-fonts
     // author: Detheroc
     float d = texture(font_atlas, uv).r - 0.5 + GetBold(local_offset);
-    float alpha = clamp(d / fwidth(d) + 0.5, 0.0, 1.0);
-
-    vec4 inner_color = GetInnerColor(local_offset);
-
-    out_color = vec4(inner_color.rgb, inner_color.a * alpha);
-    return;
-
-#if 0
-    vec4  mtsdf = texture(font_atlas, uv);
-    float d     = median(mtsdf.r, mtsdf.g, mtsdf.b);
-
-    // reference: https://www.redblobgames.com/x/2404-distance-field-effects/
-    //d = min(d, mtsdf.a + 0.1); // HACK: to fix glitch in msdf near edges
-
-    d += GetBold(local_offset);
+    float w = fwidth(d);
+    float inner_alpha = clamp(d / w + 0.5, 0.0, 1.0);
 
     vec4 inner_color = GetInnerColor(local_offset);
     vec4 outer_color = GetOuterColor(local_offset);
 
-    const float outline_width = 0.5;
-    if (outline_width == 0.0 || outer_color.a == 0)
-    {   
-      float distance = screenPxRange() * (d - 0.5);
-      float alpha    = clamp(distance + 0.5, 0.0, 1.0);
-      out_color = vec4(inner_color.rgb, inner_color.a * alpha);
-      return;
-    }
-
-    // typically 0.5 is the threshold, >0.5 inside <0.5 outside
-    float width = screenPxRange();
-    float inner = width * (d - 0.5) + 0.5;
-    float outer = width * (d - 0.5 + outline_width) + 0.5;
-    
-    float inner_alpha = clamp(inner, 0.0, 1.0);
-    float outer_alpha = clamp(outer, 0.0, 1.0);
-
-    if (inner_color.a == 0)
-      inner_color = vec4(0);
+    if (outer_color.a == 0.0)
+      out_color = vec4(inner_color.rgb, inner_color.a * inner_alpha);
     else
-      inner_color = inner_color * inner_alpha;
+    {
+      // reference: https://www.redblobgames.com/x/2404-distance-field-effects/
+      float outline_width = GetOutlineWidht(local_offset);
+      float outer_alpha = clamp((d + outline_width) / w + 0.5, 0.0, 1.0);
 
-    out_color = inner_color + (outer_color * (outer_alpha - inner_alpha));
+      if (inner_color.a == 0)
+        inner_color = vec4(0);
+      else
+        inner_color = inner_color * inner_alpha;
+
+      out_color = inner_color + (outer_color * (outer_alpha - inner_alpha));
+    }
     return;
-#endif
   }
 
   // sdf process
