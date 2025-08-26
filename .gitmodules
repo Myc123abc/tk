@@ -6,10 +6,6 @@
 	path = vendor/vma
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
 	branch = master
-[submodule "vendor/msdf-atlas-gen"]
-	path = vendor/msdf-atlas-gen
-	url = https://github.com/Chlumsky/msdf-atlas-gen.git
-	branch = master
 [submodule "vendor/freetype"]
 	path = vendor/freetype
 	url = https://gitlab.freedesktop.org/freetype/freetype.git

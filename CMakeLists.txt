@@ -16,34 +16,19 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(WIN32)
   find_package(Vulkan REQUIRED)
-  # avoid vma use MTd_StaticDebug but msdfgen use MDd_DynamicDebug
-  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
-set(MSDF_ATLAS_BUILD_STANDALONE OFF)
-set(MSDF_ATLAS_USE_VCPKG OFF)
-set(MSDF_ATLAS_USE_SKIA OFF)
-set(MSDFGEN_DISABLE_PNG ON)
 set(FT_DISABLE_HARFBUZZ ON)
 
 add_subdirectory(vendor/glm)
 add_subdirectory(vendor/vma)
 add_subdirectory(vendor/freetype)
+add_subdirectory(vendor/harfbuzz)
 
 # when generator not vs, rc files will be built fail
 if (NOT "${CMAKE_GENERATOR}" MATCHES "Visual Studio")
   file(WRITE vendor/freetype/src/base/ftver.rc "")
 endif()
-
-# msdfgen only have find_package(Freetype::Freetype)
-# we need alias freetype to Freetype::Freetype
-if(TARGET freetype AND NOT TARGET Freetype::Freetype)
-  add_library(Freetype::Freetype ALIAS freetype)
-  message(STATUS "Created ALIAS Freetype::Freetype pointing to actual 'freetype' library.")
-endif()
-
-add_subdirectory(vendor/msdf-atlas-gen)
-add_subdirectory(vendor/harfbuzz)
 
 ################################################################################
 #                               Build Static Library 
@@ -66,7 +51,6 @@ target_link_libraries(tk
   PRIVATE
     ${Vulkan_LIBRARIES}
     GPUOpen::VulkanMemoryAllocator
-    msdf-atlas-gen
     harfbuzz
 )
 
@@ -80,7 +64,6 @@ target_compile_definitions(tk
     SHARED_TK
     GLM_FORCE_DEPTH_ZERO_TO_ONE
     GLM_FORCE_RADIANS
-    _CRT_SECURE_NO_WARNINGS
 )
 
 ################################################################################
