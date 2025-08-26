@@ -97,12 +97,16 @@ void render()
     ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ progress, 3 }, 0x0000FFFF );
 
     // TODO: space, invalid character, cache, mulitple atlases, multiple fonts
-    auto baseline = glm::vec2{ 0, 150 };
-    auto r1 = ui::text("abcdefghijklmnopqrstuvwxyz", baseline, 32, 0xffffffff, false, false);
-    auto r2 = ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 50 }, 32, 0xffffffff, false, false);
-    auto r3 = ui::text("あいうえおかきくけこたちつてとなにぬねのまみむめもはひふへほかちくけこらりるれろやみむめもん", baseline + glm::vec2{ 0, 100 }, 32, 0xffffffff, false, false);
-    auto r4 = ui::text("アイウエオカキクケコタチツテトナニヌネノマミムメモハヒフヘホカチケケコラリルレロヤミムマモン", baseline + glm::vec2{ 0, 150 }, 32, 0xffffffff, false, false);
-    auto r5 = ui::text("我草，我真是服了啊，明天又要上班。害", baseline + glm::vec2{ 0, 200 }, 32, 0xffffffff, false, false);
+    auto baseline = glm::vec2{ 0, 50 };
+    ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline, 32, 0xffffffff, false, true);
+    ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 75 }, 64, 0xffffffff, false, true);
+    ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 175 }, 128, 0xffffffff, false, true);
+    ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 375 }, 256, 0xffffffff, false, true);
+    //auto r1 = ui::text("abcdefghijklmnopqrstuvwxyz", baseline, 32, 0x00ff00ff, false, false);
+    //auto r2 = ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 50 }, 32, 0xffffffff, false, true);
+    //auto r3 = ui::text("あいうえおかきくけこたちつてとなにぬねのまみむめもはひふへほかちくけこらりるれろやみむめもん", baseline + glm::vec2{ 0, 100 }, 32, 0xffffffff, false, false);
+    //auto r4 = ui::text("アイウエオカキクケコタチツテトナニヌネノマミムメモハヒフヘホカチケケコラリルレロヤミムマモン", baseline + glm::vec2{ 0, 150 }, 32, 0xffffffff, false, false);
+    //auto r5 = ui::text("我草，我真是服了啊，明天又要上班。害", baseline + glm::vec2{ 0, 200 }, 32, 0xffffffff, false, false);
     //ui::line(baseline, { 1000, baseline.y }, 0x00ff00ff);
     // auto r1 = ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", { 0, 0 }, 120, 0xffffffff, false, false);
     // ui::text("abcdefghijklmnopqrstuvwxyz", { 0, r1.second.y }, 120, 0xffffffff, false, false);

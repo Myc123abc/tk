@@ -72,7 +72,7 @@ namespace tk { namespace graphics_engine {
 
     auto find_glyph(uint32_t unicode) -> std::optional<std::pair<Font, uint32_t>>;
 
-    auto calculate_positions(std::string_view text, glm::vec2 pos, float size) -> std::vector<glm::vec2>;
+    auto calculate_advances(std::string_view text) -> std::vector<glm::vec2>;
 
   private:
     FT_Library                              _ft;
@@ -86,7 +86,7 @@ namespace tk { namespace graphics_engine {
     std::unordered_map<uint32_t, std::pair<Font, uint32_t>> _wait_generate_sdf_bitmap_glyphs{};
 
     hb_buffer_t*                            _hb_buffer{};
-    std::unordered_map<std::string, std::vector<glm::vec2>> _cached_text_positions;
+    std::unordered_map<std::string, std::vector<glm::vec2>> _cached_text_advances;
     std::unordered_set<uint32_t>            _missing_glyphs;
   };
 
@@ -131,10 +131,15 @@ namespace tk { namespace graphics_engine {
       max_y = (pos.y + extent.y - 0.5f) / TextEngine::Glyph_Atlas_Height;
     }
 
+    static auto get_scale(float size) noexcept
+    {
+      return size / Font::Pixel_Size;
+    }
+
     auto get_vertices(glm::vec2 pos, float size, uint32_t offset) const noexcept -> std::vector<Vertex>
     {
       // TODO: add vertical draw in future
-      auto scale = size / Font::Pixel_Size;
+      auto scale = get_scale(size);
       auto pos_min_x = pos.x + left_offset * scale;
       auto pos_min_y = pos.y + up_offset * scale;
       auto pos_max_x = pos_min_x + extent.x * scale;
@@ -157,6 +162,11 @@ namespace tk { namespace graphics_engine {
         static_cast<uint16_t>(idx + 0), static_cast<uint16_t>(idx + 1), static_cast<uint16_t>(idx + 2),
         static_cast<uint16_t>(idx + 2), static_cast<uint16_t>(idx + 1), static_cast<uint16_t>(idx + 3),
       };
+    }
+
+    static auto get_next_position(glm::vec2 pos, float size, glm::vec2 advance) noexcept
+    {
+      return pos + advance * get_scale(size);
     }
   };
 }}

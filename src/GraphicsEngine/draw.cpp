@@ -243,11 +243,11 @@ void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> 
   vkCmdDrawIndexed(cmd, indices.size(), 1, 0, 0, 0);
 }
 
-auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 const& pos, float size, bool italic, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices, uint32_t offset, uint16_t& idx) -> std::pair<glm::vec2, glm::vec2>
+auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 pos, float size, bool italic, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices, uint32_t offset, uint16_t& idx) -> std::pair<glm::vec2, glm::vec2>
 {
-  auto u32str    = util::to_u32string(text);
-  auto positions = _text_engine.calculate_positions(text, pos, size);
-  assert(u32str.size() == positions.size());
+  auto u32str   = util::to_u32string(text);
+  auto advances = _text_engine.calculate_advances(text);
+  assert(u32str.size() == advances.size());
 
   // get some glyphs not cached
   if (_text_engine.has_uncached_glyphs(u32str))
@@ -262,8 +262,9 @@ auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 const& pos, flo
   for (auto i = 0; i < u32str.size(); ++i)
   {
     auto glyph_info = _text_engine.get_cached_glyph_info(u32str[i]);
-    vertices.append_range(glyph_info->get_vertices(positions[i], size, offset));
+    vertices.append_range(glyph_info->get_vertices(pos, size, offset));
     indices.append_range(GlyphInfo::get_indices(idx));
+    pos = GlyphInfo::get_next_position(pos, size, advances[i]);
   }
   return {};
 }

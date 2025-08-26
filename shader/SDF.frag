@@ -144,12 +144,14 @@ void main()
   // glyph process
   if (GetType(local_offset) == Glyph)
   {
-    // reference: https://www.shadertoy.com/view/llK3Wm
-    float d = texture(font_atlas, uv).r;
-    float s = d - 0.5;
-    float v = s / fwidth(s);
-    float a = clamp(v + 0.5, 0.0, 1.0);
-    out_color = vec4(1, 1, 1, a);
+    // reference: https://computergraphics.stackexchange.com/questions/306/sharp-corners-with-signed-distance-fields-fonts
+    // author: Detheroc
+    float d = texture(font_atlas, uv).r - 0.5 + GetBold(local_offset);
+    float alpha = clamp(d / fwidth(d) + 0.5, 0.0, 1.0);
+
+    vec4 inner_color = GetInnerColor(local_offset);
+
+    out_color = vec4(inner_color.rgb, inner_color.a * alpha);
     return;
 
 #if 0

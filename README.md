@@ -22,9 +22,10 @@ reserve:
 * https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator (MIT)
 * https://iquilezles.org/articles/distfunctions2d/ (MIT)
 * https://www.shadertoy.com/view/ftdGDB (MIT)
-* https://github.com/Chlumsky/msdf-atlas-gen (MIT)
 * https://gitlab.freedesktop.org/freetype/freetype (FreeType License, FLT.txt in Licenses directory)
    ```
     Portions of this software are copyright © <2025> The FreeType
     Project (www.freetype.org).  All rights reserved.
    ```
+* https://github.com/harfbuzz/harfbuzz (Old MIT)
+* Some code in SDF.frag from https://computergraphics.stackexchange.com/ (CC BY-SA 4.0)

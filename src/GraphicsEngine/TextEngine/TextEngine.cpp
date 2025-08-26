@@ -218,9 +218,9 @@ auto TextEngine::has_uncached_glyphs(std::u32string_view text) -> bool
   return !_wait_generate_sdf_bitmap_glyphs.empty();
 }
 
-auto TextEngine::calculate_positions(std::string_view text, glm::vec2 pos, float size) -> std::vector<glm::vec2>
+auto TextEngine::calculate_advances(std::string_view text) -> std::vector<glm::vec2>
 {
-  if (_cached_text_positions.contains(text.data())) return _cached_text_positions[text.data()];
+  if (_cached_text_advances.contains(text.data())) return _cached_text_advances[text.data()];
 
   hb_buffer_reset(_hb_buffer);
   // TODO: promise text is same script and direction
@@ -230,21 +230,17 @@ auto TextEngine::calculate_positions(std::string_view text, glm::vec2 pos, float
   // TODO: select right font to shape
   hb_shape(_fonts[0]._hb_font, _hb_buffer, nullptr, 0);
 
-  auto scale           = size / Font::Pixel_Size;
   auto length          = hb_buffer_get_length(_hb_buffer);
   auto glyph_infos     = hb_buffer_get_glyph_infos(_hb_buffer, nullptr);
   auto glyph_positions = hb_buffer_get_glyph_positions(_hb_buffer, nullptr);
-  std::vector<glm::vec2> positions;
-  positions.reserve(length);
+  std::vector<glm::vec2> advances;
+  advances.reserve(length);
   for (auto i = 0; i < length; ++i)
-  {
-    positions.emplace_back(pos);
-    pos.x += static_cast<float>(glyph_positions[i].x_advance) / 64 * scale;
-    pos.y += static_cast<float>(glyph_positions[i].y_advance) / 64 * scale;
-  }
+    advances.emplace_back(static_cast<float>(glyph_positions[i].x_advance) / 64,
+                          static_cast<float>(glyph_positions[i].y_advance) / 64);
 
-  _cached_text_positions.emplace(text.data(), positions);
-  return positions;
+  _cached_text_advances.emplace(text.data(), advances);
+  return advances;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
