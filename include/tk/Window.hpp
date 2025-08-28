@@ -49,14 +49,14 @@ public:
 
   void event_process() const noexcept;
 
-  void set_state(type::window state) noexcept { _state = state; }
+  void set_state(type::WindowState state) noexcept { _state = state; }
   auto state() const noexcept { return _state; }
 
   auto get_mouse_position() const noexcept -> glm::vec2;
-  auto get_mouse_state() noexcept -> type::mouse_state;
+  auto get_mouse_state() noexcept -> type::MouseState;
 
   void init_keys() noexcept;
-  auto get_key(type::key k) noexcept -> type::key_state;
+  auto get_key(type::Key k) noexcept -> type::KeyState;
 
   auto get_dpi() const noexcept -> uint32_t;
 
@@ -71,11 +71,11 @@ private:
 private:
   friend LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param);
 
-  LPCWSTR      ClassName{ L"main window" };
-  HWND         _handle{};
-  type::window _state{ type::window::suspended };
+  LPCWSTR           ClassName{ L"main window" };
+  HWND              _handle{};
+  type::WindowState _state{ type::WindowState::suspended };
 
-  std::queue<type::mouse_state> _mouse_states;
+  std::queue<type::MouseState> _mouse_states;
 #endif
 
 private:
@@ -85,11 +85,11 @@ private:
   {
     std::chrono::high_resolution_clock::time_point start_time;
     std::chrono::high_resolution_clock::time_point last_time;
-    type::key_state state{ type::key_state::release };
+    type::KeyState state{ type::KeyState::release };
   };
   uint32_t _key_start_repeat_time{ 400 };
   uint32_t _key_repeat_interval{ 80 };
-  std::unordered_map<type::key, KeyState> _keys;
+  std::unordered_map<type::Key, KeyState> _keys;
 };
 
 }

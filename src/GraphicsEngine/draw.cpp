@@ -255,10 +255,13 @@ auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 pos, float size
     // upload them
     auto cmd = _command_pool.create_command().begin();
     _text_engine.generate_sdf_bitmaps(cmd);
-    cmd.end().submit_wait_free(_command_pool, _graphics_queue); // TODO: use Semaphores to replace wait
+    cmd.end().submit_wait_free(_command_pool, _graphics_queue); // TODO: use single cmd every frame after start rendering
+                                                                //       use Semaphores to replace wait
   }
 
   // add vertices and indices
+  vertices.reserve(vertices.size() + u32str.size() * 4);
+  indices.reserve(indices.size() + u32str.size() * 6);
   for (auto i = 0; i < u32str.size(); ++i)
   {
     auto glyph_info = _text_engine.get_cached_glyph_info(u32str[i]);

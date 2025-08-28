@@ -15,7 +15,7 @@ auto playback_pos2 = playback_pos0 + glm::vec2(0, 25);
 auto playback_btn  = PlayBackButton("playback_btn", playback_pos0, playback_pos1, playback_pos2, 0xffffffff, 1);
 bool click = {};
 
-auto event_process() -> type::window;
+auto event_process() -> type::WindowState;
 void render();
 
 int main()
@@ -31,15 +31,15 @@ int main()
     while (true)
     {
       auto res = tk::event_process();
-      if (res == type::window::closed)
+      if (res == type::WindowState::closed)
         break;
-      else if (res == type::window::suspended)
+      else if (res == type::WindowState::suspended)
       {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         continue;
       }
 
-      if (::event_process() == type::window::closed)
+      if (::event_process() == type::WindowState::closed)
         break;
       ::render();
 
@@ -55,11 +55,11 @@ int main()
   }
 }
 
-auto event_process() -> type::window
+auto event_process() -> type::WindowState
 {
-  using enum type::window;
-  using enum type::key;
-  using enum type::key_state;
+  using enum type::WindowState;
+  using enum type::Key;
+  using enum type::KeyState;
 
   if (tk::get_key(q) == press)
   {
@@ -100,7 +100,7 @@ void render()
     auto baseline = glm::vec2{ 0, 50 };
     
     ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline, 32, 0xffffffff, false, false);
-    ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 30 }, 32, 0xffffffff, false, true);
+    ui::text("ABCDEFｇがIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 30 }, 32, 0xffffffff, false, true);
     //ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 60 }, 32, 0xffffff00, false, false, 0xff0000ff);
     //ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 90 }, 32, 0xffffffff, false, false, 0xff000000);
     ui::text("老妈马骢", baseline + glm::vec2{ 0, 150 }, 128, 0xffffffff, false, false, 0xff000000);

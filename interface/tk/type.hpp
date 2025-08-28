@@ -2,7 +2,7 @@
 
 namespace tk { namespace type {
 
-  enum class shape
+  enum class Shape
   {
     line,
     rectangle,
@@ -18,32 +18,32 @@ namespace tk { namespace type {
     glyph,
   };
 
-  enum class shape_op
+  enum class ShapeOp 
   {
     mix,
     min,
   };
 
-  enum class mouse_state
+  enum class MouseState
   {
     left_down,
     left_up,
   };
 
-  enum class window
+  enum class WindowState
   {
     running,
     closed,
     suspended,
   };
 
-  enum class key
+  enum class Key
   {
     space,
     q,
   };
 
-  enum class key_state
+  enum class KeyState
   {
     press,
     repeate_wait,

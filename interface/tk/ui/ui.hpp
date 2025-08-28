@@ -146,7 +146,7 @@ TK_API auto text(std::string_view text, glm::vec2 const& pos, float size, uint32
  * @param thickness thickness of button's shape
  * @return true if button is clicked
  */
-TK_API bool button(std::string_view name, type::shape shape, std::vector<glm::vec2> const& data, uint32_t color, uint32_t thickness = 0);
+TK_API bool button(std::string_view name, type::Shape shape, std::vector<glm::vec2> const& data, uint32_t color, uint32_t thickness = 0);
 
 /**
  * create a clickable rectangle area

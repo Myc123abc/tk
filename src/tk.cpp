@@ -42,7 +42,7 @@ void init(std::string_view title, uint32_t width, uint32_t height, std::vector<s
   tk_ctx->engine.init(tk_ctx->window);
   tk_ctx->window.set_engine(&tk_ctx->engine);
 
-  tk_ctx->window.set_state(type::window::running); // set running to avoid event process always jump the rendering
+  tk_ctx->window.set_state(type::WindowState::running); // set running to avoid event process always jump the rendering
                                                    // the first rendered frame will also show the window
   
   // init ui context
@@ -57,7 +57,7 @@ auto get_window_size() -> glm::vec2
   return tk_ctx->window.get_framebuffer_size();
 }
 
-auto event_process() -> type::window
+auto event_process() -> type::WindowState
 {
   auto& win = tk_ctx->window;
   win.event_process();
@@ -67,7 +67,7 @@ auto event_process() -> type::window
   return win.state();
 }
 
-auto get_key(type::key k) -> type::key_state
+auto get_key(type::Key k) -> type::KeyState
 {
   return tk_ctx->window.get_key(k);
 }

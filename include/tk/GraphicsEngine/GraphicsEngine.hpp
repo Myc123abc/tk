@@ -21,10 +21,10 @@ namespace tk { namespace graphics_engine {
   {
     inline static constexpr uint32_t header_field_count{ 7 };
 
-    type::shape        type{};
-    glm::vec4          color{};
-    uint32_t           thickness{};
-    type::shape_op     op{};
+    type::Shape   type{};
+    glm::vec4     color{};
+    uint32_t      thickness{};
+    type::ShapeOp op{};
     
     std::vector<float> values;
   };

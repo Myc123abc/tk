@@ -45,7 +45,7 @@ namespace tk {
 
 LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param)
 {
-  using enum tk::type::window;
+  using enum tk::type::WindowState;
 
   auto window = reinterpret_cast<Window*>(GetWindowLongPtr(handle, GWLP_USERDATA));
   if (!window) return DefWindowProcW(handle, msg, w_param, l_param);
@@ -128,13 +128,13 @@ LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LP
 
   case WM_LBUTTONDOWN:
   {
-    window->_mouse_states.push(type::mouse_state::left_down);
+    window->_mouse_states.push(type::MouseState::left_down);
   }
   break;
 
   case WM_LBUTTONUP:
   {
-    window->_mouse_states.push(type::mouse_state::left_up);
+    window->_mouse_states.push(type::MouseState::left_up);
   }
   break;
 
@@ -144,7 +144,7 @@ LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LP
 
 void Window::init_keys() noexcept
 {
-  using enum type::key;
+  using enum type::Key;
 
   _keys =
   {
@@ -219,7 +219,7 @@ auto Window::create_vulkan_surface(VkInstance instance) const noexcept -> VkSurf
 void Window::show() noexcept
 {
   ShowWindow(_handle, SW_SHOWDEFAULT);
-  _state = type::window::running;
+  _state = type::WindowState::running;
 }
 
 auto Window::get_framebuffer_size() const noexcept -> glm::vec2
@@ -242,9 +242,9 @@ auto Window::get_mouse_position() const noexcept -> glm::vec2
   return { pos.x, pos.y };
 }
 
-auto Window::get_mouse_state() noexcept -> type::mouse_state
+auto Window::get_mouse_state() noexcept -> type::MouseState
 {
-  if (_mouse_states.empty()) return type::mouse_state::left_up;
+  if (_mouse_states.empty()) return type::MouseState::left_up;
   auto state = _mouse_states.front();
   _mouse_states.pop();
   return state;
@@ -264,9 +264,9 @@ void CALLBACK Window::message_process(LPVOID) noexcept
   }
 }
 
-auto to_vk(type::key k) -> int
+auto to_vk(type::Key k) -> int
 {
-  using enum type::key;
+  using enum type::Key;
   switch (k)
   {
   case q:     return 'Q';
@@ -275,18 +275,18 @@ auto to_vk(type::key k) -> int
   throw_if(true, "not have this key");
 }
 
-auto Window::get_key(type::key k) noexcept -> type::key_state
+auto Window::get_key(type::Key k) noexcept -> type::KeyState
 {
-  using enum type::key;
-  using enum type::key_state;
+  using enum type::Key;
+  using enum type::KeyState;
 
-  auto  key_state = GetKeyState(to_vk(k)) & 0x8000;
+  auto  KeyState = GetKeyState(to_vk(k)) & 0x8000;
   auto& key       = _keys[k];
   auto  now       = std::chrono::high_resolution_clock::now();
 
   if (key.state == release)
   {
-    if (key_state == 0)
+    if (KeyState == 0)
       return release;
     else
     {
@@ -298,7 +298,7 @@ auto Window::get_key(type::key k) noexcept -> type::key_state
   }
   else
   {
-    if (key_state == 0)
+    if (KeyState == 0)
     {
       key.state = release;
       return release;

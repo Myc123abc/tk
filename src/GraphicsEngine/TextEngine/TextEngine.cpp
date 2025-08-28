@@ -230,6 +230,8 @@ auto TextEngine::calculate_advances(std::string_view text) -> std::vector<glm::v
   // TODO: select right font to shape
   hb_shape(_fonts[0]._hb_font, _hb_buffer, nullptr, 0);
 
+  // TODO: use hb get every unicode script in text and split, search right font to shape
+
   auto length          = hb_buffer_get_length(_hb_buffer);
   auto glyph_infos     = hb_buffer_get_glyph_infos(_hb_buffer, nullptr);
   auto glyph_positions = hb_buffer_get_glyph_positions(_hb_buffer, nullptr);
@@ -254,6 +256,14 @@ auto Font::create(FT_Library ft, std::string_view path) -> Font
   check(FT_New_Face(ft, path.data(), 0, &font._face), "failed to load font");
   check(FT_Set_Pixel_Sizes(font._face, 0, Pixel_Size), "failed to set pixel size");
   font._hb_font = hb_ft_font_create(font._face, nullptr);
+
+  if (font._face->style_flags & FT_STYLE_FLAG_ITALIC)
+    font._style = Style::italic;
+  else if (font._face->style_flags & FT_STYLE_FLAG_BOLD)
+    font._style = Style::bold;
+  else
+    font._style = Style::italic_bold;
+
   return font;
 }
 

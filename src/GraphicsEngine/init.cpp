@@ -482,6 +482,10 @@ void GraphicsEngine::create_sampler()
 void GraphicsEngine::init_text_engine()
 {
   _text_engine.init(_mem_alloc);
+  _text_engine.load_font("resources/SourceCodePro-Regular.otf");
+  _text_engine.load_font("resources/SourceCodePro-Bold.otf");
+  _text_engine.load_font("resources/SourceCodePro-BoldIt.otf");
+  _text_engine.load_font("resources/SourceCodePro-It.otf");
   _text_engine.load_font("resources/NotoSansJP-Regular.ttf");
   _text_engine.load_font("resources/NotoSansSC-Regular.ttf");
   _destructors.push([&] { _text_engine.destroy(); });

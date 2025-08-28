@@ -32,11 +32,11 @@ namespace tk
    * if not call tk::render, the window will not display and event_process will alway return type::window::running
    * I do this just for display window the first frame content to avoid the possible temporary blank 
    */
-  TK_API auto event_process() -> type::window;
+  TK_API auto event_process() -> type::WindowState;
 
   TK_API void render();
   
   TK_API void destroy();
 
-  TK_API auto get_key(type::key k) -> type::key_state;
+  TK_API auto get_key(type::Key k) -> type::KeyState;
 }

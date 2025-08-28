@@ -5,7 +5,7 @@ using namespace tk::ui;
 
 void LerpPoint::run()
 {
-  using enum status;
+  using enum Status;
   if (_status == unrun)
   {
     _status     = running;
@@ -28,7 +28,7 @@ void LerpPoint::run()
 
 void LerpPoint::render()
 {
-  using enum status;
+  using enum Status;
   if (_status == running)
   {
     if (_reentry)
@@ -60,7 +60,7 @@ void LerpPoint::render()
 
 void LerpPoints::run()
 {
-  using enum status;
+  using enum Status;
   if (_status == unrun)
   {
     _status     = running;
@@ -99,7 +99,7 @@ void LerpPoints::run()
 
 void LerpPoints::render()
 {
-  using enum status;
+  using enum Status;
   if (_status == running)
   {
     if (_it == _infos.end())

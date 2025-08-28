@@ -2,12 +2,12 @@
 
 /*
 TODO:
-  1. bold, iteral, outline
-  2. split text to different lanuage
-  3. move pos from baseline to left-top corner
-  4. get line height
-  5. use vertical layout
-  6. use multiple atlas  
+  split text to different lanuage
+  change sdf italic and bold to use font families
+  move pos from baseline to left-top corner
+  get line height
+  use vertical layout
+  use multiple atlas  
 */
 
 #include <ft2build.h>
@@ -93,6 +93,15 @@ namespace tk { namespace graphics_engine {
   class Font
   {
     friend class TextEngine;
+
+    enum class Style
+    {
+      regular,
+      italic,
+      bold,
+      italic_bold,
+    };
+
   public:
     // TODO: small pixel size will lead complex glyph generate sdf bitmap not right when render in big size
     //       try use dynamic pixel size adjust by complexity of glyph
@@ -109,6 +118,7 @@ namespace tk { namespace graphics_engine {
     std::string _name;
     FT_Face    _face;
     hb_font_t* _hb_font{};
+    Style      _style{};
   };
 
   struct GlyphInfo

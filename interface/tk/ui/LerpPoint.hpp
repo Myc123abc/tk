@@ -17,7 +17,7 @@ public:
   LerpPoint(glm::vec2 start, glm::vec2 end, uint32_t time)
     : _start(start), _end(end), _now(start), _time(time), _distance(glm::distance(start, end)) {}
 
-  enum class status
+  enum class Status
   {
     unrun,
     running,
@@ -33,7 +33,7 @@ public:
 private:
   glm::vec2 _start, _end, _now;
   uint32_t  _time   = {}; // millisecond
-  status    _status = status::unrun;
+  Status    _status = Status::unrun;
   double    _rate   = {};
   decltype(std::chrono::high_resolution_clock::now()) _start_time;
 
@@ -76,7 +76,7 @@ public:
   auto stage() const noexcept  { return _stage; }
 
 private:
-  enum class status
+  enum class Status
   {
     unrun,
     running,
@@ -85,7 +85,7 @@ private:
   glm::vec2                _now;
   std::vector<LerpInfo>    _infos;
   decltype(_infos.begin()) _it;
-  status                   _status{ status::unrun };
+  Status                   _status{ Status::unrun };
   decltype(std::chrono::high_resolution_clock::now()) _start_time;
   double                   _rate {};
 
