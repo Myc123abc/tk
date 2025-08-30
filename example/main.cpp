@@ -97,18 +97,26 @@ void render()
     ui::rectangle(playback_progree_pos, playback_progree_pos + glm::vec2{ progress, 3 }, 0x0000FFFF );
 
     // TODO: space, invalid character, cache, mulitple atlases, multiple fonts
-    auto baseline = glm::vec2{ 0, 50 };
     
-    //ui::text("ABCDEFｇがIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 30 }, 32, 0xffffffff, type::FontStyle::regular);
-    //ui::line(baseline + glm::vec2 {0, 30}, baseline + glm::vec2 {1000, 30}, 0x00ff00ff);
+    auto pos = glm::vec2(0, 30);
+    //auto extent = ui::text("あ", pos, 32, 0xffffffff, type::FontStyle::italic);
+    //ui::rectangle(pos, { 1000, pos.y + extent.y }, 0x00ff00ff, 1);
+    //ui::line({ pos.x, extent.x + pos.y }, { 1000, pos.y + extent.x }, 0x00ff00ff);
 
-    ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline, 32, 0xffffffff);
-    ui::text("ABCDEFｇがIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 30 }, 32, 0xffffffff, type::FontStyle::regular);
-    ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 60 }, 32, 0xffffffff, type::FontStyle::bold);
-    ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 90 }, 32, 0xffffffff, type::FontStyle::italic_bold);    
+    auto extent = ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", pos, 32, 0xffffffff);
+    ui::rectangle(pos, pos + extent, 0x00ff00ff, 1);
+    pos.y += extent.y;
+    extent = ui::text("ABCDEFｇがIJKLMNOPQRSTUVWXYZ", pos, 32, 0xffffffff, type::FontStyle::italic);
+    ui::rectangle(pos, pos + extent, 0x00ff00ff, 1);
+    pos.y += extent.y;
+    extent = ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", pos, 32, 0xffffffff, type::FontStyle::bold);
+    ui::rectangle(pos, pos + extent, 0x00ff00ff, 1);
+    pos.y += extent.y;
+    extent = ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", pos, 32, 0xffffffff, type::FontStyle::italic_bold);    
+    ui::rectangle(pos, pos + extent, 0x00ff00ff, 1);
 
-    ui::text("老妈马骢", baseline + glm::vec2{ 0, 150 }, 128, 0xffffffff, 0xff0000ff);
-    ui::text("老妈马骢", baseline + glm::vec2{ 0, 300 }, 128, 0xffffffff, 0xff0000ff);
+    //ui::text("老妈马骢", baseline + glm::vec2{ 0, 150 }, 128, 0xffffffff, 0xff0000ff);
+    //ui::text("老妈马骢", baseline + glm::vec2{ 0, 300 }, 128, 0xffffffff, 0xff0000ff);
     //ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 150 }, 128, 0xffffffff, 0xff000000);
     //ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 300 }, 128, 0xffffffff, 0xff000000);
     //ui::text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", baseline + glm::vec2{ 0, 175 }, 128, 0xffffffff, true, false);

@@ -11,8 +11,6 @@
 
 /*
 TODO:
-  move pos from baseline to left-top corner
-  get line height
   add draw baseline option
   use vertical layout
   use multiple atlas 
@@ -56,6 +54,13 @@ namespace tk { namespace graphics_engine {
     }
   };
 
+  struct TextPosInfo
+  {
+    std::vector<glm::vec2> advances;
+    float                  max_ascender{};
+    float                  max_height{};
+  };
+
   // TODO: static func get_line_height will get current line's fonts' max heighest line-height
   // TODO: use baseline-pos convert to left-top pos also need current line's max ascender of all of fonts
   struct GlyphInfo;
@@ -84,7 +89,7 @@ namespace tk { namespace graphics_engine {
 
     auto find_glyph(uint32_t unicode, type::FontStyle style) -> std::optional<std::pair<std::reference_wrapper<Font>, uint32_t>>;
     
-    auto calculate_advances(std::string_view text, type::FontStyle style) -> std::pair<std::vector<glm::vec2>, std::u32string>;
+    auto calculate_text_pos_info(std::string_view text, type::FontStyle style) -> std::pair<TextPosInfo, std::u32string>;
     auto split_text_by_font(std::u32string_view text, type::FontStyle style) -> std::vector<std::pair<std::u32string_view, Font*>>;
     auto find_suitable_font(uint32_t unicode, type::FontStyle style) -> Font*;
 
@@ -127,9 +132,13 @@ namespace tk { namespace graphics_engine {
     FontStyleMap<UnicodeMap<GlyphInfo>>                  _glyph_infos;
     FontStyleMap<UnicodeMap<std::pair<Font, uint32_t>>>  _wait_generate_sdf_bitmap_glyphs{};
     hb_buffer_t*                                         _hb_buffer{};
-    FontStyleMap<TextMap<std::vector<glm::vec2>>>        _cached_text_advances;
+    FontStyleMap<TextMap<TextPosInfo>>                   _cached_text_advances;
     std::vector<std::pair<type::FontStyle, std::string>> _cached_texts_with_missing_glyphs;
     FontStyleMap<std::unordered_set<uint32_t>>           _missing_glyphs;
+    
+    // temp info
+    float _max_ascender{};
+    float _max_height{};
   };
 
   class Font
@@ -153,6 +162,8 @@ namespace tk { namespace graphics_engine {
     FT_Face         _face;
     hb_font_t*      _hb_font{};
     type::FontStyle _style{};
+    float           _ascender{};
+    float           _height{};
   };
 
   struct GlyphInfo
@@ -179,11 +190,12 @@ namespace tk { namespace graphics_engine {
       return size / Font::Pixel_Size;
     }
 
-    auto get_vertices(glm::vec2 const& pos, float size, uint32_t offset) const noexcept -> std::vector<Vertex>
+    auto get_vertices(glm::vec2 const& pos, float size, uint32_t offset, float ascender) const noexcept -> std::vector<Vertex>
     {
       // TODO: add vertical draw in future
-      auto scale    = get_scale(size);
+      auto scale = get_scale(size);
       auto p0 = pos + pos_offset * scale;
+      p0.y += ascender * scale;
       auto p1 = glm::vec2{ p0.x + extent.x * scale, p0.y };
       auto p2 = glm::vec2{ p0.x, p0.y + extent.y * scale };
       auto p3 = glm::vec2{ p1.x, p2.y };      

@@ -317,7 +317,7 @@ void union_end(uint32_t color, uint32_t thickness)
   shape.thickness = thickness;
 }
 
-auto text_impl(std::string_view text, glm::vec2 const& pos, float size, uint32_t inner_color, type::FontStyle style, uint32_t outer_color) -> std::pair<glm::vec2, glm::vec2>
+auto text_impl(std::string_view text, glm::vec2 const& pos, float size, uint32_t inner_color, type::FontStyle style, uint32_t outer_color) -> glm::vec2
 {
   if (text.empty()) return {};
   auto ctx = get_ctx();
@@ -327,12 +327,12 @@ auto text_impl(std::string_view text, glm::vec2 const& pos, float size, uint32_t
   return extent;
 }
 
-auto text(std::string_view text, glm::vec2 const& pos, float size, uint32_t color, type::FontStyle style) -> std::pair<glm::vec2, glm::vec2>
+auto text(std::string_view text, glm::vec2 const& pos, float size, uint32_t color, type::FontStyle style) -> glm::vec2
 {
   return text_impl(text, pos, size, color, style, 0);
 }
 
-auto text(std::string_view text, glm::vec2 const& pos, float size, uint32_t inner_color, uint32_t outer_color) -> std::pair<glm::vec2, glm::vec2>
+auto text(std::string_view text, glm::vec2 const& pos, float size, uint32_t inner_color, uint32_t outer_color) -> glm::vec2
 {
   return text_impl(text, pos, size, inner_color, type::FontStyle::regular, outer_color);
 }

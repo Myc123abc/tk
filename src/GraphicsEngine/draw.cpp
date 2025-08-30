@@ -241,9 +241,9 @@ void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> 
   vkCmdDrawIndexed(cmd, indices.size(), 1, 0, 0, 0);
 }
 
-auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 pos, float size, type::FontStyle style, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices, uint32_t offset, uint16_t& idx) -> std::pair<glm::vec2, glm::vec2>
+auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 pos, float size, type::FontStyle style, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices, uint32_t offset, uint16_t& idx) -> glm::vec2
 {
-  auto [advances, u32str] = _text_engine.calculate_advances(text, style);
+  auto [text_pos_info, u32str] = _text_engine.calculate_text_pos_info(text, style);
 
   // get some glyphs not cached
   if (_text_engine.has_uncached_glyphs(u32str, style))
@@ -261,11 +261,11 @@ auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 pos, float size
   for (auto i = 0; i < u32str.size(); ++i)
   {
     auto glyph_info = _text_engine.get_cached_glyph_info(u32str[i], style);
-    vertices.append_range(glyph_info->get_vertices(pos, size, offset)); // TODO: vertices and indices generate performance worse
+    vertices.append_range(glyph_info->get_vertices(pos, size, offset, text_pos_info.max_ascender)); // TODO: vertices and indices generate performance worse
     indices.append_range(GlyphInfo::get_indices(idx));
-    pos = GlyphInfo::get_next_position(pos, size, advances[i]);
+    pos = GlyphInfo::get_next_position(pos, size, text_pos_info.advances[i]);
   }
-  return {};
+  return { vertices.back().pos.x, text_pos_info.max_height };
 }
 
 }}

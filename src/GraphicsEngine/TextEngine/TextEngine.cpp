@@ -231,7 +231,7 @@ auto TextEngine::has_uncached_glyphs(std::u32string_view text, type::FontStyle s
   return !_wait_generate_sdf_bitmap_glyphs[style].empty();
 }
 
-auto TextEngine::calculate_advances(std::string_view text, type::FontStyle style) -> std::pair<std::vector<glm::vec2>, std::u32string>
+auto TextEngine::calculate_text_pos_info(std::string_view text, type::FontStyle style) -> std::pair<TextPosInfo, std::u32string>
 {
   assert(!text.empty());
 
@@ -271,11 +271,21 @@ auto TextEngine::calculate_advances(std::string_view text, type::FontStyle style
     }
   }
 
-  // cached calculate result
-  cached_text_advances.emplace(text.data(), advances);
-  if (has_missing_glyphs) _cached_texts_with_missing_glyphs.emplace_back(style, text.data());
+  if (has_missing_glyphs) 
+  {
+    // cache text with missing glyphs
+    _cached_texts_with_missing_glyphs.emplace_back(style, text.data());
+    // update max info
+    _max_ascender = std::max(_max_ascender, Missing_Glyph_Font_Ascender);
+    _max_height   = std::max(_max_height, Missing_Glyph_Font_Height);
+  }
 
-  return { advances, u32str };
+  auto res = TextPosInfo{ advances, _max_ascender, _max_height };
+
+  // cached calculate result
+  cached_text_advances.emplace(text.data(), res);
+
+  return { res, u32str };
 }
 
 auto TextEngine::split_text_by_font(std::u32string_view text, type::FontStyle style) -> std::vector<std::pair<std::u32string_view, Font*>>
@@ -285,9 +295,14 @@ auto TextEngine::split_text_by_font(std::u32string_view text, type::FontStyle st
   std::vector<std::pair<std::u32string_view, Font*>> result;
   result.reserve(text.size());
 
-  auto it_a     = text.begin();
-  auto it_b     = it_a + 1;
+  auto it_a      = text.begin();
+  auto it_b      = it_a + 1;
   auto prev_font = find_suitable_font(*it_a, style);
+  if (prev_font)
+  {
+    _max_ascender  = prev_font->_ascender;
+    _max_height    = prev_font->_height;
+  }
 
   while (it_b != text.end())
   {
@@ -303,6 +318,12 @@ auto TextEngine::split_text_by_font(std::u32string_view text, type::FontStyle st
       prev_font = current_font;
       it_a = it_b;
       ++it_b;
+
+      if (prev_font)
+      {
+        _max_ascender = std::max(_max_ascender, prev_font->_ascender);
+        _max_height   = std::max(_max_height, prev_font->_height);
+      }
     }
   }
 
@@ -340,6 +361,9 @@ auto Font::create(FT_Library ft, std::string_view path) -> Font
   check(FT_New_Face(ft, path.data(), 0, &font._face), "failed to load font");
   check(FT_Set_Pixel_Sizes(font._face, 0, Pixel_Size), "failed to set pixel size");
   font._hb_font = hb_ft_font_create(font._face, nullptr);
+
+  font._ascender = static_cast<float>(font._face->ascender) * Pixel_Size / font._face->units_per_EM;
+  font._height   = static_cast<float>(font._face->height)   * Pixel_Size / font._face->units_per_EM;
 
   using enum tk::type::FontStyle;
   switch (font._face->style_flags)
