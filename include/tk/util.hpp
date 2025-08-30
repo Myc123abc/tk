@@ -17,7 +17,7 @@ auto get_file_data(std::string_view filename) -> std::vector<uint32_t>;
 auto lerp(glm::vec2 const& a, glm::vec2 const& b, float t) -> glm::vec2;
 auto lerp(std::vector<glm::vec2> const& a, std::vector<glm::vec2> const& b, float t) -> std::vector<glm::vec2>;
 
-auto to_utf32(std::string_view str) -> std::pair<uint32_t, uint32_t>;
+auto to_unicode(std::string_view str) -> std::pair<uint32_t, uint32_t>;
 auto to_u32string(std::string_view str) -> std::u32string;
 
 auto to_lower(std::string_view str) -> std::string;

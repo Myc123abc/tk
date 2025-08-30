@@ -60,8 +60,6 @@ struct ui_context
   uint32_t               op_offset{};
   bool                   union_start{};
 
-  float bold_size{ .025f };
-  float italic_factor{ .4f };
   float outline_width{ .05f };
 };
 

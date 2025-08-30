@@ -146,7 +146,7 @@ void main()
   {
     // reference: https://computergraphics.stackexchange.com/questions/306/sharp-corners-with-signed-distance-fields-fonts
     // author: Detheroc
-    float d = texture(font_atlas, uv).r - 0.5 + GetBold(local_offset);
+    float d = texture(font_atlas, uv).r - 0.5;
     float w = fwidth(d);
     float inner_alpha = clamp(d / w + 0.5, 0.0, 1.0);
 
@@ -159,7 +159,7 @@ void main()
     {
       // reference: https://www.redblobgames.com/x/2404-distance-field-effects/
       float outline_width = GetOutlineWidht(local_offset);
-      float outer_alpha = clamp((d + outline_width) / w + 0.5, 0.0, 1.0);
+      float outer_alpha   = clamp((d + outline_width) / w + 0.5, 0.0, 1.0);
 
       if (inner_color.a == 0)
         inner_color = vec4(0);
@@ -171,7 +171,7 @@ void main()
     return;
   }
 
-  // sdf process
+  // other process
   float w = length(vec2(dFdxFine(gl_FragCoord.x), dFdyFine(gl_FragCoord.y)));
 
   out_color = GetColor(local_offset);

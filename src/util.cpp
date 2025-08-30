@@ -39,7 +39,7 @@ auto lerp(std::vector<glm::vec2> const& a, std::vector<glm::vec2> const& b, floa
   return res;
 }
 
-auto to_utf32(std::string_view str) -> std::pair<uint32_t, uint32_t>
+auto to_unicode(std::string_view str) -> std::pair<uint32_t, uint32_t>
 {
   assert(!str.empty());
   uint8_t ch = str[0];
@@ -69,7 +69,7 @@ auto to_u32string(std::string_view str) -> std::u32string
   std::u32string u32str;
   for (auto i = 0; i < str.size();)
   {
-    auto res = to_utf32(str.data() + i);
+    auto res = to_unicode(str.data() + i);
     u32str.push_back(res.first);
     i += res.second;
   }

@@ -50,4 +50,12 @@ namespace tk { namespace type {
     release,
   };
 
+  enum class FontStyle
+  {
+    regular,
+    italic,
+    bold,
+    italic_bold,
+  };
+
 }}

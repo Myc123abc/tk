@@ -38,16 +38,6 @@ TK_API inline void begin(std::string_view name, float x, float y) { begin(name, 
 TK_API void end();
 
 /**
- * set bold size of text rendering.
- */
-TK_API void set_text_bold_size(float size) noexcept;
-
-/**
- * set italic factor of text rendering.
- */
-TK_API void set_text_italic_factor(float factor) noexcept;
-
-/**
  * set outline width of text rendering.
  */
 TK_API void set_text_outline_width(float width) noexcept;
@@ -125,13 +115,22 @@ TK_API void union_end(uint32_t color, uint32_t thickness = 0);
  * @param text
  * @param pos left top of text
  * @param size
+ * @param color
+ * @param style regular(default), italic, bold, italic_bold
+ * @return extent of text
+ */
+TK_API auto text(std::string_view text, glm::vec2 const& pos, float size, uint32_t color, type::FontStyle style = type::FontStyle::regular) -> std::pair<glm::vec2, glm::vec2>;
+
+/**
+ * draw text
+ * @param text
+ * @param pos left top of text
+ * @param size
  * @param inner_color
- * @param italic
- * @param bold
  * @param outer_color alpha not 0 then draw outline
  * @return extent of text
  */
-TK_API auto text(std::string_view text, glm::vec2 const& pos, float size, uint32_t inner_color, bool italic = false, bool bold = false, uint32_t outer_color = 0) -> std::pair<glm::vec2, glm::vec2>;
+TK_API auto text(std::string_view text, glm::vec2 const& pos, float size, uint32_t inner_color, uint32_t outer_color) -> std::pair<glm::vec2, glm::vec2>;
 
 ////////////////////////////////////////////////////////////////////////////////
 //                                UI

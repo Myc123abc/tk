@@ -5,6 +5,9 @@ constexpr auto Missing_Glyph_Width       = 43;
 constexpr auto Missing_Glyph_Height      = 47;
 constexpr auto Missing_Glyph_Left_Offset = -7;
 constexpr auto Missing_Glyph_Up_Offset   = -32;
+constexpr auto Missing_Glyph_Size        = 32;
+constexpr auto Missing_Glyph_Advance_X   = 30;
+constexpr auto Missing_Glyph_Advance_Y   = 0;
 
 constexpr unsigned char Missing_Glyph_SDF_Bitmap[] = {
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,

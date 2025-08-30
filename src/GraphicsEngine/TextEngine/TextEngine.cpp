@@ -1,7 +1,12 @@
 #include "tk/GraphicsEngine/TextEngine/TextEngine.hpp"
 #include "tk/ErrorHandling.hpp"
 #include "missing-glyph-sdf-bitmap.hpp"
-#include "hb-ft.h"
+#include "tk/util.hpp"
+
+#include <hb-ft.h>
+#include <hb-ot.h>
+
+#include <ranges>
 
 
 #define check(x, msg) throw_if(x, "[TextEngine] {}", msg)
@@ -30,15 +35,19 @@ void TextEngine::destroy()
   hb_buffer_destroy(_hb_buffer);
   _glyph_atlas_buffer.destroy();
   _glyph_atlas.destroy();
-  for (auto& font: _fonts)
-    font.destory();
+  for (auto& [_, fonts]: _fonts)
+    for (auto& font : fonts)
+      font.destory();
   check(FT_Done_FreeType(_ft), "failed to destroy");
 }
 
 void TextEngine::preload_glyphs(Command const& cmd)
 {
   calculate_write_position({ Missing_Glyph_Width, Missing_Glyph_Height });
-  upload_glyph(cmd, Missing_Glyph_Unicode, Missing_Glyph_SDF_Bitmap, { Missing_Glyph_Width, Missing_Glyph_Height }, Missing_Glyph_Left_Offset, Missing_Glyph_Up_Offset);
+  upload_glyph(cmd, Missing_Glyph_Unicode, Missing_Glyph_SDF_Bitmap,
+    { Missing_Glyph_Width, Missing_Glyph_Height },
+    Missing_Glyph_Left_Offset, Missing_Glyph_Up_Offset,
+    type::FontStyle::regular);
 }
 
 void TextEngine::calculate_write_position(glm::vec2 const& extent)
@@ -72,10 +81,10 @@ again:
   assert(true);
 }
 
-void TextEngine::upload_glyph(Command const& cmd, uint32_t unicode, uint8_t const* data, glm::vec2 extent, float left_offset, float up_offset)
+void TextEngine::upload_glyph(Command const& cmd, uint32_t unicode, uint8_t const* data, glm::vec2 extent, float left_offset, float up_offset, type::FontStyle style)
 {
   // promise only one glyph to upload and not contain it
-  assert(_write_positions.size() == 1 && !_glyph_infos.contains(unicode));
+  assert(_write_positions.size() == 1 && !glyph_infos_has(unicode, style));
   // record glyph information
   GlyphInfo info(_write_positions[0], extent, left_offset, up_offset);
 
@@ -94,7 +103,7 @@ void TextEngine::upload_glyph(Command const& cmd, uint32_t unicode, uint8_t cons
   _write_positions.clear();
 
   // store glyph information
-  _glyph_infos.emplace(unicode, info);
+  _glyph_infos[style].emplace(unicode, info);
 }
 
 void TextEngine::upload_glyphs(Command const& cmd, std::span<SDFBitmap> bitmaps)
@@ -110,14 +119,14 @@ void TextEngine::upload_glyphs(Command const& cmd, std::span<SDFBitmap> bitmaps)
   for (auto const& bitmap : bitmaps)
   {
     // promise this is an uncached glyph
-    assert(!_glyph_infos.contains(bitmap.unicode));
+    assert(!glyph_infos_has(bitmap.unicode, bitmap.style));
 
     auto byte_size = bitmap.extent.x * bitmap.extent.y;
     
     // get glyph information
     GlyphInfo info(_write_positions[index], bitmap.extent, bitmap.left_offset, bitmap.up_offset);
     // record glyph information
-    _glyph_infos.emplace(bitmap.unicode, info);
+    _glyph_infos[bitmap.style].emplace(bitmap.unicode, info);
 
     if (bitmap.valid())
     {
@@ -145,16 +154,19 @@ void TextEngine::generate_sdf_bitmaps(Command const& cmd)
   assert(!_wait_generate_sdf_bitmap_glyphs.empty());
 
   std::vector<SDFBitmap> bitmaps;
-  bitmaps.reserve(_wait_generate_sdf_bitmap_glyphs.size());
-  _write_positions.reserve(_wait_generate_sdf_bitmap_glyphs.size());
+  bitmaps.reserve(wait_generate_glyphs_size());
+  _write_positions.reserve(bitmaps.size());
 
-  for (auto& [unicode, pair] : _wait_generate_sdf_bitmap_glyphs)
+  for (auto& [style, unicode_pairs] : _wait_generate_sdf_bitmap_glyphs)
   {
-    auto& [font, glyph_index] = pair;
-    // generate sdf bitmaps
-    bitmaps.emplace_back(font.generate_sdf_bitmap(glyph_index, unicode));
-    // calculate every bitmaps position in atlas
-    calculate_write_position(bitmaps.back().extent);
+    for (auto& [unicode, pair] : unicode_pairs)
+    {
+      auto& [font, glyph_index] = pair;
+      // generate sdf bitmaps
+      bitmaps.emplace_back(font.generate_sdf_bitmap(glyph_index, unicode, style));
+      // calculate every bitmaps position in atlas
+      calculate_write_position(bitmaps.back().extent);
+    }
   }
 
   // upload to atlas
@@ -165,84 +177,156 @@ void TextEngine::generate_sdf_bitmaps(Command const& cmd)
 
 void TextEngine::load_font(std::string_view path)
 {
-  for (auto const& font : _fonts)
-    throw_if(font._name == path, "[TextEngine] {} is already exist", path);
-  _fonts.emplace_back(Font::create(_ft, path));
+  for (auto const& [_, fonts] : _fonts)
+    for (auto const& font : fonts)
+      throw_if(font._name == path, "[TextEngine] {} is already exist", path);
+  
+  auto font = Font::create(_ft, path);
+  _fonts[font._style].emplace_back(font);
 
-  // TODO: if dynamic add new fonts, remove have missing glyphs' cached text and in next rendering reshaped by hurfbuzz
+  // clear missing glyphs and cached text advances
+  _missing_glyphs.clear();
+  for (auto const& [style, text] : _cached_texts_with_missing_glyphs)
+    _cached_text_advances[style].erase(text);
+  _cached_texts_with_missing_glyphs.clear();
 }
 
-auto TextEngine::find_glyph(uint32_t unicode) -> std::optional<std::pair<Font, uint32_t>>
+auto TextEngine::find_glyph(uint32_t unicode, type::FontStyle style) -> std::optional<std::pair<std::reference_wrapper<Font>, uint32_t>>
 {
   // promise not generated
-  assert(!_glyph_infos.contains(unicode));
-  for (auto& font : _fonts)
+  assert(!glyph_infos_has(unicode, style));
+  for (auto& font : _fonts[style])
   {
     auto glyph_index = font.find_glyph(unicode);
     if (glyph_index)
     {
-      return std::make_pair(font, glyph_index);
+      return std::make_pair(std::ref(font), glyph_index);
     }
   }
   return {};
 }
 
-auto TextEngine::get_cached_glyph_info(uint32_t unicode) -> GlyphInfo*
+auto TextEngine::get_cached_glyph_info(uint32_t unicode, type::FontStyle style) -> GlyphInfo*
 {
   // promise cached
-  assert(_glyph_infos.contains(unicode) || _missing_glyphs.contains(unicode));
-  auto it = _glyph_infos.find(unicode);
-  if (it != _glyph_infos.end())
+  assert(glyph_infos_has(unicode, style) || missing_glyphs_has(unicode, style));
+  auto& infos = _glyph_infos[style];
+  if (auto it = infos.find(unicode); it != infos.end())
     return &it->second;
-  return &_glyph_infos.at(Missing_Glyph_Unicode);
+  return &_glyph_infos[type::FontStyle::regular].at(Missing_Glyph_Unicode);
 }
 
-auto TextEngine::has_uncached_glyphs(std::u32string_view text) -> bool
+auto TextEngine::has_uncached_glyphs(std::u32string_view text, type::FontStyle style) -> bool
 {
   for (auto const& unicode : text)
   {
-    if (!_glyph_infos.contains(unicode) && !_missing_glyphs.contains(unicode) && !_wait_generate_sdf_bitmap_glyphs.contains(unicode))
+    if (!glyph_infos_has(unicode, style) && !missing_glyphs_has(unicode, style) && !wait_generate_glyphs_has(unicode, style))
     {
-      auto res = find_glyph(unicode);
-      if (res)
-      {
-        _wait_generate_sdf_bitmap_glyphs.emplace(unicode, res.value());
-      }
+      if (auto res = find_glyph(unicode, style))
+        _wait_generate_sdf_bitmap_glyphs[style].emplace(unicode, *res);
       else
-      {
-        _missing_glyphs.emplace(unicode); // TODO: can use for dynamic load font refind missing glyph,
-                                          // and reshape in cached text which have missing glyphs
-      }
+        _missing_glyphs[style].emplace(unicode);
     }
   }
-  return !_wait_generate_sdf_bitmap_glyphs.empty();
+  return !_wait_generate_sdf_bitmap_glyphs[style].empty();
 }
 
-auto TextEngine::calculate_advances(std::string_view text) -> std::vector<glm::vec2>
+auto TextEngine::calculate_advances(std::string_view text, type::FontStyle style) -> std::pair<std::vector<glm::vec2>, std::u32string>
 {
-  if (_cached_text_advances.contains(text.data())) return _cached_text_advances[text.data()];
+  assert(!text.empty());
 
-  hb_buffer_reset(_hb_buffer);
-  // TODO: promise text is same script and direction
-  hb_buffer_add_utf8(_hb_buffer, text.data(), -1, 0, -1);
-  // TODO: use icu or smt or else like suckless's one to set script, direction, language
-  hb_buffer_guess_segment_properties(_hb_buffer);
-  // TODO: select right font to shape
-  hb_shape(_fonts[0]._hb_font, _hb_buffer, nullptr, 0);
+  auto u32str = util::to_u32string(text);
 
-  // TODO: use hb get every unicode script in text and split, search right font to shape
+  // try to get cached text advances
+  auto& cached_text_advances = _cached_text_advances[style];
+  if (cached_text_advances.contains(text.data())) return { cached_text_advances[text.data()], u32str };
 
-  auto length          = hb_buffer_get_length(_hb_buffer);
-  auto glyph_infos     = hb_buffer_get_glyph_infos(_hb_buffer, nullptr);
-  auto glyph_positions = hb_buffer_get_glyph_positions(_hb_buffer, nullptr);
+  // uncached, calculate advances
   std::vector<glm::vec2> advances;
-  advances.reserve(length);
-  for (auto i = 0; i < length; ++i)
-    advances.emplace_back(static_cast<float>(glyph_positions[i].x_advance) / 64,
-                          static_cast<float>(glyph_positions[i].y_advance) / 64);
+  advances.reserve(u32str.size());
+  bool has_missing_glyphs{};
 
-  _cached_text_advances.emplace(text.data(), advances);
-  return advances;
+  // split text by script
+  for (auto const& [text, font] : split_text_by_font(u32str, style))
+  {
+    if (font)
+    {
+      hb_buffer_reset(_hb_buffer);
+      hb_buffer_add_utf32(_hb_buffer, reinterpret_cast<uint32_t const*>(text.data()), text.size(), 0, -1);
+      hb_buffer_guess_segment_properties(_hb_buffer);
+      hb_shape(font->_hb_font, _hb_buffer, nullptr, 0);
+
+      auto glyph_positions = hb_buffer_get_glyph_positions(_hb_buffer, nullptr);
+      for (auto i = 0; i < text.size(); ++i)
+        advances.emplace_back(static_cast<float>(glyph_positions[i].x_advance) / 64, static_cast<float>(glyph_positions[i].y_advance) / 64);
+    }
+    // if not have font, the text is missing glyphs
+    else
+    {
+      has_missing_glyphs = true;
+      static auto missing_glyph_position_info = glm::vec2{ Missing_Glyph_Advance_X * Missing_Glyph_Size / Font::Pixel_Size,
+                                                           Missing_Glyph_Advance_Y * Missing_Glyph_Size / Font::Pixel_Size };
+      advances.resize(advances.size() + text.size(), missing_glyph_position_info);
+      continue;
+    }
+  }
+
+  // cached calculate result
+  cached_text_advances.emplace(text.data(), advances);
+  if (has_missing_glyphs) _cached_texts_with_missing_glyphs.emplace_back(style, text.data());
+
+  return { advances, u32str };
+}
+
+auto TextEngine::split_text_by_font(std::u32string_view text, type::FontStyle style) -> std::vector<std::pair<std::u32string_view, Font*>>
+{
+  assert(!text.empty());
+
+  std::vector<std::pair<std::u32string_view, Font*>> result;
+  result.reserve(text.size());
+
+  auto it_a     = text.begin();
+  auto it_b     = it_a + 1;
+  auto prev_font = find_suitable_font(*it_a, style);
+
+  while (it_b != text.end())
+  {
+    auto current_font = find_suitable_font(*it_b, style);
+    if (current_font == prev_font)
+    {
+      ++it_b;
+      continue;
+    }
+    else
+    {
+      result.emplace_back(std::u32string_view{ it_a, it_b }, prev_font);
+      prev_font = current_font;
+      it_a = it_b;
+      ++it_b;
+    }
+  }
+
+  // process last one
+  assert(it_a < it_b);
+  result.emplace_back(std::u32string_view{ it_a, it_b }, prev_font);
+
+  return result;
+}
+
+auto TextEngine::find_suitable_font(uint32_t unicode, type::FontStyle style) -> Font*
+{
+  if (auto it = std::ranges::find_if(_fonts[style], [unicode](auto& font) { return font.find_glyph(unicode); });
+      it != _fonts[style].end())
+      return &*it;
+  return {};
+}
+
+auto TextEngine::wait_generate_glyphs_size() const noexcept -> uint32_t
+{
+  uint32_t size{};
+  for (auto const& [_, glyphs] : _wait_generate_sdf_bitmap_glyphs)
+    size += glyphs.size();
+  return size;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -257,12 +341,25 @@ auto Font::create(FT_Library ft, std::string_view path) -> Font
   check(FT_Set_Pixel_Sizes(font._face, 0, Pixel_Size), "failed to set pixel size");
   font._hb_font = hb_ft_font_create(font._face, nullptr);
 
-  if (font._face->style_flags & FT_STYLE_FLAG_ITALIC)
-    font._style = Style::italic;
-  else if (font._face->style_flags & FT_STYLE_FLAG_BOLD)
-    font._style = Style::bold;
-  else
-    font._style = Style::italic_bold;
+  using enum tk::type::FontStyle;
+  switch (font._face->style_flags)
+  {
+  case FT_STYLE_FLAG_ITALIC:
+    font._style = italic;
+    break;
+
+  case FT_STYLE_FLAG_BOLD:
+    font._style = bold;
+    break;
+
+  case FT_STYLE_FLAG_ITALIC | FT_STYLE_FLAG_BOLD:
+    font._style = italic_bold;
+    break;
+      
+  default:
+    font._style = regular;
+    break;
+  }
 
   return font;
 }
@@ -273,23 +370,26 @@ void Font::destory()
   check(FT_Done_Face(_face), "failed to destroy font");
 }
 
-auto Font::find_glyph(uint32_t unicode) -> uint32_t
+auto Font::find_glyph(uint32_t unicode) noexcept -> uint32_t
 {
   return FT_Get_Char_Index(_face, unicode);
 }
 
-auto Font::generate_sdf_bitmap(uint32_t glyph_index, uint32_t unicode) -> SDFBitmap
+auto Font::generate_sdf_bitmap(uint32_t glyph_index, uint32_t unicode, type::FontStyle style) -> SDFBitmap
 {
   assert(glyph_index != 0);
   check(FT_Load_Glyph(_face, glyph_index, FT_LOAD_RENDER), "failed to load glyph with render");
-  check(FT_Render_Glyph(_face->glyph, FT_RENDER_MODE_SDF), "failed to render sdf bitmap");
+  auto glyph = _face->glyph;
+  check(FT_Render_Glyph(glyph, FT_RENDER_MODE_SDF), "failed to render sdf bitmap");
+  auto ft_bitmap = _face->glyph->bitmap;
   SDFBitmap bitmap;
-  bitmap.extent      = { _face->glyph->bitmap.width, _face->glyph->bitmap.rows };
+  bitmap.extent      = { ft_bitmap.width, ft_bitmap.rows };
   bitmap.unicode     = unicode;
-  bitmap.left_offset = _face->glyph->bitmap_left;
-  bitmap.up_offset   = -_face->glyph->bitmap_top;
+  bitmap.style       = style;
+  bitmap.left_offset = glyph->bitmap_left;
+  bitmap.up_offset   = -glyph->bitmap_top;
   bitmap.data.resize(bitmap.extent.x * bitmap.extent.y);
-  memcpy(bitmap.data.data(), _face->glyph->bitmap.buffer, bitmap.data.size());
+  memcpy(bitmap.data.data(), ft_bitmap.buffer, bitmap.data.size());
   return bitmap;
 }
 

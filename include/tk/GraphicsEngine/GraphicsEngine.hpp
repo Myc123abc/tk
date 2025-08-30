@@ -64,7 +64,7 @@ namespace tk { namespace graphics_engine {
 
     void render_end();
 
-    auto parse_text(std::string_view text, glm::vec2 pos, float size, float italic_factor, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices, uint32_t offset, uint16_t& idx) -> std::pair<glm::vec2, glm::vec2>;
+    auto parse_text(std::string_view text, glm::vec2 pos, float size, type::FontStyle style, std::vector<Vertex>& vertices, std::vector<uint16_t>& indices, uint32_t offset, uint16_t& idx) -> std::pair<glm::vec2, glm::vec2>;
 
     void sdf_render_begin();
     void sdf_render(std::span<Vertex> vertices, std::span<uint16_t> indices, std::span<ShapeProperty> shape_properties);
