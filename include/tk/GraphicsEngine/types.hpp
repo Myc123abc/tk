@@ -10,7 +10,7 @@ namespace tk { namespace graphics_engine {
     glm::vec2 pos{};
     glm::vec2 uv{};
     uint32_t  offset{};
-    uint32_t  padding{};
+    uint32_t  glyph_atlases_index{};
   };
 
 }}

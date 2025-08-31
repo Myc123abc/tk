@@ -72,7 +72,7 @@ void Buffer::add_tag(std::string const& tag)
 auto Buffer::append(void const* data, uint32_t size) -> Buffer&
 {
   auto total_size = _size + size;
-  throw_if(total_size > _capacity, "exceeding capcity");
+  throw_if(total_size > _capacity, "[MemoryAllocator] TODO: dynamic increase capacity of buffer");
   throw_if(vmaCopyMemoryToAllocation(_allocator, data, _allocation, _size, size) != VK_SUCCESS,
            "failed to copy data to upload buffer");
   _size = total_size;

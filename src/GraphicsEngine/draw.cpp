@@ -191,7 +191,7 @@ void GraphicsEngine::render_end()
 void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> indices, std::span<ShapeProperty> shape_properties)
 {
   // get buffer and clear
-  auto& buffer = _buffers[_current_frame].clear();
+  auto& buffer = _vertex_buffers[_current_frame].clear();
 
   // upload vertices to buffer
   buffer.append_range(vertices);
@@ -261,7 +261,8 @@ auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 pos, float size
   for (auto i = 0; i < u32str.size(); ++i)
   {
     auto glyph_info = _text_engine.get_cached_glyph_info(u32str[i], style);
-    vertices.append_range(glyph_info->get_vertices(pos, size, offset, text_pos_info.max_ascender)); // TODO: vertices and indices generate performance worse
+    // TODO: change 0 to atlases index
+    vertices.append_range(glyph_info->get_vertices(pos, size, offset, text_pos_info.max_ascender, 0)); // TODO: vertices and indices generate performance worse
     indices.append_range(GlyphInfo::get_indices(idx));
     pos = GlyphInfo::get_next_position(pos, size, text_pos_info.advances[i]);
   }

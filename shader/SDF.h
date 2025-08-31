@@ -5,7 +5,7 @@ struct Vertex
   vec2 pos;
   vec2 uv;
   uint offset;
-  uint padding;
+  uint glyph_atlases_index;
 };
 
 layout(std430, buffer_reference) readonly buffer Vertices 
@@ -79,9 +79,9 @@ layout(push_constant) uniform PushConstant
 #define GetThickness(x) GetData(x + 5)
 #define GetOperator(x)  GetData(x + 6)
 
-#define GetInnerColor(x)   GetVec4(x + 1)
-#define GetOuterColor(x)   GetVec4(x + 5)
-#define GetOutlineWidht(x) GetDataF(x + 9)
+#define GetInnerColor(x)        GetVec4(x + 1)
+#define GetOuterColor(x)        GetVec4(x + 5)
+#define GetOutlineWidht(x)      GetDataF(x + 9)
 
 ////////////////////////////////////////////////////////////////////////////////
 //                            SDF functions

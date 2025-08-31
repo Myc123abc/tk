@@ -1,13 +1,15 @@
 #version 460
+#extension GL_EXT_nonuniform_qualifier : require
 
 #include "SDF.h"
 
 layout(location = 0) in vec2 uv;
 layout(location = 1) flat in uint offset;
+layout(location = 2) flat in uint glyph_atlases_index;
 
 layout(location = 0) out vec4 out_color;
 
-layout(binding = 0) uniform sampler2D font_atlas;
+layout(binding = 0) uniform sampler2D glyph_atlases[];
 
 ////////////////////////////////////////////////////////////////////////////////
 //                                SDF shapes
@@ -146,7 +148,7 @@ void main()
   {
     // reference: https://computergraphics.stackexchange.com/questions/306/sharp-corners-with-signed-distance-fields-fonts
     // author: Detheroc
-    float d = texture(font_atlas, uv).r - 0.5;
+    float d = texture(glyph_atlases[nonuniformEXT(glyph_atlases_index)], uv).r - 0.5;
     float w = fwidth(d);
     float inner_alpha = clamp(d / w + 0.5, 0.0, 1.0);
 

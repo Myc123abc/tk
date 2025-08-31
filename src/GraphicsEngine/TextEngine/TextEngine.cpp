@@ -22,8 +22,11 @@ void TextEngine::init(MemoryAllocator& alloc)
   // initialize freetype
   check(FT_Init_FreeType(&_ft), "failed to initialize");
   
+  _mem_alloc = &alloc;
+
   // create glyph atlas and buffer
-  _glyph_atlas = alloc.create_image(VK_FORMAT_R8_UNORM, Glyph_Atlas_Width, Glyph_Atlas_Height, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+  _glyph_atlases.emplace_back(alloc.create_image(VK_FORMAT_R8_UNORM, Glyph_Atlas_Width, Glyph_Atlas_Height, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT));
+  // TODO: dynamic buffer
   _glyph_atlas_buffer = alloc.create_buffer(Glyph_Atlas_Width * Glyph_Atlas_Height, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
 
   // create harffbuzz buffer
@@ -34,7 +37,8 @@ void TextEngine::destroy()
 {
   hb_buffer_destroy(_hb_buffer);
   _glyph_atlas_buffer.destroy();
-  _glyph_atlas.destroy();
+  for (auto& image : _glyph_atlases)
+    image.destroy();
   for (auto& [_, fonts]: _fonts)
     for (auto& font : fonts)
       font.destory();
@@ -62,6 +66,7 @@ again:
     _write_positions.emplace_back(_current_write_position);
     _current_write_position.x = write_max_pos.x;
     _current_line_max_glyph_height = std::max(_current_line_max_glyph_height, extent.y);
+    // TODO: _glyph_atlases_indexs.emplace_back(_glyph_atlases.size() - 1);
     return;
   }
   else if (write_max_pos.x >= Glyph_Atlas_Width)
@@ -74,8 +79,9 @@ again:
   }
   else if (write_max_pos.y >= Glyph_Atlas_Height)
   {
-    throw_if(true, "TODO: create new glyph atlas");
-    _current_write_position.y = {};
+    // TODO: update descriptor buffer
+    _glyph_atlases.emplace_back(_mem_alloc->create_image(VK_FORMAT_R8_UNORM, Glyph_Atlas_Width, Glyph_Atlas_Height, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT));
+    _current_write_position.y = 0;
     goto again;
   }
   assert(true);
@@ -93,11 +99,13 @@ void TextEngine::upload_glyph(Command const& cmd, uint32_t unicode, uint8_t cons
   // upload data to buffer
   _glyph_atlas_buffer.append(data, extent.x * extent.y);
 
+  // TODO:
   // copy glyph data from buffer to image
-  copy(cmd, _glyph_atlas_buffer, 0, _glyph_atlas, _write_positions[0], extent);
+  copy(cmd, _glyph_atlas_buffer, 0, *get_first_glyph_atlas_pointer(), _write_positions[0], extent);
   
+  // TODO:
   // set image layout for read
-  _glyph_atlas.set_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  get_first_glyph_atlas_pointer()->set_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
   // clear position information
   _write_positions.clear();
@@ -132,8 +140,9 @@ void TextEngine::upload_glyphs(Command const& cmd, std::span<SDFBitmap> bitmaps)
     {
       // copy glyph data to buffer
       _glyph_atlas_buffer.append(bitmap.data.data(), byte_size);
+      // TODO:
       // copy glyph from buffer to image
-      copy(cmd, _glyph_atlas_buffer, buffer_offset, _glyph_atlas, _write_positions[index], bitmap.extent);
+      copy(cmd, _glyph_atlas_buffer, buffer_offset, *get_first_glyph_atlas_pointer(), _write_positions[index], bitmap.extent);
     }
 
     // move to next one
@@ -141,8 +150,9 @@ void TextEngine::upload_glyphs(Command const& cmd, std::span<SDFBitmap> bitmaps)
     buffer_offset += byte_size;
   }
 
+  // TODO:
   // set image layout for read
-  _glyph_atlas.set_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  get_first_glyph_atlas_pointer()->set_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
   // clear stored uvs
   _write_positions.clear();

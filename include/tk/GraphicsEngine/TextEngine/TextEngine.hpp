@@ -11,9 +11,8 @@
 
 /*
 TODO:
-  add draw baseline option
-  use vertical layout
   use multiple atlas 
+  use vertical layout
   split text engine from grapihcs engine, supply interface to initialize graphics backend
   and model vn project, vn-text, vn-graphics, vn-ui
 */
@@ -61,8 +60,6 @@ namespace tk { namespace graphics_engine {
     float                  max_height{};
   };
 
-  // TODO: static func get_line_height will get current line's fonts' max heighest line-height
-  // TODO: use baseline-pos convert to left-top pos also need current line's max ascender of all of fonts
   struct GlyphInfo;
   class Font;
   class TextEngine
@@ -81,7 +78,7 @@ namespace tk { namespace graphics_engine {
 
     void load_font(std::string_view path);
     
-    auto get_glyph_atlas_pointer() noexcept { return &_glyph_atlas; }
+    auto get_first_glyph_atlas_pointer() noexcept { return &_glyph_atlases[0]; }
 
     auto has_uncached_glyphs(std::u32string_view text, type::FontStyle style) -> bool;
     auto get_cached_glyph_info(uint32_t unicode, type::FontStyle style) -> GlyphInfo*;
@@ -124,7 +121,8 @@ namespace tk { namespace graphics_engine {
 
     FT_Library                                           _ft;
     FontStyleMap<std::vector<Font>>                      _fonts;
-    Image                                                _glyph_atlas; // TODO: expand to multiple, and should it have a limitation? and replace old one if attach limitation.
+    MemoryAllocator*                                     _mem_alloc{};
+    std::vector<Image>                                   _glyph_atlases;
     Buffer                                               _glyph_atlas_buffer; // TODO: use common buffer which in graphics engine
     glm::vec2                                            _current_write_position{};
     std::vector<glm::vec2>                               _write_positions{};
@@ -135,10 +133,9 @@ namespace tk { namespace graphics_engine {
     FontStyleMap<TextMap<TextPosInfo>>                   _cached_text_advances;
     std::vector<std::pair<type::FontStyle, std::string>> _cached_texts_with_missing_glyphs;
     FontStyleMap<std::unordered_set<uint32_t>>           _missing_glyphs;
-    
-    // temp info
-    float _max_ascender{};
-    float _max_height{};
+    float                                                _max_ascender{};
+    float                                                _max_height{};
+    // TODO: cache style unicode glyph_atlases_index
   };
 
   class Font
@@ -190,7 +187,7 @@ namespace tk { namespace graphics_engine {
       return size / Font::Pixel_Size;
     }
 
-    auto get_vertices(glm::vec2 const& pos, float size, uint32_t offset, float ascender) const noexcept -> std::vector<Vertex>
+    auto get_vertices(glm::vec2 const& pos, float size, uint32_t offset, float ascender, uint32_t glyph_atlases_index) const noexcept -> std::vector<Vertex>
     {
       // TODO: add vertical draw in future
       auto scale = get_scale(size);
@@ -201,10 +198,10 @@ namespace tk { namespace graphics_engine {
       auto p3 = glm::vec2{ p1.x, p2.y };      
       return
       {
-        { p0, { min_x, min_y }, offset },
-        { p1, { max_x, min_y }, offset },
-        { p2, { min_x, max_y }, offset },
-        { p3, { max_x, max_y }, offset },
+        { p0, { min_x, min_y }, offset, glyph_atlases_index },
+        { p1, { max_x, min_y }, offset, glyph_atlases_index },
+        { p2, { min_x, max_y }, offset, glyph_atlases_index },
+        { p3, { max_x, max_y }, offset, glyph_atlases_index },
       };
     }
 

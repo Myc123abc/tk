@@ -4,4 +4,3 @@ out
 .vs
 shader/*.spv
 CMakeSettings.json
-resources/*.msdf

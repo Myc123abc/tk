@@ -13,5 +13,5 @@ glslc -fshader-stage=fragment shader/SDF.frag -o shader/SDF_frag.spv
 cp shader/SDF_vert.spv build/example/shader/SDF_vert.spv
 cp shader/SDF_frag.spv build/example/shader/SDF_frag.spv
 
-mkdir build/example/resources
-cp    resources/* build/example/resources/
+mkdir build/example/assets
+cp    assets/* build/example/assets/

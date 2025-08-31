@@ -2,6 +2,7 @@
 #include "init-util.hpp"
 #include "tk/GraphicsEngine/vk_extension.hpp"
 #include "tk/GraphicsEngine/config.hpp"
+#include "tk/GraphicsEngine/Features.hpp"
 
 #include <ranges>
 #include <set>
@@ -45,7 +46,6 @@ void GraphicsEngine::destroy()
   if (_device)
     vkDeviceWaitIdle(_device);
   _destructors.clear();
-  _device_extensions.clear();
 }
 
 void GraphicsEngine::create_instance()
@@ -59,7 +59,7 @@ void GraphicsEngine::create_instance()
   VkApplicationInfo app_info
   {
     .pApplicationName = "tk",
-    .apiVersion       = Vulkan_Version,
+    .apiVersion       = config()->vulkan_version,
   };
 
   // layers
@@ -125,7 +125,7 @@ void GraphicsEngine::select_physical_device()
     if (score > 0)
     {
       auto queue_family_indices = get_queue_family_indices(device, _surface);
-      if (check_device_extensions_support(device, _device_extensions) &&
+      if (check_device_extensions_support(device, config()->device_extensions) &&
           !get_swapchain_details(device, _surface).has_empty())
       {
         _physical_device = device;
@@ -136,13 +136,9 @@ void GraphicsEngine::select_physical_device()
 
   throw_if(_physical_device == VK_NULL_HANDLE, "failed to find a suitable GPU");
 
-  auto max_msaa_sample_count = get_max_multisample_count(_physical_device);
-  //throw_if(_msaa_sample_count > max_msaa_sample_count, "unsupported 4xmsaa");
-
 #ifndef NDEBUG
   print_supported_physical_devices(_instance);
   print_supported_device_extensions(_physical_device);
-  print_supported_max_msaa_sample_count(max_msaa_sample_count);
 #endif
 }
 
@@ -171,58 +167,19 @@ void GraphicsEngine::create_device_and_get_queues()
       .pQueuePriorities = &priority,
     });
 
-  // features
-  VkPhysicalDeviceShaderObjectFeaturesEXT shader_object_features
-  {
-    .sType        = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_OBJECT_FEATURES_EXT,
-    .shaderObject = VK_TRUE,
-  };
-  VkPhysicalDeviceDescriptorBufferFeaturesEXT descriptor_buffer_features
-  {
-    .sType            = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_FEATURES_EXT,
-    .descriptorBuffer = VK_TRUE,
-  };
-  VkPhysicalDeviceVulkan13Features features13
-  { 
-    .sType               = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
-    .synchronization2    = VK_TRUE,
-    .dynamicRendering    = VK_TRUE,
-  };
-  if (config()->use_descriptor_buffer && config()->use_shader_object)
-  {
-    features13.pNext = &descriptor_buffer_features;
-    descriptor_buffer_features.pNext = &shader_object_features;
-  }
-  else if (config()->use_descriptor_buffer)
-    features13.pNext = &descriptor_buffer_features;
-  else if (config()->use_shader_object)
-    features13.pNext = &shader_object_features;
-
-  VkPhysicalDeviceVulkan12Features features12
-  { 
-    .sType               = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
-    .pNext               = &features13,
-    .descriptorIndexing  = VK_TRUE,
-    .bufferDeviceAddress = VK_TRUE,
-  };
-  VkPhysicalDeviceFeatures2 features2
-  {
-    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-    .pNext = &features12,
-  };
-
   // device info 
+  auto features = Features{};
   VkDeviceCreateInfo create_info
   {
     .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-    .pNext                   = &features2,
-    .queueCreateInfoCount    = (uint32_t)queue_infos.size(),
+    .pNext                   = features.get(),
+    .queueCreateInfoCount    = static_cast<uint32_t>(queue_infos.size()),
     .pQueueCreateInfos       = queue_infos.data(),
-    .enabledExtensionCount   = (uint32_t)_device_extensions.size(),
-    .ppEnabledExtensionNames = _device_extensions.data(),
+    .enabledExtensionCount   = static_cast<uint32_t>(config()->device_extensions.size()),
+    .ppEnabledExtensionNames = config()->device_extensions.data(),
   };
 #ifndef NDEBUG
-  print_enabled_extensions("device", _device_extensions);
+  print_enabled_extensions("device", config()->device_extensions);
 #endif
 
   // create logical device
@@ -236,10 +193,10 @@ void GraphicsEngine::create_device_and_get_queues()
   vkGetDeviceQueue(_device, queue_families.graphics_family.value(), 0, &_graphics_queue);
   vkGetDeviceQueue(_device, queue_families.present_family.value(), 0, &_present_queue);
 }
-    
+
 void GraphicsEngine::init_memory_allocator()
 {
-  _mem_alloc.init(_physical_device, _device, _instance, Vulkan_Version);
+  _mem_alloc.init(_physical_device, _device, _instance, config()->vulkan_version);
   _destructors.push([this] { _mem_alloc.destroy(); });
 }
 
@@ -401,10 +358,10 @@ void GraphicsEngine::create_frame_resources()
 
 void GraphicsEngine::create_buffer()
 {
-  _buffers.reserve(_swapchain_images.size());
+  _vertex_buffers.reserve(_swapchain_images.size());
   for (auto i = 0; i < _swapchain_images.size(); ++i)
   {
-    _buffers.emplace_back(_mem_alloc.create_buffer(Buffer_Size, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT));
+    _vertex_buffers.emplace_back(_mem_alloc.create_buffer(config()->buffer_size, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT));
   }
   
   if (config()->use_descriptor_buffer)
@@ -416,7 +373,7 @@ void GraphicsEngine::create_buffer()
       _descriptor_buffer.destroy();
     for (auto i = 0; i < _swapchain_images.size(); ++i)
     {
-      _buffers[i].destroy();
+      _vertex_buffers[i].destroy();
     }
   });
 }
@@ -444,7 +401,7 @@ void GraphicsEngine::create_sdf_rendering_resource()
   _sdf_render_pipeline = _device.create_render_pipeline(
     sizeof(PushConstant_SDF), 
     {
-      { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, _text_engine.get_glyph_atlas_pointer(), _sampler }, 
+      { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, { _text_engine.get_first_glyph_atlas_pointer() }, _sampler },
     },
     _descriptor_buffer,
     "sdf",
@@ -482,12 +439,12 @@ void GraphicsEngine::create_sampler()
 void GraphicsEngine::init_text_engine()
 {
   _text_engine.init(_mem_alloc);
-  _text_engine.load_font("resources/SourceCodePro-Regular.otf");
-  _text_engine.load_font("resources/SourceCodePro-Bold.otf");
-  _text_engine.load_font("resources/SourceCodePro-BoldIt.otf");
-  _text_engine.load_font("resources/SourceCodePro-It.otf");
-  _text_engine.load_font("resources/NotoSansJP-Regular.ttf");
-  _text_engine.load_font("resources/NotoSansSC-Regular.ttf");
+  _text_engine.load_font("assets/SourceCodePro-Regular.otf");
+  _text_engine.load_font("assets/SourceCodePro-Bold.otf");
+  _text_engine.load_font("assets/SourceCodePro-BoldIt.otf");
+  _text_engine.load_font("assets/SourceCodePro-It.otf");
+  _text_engine.load_font("assets/NotoSansJP-Regular.ttf");
+  _text_engine.load_font("assets/NotoSansSC-Regular.ttf");
   _destructors.push([&] { _text_engine.destroy(); });
 }
 

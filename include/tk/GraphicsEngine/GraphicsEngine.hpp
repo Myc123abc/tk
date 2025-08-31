@@ -72,6 +72,7 @@ namespace tk { namespace graphics_engine {
     void wait_device_complete() const noexcept { vkDeviceWaitIdle(_device); }
 
   private:
+
     //
     // initialize resources
     //
@@ -122,14 +123,6 @@ namespace tk { namespace graphics_engine {
 
     bool _wait_fence{ true };
 
-    static constexpr auto    Vulkan_Version{ VK_API_VERSION_1_4 };
-    std::vector<const char*> _device_extensions
-    {
-      VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-      VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
-      VK_EXT_SHADER_OBJECT_EXTENSION_NAME,
-    };
-
     //
     // frame resources
     //
@@ -155,8 +148,7 @@ namespace tk { namespace graphics_engine {
     RenderPipeline _sdf_render_pipeline;
     void render_sdf();
 
-    static constexpr uint32_t Buffer_Size{ 1024 * 1024 };
-    std::vector<Buffer> _buffers;
+    std::vector<Buffer> _vertex_buffers;
     void create_buffer();
 
     struct PushConstant_SDF
@@ -169,7 +161,7 @@ namespace tk { namespace graphics_engine {
     //
     // Text Rendering
     //
-    VkSampler _sampler{};
+    VkSampler  _sampler{};
     TextEngine _text_engine;
   };
 }}
