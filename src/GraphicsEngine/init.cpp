@@ -318,42 +318,8 @@ void GraphicsEngine::init_command_pool()
 
 void GraphicsEngine::create_frame_resources()
 {
-  _frames.resize(_swapchain_images.size());
-  _submit_sems.resize(_swapchain_images.size());
-
-  // create command buffers
-  auto cmd_bufs = _command_pool.create_commands(_swapchain_images.size());
-  for (uint32_t i = 0; i < _frames.size(); ++i)
-    _frames[i].cmd = std::move(cmd_bufs[i]);
-
-  // async objects 
-  VkFenceCreateInfo fence_info
-  {
-    .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-    .flags = VK_FENCE_CREATE_SIGNALED_BIT,
-  };
-  VkSemaphoreCreateInfo sem_info
-  {
-    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-  };
-  for (auto& frame : _frames) 
-    throw_if(vkCreateFence(_device, &fence_info, nullptr, &frame.fence)         != VK_SUCCESS ||
-             vkCreateSemaphore(_device, &sem_info, nullptr, &frame.acquire_sem) != VK_SUCCESS,
-             "faield to create sync objects");
-  for (auto& sem : _submit_sems)
-    throw_if(vkCreateSemaphore(_device, &sem_info, nullptr, &sem) != VK_SUCCESS, 
-             "failed to create semaphore");
-
-  _destructors.push([&]
-  {
-    for (auto& frame : _frames)
-    {
-      vkDestroyFence(_device, frame.fence, nullptr);
-      vkDestroySemaphore(_device, frame.acquire_sem, nullptr);
-    }
-    for (auto& sem : _submit_sems)
-      vkDestroySemaphore(_device, sem, nullptr);
-  });
+  _frames.init(_device, _command_pool, _swapchain_images.size());
+  _destructors.push([&] { _frames.destroy(); });
 }
 
 void GraphicsEngine::create_buffer()

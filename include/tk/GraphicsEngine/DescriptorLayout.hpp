@@ -27,7 +27,7 @@ namespace tk { namespace graphics_engine {
     VkSampler           sampler{};
   };
 
-  void bind_descriptor_buffer(Command& cmd, Buffer const& buffer);
+  void bind_descriptor_buffer(Command const& cmd, Buffer const& buffer);
 
   class DescriptorLayout
   {
@@ -47,7 +47,7 @@ namespace tk { namespace graphics_engine {
 
     auto update() -> uint32_t;
 
-    void bind(Command& cmd);
+    void bind(Command const& cmd);
 
     void set(VkPipelineLayout pipeline_layout, VkPipelineBindPoint bind_point) noexcept
     {

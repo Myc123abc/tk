@@ -25,7 +25,7 @@ namespace tk { namespace graphics_engine {
     void destroy() noexcept;
 
     template <typename PushConstant>
-    void bind(Command& cmd, PushConstant const& pc)
+    void bind(Command const& cmd, PushConstant const& pc)
     {
       if (config()->use_shader_object)
         graphics_engine::vkCmdBindShadersEXT(cmd, _stages.size(), _stages.data(), _vk_shaders.data());

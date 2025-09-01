@@ -90,8 +90,9 @@ DescriptorLayout::DescriptorLayout(Device* device, std::vector<DescriptorInfo> c
   }
   else
   {
-    // TODO:
-    //       2. dynamic pool
+    // TODO: dynamic pool
+    //       add pool to frame resource
+    //       and when need create new one, promise olo still use until new one create finished
     create_descriptor_pool(descriptor_infos);
     create_descriptor_set_layout(descriptor_infos);    
     allocate_descriptor_sets(get_variable_descriptor_count(descriptor_infos));
@@ -391,7 +392,7 @@ void DescriptorLayout::upload(Buffer& buffer, std::string_view tag)
   buffer.add_size(align_size(update(), _device->get_descriptor_buffer_info().descriptorBufferOffsetAlignment));
 }
 
-void bind_descriptor_buffer(Command& cmd, Buffer const& buffer)
+void bind_descriptor_buffer(Command const& cmd, Buffer const& buffer)
 {
   // bind descriptor buffer
   VkDescriptorBufferBindingInfoEXT info
@@ -403,7 +404,7 @@ void bind_descriptor_buffer(Command& cmd, Buffer const& buffer)
   vkCmdBindDescriptorBuffersEXT(cmd, 1, &info);
 }
 
-void DescriptorLayout::bind(Command& cmd)
+void DescriptorLayout::bind(Command const& cmd)
 {
   if (config()->use_descriptor_buffer == false)
   {

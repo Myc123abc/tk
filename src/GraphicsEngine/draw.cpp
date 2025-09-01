@@ -10,96 +10,27 @@ namespace tk { namespace graphics_engine {
 
 auto GraphicsEngine::frame_begin() -> bool
 {
-  auto* frame = &get_current_frame();
-
-  if(vkWaitForFences(_device, 1, &frame->fence, VK_TRUE, _wait_fence ? UINT_MAX : 0) != VK_SUCCESS)
+  if (_frames.acquire_swapchain_image(_swapchain, _wait_fence) == false)
     return false;
-  throw_if(vkResetFences(_device, 1, &frame->fence) != VK_SUCCESS,
-           "failed to reset fence");
 
-  auto res = vkAcquireNextImageKHR(_device, _swapchain, UINT64_MAX, frame->acquire_sem, VK_NULL_HANDLE, &_current_swapchain_image_index);
-  if (res == VK_ERROR_OUT_OF_DATE_KHR)
-    return false;
-  else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
-    throw_if(true, "failed to acquire swapechain image");
-  frame->submit_sem = _submit_sems[_current_swapchain_image_index];
+  auto& cmd = _frames.get_command();
 
-  throw_if(vkResetCommandBuffer(frame->cmd, 0) != VK_SUCCESS,
-           "failed to reset command buffer");
-  VkCommandBufferBeginInfo beg_info
-  {
-    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-    .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-  };
-  vkBeginCommandBuffer(frame->cmd, &beg_info);
-
-  set_pipeline_state(frame->cmd);
+  set_pipeline_state(cmd);
 
   if (config()->use_descriptor_buffer)
-    bind_descriptor_buffer(frame->cmd, _descriptor_buffer);
+    bind_descriptor_buffer(cmd, _descriptor_buffer);
 
   return true;
 }
 
 void GraphicsEngine::frame_end()
 {
-  auto& frame = get_current_frame();
-
-  get_current_swapchain_image().set_layout(frame.cmd, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-  
-  throw_if(vkEndCommandBuffer(frame.cmd) != VK_SUCCESS,
-           "failed to end command buffer");
-
-  VkCommandBufferSubmitInfo cmd_submit_info
-  {
-    .sType         = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
-    .commandBuffer = frame.cmd,
-  };
-  VkSemaphoreSubmitInfo wait_sem_submit_info
-  {
-    .sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-    .semaphore = frame.acquire_sem,
-    .value     = 1,
-    .stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-  };
-  auto signal_sem_submit_info      = wait_sem_submit_info;
-  signal_sem_submit_info.semaphore = frame.submit_sem;
-  signal_sem_submit_info.stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
-
-  VkSubmitInfo2 submit_info
-  {
-    .sType                    = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
-    .waitSemaphoreInfoCount   = 1,
-    .pWaitSemaphoreInfos      = &wait_sem_submit_info,
-    .commandBufferInfoCount   = 1,
-    .pCommandBufferInfos      = &cmd_submit_info,
-    .signalSemaphoreInfoCount = 1,
-    .pSignalSemaphoreInfos    = &signal_sem_submit_info,
-  };
-  throw_if(vkQueueSubmit2(_graphics_queue, 1, &submit_info, frame.fence),
-           "failed to submit to queue");
-
-  VkPresentInfoKHR presentation_info
-  {
-    .sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-    .waitSemaphoreCount = 1,
-    .pWaitSemaphores    = &frame.submit_sem,
-    .swapchainCount     = 1,
-    .pSwapchains        = &_swapchain,
-    .pImageIndices      = &_current_swapchain_image_index,
-  };
-  auto res = vkQueuePresentKHR(_present_queue, &presentation_info); 
-  if (res != VK_SUCCESS               &&
-      res != VK_ERROR_OUT_OF_DATE_KHR &&
-      res != VK_SUBOPTIMAL_KHR)
-    throw_if(true, "failed to present swapchain image");
-
-  _current_frame = ++_current_frame % _swapchain_images.size();
+  _frames.present_swapchain_image(_swapchain, _graphics_queue, _present_queue, _swapchain_images);
 }
 
 void GraphicsEngine::render_begin(Image& image)
 {
-  auto& cmd = get_current_frame().cmd;
+  auto& cmd = _frames.get_command();
 
   image.set_layout(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   
@@ -124,15 +55,16 @@ void GraphicsEngine::render_begin(Image& image)
 
 void GraphicsEngine::sdf_render_begin()
 {
-  render_begin(get_current_swapchain_image());
+  render_begin(_frames.get_swapchain_image(_swapchain_images));
 }
 
 void GraphicsEngine::set_pipeline_state(Command const& cmd)
 {
+  auto& swapchain_image = _frames.get_swapchain_image(_swapchain_images);
   VkViewport viewport
   {
-    .width  = static_cast<float>(get_current_swapchain_image().extent3D().width),
-    .height = static_cast<float>(get_current_swapchain_image().extent3D().height), 
+    .width  = static_cast<float>(swapchain_image.extent3D().width),
+    .height = static_cast<float>(swapchain_image.extent3D().height), 
     .maxDepth = 1.f,
   };
 
@@ -150,7 +82,7 @@ void GraphicsEngine::set_pipeline_state(Command const& cmd)
     graphics_engine::vkCmdSetSampleMaskEXT(cmd, VK_SAMPLE_COUNT_1_BIT, &sampler_mask);
     vkCmdSetFrontFace(cmd, VK_FRONT_FACE_CLOCKWISE);
     graphics_engine::vkCmdSetAlphaToCoverageEnableEXT(cmd, VK_FALSE);
-    VkRect2D scissor{ .extent = get_current_swapchain_image().extent2D(), };
+    VkRect2D scissor{ .extent = swapchain_image.extent2D(), };
     vkCmdSetViewportWithCount(cmd, 1, &viewport);
     vkCmdSetScissorWithCount(cmd, 1, &scissor);
     vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
@@ -177,21 +109,20 @@ void GraphicsEngine::set_pipeline_state(Command const& cmd)
   else
   {
     vkCmdSetViewport(cmd, 0, 1, &viewport);
-    VkRect2D scissor{ .extent = get_current_swapchain_image().extent2D(), };
+    VkRect2D scissor{ .extent = swapchain_image.extent2D(), };
     vkCmdSetScissor(cmd, 0, 1, &scissor);
   }
 }
 
 void GraphicsEngine::render_end()
 {
-  auto& frame = get_current_frame();
-  vkCmdEndRendering(frame.cmd);
+  vkCmdEndRendering(_frames.get_command());
 }
 
 void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> indices, std::span<ShapeProperty> shape_properties)
 {
   // get buffer and clear
-  auto& buffer = _vertex_buffers[_current_frame].clear();
+  auto& buffer = _vertex_buffers[_frames.get_frame_index()].clear();
 
   // upload vertices to buffer
   buffer.append_range(vertices);
@@ -224,7 +155,7 @@ void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> 
   // upload shape properties to buffer
   buffer.append_range(data);
   
-  auto& cmd = get_current_frame().cmd;
+  auto& cmd = _frames.get_command();
 
   // bind index buffer
   vkCmdBindIndexBuffer(cmd, buffer.handle(), indices_offset, VK_INDEX_TYPE_UINT16);

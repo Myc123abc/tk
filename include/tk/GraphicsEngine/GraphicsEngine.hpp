@@ -11,6 +11,7 @@
 #include "Device.hpp"
 #include "tk/type.hpp"
 #include "TextEngine/TextEngine.hpp"
+#include "FrameResources.hpp"
 
 #include <span>
 
@@ -123,22 +124,7 @@ namespace tk { namespace graphics_engine {
 
     bool _wait_fence{ true };
 
-    //
-    // frame resources
-    //
-    struct FrameResource
-    {
-      Command     cmd;
-      VkFence     fence{};
-      VkSemaphore acquire_sem{};
-      VkSemaphore submit_sem{};
-    };
-    std::vector<FrameResource> _frames;
-    std::vector<VkSemaphore>   _submit_sems;
-    uint32_t                   _current_frame{};
-    uint32_t                   _current_swapchain_image_index{};
-    auto get_current_frame()           noexcept -> FrameResource& { return _frames[_current_frame]; }
-    auto get_current_swapchain_image() noexcept -> Image&         { return _swapchain_images[_current_swapchain_image_index]; }
+    FrameResources _frames;
 
     Buffer _descriptor_buffer;
 
