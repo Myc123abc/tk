@@ -126,7 +126,7 @@ void GraphicsEngine::select_physical_device()
     {
       auto queue_family_indices = get_queue_family_indices(device, _surface);
       if (check_device_extensions_support(device, config()->device_extensions) &&
-          !get_swapchain_details(device, _surface).has_empty())
+          !SwapchainDetails(device, _surface).has_empty())
       {
         _physical_device = device;
         break;
@@ -200,112 +200,10 @@ void GraphicsEngine::init_memory_allocator()
   _destructors.push([this] { _mem_alloc.destroy(); });
 }
 
-void GraphicsEngine::create_swapchain(VkSwapchainKHR old_swapchain)
+void GraphicsEngine::create_swapchain()
 {
-  auto details         = get_swapchain_details(_physical_device, _surface);
-  auto surface_format  = details.get_surface_format();
-  auto present_mode    = details.get_present_mode();
-  auto extent          = details.get_swap_extent(*_window);
-  uint32_t image_count = details.capabilities.minImageCount + 1;
-
-  if (details.capabilities.maxImageCount > 0 &&
-      image_count > details.capabilities.maxImageCount)
-    image_count = details.capabilities.maxImageCount;
-
-  VkSwapchainCreateInfoKHR create_info
-  {
-    .sType            = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-    .surface          = _surface,
-    .minImageCount    = image_count,
-    .imageFormat      = surface_format.format,
-    .imageColorSpace  = surface_format.colorSpace,
-    .imageExtent      = extent,
-    .imageArrayLayers = 1,
-    .imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                        VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-    .preTransform     = details.capabilities.currentTransform,
-    .compositeAlpha   = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-    .presentMode      = present_mode,
-    .clipped          = VK_TRUE,
-    .oldSwapchain     = old_swapchain,
-  };
-
-  auto queue_families = get_queue_family_indices(_physical_device, _surface);
-  uint32_t indices[]
-  {
-    queue_families.graphics_family.value(),
-    queue_families.present_family.value(),
-  };
-
-  if (queue_families.graphics_family != queue_families.present_family)
-  {
-    create_info.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
-    create_info.queueFamilyIndexCount = 2;
-    create_info.pQueueFamilyIndices   = indices;
-  }
-  else
-    create_info.imageSharingMode      = VK_SHARING_MODE_EXCLUSIVE;
-
-  throw_if(vkCreateSwapchainKHR(_device, &create_info, nullptr, &_swapchain) != VK_SUCCESS,
-      "failed to create swapchain");
-
-  //
-  // get swapchain images info
-  //
-
-  // clear old image infos
-  if (!_swapchain_images.empty())
-  {
-    for (auto const& image : _swapchain_images)
-      vkDestroyImageView(_device, image.view(), nullptr);
-    _swapchain_images.clear();
-  }
-
-  // get image count
-  vkGetSwapchainImagesKHR(_device, _swapchain, &image_count, nullptr);
-
-  // get swapchain images
-  auto images = std::vector<VkImage>(image_count);
-  vkGetSwapchainImagesKHR(_device, _swapchain, &image_count, images.data());
-
-  // create image views
-  auto image_views = std::vector<VkImageView>(image_count);
-  for (auto i = 0; i < image_count; ++i)
-  {
-    VkImageViewCreateInfo info
-    {
-      .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-      .image    = images[i],
-      .viewType = VK_IMAGE_VIEW_TYPE_2D,
-      .format   = surface_format.format,
-      .subresourceRange =
-      {
-        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        .levelCount = 1,
-        .layerCount = 1,
-      },
-    };
-    vkCreateImageView(_device, &info, nullptr, &image_views[i]);
-  }
-
-  // set image info to _swapchain_images
-  _swapchain_images.reserve(image_count);
-  for (auto i = 0; i < image_count; ++i)
-    _swapchain_images.emplace_back(images[i], image_views[i], extent, surface_format.format);
-
-  if (old_swapchain == VK_NULL_HANDLE)
-  {
-#ifndef NDEBUG 
-    print_present_mode(present_mode);
-    std::println("swapchain image counts: {}\n", image_count);
-#endif
-    _destructors.push([this]
-    {
-      vkDestroySwapchainKHR(_device, _swapchain, nullptr);
-      for (auto const& image : _swapchain_images)
-        vkDestroyImageView(_device, image.view(), nullptr);
-    });
-  }
+  _swapchain.init(_physical_device, _device, _surface, _window);
+  _destructors.push([&] { _swapchain.destroy(); });
 }
 
 void GraphicsEngine::init_command_pool()
@@ -318,14 +216,15 @@ void GraphicsEngine::init_command_pool()
 
 void GraphicsEngine::create_frame_resources()
 {
-  _frames.init(_device, _command_pool, _swapchain_images.size());
+  _frames.init(_device, _command_pool, &_swapchain);
   _destructors.push([&] { _frames.destroy(); });
 }
 
 void GraphicsEngine::create_buffer()
 {
-  _vertex_buffers.reserve(_swapchain_images.size());
-  for (auto i = 0; i < _swapchain_images.size(); ++i)
+  // TODO: move vertex buffers to frame resources and make buffer dynamic
+  _vertex_buffers.reserve(_swapchain.size());
+  for (auto i = 0; i < _swapchain.size(); ++i)
   {
     _vertex_buffers.emplace_back(_mem_alloc.create_buffer(config()->buffer_size, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT));
   }
@@ -337,7 +236,7 @@ void GraphicsEngine::create_buffer()
   {
     if (config()->use_descriptor_buffer)
       _descriptor_buffer.destroy();
-    for (auto i = 0; i < _swapchain_images.size(); ++i)
+    for (auto i = 0; i < _swapchain.size(); ++i)
     {
       _vertex_buffers[i].destroy();
     }
@@ -346,20 +245,14 @@ void GraphicsEngine::create_buffer()
 
 auto GraphicsEngine::get_swapchain_image_size() -> glm::vec2
 {
-  assert(!_swapchain_images.empty());
-  auto size{ _swapchain_images[0].extent2D() };
+  assert(_swapchain.size());
+  auto size{ _swapchain.image(0).extent2D() };
   return { size.width, size.height };
 }
 
 void GraphicsEngine::resize_swapchain()
 {
-  // wait GPU to handle finishing resource
-  vkDeviceWaitIdle(_device);
-  
-  // recreate swapchain
-  auto old_swapchain = _swapchain;
-  create_swapchain(old_swapchain);
-  vkDestroySwapchainKHR(_device, old_swapchain, nullptr);
+  _swapchain.resize();
 }
 
 void GraphicsEngine::create_sdf_rendering_resource()
@@ -375,7 +268,7 @@ void GraphicsEngine::create_sdf_rendering_resource()
       { VK_SHADER_STAGE_VERTEX_BIT,   "shader/SDF_vert.spv" },
       { VK_SHADER_STAGE_FRAGMENT_BIT, "shader/SDF_frag.spv" },
     },
-    _swapchain_images[0].format()
+    _swapchain.format()
   );
 
   // destroy resources

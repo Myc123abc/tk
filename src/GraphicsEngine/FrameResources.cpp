@@ -5,16 +5,17 @@
 
 namespace tk { namespace graphics_engine {
 
-void FrameResources::init(VkDevice device, CommandPool& cmd_pool, uint32_t size)
+void FrameResources::init(VkDevice device, CommandPool& cmd_pool, Swapchain* swapchain)
 {
-  _device = device;
+  _device    = device;
+  _swapchain = swapchain;
 
   // resize frames and submit semaphores
-  _frames.resize(size);
-  _submit_sems.resize(size);
+  _frames.resize(swapchain->size());
+  _submit_sems.resize(swapchain->size());
 
   // create commands
-  auto cmds = cmd_pool.create_commands(size);
+  auto cmds = cmd_pool.create_commands(swapchain->size());
 
   // create fence and semaphore create infos
   auto fence_create_info = VkFenceCreateInfo
@@ -25,7 +26,7 @@ void FrameResources::init(VkDevice device, CommandPool& cmd_pool, uint32_t size)
   auto sem_create_info = VkSemaphoreCreateInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
 
   // assign commands and create sync objects
-  for (auto i = 0; i < size; ++i)
+  for (auto i = 0; i < swapchain->size(); ++i)
   {
     _frames[i].cmd = cmds[i];
     throw_if(vkCreateFence(device, &fence_create_info, nullptr, &_frames[i].fence)         != VK_SUCCESS ||
@@ -47,7 +48,7 @@ void FrameResources::destroy()
   }
 }
 
-auto FrameResources::acquire_swapchain_image(VkSwapchainKHR swapchain, bool wait) -> bool
+auto FrameResources::acquire_swapchain_image(bool wait) -> bool
 {
   // get current frame resource
   auto& frame = _frames[_frame_index];
@@ -59,7 +60,7 @@ auto FrameResources::acquire_swapchain_image(VkSwapchainKHR swapchain, bool wait
            "failed to reset fence");
 
   // acquire usable swapchain image
-  auto res = vkAcquireNextImageKHR(_device, swapchain, UINT64_MAX, frame.acquire_sem, VK_NULL_HANDLE, &_submit_sem_index);
+  auto res = vkAcquireNextImageKHR(_device, _swapchain->get(), UINT64_MAX, frame.acquire_sem, VK_NULL_HANDLE, &_submit_sem_index);
   if (res == VK_ERROR_OUT_OF_DATE_KHR)
     return false;
   else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
@@ -80,14 +81,14 @@ auto FrameResources::acquire_swapchain_image(VkSwapchainKHR swapchain, bool wait
   return true;
 }
 
-void FrameResources::present_swapchain_image(VkSwapchainKHR swapchain, VkQueue graphics_queue, VkQueue present_queue, std::span<Image> swapchain_images)
+void FrameResources::present_swapchain_image(VkQueue graphics_queue, VkQueue present_queue)
 {
   // get current frame resource and submit semaphore
   auto& frame      = _frames[_frame_index];
   auto  submit_sem = _submit_sems[_submit_sem_index];
 
   // set image layout of swapchain image
-  swapchain_images[_submit_sem_index].set_layout(frame.cmd, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+  _swapchain->image(_submit_sem_index).set_layout(frame.cmd, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
   // finish frameing command
   throw_if(vkEndCommandBuffer(frame.cmd) != VK_SUCCESS,
@@ -135,6 +136,7 @@ void FrameResources::present_swapchain_image(VkSwapchainKHR swapchain, VkQueue g
            "failed to submit to queue");
 
   // present info
+  auto swapchain = _swapchain->get();
   VkPresentInfoKHR present_info
   {
     .sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
@@ -153,7 +155,7 @@ void FrameResources::present_swapchain_image(VkSwapchainKHR swapchain, VkQueue g
     throw_if(true, "failed to present swapchain image");
 
   // update next frame frame resource index
-  _frame_index = ++_frame_index % swapchain_images.size();
+  _frame_index = ++_frame_index % _swapchain->size();
 }
 
 }}

@@ -1,5 +1,4 @@
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
-#include "tk/ErrorHandling.hpp"
 #include "tk/GraphicsEngine/vk_extension.hpp"
 #include "tk/GraphicsEngine/config.hpp"
 
@@ -10,7 +9,7 @@ namespace tk { namespace graphics_engine {
 
 auto GraphicsEngine::frame_begin() -> bool
 {
-  if (_frames.acquire_swapchain_image(_swapchain, _wait_fence) == false)
+  if (_frames.acquire_swapchain_image(_wait_fence) == false)
     return false;
 
   auto& cmd = _frames.get_command();
@@ -25,7 +24,7 @@ auto GraphicsEngine::frame_begin() -> bool
 
 void GraphicsEngine::frame_end()
 {
-  _frames.present_swapchain_image(_swapchain, _graphics_queue, _present_queue, _swapchain_images);
+  _frames.present_swapchain_image(_graphics_queue, _present_queue);
 }
 
 void GraphicsEngine::render_begin(Image& image)
@@ -55,12 +54,12 @@ void GraphicsEngine::render_begin(Image& image)
 
 void GraphicsEngine::sdf_render_begin()
 {
-  render_begin(_frames.get_swapchain_image(_swapchain_images));
+  render_begin(_frames.get_swapchain_image());
 }
 
 void GraphicsEngine::set_pipeline_state(Command const& cmd)
 {
-  auto& swapchain_image = _frames.get_swapchain_image(_swapchain_images);
+  auto& swapchain_image = _frames.get_swapchain_image();
   VkViewport viewport
   {
     .width  = static_cast<float>(swapchain_image.extent3D().width),

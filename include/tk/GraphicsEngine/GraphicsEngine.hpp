@@ -4,12 +4,8 @@
 
 #pragma once
 
-#include "../Window.hpp"
 #include "../DestructorStack.hpp"
-#include "MemoryAllocator.hpp"
-#include "CommandPool.hpp"
 #include "Device.hpp"
-#include "tk/type.hpp"
 #include "TextEngine/TextEngine.hpp"
 #include "FrameResources.hpp"
 
@@ -82,7 +78,7 @@ namespace tk { namespace graphics_engine {
     void create_surface();
     void select_physical_device();
     void create_device_and_get_queues();
-    void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE);
+    void create_swapchain();
     void init_command_pool();
     void init_memory_allocator();
     void create_frame_resources();
@@ -116,8 +112,7 @@ namespace tk { namespace graphics_engine {
     Device                       _device;
     VkQueue                      _graphics_queue{};
     VkQueue                      _present_queue{};
-    VkSwapchainKHR               _swapchain{};
-    std::vector<Image>           _swapchain_images;
+    Swapchain                    _swapchain;
     CommandPool                  _command_pool;
     MemoryAllocator              _mem_alloc;
     DestructorStack              _destructors;
