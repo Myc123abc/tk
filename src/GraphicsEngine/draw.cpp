@@ -121,13 +121,15 @@ void GraphicsEngine::render_end()
 
 void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> indices, std::span<ShapeProperty> shape_properties)
 {
+  auto& buf = _frames.get_sdf_buffer();
+
   // upload vertices to buffer
-  _frames.append_range(vertices);
+  buf.append_range(vertices);
 
   // get offset of indices
-  auto indices_offset = _frames.size();
+  auto indices_offset = buf.size();
   // upload indices to buffer
-  _frames.append_range(indices);
+  buf.append_range(indices);
 
   // convert shape properties to binary data
   uint32_t total_size{};
@@ -148,19 +150,19 @@ void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> 
       data.emplace_back(std::bit_cast<uint32_t>(value));
   }
   // get offset of shape properties
-  auto shape_properties_offset = util::align_size(_frames.size(), 8);
+  auto shape_properties_offset = util::align_size(buf.size(), 8);
   // add padding for 8 bytes alignment
-  _frames.append_range(std::vector<std::byte>(shape_properties_offset - _frames.size()));
+  buf.append_range(std::vector<std::byte>(shape_properties_offset - buf.size()));
   // upload shape properties to buffer
-  _frames.append_range(data);
+  buf.append_range(data);
   
   auto& cmd = _frames.get_command();
 
-  _frames.upload();
-  auto [handle, address] = _frames.get_handle_and_address();
+  buf.upload();
+  auto [handle, address] = buf.get_handle_and_address();
 
   // bind index buffer
-  vkCmdBindIndexBuffer(cmd, handle, _frames.get_current_frame_byte_offset() + indices_offset, VK_INDEX_TYPE_UINT16);
+  vkCmdBindIndexBuffer(cmd, handle, buf.get_current_frame_byte_offset() + indices_offset, VK_INDEX_TYPE_UINT16);
 
   auto pc = PushConstant_SDF
   {

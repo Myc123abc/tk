@@ -29,13 +29,11 @@ namespace tk { namespace graphics_engine {
   class GraphicsEngine
   {
   public:
-    GraphicsEngine()  = default;
-    ~GraphicsEngine() = default;
-
-    GraphicsEngine(GraphicsEngine const&)            = delete;
-    GraphicsEngine(GraphicsEngine&&)                 = delete;
-    GraphicsEngine& operator=(GraphicsEngine const&) = delete;
-    GraphicsEngine& operator=(GraphicsEngine&&)      = delete;
+    GraphicsEngine()            = default;
+    GraphicsEngine(auto const&) = delete;
+    GraphicsEngine(auto&&)      = delete;
+    auto operator=(auto const&) = delete;
+    auto operator=(auto&&)      = delete;
 
     // HACK: expand to multi windows
     /**

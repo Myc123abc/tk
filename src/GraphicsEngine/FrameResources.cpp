@@ -9,38 +9,97 @@ namespace tk { namespace graphics_engine {
 ////////////////////////////////////////////////////////////////////////////////
 ///                         Vertex Buffer
 ////////////////////////////////////////////////////////////////////////////////
-#if 0
-void VertexBuffer::init(FrameResources* frame_resources, MemoryAllocator& alloc)
+
+void FramesDynamicBuffer::init(FrameResources* frame_resources, MemoryAllocator* alloc)
 {
   _frame_resources = frame_resources;
-  _size_pre_frame  = config()->buffer_size;
-  _buffer = alloc.create_buffer(_size_pre_frame * frame_resources->_frames.size(), VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+  _alloc           = alloc;
+  _byte_size_pre_frame = util::align_size(config()->buffer_size, 8);
+  _buffer = alloc->create_buffer(_byte_size_pre_frame * frame_resources->_frames.size(), VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
 }
 
-void VertexBuffer::destroy() const
+void FramesDynamicBuffer::destroy()
 {
   _buffer.destroy();
+  while (!_destructors.empty())
+  {
+    _destructors.front()(0, true);
+    _destructors.pop();
+  }
 }
 
-void VertexBuffer::frame_begin() noexcept
+void FramesDynamicBuffer::destroy_old_buffers()
 {
-  _state = State::append_data;
-  _data.clear();
-  _buffer.clear();
+  if (!_destructors.empty() && _destructors.front()(_frame_resources->_frame_index, false))
+    _destructors.pop();
 }
 
-void VertexBuffer::upload()
+auto FramesDynamicBuffer::get_current_frame_byte_offset() const -> uint32_t
 {
+  throw_if(_state != State::uploaded, "[FramesDynamicBuffer] cannot get frame byte offset after upload");
+  return _current_frame_byte_offset;
+}
+
+void FramesDynamicBuffer::upload()
+{
+  // exceed capacity, need to expand
+  if (_current_frame_data.size() > _byte_size_pre_frame)
+  {
+    _byte_size_pre_frame = util::align_size(std::max(_current_frame_data.size(), static_cast<size_t>(_byte_size_pre_frame * config()->buffer_expand_ratio)), 8);
+    auto tmp_buf = _alloc->create_buffer(_byte_size_pre_frame * _frame_resources->_frames.size(), VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+
+    // add destructor for old buffer
+    _destructors.emplace(
+      [buf = this->_buffer, frame_index = this->_frame_resources->_frame_index]
+      (uint32_t current_frame_index, bool directly_destruct)
+      {
+        if (directly_destruct)
+        {
+          buf.destroy();
+          return true;
+        }
+        if (current_frame_index == frame_index)
+        {
+          buf.destroy();
+          return true;
+        }
+        return false;
+      });
+
+    // reset new allocation information
+    _buffer.set_realloc_info(tmp_buf);
+    // update byte offset of current frame with new byte size per frame
+    _current_frame_byte_offset = _frame_resources->_frame_index * _byte_size_pre_frame;
+    // re-upload
+    upload();
+    return;
+  }
+  memcpy(static_cast<std::byte*>(_buffer.data()) + _current_frame_byte_offset, _current_frame_data.data(), _current_frame_data.size());
+  _current_frame_data.clear();
   _state = State::uploaded;
-  _buffer.append_range(_current_frame_data);
+}
+  
+// set state is promise the handle and address is valid
+// append_range maybe recreate a bigger buffer to make handle and address invalid
+auto FramesDynamicBuffer::get_handle_and_address() const -> std::pair<VkBuffer, VkDeviceAddress>
+{
+  throw_if(_state != State::uploaded, "[FramesDynamicBuffer] must be uploaded, then handle and address will be valid");
+  return { _buffer.handle(), _buffer.address() + _current_frame_byte_offset };
 }
 
-auto VertexBuffer::get_handle_and_address() const -> std::pair<VkBuffer, VkDeviceAddress>
+auto FramesDynamicBuffer::size() const -> uint32_t
 {
-  throw_if(_state != State::uploaded, "[VertexBuffer] not upload data");
-  return { _buffer.handle(), _buffer.address() };
+  throw_if(_state != State::append_data, "[FramesDynamicBuffer] cannot get current frame data size after upload");
+  return _current_frame_data.size();
 }
-#endif
+
+void FramesDynamicBuffer::frame_begin()
+{
+  _current_frame_data.clear();
+  _current_frame_byte_offset = _byte_size_pre_frame * _frame_resources->_frame_index;
+  _state = State::append_data;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 ///                         Frame Resources
 ////////////////////////////////////////////////////////////////////////////////
@@ -77,10 +136,8 @@ void FrameResources::init(VkDevice device, CommandPool& cmd_pool, Swapchain* swa
              "failed to create semaphore");
   }
 
-  //_vertex_buffer.init(this, alloc);
-  _byte_size_pre_frame = util::align_size(config()->buffer_size, 8);
-  _vertex_buffer = alloc.create_buffer(_byte_size_pre_frame * _frames.size(), VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
-  _alloc = &alloc;
+  // initialize other frame resources
+  _sdf_buffer.init(this, &alloc);
 }
 
 void FrameResources::destroy()
@@ -93,13 +150,7 @@ void FrameResources::destroy()
     vkDestroySemaphore(_device, frame.acquire_sem, nullptr);
     vkDestroySemaphore(_device, _submit_sems[i], nullptr);
   }
-  //_vertex_buffer.destroy();
-  _vertex_buffer.destroy();
-  while (!_destructors.empty())
-  {
-    _destructors.front()(0, true);
-    _destructors.pop();
-  }
+  _sdf_buffer.destroy();
 }
 
 auto FrameResources::acquire_swapchain_image(bool wait) -> bool
@@ -114,8 +165,7 @@ auto FrameResources::acquire_swapchain_image(bool wait) -> bool
            "failed to reset fence");
 
   // destroy old resources
-  if (!_destructors.empty() && _destructors.front()(_frame_index, false))
-    _destructors.pop();
+  _sdf_buffer.destroy_old_buffers();
 
   // acquire usable swapchain image
   auto res = vkAcquireNextImageKHR(_device, _swapchain->get(), UINT64_MAX, frame.acquire_sem, VK_NULL_HANDLE, &_submit_sem_index);
@@ -136,9 +186,8 @@ auto FrameResources::acquire_swapchain_image(bool wait) -> bool
   };
   vkBeginCommandBuffer(frame.cmd, &command_begin_info);
 
-  _current_frame_data.clear();
-  _current_frame_byte_offset = _byte_size_pre_frame * _frame_index;
-  _state = State::append_data;
+  // set resource for a new frame
+  _sdf_buffer.frame_begin();
 
   return true;
 }

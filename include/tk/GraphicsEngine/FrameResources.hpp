@@ -8,8 +8,6 @@
 #include "Swapchain.hpp"
 #include "MemoryAllocator.hpp"
 #include "../ErrorHandling.hpp"
-#include "config.hpp"
-#include "../util.hpp"
 
 #include <queue>
 #include <functional>
@@ -24,92 +22,31 @@ struct FrameResource
   VkSemaphore acquire_sem;
 };
 
-#if 0
-class VertexBuffer
+class FrameResources;
+
+class FramesDynamicBuffer
 {
   enum class State
   {
     append_data,
     uploaded,
-  };
-
-  friend class FrameResources;
-private:
-  void init(FrameResources* frame_resources, MemoryAllocator& alloc);
-  void destroy() const;
-
-  void frame_begin() noexcept;
+  }; 
 
 public:
-  template <typename ContainerType>
-  void append_range(ContainerType const& c)
-  {
-    throw_if(_state != State::append_data, "[VertexBuffer] append data after upload!");
-    using ValueType = typename ContainerType::value_type;
-    static_assert(std::is_trivially_copyable_v<ValueType>, "must be copyable type");
-    auto size = c.size() * sizeof(ValueType);
-    _current_frame_data.resize(_current_frame_data.size() + size);
-    memcpy(_current_frame_data.data() + _current_frame_data.size(), c.data(), size);
-  }
+  FramesDynamicBuffer()            = default;
+  FramesDynamicBuffer(auto const&) = delete;
+  FramesDynamicBuffer(auto&&)      = delete;
+  auto operator=(auto const&)      = delete;
+  auto operator=(auto&&)           = delete;
 
-  void upload();
-
-  auto get_handle_and_address() const -> std::pair<VkBuffer, VkDeviceAddress>;
-
-private:
-  FrameResources*        _frame_resources;
-  Buffer                 _buffer;
-  std::vector<std::byte> _current_frame_data;
-  State                  _state = State::append_data;
-  uint32_t               _size_pre_frame{};
-};
-#endif
-
-class FrameResources
-{
-  //friend class VertexBuffer;
-public:
-  FrameResources() = default;
-
-  void init(VkDevice device, CommandPool& cmd_pool, Swapchain* swapchain, MemoryAllocator& alloc);
+  void init(FrameResources* frame_resources, MemoryAllocator* alloc);
   void destroy();
 
-  auto& get_command() const noexcept { return _frames[_frame_index].cmd; }
+  void destroy_old_buffers();
 
-  auto acquire_swapchain_image(bool wait) -> bool;
-  void present_swapchain_image(VkQueue graphics_queue, VkQueue present_queue);
-  auto& get_swapchain_image() noexcept { return _swapchain->image(_submit_sem_index); }
+  void frame_begin();
 
-private:
-  VkDevice                   _device;
-  std::vector<FrameResource> _frames;
-  std::vector<VkSemaphore>   _submit_sems;
-  uint32_t                   _frame_index{};
-  uint32_t                   _submit_sem_index{};
-  Swapchain*                 _swapchain{};
-  //VertexBuffer               _vertex_buffer;
-
-  enum class State
-  {
-    append_data,
-    uploaded,
-  };
-
-  Buffer                 _vertex_buffer;
-  uint32_t               _byte_size_pre_frame;
-  uint32_t               _current_frame_byte_offset{};
-  std::vector<std::byte> _current_frame_data;
-  State                  _state = State::append_data;
-  MemoryAllocator*       _alloc{};
-  std::queue<std::function<bool(uint32_t, bool)>> _destructors;
-  
-public:
-
-  auto get_current_frame_byte_offset() const
-  {
-    throw_if(_state != State::uploaded, "[VertexBuffer] cannot get frame byte offset after upload");
-    return _current_frame_byte_offset;
-  }
+  auto get_current_frame_byte_offset() const -> uint32_t;
 
   template <typename T>
   requires std::ranges::sized_range<T>      &&
@@ -134,53 +71,52 @@ public:
     memcpy(_current_frame_data.data() + byte_offset, std::ranges::data(values), values_byte_size);
   }
 
-  void upload()
-  {
-    // exceed capacity, need to expand
-    if (_current_frame_data.size() > _byte_size_pre_frame)
-    {
-      _byte_size_pre_frame = util::align_size(std::max(_current_frame_data.size(), static_cast<size_t>(_byte_size_pre_frame * config()->buffer_expand_ratio)), 8);
-      auto tmp_buf = _alloc->create_buffer(_byte_size_pre_frame * _frames.size(), VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
-      _destructors.emplace(
-        [buf = this->_vertex_buffer, frame_index = this->_frame_index]
-        (uint32_t current_frame_index, bool directly_destruct)
-        {
-          if (directly_destruct)
-          {
-            buf.destroy();
-            return true;
-          }
-          if (current_frame_index == frame_index)
-          {
-            buf.destroy();
-            return true;
-          }
-          return false;
-        });
-      _vertex_buffer.set_realloc_info(tmp_buf);
-      _current_frame_byte_offset = _frame_index * _byte_size_pre_frame;
-      upload();
-      return;
-    }
-
-    memcpy(static_cast<std::byte*>(_vertex_buffer.data()) + _current_frame_byte_offset, _current_frame_data.data(), _current_frame_data.size());
-    _current_frame_data.clear();
-    _state = State::uploaded;
-  }
+  void upload();
   
-  // set state is promise the handle and address is valid
-  // append_range maybe recreate a bigger buffer to make handle and address invalid
-  auto get_handle_and_address() const -> std::pair<VkBuffer, VkDeviceAddress>
-  {
-    throw_if(_state != State::uploaded, "[VertexBuffer] must be uploaded, then handle and address will be valid");
-    return { _vertex_buffer.handle(), _vertex_buffer.address() + _current_frame_byte_offset };
-  }
+  auto get_handle_and_address() const -> std::pair<VkBuffer, VkDeviceAddress>;
 
-  auto size() const
-  {
-    throw_if(_state != State::append_data, "[VertexBuffer] cannot get current frame data size after upload");
-    return _current_frame_data.size();
-  }
+  auto size() const -> uint32_t;
+
+private:
+  FrameResources*        _frame_resources{};
+  Buffer                 _buffer;
+  uint32_t               _byte_size_pre_frame;
+  uint32_t               _current_frame_byte_offset{};
+  std::vector<std::byte> _current_frame_data;
+  State                  _state = State::append_data;
+  MemoryAllocator*       _alloc{};
+  std::queue<std::function<bool(uint32_t, bool)>> _destructors;
+};
+
+class FrameResources
+{
+  friend class FramesDynamicBuffer;
+public:
+  FrameResources()            = default;
+  FrameResources(auto const&) = delete;
+  FrameResources(auto&&)      = delete;
+  auto operator=(auto const&) = delete;
+  auto operator=(auto&&)      = delete;
+
+  void init(VkDevice device, CommandPool& cmd_pool, Swapchain* swapchain, MemoryAllocator& alloc);
+  void destroy();
+
+  auto& get_command() const noexcept { return _frames[_frame_index].cmd; }
+
+  auto acquire_swapchain_image(bool wait) -> bool;
+  void present_swapchain_image(VkQueue graphics_queue, VkQueue present_queue);
+  auto& get_swapchain_image() noexcept { return _swapchain->image(_submit_sem_index); }
+
+  auto& get_sdf_buffer() noexcept { return _sdf_buffer; }
+
+private:
+  VkDevice                   _device;
+  std::vector<FrameResource> _frames;
+  std::vector<VkSemaphore>   _submit_sems;
+  uint32_t                   _frame_index{};
+  uint32_t                   _submit_sem_index{};
+  Swapchain*                 _swapchain{};
+  FramesDynamicBuffer        _sdf_buffer;
 };
 
 }}
