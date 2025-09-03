@@ -1,5 +1,6 @@
 #include "tk/GraphicsEngine/MemoryAllocator.hpp"
 #include "tk/ErrorHandling.hpp"
+#include "tk/GraphicsEngine/config.hpp"
 #include "tk/GraphicsEngine/CommandPool.hpp"
 
 #include <cassert>
@@ -10,47 +11,43 @@ namespace tk { namespace graphics_engine {
 //                                  Buffer
 ////////////////////////////////////////////////////////////////////////////////
 
-void Buffer::destroy()
+void Buffer::destroy() const
 {
   assert(_allocator && _handle && _allocation);
-  vmaDestroyBuffer(_allocator, _handle, _allocation);
-  _allocator  = {};
-  _handle     = {};
-  _allocation = {};
-  _address    = {};
-  _data       = {};
-  _capacity   = {};
-  _size       = {};
-  _descriptor_buffer_usages = {};
+  vmaDestroyBuffer(_allocator->get(), _handle, _allocation);
 }
 
 Buffer::Buffer(MemoryAllocator* allocator, uint32_t size, VkBufferUsageFlags usages, VmaAllocationCreateFlags flags) 
 {
-  _allocator = allocator->get();
+  _allocator = allocator;
   _capacity  = size;
+  _usages    = usages;
+  _flags     = flags;
+  
+// for dynamic expand, use mapped
+flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
   
   // TODO: expand other descriptor usages
   _descriptor_buffer_usages = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT;
   if (usages & VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT)
     _descriptor_buffer_usages |= VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT;
   
-  VkBufferCreateInfo buf_info
+  VkBufferCreateInfo buffer_create_info
   {
     .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
     .size  = size,
     .usage = usages,
   };
-  VmaAllocationCreateInfo alloc_info
+  VmaAllocationCreateInfo allocation_create_info
   {
     .flags = flags,
     .usage = VMA_MEMORY_USAGE_AUTO,
   };
-  VmaAllocationInfo info;
-  VmaAllocationInfo* p_info = flags & VMA_ALLOCATION_CREATE_MAPPED_BIT ? &info : nullptr;
-  throw_if(vmaCreateBuffer(_allocator, &buf_info, &alloc_info, &_handle, &_allocation, p_info) != VK_SUCCESS,
+  VmaAllocationInfo allocation_info;
+  throw_if(vmaCreateBuffer(_allocator->get(), &buffer_create_info, &allocation_create_info, &_handle, &_allocation, &allocation_info) != VK_SUCCESS,
            "failed to create buffer");
-
-  if (p_info) _data = info.pMappedData;
+  assert(allocation_info.pMappedData);
+  _data = allocation_info.pMappedData;
 
   if (usages & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
   {
@@ -72,11 +69,34 @@ void Buffer::add_tag(std::string const& tag)
 auto Buffer::append(void const* data, uint32_t size) -> Buffer&
 {
   auto total_size = _size + size;
-  throw_if(total_size > _capacity, "[MemoryAllocator] TODO: dynamic increase capacity of buffer");
-  throw_if(vmaCopyMemoryToAllocation(_allocator, data, _allocation, _size, size) != VK_SUCCESS,
-           "failed to copy data to upload buffer");
-  _size = total_size;
+  if (total_size <= _capacity)
+  {
+    throw_if(vmaCopyMemoryToAllocation(_allocator->get(), data, _allocation, _size, size) != VK_SUCCESS,
+             "failed to copy data to upload buffer");
+    _size = total_size;
+  }
+  // unenough, expand capacity
+  else
+  {
+    auto tmp_buf = Buffer(_allocator, std::max(total_size, static_cast<uint32_t>(_capacity * config()->buffer_expand_ratio)), _usages, _flags);
+    tmp_buf.append(_data, _size)
+           .append(data, size);
+    // destroy old buffer
+    destroy();
+    set_realloc_info(tmp_buf);
+  }
   return *this;
+}
+
+auto Buffer::set_realloc_info(Buffer& buf) -> Buffer*
+{
+  _handle     = buf._handle;
+  _allocation = buf._allocation;
+  _address    = buf._address;
+  _data       = buf._data;
+  _capacity   = buf._capacity;
+  _size       = buf._size;
+  return this;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

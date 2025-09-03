@@ -129,7 +129,6 @@ namespace tk { namespace graphics_engine {
     RenderPipeline _sdf_render_pipeline;
     void render_sdf();
 
-    std::vector<Buffer> _vertex_buffers;
     void create_buffer();
 
     struct PushConstant_SDF

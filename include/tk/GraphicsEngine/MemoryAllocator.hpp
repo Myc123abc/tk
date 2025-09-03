@@ -30,7 +30,7 @@ namespace tk { namespace graphics_engine {
 
     auto descriptor_buffer_usages() const noexcept { return _descriptor_buffer_usages; }
 
-    void destroy();
+    void destroy() const;
 
     auto handle()     const noexcept { return _handle;     }
     auto allocation() const noexcept { return _allocation; }
@@ -74,21 +74,16 @@ namespace tk { namespace graphics_engine {
       return append(value);
     }
 
-    template <std::ranges::range R>
-    requires (std::is_trivially_copyable_v<std::ranges::range_value_t<R>>)
-    auto append_range(R&& values) -> Buffer&
+    template <std::ranges::range T>
+    requires std::ranges::sized_range<T> && std::ranges::contiguous_range<T>
+    auto append_range(T&& values) -> Buffer&
     {
-      using T = std::ranges::range_value_t<R>;
+      auto count = std::ranges::size(values);
+      if (count == 0) return *this;
 
-      if constexpr (std::ranges::sized_range<R>)
-      {
-        auto count = std::ranges::size(values);
-        if (count)
-          append(std::ranges::data(values), count * sizeof(T));
-      } 
-      else
-        for (T const& val : values)
-          append(&val, sizeof(T));
+      using ValueType = std::ranges::range_value_t<T>;  
+      append(std::ranges::data(values), count * sizeof(ValueType));
+
       return *this;
     }
 
@@ -100,16 +95,20 @@ namespace tk { namespace graphics_engine {
       return append_range(values);
     }
 
+    auto set_realloc_info(Buffer& buf) -> Buffer*;
+
   private:
-    VmaAllocator    _allocator{};
-    VkBuffer        _handle{};
-    VmaAllocation   _allocation{};
-    VkDeviceAddress _address{};
-    void*           _data{};
-    uint32_t        _capacity{};
-    uint32_t        _size{};
+    MemoryAllocator*                          _allocator{};
+    VkBuffer                                  _handle{};
+    VmaAllocation                             _allocation{};
+    VkDeviceAddress                           _address{};
+    void*                                     _data{};
+    uint32_t                                  _capacity{};
+    uint32_t                                  _size{};
     std::unordered_map<std::string, uint32_t> _offsets;
-    VkBufferUsageFlags _descriptor_buffer_usages{};
+    VkBufferUsageFlags                        _descriptor_buffer_usages{};
+    VkBufferUsageFlags                        _usages{};
+    VmaAllocationCreateFlags                  _flags{};
   };
 
   class Image

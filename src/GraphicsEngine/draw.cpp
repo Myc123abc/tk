@@ -1,6 +1,7 @@
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
 #include "tk/GraphicsEngine/vk_extension.hpp"
 #include "tk/GraphicsEngine/config.hpp"
+#include "tk/util.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -120,16 +121,13 @@ void GraphicsEngine::render_end()
 
 void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> indices, std::span<ShapeProperty> shape_properties)
 {
-  // get buffer and clear
-  auto& buffer = _vertex_buffers[_frames.get_frame_index()].clear();
-
   // upload vertices to buffer
-  buffer.append_range(vertices);
+  _frames.append_range(vertices);
 
   // get offset of indices
-  auto indices_offset = buffer.size();
+  auto indices_offset = _frames.size();
   // upload indices to buffer
-  buffer.append_range(indices);
+  _frames.append_range(indices);
 
   // convert shape properties to binary data
   uint32_t total_size{};
@@ -150,19 +148,24 @@ void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> 
       data.emplace_back(std::bit_cast<uint32_t>(value));
   }
   // get offset of shape properties
-  auto shape_properties_offset = buffer.size();
+  auto shape_properties_offset = util::align_size(_frames.size(), 8);
+  // add padding for 8 bytes alignment
+  _frames.append_range(std::vector<std::byte>(shape_properties_offset - _frames.size()));
   // upload shape properties to buffer
-  buffer.append_range(data);
+  _frames.append_range(data);
   
   auto& cmd = _frames.get_command();
 
+  _frames.upload();
+  auto [handle, address] = _frames.get_handle_and_address();
+
   // bind index buffer
-  vkCmdBindIndexBuffer(cmd, buffer.handle(), indices_offset, VK_INDEX_TYPE_UINT16);
+  vkCmdBindIndexBuffer(cmd, handle, _frames.get_current_frame_byte_offset() + indices_offset, VK_INDEX_TYPE_UINT16);
 
   auto pc = PushConstant_SDF
   {
-    .vertices         = buffer.address(),
-    .shape_properties = buffer.address() + shape_properties_offset,
+    .vertices         = address,
+    .shape_properties = address + shape_properties_offset,
     .window_extent    = _window->get_framebuffer_size(),
   };
 

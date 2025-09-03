@@ -216,19 +216,13 @@ void GraphicsEngine::init_command_pool()
 
 void GraphicsEngine::create_frame_resources()
 {
-  _frames.init(_device, _command_pool, &_swapchain);
+  _frames.init(_device, _command_pool, &_swapchain, _mem_alloc);
   _destructors.push([&] { _frames.destroy(); });
 }
 
 void GraphicsEngine::create_buffer()
-{
-  // TODO: move vertex buffers to frame resources and make buffer dynamic
-  _vertex_buffers.reserve(_swapchain.size());
-  for (auto i = 0; i < _swapchain.size(); ++i)
-  {
-    _vertex_buffers.emplace_back(_mem_alloc.create_buffer(config()->buffer_size, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT));
-  }
-  
+{  
+  // TODO: descriptor_buffer should be frame resources
   if (config()->use_descriptor_buffer)
     _descriptor_buffer = _mem_alloc.create_buffer(1024, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT  | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT , VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
   
@@ -236,10 +230,6 @@ void GraphicsEngine::create_buffer()
   {
     if (config()->use_descriptor_buffer)
       _descriptor_buffer.destroy();
-    for (auto i = 0; i < _swapchain.size(); ++i)
-    {
-      _vertex_buffers[i].destroy();
-    }
   });
 }
 

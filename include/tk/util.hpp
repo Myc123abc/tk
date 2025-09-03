@@ -7,7 +7,7 @@
 
 namespace tk { namespace util {
     
-inline uint32_t align_size(uint32_t size, uint32_t alignment)
+inline uint32_t align_size(uint32_t size, uint32_t alignment) noexcept
 {
   return (size + alignment - 1) & ~(alignment - 1);
 }

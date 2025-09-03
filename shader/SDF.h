@@ -8,13 +8,13 @@ struct Vertex
   uint glyph_atlases_index;
 };
 
-layout(std430, buffer_reference) readonly buffer Vertices 
+layout(std430, buffer_reference, buffer_reference_align = 8) readonly buffer Vertices 
 {
   Vertex data[];
 };
 
 // TODO: min ( union )
-layout(std430, buffer_reference) readonly buffer ShapeProperties
+layout(std430, buffer_reference, buffer_reference_align = 8) readonly buffer ShapeProperties
 {
   uint data[];  // shape type  |  color  |  thickness  |  operator  |  values
                 //   uint     |   vec4  |     uint    |    uint    |    ...

@@ -1,11 +1,51 @@
 #include "tk/GraphicsEngine/FrameResources.hpp"
-#include "tk/ErrorHandling.hpp"
+#include "tk/GraphicsEngine/config.hpp"
+#include "tk/util.hpp"
 
 #include <cassert>
 
 namespace tk { namespace graphics_engine {
 
-void FrameResources::init(VkDevice device, CommandPool& cmd_pool, Swapchain* swapchain)
+////////////////////////////////////////////////////////////////////////////////
+///                         Vertex Buffer
+////////////////////////////////////////////////////////////////////////////////
+#if 0
+void VertexBuffer::init(FrameResources* frame_resources, MemoryAllocator& alloc)
+{
+  _frame_resources = frame_resources;
+  _size_pre_frame  = config()->buffer_size;
+  _buffer = alloc.create_buffer(_size_pre_frame * frame_resources->_frames.size(), VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+}
+
+void VertexBuffer::destroy() const
+{
+  _buffer.destroy();
+}
+
+void VertexBuffer::frame_begin() noexcept
+{
+  _state = State::append_data;
+  _data.clear();
+  _buffer.clear();
+}
+
+void VertexBuffer::upload()
+{
+  _state = State::uploaded;
+  _buffer.append_range(_current_frame_data);
+}
+
+auto VertexBuffer::get_handle_and_address() const -> std::pair<VkBuffer, VkDeviceAddress>
+{
+  throw_if(_state != State::uploaded, "[VertexBuffer] not upload data");
+  return { _buffer.handle(), _buffer.address() };
+}
+#endif
+////////////////////////////////////////////////////////////////////////////////
+///                         Frame Resources
+////////////////////////////////////////////////////////////////////////////////
+
+void FrameResources::init(VkDevice device, CommandPool& cmd_pool, Swapchain* swapchain, MemoryAllocator& alloc)
 {
   _device    = device;
   _swapchain = swapchain;
@@ -28,13 +68,19 @@ void FrameResources::init(VkDevice device, CommandPool& cmd_pool, Swapchain* swa
   // assign commands and create sync objects
   for (auto i = 0; i < swapchain->size(); ++i)
   {
-    _frames[i].cmd = cmds[i];
-    throw_if(vkCreateFence(device, &fence_create_info, nullptr, &_frames[i].fence)         != VK_SUCCESS ||
-             vkCreateSemaphore(device, &sem_create_info, nullptr, &_frames[i].acquire_sem) != VK_SUCCESS,
+    auto& frame = _frames[i];
+    frame.cmd = cmds[i];
+    throw_if(vkCreateFence(device, &fence_create_info, nullptr, &frame.fence)         != VK_SUCCESS ||
+             vkCreateSemaphore(device, &sem_create_info, nullptr, &frame.acquire_sem) != VK_SUCCESS,
              "failed to create sync objects");
     throw_if(vkCreateSemaphore(device, &sem_create_info, nullptr, &_submit_sems[i]) != VK_SUCCESS, 
              "failed to create semaphore");
   }
+
+  //_vertex_buffer.init(this, alloc);
+  _byte_size_pre_frame = util::align_size(config()->buffer_size, 8);
+  _vertex_buffer = alloc.create_buffer(_byte_size_pre_frame * _frames.size(), VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+  _alloc = &alloc;
 }
 
 void FrameResources::destroy()
@@ -42,9 +88,17 @@ void FrameResources::destroy()
   assert(_frames.size() == _submit_sems.size());
   for (auto i = 0; i < _frames.size(); ++i)
   {
-    vkDestroyFence(_device, _frames[i].fence, nullptr);
-    vkDestroySemaphore(_device, _frames[i].acquire_sem, nullptr);
+    auto& frame = _frames[i];
+    vkDestroyFence(_device, frame.fence, nullptr);
+    vkDestroySemaphore(_device, frame.acquire_sem, nullptr);
     vkDestroySemaphore(_device, _submit_sems[i], nullptr);
+  }
+  //_vertex_buffer.destroy();
+  _vertex_buffer.destroy();
+  while (!_destructors.empty())
+  {
+    _destructors.front()(0, true);
+    _destructors.pop();
   }
 }
 
@@ -58,6 +112,10 @@ auto FrameResources::acquire_swapchain_image(bool wait) -> bool
     return false;
   throw_if(vkResetFences(_device, 1, &frame.fence) != VK_SUCCESS,
            "failed to reset fence");
+
+  // destroy old resources
+  if (!_destructors.empty() && _destructors.front()(_frame_index, false))
+    _destructors.pop();
 
   // acquire usable swapchain image
   auto res = vkAcquireNextImageKHR(_device, _swapchain->get(), UINT64_MAX, frame.acquire_sem, VK_NULL_HANDLE, &_submit_sem_index);
@@ -77,6 +135,10 @@ auto FrameResources::acquire_swapchain_image(bool wait) -> bool
     .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
   };
   vkBeginCommandBuffer(frame.cmd, &command_begin_info);
+
+  _current_frame_data.clear();
+  _current_frame_byte_offset = _byte_size_pre_frame * _frame_index;
+  _state = State::append_data;
 
   return true;
 }
