@@ -18,7 +18,7 @@ namespace tk { namespace graphics_engine {
   //  2. binding and type cannot duplicate
   //  3. assume only single variable descriptors can be used now
   //  4. assume all use combined image now
-  struct DescriptorInfo
+  struct DescriptorInfo2
   {
     uint32_t            binding{};
     VkDescriptorType    type{};
@@ -58,14 +58,14 @@ namespace tk { namespace graphics_engine {
   private:
     friend class Device;
 
-    DescriptorLayout(class Device* device, std::vector<DescriptorInfo> const& layouts);
+    DescriptorLayout(class Device* device, std::vector<DescriptorInfo2> const& layouts);
 
-    void create_descriptor_pool(std::vector<DescriptorInfo> const& layouts);
-    void create_descriptor_set_layout(std::vector<DescriptorInfo> const& descriptor_infos); // TODO: need to be distinguished from using descriptor buffer features
+    void create_descriptor_pool(std::vector<DescriptorInfo2> const& layouts);
+    void create_descriptor_set_layout(std::vector<DescriptorInfo2> const& descriptor_infos); // TODO: need to be distinguished from using descriptor buffer features
     void allocate_descriptor_sets(uint32_t variable_descriptor_count);
-    void update_descriptor_sets(std::vector<DescriptorInfo> const& descriptor_infos);
+    void update_descriptor_sets(std::vector<DescriptorInfo2> const& descriptor_infos);
 
-    auto get_variable_descriptor_count(std::vector<DescriptorInfo> const& descriptor_infos) -> uint32_t;
+    auto get_variable_descriptor_count(std::vector<DescriptorInfo2> const& descriptor_infos) -> uint32_t;
 
     void create_descrptor_set_layout(std::vector<VkDescriptorSetLayoutBinding> const& bindings);
     void create_descriptor_pool(std::unordered_map<int, uint32_t> const& types);
@@ -76,7 +76,7 @@ namespace tk { namespace graphics_engine {
     class Device*                _device{};
     VkDescriptorSetLayout        _layout{};
     VkDeviceSize                 _size{};
-    std::vector<DescriptorInfo>  _descriptors;
+    std::vector<DescriptorInfo2>  _descriptors;
     VkPipelineLayout             _pipeline_layout{};
     VkPipelineBindPoint          _bind_point{};
     std::string                  _tag{};

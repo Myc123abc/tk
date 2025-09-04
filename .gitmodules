@@ -13,3 +13,6 @@
 [submodule "vendor/harfbuzz"]
 	path = vendor/harfbuzz
 	url = https://github.com/harfbuzz/harfbuzz.git
+[submodule "vendor/utfcpp"]
+	path = vendor/utfcpp
+	url = https://github.com/nemtrif/utfcpp.git

@@ -23,7 +23,7 @@ struct Config
                                                  // and this value only be like vector::reserve, not in config, should in creatation in renderpipeline
 
   bool use_descriptor_buffer{ false };
-  bool use_shader_object{ true };
+  bool use_shader_object{ false };
 };
 
 inline auto config() noexcept

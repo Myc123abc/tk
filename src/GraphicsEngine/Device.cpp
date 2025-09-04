@@ -32,7 +32,7 @@ auto Device::init(VkPhysicalDevice device, VkDeviceCreateInfo const& info) -> De
   return *this;
 }
 
-auto Device::create_descriptor_layout(std::vector<DescriptorInfo> const& infos) -> DescriptorLayout
+auto Device::create_descriptor_layout(std::vector<DescriptorInfo2> const& infos) -> DescriptorLayout
 {
   return DescriptorLayout(this, infos);
 }

@@ -97,6 +97,8 @@ public:
 
   auto& image(uint32_t index) noexcept { return _images[index]; }
 
+  auto extent() const noexcept { return _images[0].extent2D(); }
+
   auto get() const noexcept { return _swapchain; }
 
 private:

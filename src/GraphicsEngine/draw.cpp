@@ -15,10 +15,10 @@ auto GraphicsEngine::frame_begin() -> bool
 
   auto& cmd = _frames.get_command();
 
-  set_pipeline_state(cmd);
+  //set_pipeline_state(cmd);
 
-  if (config()->use_descriptor_buffer)
-    bind_descriptor_buffer(cmd, _descriptor_buffer);
+  //if (config()->use_descriptor_buffer)
+  //  bind_descriptor_buffer(cmd, _descriptor_buffer);
 
   return true;
 }
@@ -58,6 +58,7 @@ void GraphicsEngine::sdf_render_begin()
   render_begin(_frames.get_swapchain_image());
 }
 
+#if 0
 void GraphicsEngine::set_pipeline_state(Command const& cmd)
 {
   auto& swapchain_image = _frames.get_swapchain_image();
@@ -113,6 +114,7 @@ void GraphicsEngine::set_pipeline_state(Command const& cmd)
     vkCmdSetScissor(cmd, 0, 1, &scissor);
   }
 }
+#endif
 
 void GraphicsEngine::render_end()
 {
@@ -164,14 +166,14 @@ void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> 
   // bind index buffer
   vkCmdBindIndexBuffer(cmd, handle, buf.get_current_frame_byte_offset() + indices_offset, VK_INDEX_TYPE_UINT16);
 
-  auto pc = PushConstant_SDF
+  auto pc = FrameResources::PushConstant_SDF
   {
     .vertices         = address,
     .shape_properties = address + shape_properties_offset,
     .window_extent    = _window->get_framebuffer_size(),
   };
 
-  _sdf_render_pipeline.bind(cmd, pc);
+  _frames.bind_sdf_pipeline(cmd, pc);
 
   vkCmdDrawIndexed(cmd, indices.size(), 1, 0, 0, 0);
 }
@@ -201,7 +203,7 @@ auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 pos, float size
     indices.append_range(GlyphInfo::get_indices(idx));
     pos = GlyphInfo::get_next_position(pos, size, text_pos_info.advances[i]);
   }
-  return { vertices.back().pos.x, text_pos_info.max_height };
+  return { vertices.back().pos.x, text_pos_info.max_height * GlyphInfo::get_scale(size) };
 }
 
 }}

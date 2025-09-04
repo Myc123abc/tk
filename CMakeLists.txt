@@ -45,6 +45,7 @@ target_include_directories(tk
     include
     ${Vulkan_INCLUDE_DIRS}
     vendor/freetype/include
+    vendor/utfcpp/source
 )
 
 target_link_libraries(tk

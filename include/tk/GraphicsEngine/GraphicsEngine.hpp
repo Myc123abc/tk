@@ -82,15 +82,15 @@ namespace tk { namespace graphics_engine {
     void create_frame_resources();
     void create_sampler();
 
-    void create_sdf_rendering_resource();
+    //void create_sdf_rendering_resource();
 
     // vk extension funcs
     void load_instance_extension_funcs();
     void load_device_extension_funcs();
 
     // rendering
-    void set_pipeline_state(Command const& cmd);
-    // TODO: expand which not need color attachemtn, such as compute pipeline?
+    //void set_pipeline_state(Command const& cmd);
+
     void render_begin(Image& image);
 
     void init_text_engine();
@@ -119,22 +119,13 @@ namespace tk { namespace graphics_engine {
 
     FrameResources _frames;
 
-    Buffer _descriptor_buffer;
+    //Buffer _descriptor_buffer;
 
     //
     // SDF rendering resources
     //
-    RenderPipeline _sdf_render_pipeline;
     void render_sdf();
-
-    void create_buffer();
-
-    struct PushConstant_SDF
-    {
-      VkDeviceAddress vertices{};
-      VkDeviceAddress shape_properties{};
-      glm::vec2       window_extent{};
-    };
+    //void create_buffer(); // FIXME: discard
 
     //
     // Text Rendering

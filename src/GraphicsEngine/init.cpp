@@ -31,12 +31,13 @@ void GraphicsEngine::init(Window& window)
   create_swapchain();
   init_command_pool();
   init_memory_allocator();
-  create_frame_resources();
   create_sampler();
 
-  create_buffer();
+  //create_buffer();
   init_text_engine();
-  create_sdf_rendering_resource();
+  //create_sdf_rendering_resource();
+
+  create_frame_resources();
 
   init_gpu_resource();
 }
@@ -216,10 +217,17 @@ void GraphicsEngine::init_command_pool()
 
 void GraphicsEngine::create_frame_resources()
 {
-  _frames.init(_device, _command_pool, &_swapchain, _mem_alloc);
-  _destructors.push([&] { _frames.destroy(); });
+  _frames.init(_device, _command_pool, &_swapchain);
+  _frames.init_sdf_resource(_mem_alloc, &_text_engine, _sampler);
+
+  _destructors.push([&] 
+  {
+    _frames.destroy();
+    _frames.destroy_sdf_resource();
+  });
 }
 
+#if 0
 void GraphicsEngine::create_buffer()
 {  
   // TODO: descriptor_buffer should be frame resources
@@ -232,6 +240,7 @@ void GraphicsEngine::create_buffer()
       _descriptor_buffer.destroy();
   });
 }
+#endif
 
 auto GraphicsEngine::get_swapchain_image_size() -> glm::vec2
 {
@@ -245,6 +254,7 @@ void GraphicsEngine::resize_swapchain()
   _swapchain.resize();
 }
 
+#if 0
 void GraphicsEngine::create_sdf_rendering_resource()
 {
   _sdf_render_pipeline = _device.create_render_pipeline(
@@ -267,6 +277,7 @@ void GraphicsEngine::create_sdf_rendering_resource()
     _sdf_render_pipeline.destroy();
   });
 }
+#endif
 
 void GraphicsEngine::create_sampler()
 {

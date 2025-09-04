@@ -39,43 +39,6 @@ auto lerp(std::vector<glm::vec2> const& a, std::vector<glm::vec2> const& b, floa
   return res;
 }
 
-auto to_unicode(std::string_view str) -> std::pair<uint32_t, uint32_t>
-{
-  assert(!str.empty());
-  uint8_t ch = str[0];
-  if (ch < 0x80)
-    return { ch, 1 };
-  else if ((ch & 0xE0) == 0xC0)
-  {
-    assert(str.size() > 1);
-    return { (ch & 0x1F) << 6 | (str[1] & 0x3F), 2 };
-  }
-  else if ((ch & 0xF0) == 0xE0)
-  {
-    assert(str.size() > 2);
-    return { (ch & 0x0F) << 12 | (str[1] & 0x3F) << 6 | (str[2] & 0x3F), 3 };
-  }
-  else if ((ch & 0xF8) == 0xF0)
-  {
-    assert(str.size() > 3);
-    return { (str[0] & 0x07) << 18 | (str[1] & 0x3F) << 12 | (str[2] & 0x3F) << 6 | (str[3] & 0x3F), 4 };
-  }
-  assert(true);
-  return {};
-}
-
-auto to_u32string(std::string_view str) -> std::u32string
-{
-  std::u32string u32str;
-  for (auto i = 0; i < str.size();)
-  {
-    auto res = to_unicode(str.data() + i);
-    u32str.push_back(res.first);
-    i += res.second;
-  }
-  return u32str;
-}
-
 auto to_lower(std::string_view str) -> std::string
 {
   std::string res(str.size(), '\0');

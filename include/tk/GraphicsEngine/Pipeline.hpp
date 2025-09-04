@@ -2,7 +2,6 @@
 
 #include <vulkan/vulkan.h>
 
-#include <vector>
 #include <string_view>
 
 namespace tk { namespace graphics_engine {

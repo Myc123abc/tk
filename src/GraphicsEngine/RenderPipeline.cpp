@@ -23,7 +23,7 @@ void RenderPipeline::destroy() noexcept
 RenderPipeline::RenderPipeline(
   Device&                            device,
   uint32_t                           push_constant_size,
-  std::vector<DescriptorInfo> const& descriptors,           // TODO: only use set 0 (single set, multiple sets not process)
+  std::vector<DescriptorInfo2> const& descriptors,           // TODO: only use set 0 (single set, multiple sets not process)
   Buffer&                            descriptor_buffer, 
   std::string_view                   descriptor_layout_tag, // FIXME: find way to discard this
   std::vector<std::pair<VkShaderStageFlagBits, std::string_view>> const& shaders,

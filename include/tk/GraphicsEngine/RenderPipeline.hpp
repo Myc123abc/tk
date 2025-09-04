@@ -58,7 +58,7 @@ namespace tk { namespace graphics_engine {
      */
     RenderPipeline(Device&                            device,
                    uint32_t                           push_constant_size,
-                   std::vector<DescriptorInfo> const& descriptors, 
+                   std::vector<DescriptorInfo2> const& descriptors, 
                    Buffer&                            descriptor_buffer, 
                    std::string_view                   descriptor_layout_tag, // FIXME: find way to discard this
                    std::vector<std::pair<VkShaderStageFlagBits, std::string_view>> const& shaders,

@@ -30,7 +30,7 @@ namespace tk { namespace graphics_engine {
 
     void create_shaders(std::vector<ShaderCreateInfo> const& infos, bool link = false);
 
-    auto create_descriptor_layout(std::vector<DescriptorInfo> const& infos) -> DescriptorLayout;
+    auto create_descriptor_layout(std::vector<DescriptorInfo2> const& infos) -> DescriptorLayout;
 
     auto create_pipeline_layout(
       std::vector<VkDescriptorSetLayout> const& descritptor_layouts = {},
@@ -46,7 +46,7 @@ namespace tk { namespace graphics_engine {
 
     auto create_render_pipeline(
       uint32_t                           push_constant_size,
-      std::vector<DescriptorInfo> const& descriptors, 
+      std::vector<DescriptorInfo2> const& descriptors, 
       Buffer&                            descriptor_buffer, 
       std::string_view                   descriptor_layout_tag, // FIXME: find way to discard this
       std::vector<std::pair<VkShaderStageFlagBits, std::string_view>> const& shaders,

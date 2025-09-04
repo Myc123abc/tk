@@ -1,10 +1,10 @@
 #include "tk/GraphicsEngine/TextEngine/TextEngine.hpp"
 #include "tk/ErrorHandling.hpp"
 #include "missing-glyph-sdf-bitmap.hpp"
-#include "tk/util.hpp"
 
 #include <hb-ft.h>
 #include <hb-ot.h>
+#include <utf8.h>
 
 #include <ranges>
 
@@ -245,7 +245,7 @@ auto TextEngine::calculate_text_pos_info(std::string_view text, type::FontStyle 
 {
   assert(!text.empty());
 
-  auto u32str = util::to_u32string(text);
+  auto u32str = utf8::utf8to32(text);
 
   // try to get cached text advances
   auto& cached_text_advances = _cached_text_advances[style];

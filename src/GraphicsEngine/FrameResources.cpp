@@ -104,7 +104,7 @@ void FramesDynamicBuffer::frame_begin()
 ///                         Frame Resources
 ////////////////////////////////////////////////////////////////////////////////
 
-void FrameResources::init(VkDevice device, CommandPool& cmd_pool, Swapchain* swapchain, MemoryAllocator& alloc)
+void FrameResources::init(VkDevice device, CommandPool& cmd_pool, Swapchain* swapchain)
 {
   _device    = device;
   _swapchain = swapchain;
@@ -135,9 +135,6 @@ void FrameResources::init(VkDevice device, CommandPool& cmd_pool, Swapchain* swa
     throw_if(vkCreateSemaphore(device, &sem_create_info, nullptr, &_submit_sems[i]) != VK_SUCCESS, 
              "failed to create semaphore");
   }
-
-  // initialize other frame resources
-  _sdf_buffer.init(this, &alloc);
 }
 
 void FrameResources::destroy()
@@ -150,7 +147,27 @@ void FrameResources::destroy()
     vkDestroySemaphore(_device, frame.acquire_sem, nullptr);
     vkDestroySemaphore(_device, _submit_sems[i], nullptr);
   }
+}
+
+void FrameResources::init_sdf_resource(MemoryAllocator& alloc, TextEngine* text_engine, VkSampler sampler)
+{
+  _sdf_buffer.init(this, &alloc);
+  _sdf_graphics_pipeline.init(
+    _device,
+    {
+      { ShaderType::fragment, 0, DescriptorType::sampler2D, { *text_engine->get_first_glyph_atlas_pointer() }, sampler},
+    },
+    sizeof(PushConstant_SDF),
+    _swapchain->format(),
+    "shader/SDF_vert.spv",
+    "shader/SDF_frag.spv"
+  );
+}
+
+void FrameResources::destroy_sdf_resource()
+{
   _sdf_buffer.destroy();
+  _sdf_graphics_pipeline.destroy();
 }
 
 auto FrameResources::acquire_swapchain_image(bool wait) -> bool

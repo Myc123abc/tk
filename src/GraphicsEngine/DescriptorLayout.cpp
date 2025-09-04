@@ -23,7 +23,7 @@ inline void throw_if(bool b, std::string_view msg)
   if (b) throw std::exception(std::format("[Descriptor] {}", msg).data());
 }
 
-void check_descriptor_infos_valid(std::vector<DescriptorInfo> const& layouts)
+void check_descriptor_infos_valid(std::vector<DescriptorInfo2> const& layouts)
 {
   auto bindings = std::unordered_set<uint32_t>(layouts.size());
   auto types    = std::unordered_set<VkDescriptorType>(layouts.size());
@@ -73,7 +73,7 @@ void DescriptorLayout::destroy() noexcept
   _set             = {};
 }
 
-DescriptorLayout::DescriptorLayout(Device* device, std::vector<DescriptorInfo> const& descriptor_infos)
+DescriptorLayout::DescriptorLayout(Device* device, std::vector<DescriptorInfo2> const& descriptor_infos)
 {
   assert(device && !descriptor_infos.empty());
 
@@ -143,7 +143,7 @@ DescriptorLayout::DescriptorLayout(Device* device, std::vector<DescriptorInfo> c
   }
 }
 
-void DescriptorLayout::create_descriptor_pool(std::vector<DescriptorInfo> const& descriptor_infos)
+void DescriptorLayout::create_descriptor_pool(std::vector<DescriptorInfo2> const& descriptor_infos)
 {
   auto pool_sizes  = std::vector<VkDescriptorPoolSize>();
   auto create_info = VkDescriptorPoolCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
@@ -168,7 +168,7 @@ void DescriptorLayout::create_descriptor_pool(std::vector<DescriptorInfo> const&
            "failed to create descriptor pool");
 }
 
-void DescriptorLayout::create_descriptor_set_layout(std::vector<DescriptorInfo> const& descriptor_infos)
+void DescriptorLayout::create_descriptor_set_layout(std::vector<DescriptorInfo2> const& descriptor_infos)
 {
   auto bindings                  = std::vector<VkDescriptorSetLayoutBinding>();
   auto binding_flags             = std::vector<VkDescriptorBindingFlags>();
@@ -229,7 +229,7 @@ void DescriptorLayout::allocate_descriptor_sets(uint32_t variable_descriptor_cou
            "failed to allocate descriptor set");
 }
 
-void DescriptorLayout::update_descriptor_sets(std::vector<DescriptorInfo> const& descriptor_infos)
+void DescriptorLayout::update_descriptor_sets(std::vector<DescriptorInfo2> const& descriptor_infos)
 {
   auto image_infos = std::vector<VkDescriptorImageInfo>();
   auto writes      = std::vector<VkWriteDescriptorSet>(descriptor_infos.size());
@@ -273,7 +273,7 @@ void DescriptorLayout::update_descriptor_sets(std::vector<DescriptorInfo> const&
   vkUpdateDescriptorSets(_device->get(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
 }
 
-auto DescriptorLayout::get_variable_descriptor_count(std::vector<DescriptorInfo> const& descriptor_infos) -> uint32_t
+auto DescriptorLayout::get_variable_descriptor_count(std::vector<DescriptorInfo2> const& descriptor_infos) -> uint32_t
 {
   // TODO: assume only single variable descriptor now
   auto it = std::ranges::find_if(descriptor_infos, [](auto const& info) { return info.images.size() > 1; });
@@ -362,7 +362,7 @@ void DescriptorLayout::create_descriptor_pool(std::unordered_map<int, uint32_t> 
   update();
 }
 
-auto get_image_sampler_info(DescriptorInfo const& desc)
+auto get_image_sampler_info(DescriptorInfo2 const& desc)
 {
   assert(true);
   return VkDescriptorImageInfo
@@ -373,7 +373,7 @@ auto get_image_sampler_info(DescriptorInfo const& desc)
   };
 }
 
-auto get_storage_info(DescriptorInfo const& desc)
+auto get_storage_info(DescriptorInfo2 const& desc)
 {
   assert(true);
   return VkDescriptorImageInfo

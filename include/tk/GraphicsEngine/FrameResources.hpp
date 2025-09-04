@@ -8,6 +8,8 @@
 #include "Swapchain.hpp"
 #include "MemoryAllocator.hpp"
 #include "../ErrorHandling.hpp"
+#include "Pipeline/GraphicsPipeline.hpp"
+#include "TextEngine/TextEngine.hpp"
 
 #include <queue>
 #include <functional>
@@ -98,7 +100,7 @@ public:
   auto operator=(auto const&) = delete;
   auto operator=(auto&&)      = delete;
 
-  void init(VkDevice device, CommandPool& cmd_pool, Swapchain* swapchain, MemoryAllocator& alloc);
+  void init(VkDevice device, CommandPool& cmd_pool, Swapchain* swapchain);
   void destroy();
 
   auto& get_command() const noexcept { return _frames[_frame_index].cmd; }
@@ -107,8 +109,6 @@ public:
   void present_swapchain_image(VkQueue graphics_queue, VkQueue present_queue);
   auto& get_swapchain_image() noexcept { return _swapchain->image(_submit_sem_index); }
 
-  auto& get_sdf_buffer() noexcept { return _sdf_buffer; }
-
 private:
   VkDevice                   _device;
   std::vector<FrameResource> _frames;
@@ -116,7 +116,31 @@ private:
   uint32_t                   _frame_index{};
   uint32_t                   _submit_sem_index{};
   Swapchain*                 _swapchain{};
-  FramesDynamicBuffer        _sdf_buffer;
+
+  //
+  // SDF
+  //
+public:
+  void init_sdf_resource(MemoryAllocator& alloc, TextEngine* text_engine, VkSampler sampler);
+  void destroy_sdf_resource();
+  auto& get_sdf_buffer() noexcept { return _sdf_buffer; }
+
+  struct PushConstant_SDF
+  {
+    VkDeviceAddress vertices{};
+    VkDeviceAddress shape_properties{};
+    glm::vec2       window_extent{};
+  };
+
+  void bind_sdf_pipeline(Command const& cmd, PushConstant_SDF const& pc) const noexcept
+  { 
+    _sdf_graphics_pipeline.bind(cmd, pc);
+    _sdf_graphics_pipeline.set_pipeline_state(cmd, _swapchain->extent());
+  }
+
+private:
+  FramesDynamicBuffer _sdf_buffer;
+  GraphicsPipeline    _sdf_graphics_pipeline;
 };
 
 }}
