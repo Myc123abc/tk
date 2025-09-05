@@ -14,15 +14,13 @@
 
 namespace tk
 {
-  // TODO: make more modular config engine, such as dynamic load fonts
   /**
    * initialize tk context
    * @param title title of main window
    * @param width width of main window
    * @param height height of main window
-   * @param fonts fonts for preload
    */
-  TK_API void init(std::string_view title, uint32_t width, uint32_t height, std::vector<std::string_view> const& fonts);
+  TK_API void init(std::string_view title, uint32_t width, uint32_t height);
 
   TK_API auto get_window_size() -> glm::vec2;
 
@@ -39,4 +37,10 @@ namespace tk
   TK_API void destroy();
 
   TK_API auto get_key(type::Key k) -> type::KeyState;
+
+  /**
+   * load fonts, can dynamic load
+   * @param fonts
+   */
+  TK_API void load_fonts(std::vector<std::string_view> fonts);
 }

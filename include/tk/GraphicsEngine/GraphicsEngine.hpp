@@ -5,7 +5,6 @@
 #pragma once
 
 #include "../DestructorStack.hpp"
-#include "Device.hpp"
 #include "TextEngine/TextEngine.hpp"
 #include "FrameResources.hpp"
 #include "Pipeline/GraphicsPipeline.hpp"
@@ -67,6 +66,8 @@ namespace tk { namespace graphics_engine {
 
     void wait_device_complete() const noexcept { vkDeviceWaitIdle(_device); }
 
+    void load_fonts(std::vector<std::string_view> const& fonts);
+
   private:
 
     //
@@ -87,9 +88,6 @@ namespace tk { namespace graphics_engine {
     void load_instance_extension_funcs();
     void load_device_extension_funcs();
 
-    // rendering
-    //void set_pipeline_state(Command const& cmd);
-
     void render_begin(Image& image);
 
     void init_text_engine();
@@ -106,7 +104,7 @@ namespace tk { namespace graphics_engine {
     VkDebugUtilsMessengerEXT     _debug_messenger{};
     VkSurfaceKHR                 _surface{};
     VkPhysicalDevice             _physical_device{};
-    Device                       _device;
+    VkDevice                     _device{};
     VkQueue                      _graphics_queue{};
     VkQueue                      _present_queue{};
     Swapchain                    _swapchain;
@@ -117,8 +115,6 @@ namespace tk { namespace graphics_engine {
     bool _wait_fence{ true };
 
     FrameResources _frames;
-
-    //Buffer _descriptor_buffer;
 
     //
     // SDF rendering resources
@@ -135,8 +131,6 @@ namespace tk { namespace graphics_engine {
 
     FramesDynamicBuffer _sdf_buffer;
     GraphicsPipeline    _sdf_graphics_pipeline;
-
-    //void create_buffer(); // FIXME: discard
 
     //
     // Text Rendering

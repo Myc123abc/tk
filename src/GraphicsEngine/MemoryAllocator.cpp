@@ -23,13 +23,8 @@ Buffer::Buffer(MemoryAllocator* allocator, uint32_t size, VkBufferUsageFlags usa
   _usages    = usages;
   _flags     = flags;
   
-// for dynamic expand, use mapped
-flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
-  
-  // TODO: expand other descriptor usages
-  _descriptor_buffer_usages = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT;
-  if (usages & VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT)
-    _descriptor_buffer_usages |= VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT;
+  // for dynamic expand, use mapped
+  flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
   
   VkBufferCreateInfo buffer_create_info
   {

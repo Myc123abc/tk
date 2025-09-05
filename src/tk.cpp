@@ -2,12 +2,6 @@
 // init tk context and handle events and other
 // wrapper callback system of sdl3 callback system
 //
-// HACK:
-// 1. while, use log in internal callback functions is strange...
-//
-// FIX:
-// 1. should not use try catch in internal callback system!
-//
 
 #include "tk/tk.hpp"
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
@@ -34,7 +28,7 @@ struct tk_context
 static tk_context* tk_ctx{};
 extern struct ui_context ui_ctx;
 
-void init(std::string_view title, uint32_t width, uint32_t height, std::vector<std::string_view> const& fonts)
+void init(std::string_view title, uint32_t width, uint32_t height)
 {
   tk_ctx = new tk_context();
 
@@ -43,7 +37,7 @@ void init(std::string_view title, uint32_t width, uint32_t height, std::vector<s
   tk_ctx->window.set_engine(&tk_ctx->engine);
 
   tk_ctx->window.set_state(type::WindowState::running); // set running to avoid event process always jump the rendering
-                                                   // the first rendered frame will also show the window
+                                                        // the first rendered frame will also show the window
   
   // init ui context
   // TODO: currently only use main window for entire ui
@@ -89,7 +83,8 @@ void render()
   engine.frame_end();
 
   static bool is_first_frame = true;
-  if (is_first_frame) {
+  if (is_first_frame)
+  {
     tk_ctx->engine.wait_device_complete();
     tk_ctx->window.show();
     is_first_frame = false;
@@ -101,6 +96,11 @@ void destroy()
   delete ui::get_ctx();
   tk_ctx->destroy();
   delete tk_ctx;
+}
+
+void load_fonts(std::vector<std::string_view> fonts)
+{
+  tk_ctx->engine.load_fonts(fonts);
 }
 
 }

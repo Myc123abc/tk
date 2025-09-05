@@ -13,7 +13,6 @@ layout(std430, buffer_reference, buffer_reference_align = 8) readonly buffer Ver
   Vertex data[];
 };
 
-// TODO: min ( union )
 layout(std430, buffer_reference, buffer_reference_align = 8) readonly buffer ShapeProperties
 {
   uint data[];  // shape type  |  color  |  thickness  |  operator  |  values

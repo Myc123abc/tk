@@ -1,7 +1,6 @@
 #include "tk/GraphicsEngine/GraphicsEngine.hpp"
 #include "tk/ErrorHandling.hpp"
 #include "tk/GraphicsEngine/vk_extension.hpp"
-#include "tk/GraphicsEngine/config.hpp"
 
 #include <string_view>
 
@@ -35,30 +34,7 @@ void GraphicsEngine::load_instance_extension_funcs()
 
 void GraphicsEngine::load_device_extension_funcs()
 {
-  if (config()->use_descriptor_buffer)
-  {
-    load_device_ext_func(_device, vkGetDescriptorSetLayoutSizeEXT);
-    load_device_ext_func(_device, vkGetDescriptorSetLayoutBindingOffsetEXT);
-    load_device_ext_func(_device, vkGetDescriptorEXT);
-    load_device_ext_func(_device, vkCmdBindDescriptorBuffersEXT);
-    load_device_ext_func(_device, vkCmdSetDescriptorBufferOffsetsEXT);
-  }
-  if (config()->use_shader_object)
-  {
-    load_device_ext_func(_device, vkCreateShadersEXT);
-    load_device_ext_func(_device, vkDestroyShaderEXT);
-    load_device_ext_func(_device, vkCmdBindShadersEXT);
-    load_device_ext_func(_device, vkCmdSetCullModeEXT);
-    load_device_ext_func(_device, vkCmdSetDepthWriteEnableEXT);
-    load_device_ext_func(_device, vkCmdSetPolygonModeEXT);
-    load_device_ext_func(_device, vkCmdSetRasterizationSamplesEXT);
-    load_device_ext_func(_device, vkCmdSetSampleMaskEXT);
-    load_device_ext_func(_device, vkCmdSetAlphaToCoverageEnableEXT);
-    load_device_ext_func(_device, vkCmdSetVertexInputEXT);
-    load_device_ext_func(_device, vkCmdSetColorBlendEnableEXT);
-    load_device_ext_func(_device, vkCmdSetColorWriteMaskEXT);
-    load_device_ext_func(_device, vkCmdSetColorBlendEquationEXT);
-  }
+
 }
 
 }}
