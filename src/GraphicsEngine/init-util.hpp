@@ -3,10 +3,8 @@
 #include "tk/log.hpp"
 #include "tk/ErrorHandling.hpp"
 #include "tk/Window.hpp"
-#include "tk/GraphicsEngine/config.hpp"
 
 #include <map>
-#include <print>
 #include <algorithm>
 
 namespace tk { namespace graphics_engine {
@@ -53,15 +51,6 @@ inline auto get_supported_instance_layers()
   return layers;
 }
 
-inline auto print_supported_instance_layers()
-{
-  auto layers = get_supported_instance_layers();
-  std::println("available instance layers:");
-  for (const auto& layer : layers)
-    std::println("  {}", layer.layerName);
-  std::println();
-}
-
 inline auto check_layers_support(std::vector<std::string_view> const& layers)
 {
   auto supported_layers = get_supported_instance_layers();
@@ -104,23 +93,6 @@ inline auto get_supported_instance_extensions()
   std::vector<VkExtensionProperties> extensions(count);
   vkEnumerateInstanceExtensionProperties(nullptr, &count, extensions.data());
   return extensions;
-}
-
-inline auto print_supported_instance_extensions()
-{
-  auto extensions = get_supported_instance_extensions();
-  std::println("available instance extensions:");
-  for (const auto& extension : extensions)
-    std::println("  {}", extension.extensionName);
-  std::println();
-}
-
-inline auto print_enabled_extensions(std::string_view header_msg, std::vector<const char*> const& extensions)
-{
-  std::println("Enabled {} extensions:", header_msg);
-  for (const auto& extension : extensions)
-    std::println("  {}", extension);
-  std::println();
 }
 
 inline auto check_instance_extensions_support(std::vector<const char*> extensions)
@@ -187,21 +159,6 @@ inline auto get_physical_devices_score(std::vector<VkPhysicalDevice> const& devi
   return devices_score;
 }
 
-inline void print_supported_physical_devices(VkInstance instance)
-{
-  auto devices = get_supported_physical_devices(instance);
-  auto devices_score = get_physical_devices_score(devices);
-  std::println("available physical devices:\n"
-               "  name\t\t\t\t\tscore");
-  VkPhysicalDeviceProperties property;
-  for (const auto& [score, device] : devices_score)
-  {
-    vkGetPhysicalDeviceProperties(device, &property);
-    std::println("  {}\t{}", property.deviceName, score);
-  }
-  std::println();
-}
-
 inline auto get_supported_device_extensions(VkPhysicalDevice device)
 {
   uint32_t count;
@@ -209,14 +166,6 @@ inline auto get_supported_device_extensions(VkPhysicalDevice device)
   std::vector<VkExtensionProperties> extensions(count);
   vkEnumerateDeviceExtensionProperties(device, nullptr, &count, extensions.data());
   return extensions;
-}
-
-inline auto print_supported_device_extensions(VkPhysicalDevice device)
-{
-  std::println("available device extensions:");
-  for (const auto& extension : get_supported_device_extensions(device))
-    std::println("  {}", extension.extensionName);
-  std::println();
 }
 
 inline auto check_device_extensions_support(VkPhysicalDevice device, std::vector<char const*>& extensions)
@@ -231,26 +180,7 @@ inline auto check_device_extensions_support(VkPhysicalDevice device, std::vector
                              {
                                return strcmp(extension, supported_extension.extensionName) == 0;
                              });
-      if (it == available_extensions.end())
-      {
-        if (strcmp(extension, VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME) == 0)
-        {
-          config()->use_descriptor_buffer = false;
-#ifndef NDEBUG
-          log::warn("descriptor buffer extension is not supported, fallback to descriptor pool and set");
-#endif
-          continue;
-        }
-        if (strcmp(extension, VK_EXT_SHADER_OBJECT_EXTENSION_NAME) == 0)
-        {
-          config()->use_shader_object = false;
-#ifndef NDEBUG
-          log::warn("shader object extension is not supported, fallback to pipeline");
-#endif
-          continue;
-        }
-        return false;
-      }
+      if (it == available_extensions.end()) return false;
 
       supported_extensions.push_back(extension);
   }

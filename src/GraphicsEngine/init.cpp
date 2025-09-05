@@ -33,7 +33,6 @@ void GraphicsEngine::init(Window& window)
   init_memory_allocator();
   create_sampler();
 
-  //create_buffer();
   create_frame_resources();
 
   init_text_engine();
@@ -66,19 +65,12 @@ void GraphicsEngine::create_instance()
   // layers
 #ifndef NDEBUG
   auto validation_layer = "VK_LAYER_KHRONOS_validation";
-  print_supported_instance_layers();
   check_layers_support({ validation_layer });
 #endif
 
   // extensions
   auto extensions = get_instance_extensions();
-#ifndef NDEBUG
-  print_supported_instance_extensions();
-#endif
   check_instance_extensions_support(extensions);
-#ifndef NDEBUG
-  print_enabled_extensions("instance", extensions);
-#endif
 
   // create instance
   VkInstanceCreateInfo create_info =
@@ -136,11 +128,6 @@ void GraphicsEngine::select_physical_device()
   }
 
   throw_if(_physical_device == VK_NULL_HANDLE, "failed to find a suitable GPU");
-
-#ifndef NDEBUG
-  print_supported_physical_devices(_instance);
-  print_supported_device_extensions(_physical_device);
-#endif
 }
 
 void GraphicsEngine::create_device_and_get_queues()
@@ -179,14 +166,12 @@ void GraphicsEngine::create_device_and_get_queues()
     .enabledExtensionCount   = static_cast<uint32_t>(config()->device_extensions.size()),
     .ppEnabledExtensionNames = config()->device_extensions.data(),
   };
-#ifndef NDEBUG
-  print_enabled_extensions("device", config()->device_extensions);
-#endif
 
   // create logical device
-  _device.init(_physical_device, create_info);
+  throw_if(vkCreateDevice(_physical_device, &create_info, nullptr, &_device) != VK_SUCCESS,
+           "failed to create device");
 
-  _destructors.push([this] { _device.destroy(); });
+  _destructors.push([this] { vkDestroyDevice(_device, nullptr); });
 
   //
   // get queues
@@ -221,21 +206,6 @@ void GraphicsEngine::create_frame_resources()
   _destructors.push([&] { _frames.destroy(); });
 }
 
-#if 0
-void GraphicsEngine::create_buffer()
-{  
-  // TODO: descriptor_buffer should be frame resources
-  if (config()->use_descriptor_buffer)
-    _descriptor_buffer = _mem_alloc.create_buffer(1024, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT  | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT , VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-  
-  _destructors.push([&]
-  {
-    if (config()->use_descriptor_buffer)
-      _descriptor_buffer.destroy();
-  });
-}
-#endif
-
 auto GraphicsEngine::get_swapchain_image_size() -> glm::vec2
 {
   assert(_swapchain.size());
@@ -268,13 +238,13 @@ void GraphicsEngine::create_sampler()
 void GraphicsEngine::init_text_engine()
 {
   _text_engine.init(_mem_alloc);
-  _text_engine.load_font("assets/SourceCodePro-Regular.otf");
-  _text_engine.load_font("assets/SourceCodePro-Bold.otf");
-  _text_engine.load_font("assets/SourceCodePro-BoldIt.otf");
-  _text_engine.load_font("assets/SourceCodePro-It.otf");
-  _text_engine.load_font("assets/NotoSansJP-Regular.ttf");
-  _text_engine.load_font("assets/NotoSansSC-Regular.ttf");
   _destructors.push([&] { _text_engine.destroy(); });
+}
+
+void GraphicsEngine::load_fonts(std::vector<std::string_view> const& fonts)
+{
+  for (auto const& font : fonts)
+    _text_engine.load_font(font);
 }
 
 void GraphicsEngine::init_gpu_resource()
@@ -308,4 +278,4 @@ void GraphicsEngine::init_sdf_resources()
   });
 }
 
-} }
+}}

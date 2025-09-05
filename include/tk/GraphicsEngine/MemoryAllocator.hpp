@@ -30,8 +30,6 @@ namespace tk { namespace graphics_engine {
     Buffer() = default;
     Buffer(MemoryAllocator* allocator, uint32_t size, VkBufferUsageFlags usages, VmaAllocationCreateFlags flags = 0);
 
-    auto descriptor_buffer_usages() const noexcept { return _descriptor_buffer_usages; }
-
     void destroy() const;
 
     auto handle()     const noexcept { return _handle;     }
@@ -108,7 +106,6 @@ namespace tk { namespace graphics_engine {
     uint32_t                                  _capacity{};
     uint32_t                                  _size{};
     std::unordered_map<std::string, uint32_t> _offsets;
-    VkBufferUsageFlags                        _descriptor_buffer_usages{};
     VkBufferUsageFlags                        _usages{};
     VmaAllocationCreateFlags                  _flags{};
   };
