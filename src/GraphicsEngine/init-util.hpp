@@ -1,15 +1,13 @@
 #pragma once
 
-#include "Log.hpp"
-#include "ErrorHandling.hpp"
-#include "Window.hpp"
+#include "tk/log.hpp"
+#include "tk/ErrorHandling.hpp"
+#include "tk/Window.hpp"
 
-#include <fstream>
 #include <map>
-#include <print>
+#include <algorithm>
 
 namespace tk { namespace graphics_engine {
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //                              Debug Messenger 
@@ -40,29 +38,6 @@ inline auto get_debug_messenger_create_info()
   };
 }
 
-inline VkResult vkCreateDebugUtilsMessengerEXT(
-  VkInstance                                  instance,
-  VkDebugUtilsMessengerCreateInfoEXT const*   pCreateInfo,
-  VkAllocationCallbacks const*                pAllocator,
-  VkDebugUtilsMessengerEXT*                   pMessenger)
-{
-  auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance,"vkCreateDebugUtilsMessengerEXT");
-  if (func != nullptr) 
-    return func(instance, pCreateInfo, pAllocator, pMessenger);
-  return VK_ERROR_EXTENSION_NOT_PRESENT;
-}
-
-inline void vkDestroyDebugUtilsMessengerEXT(
-  VkInstance                                  instance,
-  VkDebugUtilsMessengerEXT                    messenger,
-  VkAllocationCallbacks const*                pAllocator)
-{
-  auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
-  if (func != nullptr)
-    func(instance, messenger, pAllocator);
-}
-
-
 ////////////////////////////////////////////////////////////////////////////////
 //                              Layers 
 ////////////////////////////////////////////////////////////////////////////////
@@ -74,15 +49,6 @@ inline auto get_supported_instance_layers()
   std::vector<VkLayerProperties> layers(count);
   vkEnumerateInstanceLayerProperties(&count, layers.data());
   return layers;
-}
-
-inline auto print_supported_instance_layers()
-{
-  auto layers = get_supported_instance_layers();
-  std::println("available instance layers:");
-  for (const auto& layer : layers)
-    std::println("  {}", layer.layerName);
-  std::println();
 }
 
 inline auto check_layers_support(std::vector<std::string_view> const& layers)
@@ -107,7 +73,7 @@ inline auto check_layers_support(std::vector<std::string_view> const& layers)
 
 inline auto get_instance_extensions()
 {
-  std::vector<const char*> extensions;
+  std::vector<char const*> extensions;
 
   // instance extensions
   extensions.append_range(Window::get_vulkan_instance_extensions());
@@ -127,23 +93,6 @@ inline auto get_supported_instance_extensions()
   std::vector<VkExtensionProperties> extensions(count);
   vkEnumerateInstanceExtensionProperties(nullptr, &count, extensions.data());
   return extensions;
-}
-
-inline auto print_supported_instance_extensions()
-{
-  auto extensions = get_supported_instance_extensions();
-  std::println("available instance extensions:");
-  for (const auto& extension : extensions)
-    std::println("  {}", extension.extensionName);
-  std::println();
-}
-
-inline auto print_enabled_extensions(std::string_view header_msg, std::vector<const char*> const& extensions)
-{
-  std::println("Enabled {} extensions:", header_msg);
-  for (const auto& extension : extensions)
-    std::println("  {}", extension);
-  std::println();
 }
 
 inline auto check_instance_extensions_support(std::vector<const char*> extensions)
@@ -186,6 +135,12 @@ inline auto get_physical_devices_score(std::vector<VkPhysicalDevice> const& devi
     .pNext = &features13
   };
   features2.pNext = &features13;
+  VkPhysicalDeviceDescriptorBufferFeaturesEXT descriptor_buffer_features
+  {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_FEATURES_EXT,
+  };
+  features13.pNext = &descriptor_buffer_features;
+
   for (const auto& device : devices)
   {
     int score = 0;
@@ -204,21 +159,6 @@ inline auto get_physical_devices_score(std::vector<VkPhysicalDevice> const& devi
   return devices_score;
 }
 
-inline void print_supported_physical_devices(VkInstance instance)
-{
-  auto devices = get_supported_physical_devices(instance);
-  auto devices_score = get_physical_devices_score(devices);
-  std::println("available physical devices:\n"
-               "  name\t\t\t\t\tscore");
-  VkPhysicalDeviceProperties property;
-  for (const auto& [score, device] : devices_score)
-  {
-    vkGetPhysicalDeviceProperties(device, &property);
-    std::println("  {}\t{}", property.deviceName, score);
-  }
-  std::println();
-}
-
 inline auto get_supported_device_extensions(VkPhysicalDevice device)
 {
   uint32_t count;
@@ -228,30 +168,25 @@ inline auto get_supported_device_extensions(VkPhysicalDevice device)
   return extensions;
 }
 
-inline auto print_supported_device_extensions(VkPhysicalDevice device)
+inline auto check_device_extensions_support(VkPhysicalDevice device, std::vector<char const*>& extensions)
 {
-  std::println("available device extensions:");
-  for (const auto& extension : get_supported_device_extensions(device))
-    std::println("  {}", extension.extensionName);
-  std::println();
-}
+  std::vector<char const*> supported_extensions;
 
-inline auto check_device_extensions_support(VkPhysicalDevice device, std::vector<const char*> const& extensions)
-{
-  auto supported_extensions = get_supported_device_extensions(device);
+  auto available_extensions = get_supported_device_extensions(device);
   for (auto extension : extensions) 
   {
-      auto it = std::find_if(supported_extensions.begin(), supported_extensions.end(),
+      auto it = std::find_if(available_extensions.begin(), available_extensions.end(),
                              [extension] (const auto& supported_extension)
                              {
                                return strcmp(extension, supported_extension.extensionName) == 0;
                              });
-      if (it == supported_extensions.end())
-        return false;
+      if (it == available_extensions.end()) return false;
+
+      supported_extensions.push_back(extension);
   }
+  extensions = std::move(supported_extensions);
   return true;
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //                                Queue Families 
@@ -312,165 +247,4 @@ inline auto get_queue_family_indices(VkPhysicalDevice device, VkSurfaceKHR surfa
   return *it;
 }
 
-
-////////////////////////////////////////////////////////////////////////////////
-//                                Swapchain 
-////////////////////////////////////////////////////////////////////////////////
-
-struct SwapChainSupportDetails
-{
-  VkSurfaceCapabilitiesKHR        capabilities;
-  std::vector<VkSurfaceFormatKHR> formats;
-  std::vector<VkPresentModeKHR>   present_modes;
-
-  auto has_empty()
-  {
-    return formats.empty() || present_modes.empty();
-  }
-
-  auto get_surface_format()
-  {
-    auto it = std::find_if(formats.begin(), formats.end(),
-                           [](const auto& format)
-                           {
-                             return format.format     == VK_FORMAT_B8G8R8A8_UNORM          &&
-                                    format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-                           });
-    if (it != formats.end())
-      return *it;
-    return formats[0];
-  }
-  
-  auto get_present_mode()
-  {
-    auto it = std::find_if(present_modes.begin(), present_modes.end(),
-                           [](const auto& mode)
-                           {
-                             return mode == VK_PRESENT_MODE_MAILBOX_KHR;
-                           });
-    if (it != present_modes.end())
-      return *it;
-    return VK_PRESENT_MODE_FIFO_KHR;
-  }
-  
-  auto get_swap_extent(Window const& window)
-  {
-    if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
-      return capabilities.currentExtent;
-  
-    uint32_t width, height;
-    window.get_framebuffer_size(width, height);
-  
-    VkExtent2D actual_extent{ width, height };
-  
-    actual_extent.width = std::clamp(actual_extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
-    actual_extent.height = std::clamp(actual_extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
-  
-    return actual_extent;
-  }
-
-};
-
-inline auto get_swapchain_details(VkPhysicalDevice device, VkSurfaceKHR surface)
-{
-  SwapChainSupportDetails details;
-
-  vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
-
-  uint32_t count;
-  vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &count, nullptr);
-  details.formats.resize(count);
-  vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &count, details.formats.data());
-
-  vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &count, nullptr);
-  details.present_modes.resize(count);
-  vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &count, details.present_modes.data());
-
-  return details;
-}
-
-inline void print_present_mode(VkPresentModeKHR present_mode)
-{
-  std::print("present mode:\t\t");
-  if (present_mode == VK_PRESENT_MODE_FIFO_KHR)
-    std::print("V-Sync");
-  else if (present_mode == VK_PRESENT_MODE_MAILBOX_KHR)
-    std::print("Mailbox");
-  std::println();
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-//                               Image 
-////////////////////////////////////////////////////////////////////////////////
-
-inline VkImageView create_image_view(VkDevice device, VkImage image, VkFormat format)
-{
-  VkImageViewCreateInfo view_info
-  {
-    .sType            = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-    .image            = image,
-    .viewType         = VK_IMAGE_VIEW_TYPE_2D,
-    .format           = format,
-    .subresourceRange =
-    {
-      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-      .levelCount = 1,
-      .layerCount = 1,
-    },
-  };
-  VkImageView view;
-  throw_if(vkCreateImageView(device, &view_info, nullptr, &view) != VK_SUCCESS,
-          "failed to create image view");
-  return view;
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-//                               Shader 
-////////////////////////////////////////////////////////////////////////////////
-
-inline auto get_file_data(std::string_view filename)
-{
-  std::ifstream file(filename.data(), std::ios::ate | std::ios::binary);
-  throw_if(!file.is_open(), "failed to open {}", filename);
-
-  auto file_size = (size_t)file.tellg();
-  // A SPIR-V module is defined a stream of 32bit words
-  auto buffer    = std::vector<uint32_t>(file_size / sizeof(uint32_t));
-  
-  file.seekg(0);
-  file.read((char*)buffer.data(), file_size);
-
-  file.close();
-  return buffer;
-}
-
-struct Shader
-{
-  VkShaderModule shader;
-
-  Shader(VkDevice device, std::string_view filename)
-    : _device(device)
-  {
-    auto data = get_file_data(filename);
-    VkShaderModuleCreateInfo info
-    {
-      .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-      .codeSize = data.size() * sizeof(uint32_t),
-      .pCode    = reinterpret_cast<uint32_t*>(data.data()),
-    };
-    throw_if(vkCreateShaderModule(device, &info, nullptr, &shader) != VK_SUCCESS,
-             "failed to create shader from {}", filename);
-  }
-
-  ~Shader()
-  {
-    vkDestroyShaderModule(_device, shader, nullptr);
-  }
-
-private:
-  VkDevice _device;
-};
-
-} }
+}}

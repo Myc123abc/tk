@@ -1,2 +1,6 @@
 build
 .cache
+out
+.vs
+shader/*.spv
+CMakeSettings.json

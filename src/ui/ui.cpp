@@ -1,0 +1,457 @@
+#include "tk/ui/ui.hpp"
+#include "internal.hpp"
+#include "tk/ErrorHandling.hpp"
+
+#include <cassert>
+
+
+using namespace tk::graphics_engine;
+
+namespace tk { namespace ui {
+
+////////////////////////////////////////////////////////////////////////////////
+//                                  Misc
+////////////////////////////////////////////////////////////////////////////////
+
+void begin(std::string_view name, glm::vec2 const& pos)
+{
+  auto ctx = get_ctx();
+  
+  assert(ctx->begining == false);
+  ctx->begining = true;
+
+  ctx->layouts.emplace_back(Layout
+  {
+    .name = name.data(),
+    .pos  = pos,
+  });
+  ctx->last_layout = std::to_address(ctx->layouts.rbegin());
+}
+
+void end()
+{
+  assert(get_ctx()->begining);
+  get_ctx()->begining = false;
+}
+
+auto get_bounding_rectangle(std::vector<glm::vec2> const& data) -> std::pair<glm::vec2, glm::vec2>
+{
+  assert(data.size() > 1);
+
+  glm::vec2 min = data[0];
+  glm::vec2 max = data[0];
+
+  for (auto i = 1; i < data.size(); ++i)
+  {
+    auto& p = data[i];
+    if (p.x < min.x) min.x = p.x;
+    if (p.y < min.y) min.y = p.y;
+    if (p.x > max.x) max.x = p.x;
+    if (p.y > max.y) max.y = p.y;
+  }
+
+  return { min, max };
+}
+
+bool hit(glm::vec2 const& pos, std::vector<glm::vec2> const& data)
+{
+  if (data.empty()) return false;
+
+  // get bounding rectangle
+  auto win_pos = get_ctx()->last_layout->pos;
+  auto res     = get_bounding_rectangle(data);
+  auto min     = res.first  + win_pos;
+  auto max     = res.second + win_pos;
+
+  // detect whether mouse on button
+  if (pos.x > min.x && pos.y > min.y &&
+      pos.x < max.x && pos.y < max.y)
+    return true;
+  return false;
+}
+
+void clear()
+{
+  auto ctx = get_ctx();
+
+  ctx->vertices.clear();
+  ctx->indices.clear();
+  ctx->index = {};
+  ctx->shape_properties.clear();
+  ctx->shape_offset = {};
+
+  if (hit(ctx->mouse_pos, ctx->current_hovered_widget_rect))
+    ctx->last_hovered_widget = ctx->current_hovered_widget;
+  else
+    ctx->last_hovered_widget = {};
+
+  // clear frame resources
+  ctx->layouts.clear();
+  ctx->click_finish = {};
+}
+
+void render()
+{
+  auto ctx = get_ctx();
+  if (ctx->shape_properties.empty()) return;
+  assert(ctx->engine && ctx->shape_properties.back().op == type::ShapeOp::mix);
+  assert(ctx->engine);
+  ctx->engine->sdf_render(ctx->vertices, ctx->indices, ctx->shape_properties);
+  
+  clear();
+}
+
+auto to_vec4(uint32_t color) noexcept
+{
+  float r = float((color >> 24) & 0xFF) / 255;
+  float g = float((color >> 16) & 0xFF) / 255;
+  float b = float((color >> 8 ) & 0xFF) / 255;
+  float a = float((color      ) & 0xFF) / 255;
+  return glm::vec4(r, g, b, a);
+}
+
+void set_text_outline_width(float width) noexcept
+{
+  get_ctx()->outline_width = width;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//                               Draw Shape
+////////////////////////////////////////////////////////////////////////////////
+
+void add_vertices(std::pair<glm::vec2, glm::vec2> const& box, uint32_t offset)
+{
+  auto ctx = get_ctx();
+  
+  auto& pos = ctx->last_layout->pos;
+  auto  min = pos + box.first  - glm::vec2(1);
+  auto  max = pos + box.second + glm::vec2(1);
+
+  ctx->vertices.reserve(ctx->vertices.size() + 4);
+  ctx->vertices.append_range(std::vector<Vertex>
+  {
+    { min,              {}, offset },
+    { { max.x, min.y }, {}, offset },
+    { max,              {}, offset },
+    { { min.x, max.y }, {}, offset },
+  });
+
+  ctx->indices.reserve(ctx->indices.size() + 6);
+  ctx->indices.append_range(std::vector<uint16_t>
+  {
+    static_cast<uint16_t>(ctx->index + 0), static_cast<uint16_t>(ctx->index + 1), static_cast<uint16_t>(ctx->index + 3),
+    static_cast<uint16_t>(ctx->index + 3), static_cast<uint16_t>(ctx->index + 1), static_cast<uint16_t>(ctx->index + 2),
+  });
+  ctx->index += 4;
+}
+
+void add_shape_property(type::Shape type, std::vector<float> const& values, uint32_t color, uint32_t thickness = 0, type::ShapeOp op = type::ShapeOp::mix)
+{
+  auto ctx = get_ctx();
+  ctx->shape_properties.emplace_back(type, to_vec4(color), thickness, op);
+  ctx->shape_properties.back().values.append_range(values);
+  ctx->shape_offset += ShapeProperty::header_field_count + values.size();
+}
+
+// HACK: it's suck, enforcing outer_color byte data to ShapeProperty struct it's ungly!
+void add_text_property(type::Shape type, uint32_t inner_color, uint32_t outer_color)
+{
+  auto ctx = get_ctx();
+  auto converted_outer_color = to_vec4(outer_color);
+  auto out_color_r = std::bit_cast<uint32_t>(converted_outer_color.r);
+  auto out_color_g = std::bit_cast<type::ShapeOp>(converted_outer_color.g);
+  ctx->shape_properties.emplace_back(type, to_vec4(inner_color), out_color_r, out_color_g);
+  auto values = std::vector<float>{ converted_outer_color.b, converted_outer_color.a, ctx->outline_width };
+  ctx->shape_properties.back().values.append_range(values);
+  ctx->shape_offset += ShapeProperty::header_field_count + values.size();
+}
+
+void shape(type::Shape type, std::vector<float> const& values, uint32_t color, uint32_t thickness, std::pair<glm::vec2, glm::vec2> const& box)
+{
+  auto ctx = get_ctx();
+  auto op  = type::ShapeOp::mix;
+  if (ctx->union_start)
+  {
+    if (ctx->op_points.empty())
+      ctx->op_offset = ctx->shape_offset;
+    ctx->op_points.append_range(std::vector<glm::vec2>{ box.first, box.second });
+    op = type::ShapeOp::min;
+  }
+  else
+    add_vertices(box, ctx->shape_offset);
+  add_shape_property(type, values, color, thickness, op);
+}
+
+void line(glm::vec2 const& p0, glm::vec2 const& p1, uint32_t color)
+{
+  if (p0 != p1) 
+  {
+    auto ctx = get_ctx();
+    assert(ctx->begining);
+    if (ctx->path_begining)
+    {
+      ++ctx->path_count;
+      if (ctx->union_start)
+        ctx->op_points.append_range(std::vector<glm::vec2>{ p0, p1 });
+      else
+        ctx->path_points.append_range(std::vector<glm::vec2>{ p0, p1 });
+      ctx->paritions.reserve(ctx->paritions.size() + 5);
+      ctx->paritions.emplace_back(std::bit_cast<float>(type::Shape::line_partition));
+      ctx->paritions.emplace_back(p0.x);
+      ctx->paritions.emplace_back(p0.y);
+      ctx->paritions.emplace_back(p1.x);
+      ctx->paritions.emplace_back(p1.y);
+    }
+    else
+      shape(type::Shape::line, { p0.x, p0.y, p1.x, p1.y }, color, 0, get_bounding_rectangle({ p0, p1 }));
+  }
+}
+
+void rectangle(glm::vec2 const& left_top, glm::vec2 const& right_bottom, uint32_t color, uint32_t thickness)
+{
+  auto ctx = get_ctx();
+  assert(ctx->begining && ctx->path_begining == false);
+  shape(type::Shape::rectangle, { left_top.x, left_top.y, right_bottom.x, right_bottom.y }, color, thickness, { left_top, right_bottom });
+}
+
+void triangle(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint32_t color, uint32_t thickness)
+{
+  auto ctx = get_ctx();
+  assert(ctx->begining && ctx->path_begining == false);
+  shape(type::Shape::triangle, { p0.x, p0.y, p1.x, p1.y, p2.x, p2.y }, color, thickness, get_bounding_rectangle({ p0, p1, p2 }));
+}
+
+void polygon(std::vector<glm::vec2> const& points, uint32_t color, uint32_t thickness)
+{
+  auto ctx = get_ctx();
+  assert(ctx->begining && ctx->path_begining == false);
+  std::vector<float> data;
+  data.reserve(1 + points.size() * 2);
+  data.emplace_back(std::bit_cast<float>(static_cast<uint32_t>(points.size())));
+  for (auto const& point : points)
+    data.append_range(std::vector<float>{ point.x, point.y });
+  shape(type::Shape::polygon, data, color, thickness, get_bounding_rectangle(points));
+}
+
+void circle(glm::vec2 const& center, float radius, uint32_t color, uint32_t thickness)
+{
+  auto ctx = get_ctx();
+  assert(ctx->begining && ctx->path_begining == false);
+  shape(type::Shape::circle, { center.x, center.y, radius }, color, thickness, { center - radius, center + radius });
+}
+
+void bezier(glm::vec2 const& p0, glm::vec2 const& p1, glm::vec2 const& p2, uint32_t color)
+{
+  auto ctx = get_ctx();
+  assert(ctx->begining);
+  if (ctx->path_begining)
+  {
+    ++ctx->path_count;
+    if (ctx->union_start)
+      ctx->op_points.append_range(std::vector<glm::vec2>{ p0, p1, p2 });
+    else
+      ctx->path_points.append_range(std::vector<glm::vec2>{ p0, p1, p2 });
+    ctx->paritions.reserve(ctx->paritions.size() + 7);
+    ctx->paritions.emplace_back(std::bit_cast<float>(type::Shape::bezier_partition));
+    ctx->paritions.emplace_back(p0.x);
+    ctx->paritions.emplace_back(p0.y);
+    ctx->paritions.emplace_back(p1.x);
+    ctx->paritions.emplace_back(p1.y);
+    ctx->paritions.emplace_back(p2.x);
+    ctx->paritions.emplace_back(p2.y);
+  }
+  else
+    shape(type::Shape::bezier, { p0.x, p0.y, p1.x, p1.y, p2.x, p2.y }, color, 0, get_bounding_rectangle({ p0, p1, p2 }));
+}
+
+void path_begin()
+{
+  auto ctx = get_ctx();
+  assert(ctx->begining && ctx->path_begining == false);
+  ctx->path_begining = true;
+  ctx->path_count = {};
+  ctx->path_points.clear();
+  ctx->path_offset = ctx->shape_offset;
+  ctx->paritions.clear();
+  ctx->paritions.emplace_back(0);
+
+  if (ctx->union_start)
+  {
+    if (ctx->op_points.empty())
+      ctx->op_offset = ctx->shape_offset;
+  }
+}
+
+void path_end(uint32_t color, uint32_t thickness)
+{
+  auto ctx = get_ctx();
+  assert(ctx->begining && ctx->path_begining);
+  ctx->path_begining = false;
+
+  add_shape_property(type::Shape::path, ctx->paritions, color, thickness);
+  ctx->shape_properties.back().values[0] = std::bit_cast<float>(ctx->path_count);
+
+  if (ctx->union_start)
+    ctx->shape_properties.back().op = type::ShapeOp::min;
+  else
+    add_vertices(get_bounding_rectangle(ctx->path_points), ctx->path_offset);
+}
+
+void union_begin()
+{
+  auto ctx = get_ctx();
+  assert(ctx->begining && ctx->path_begining == false && ctx->union_start == false);
+  ctx->union_start = true;
+}
+
+void union_end(uint32_t color, uint32_t thickness)
+{
+  auto ctx = get_ctx();
+  assert(ctx->begining && ctx->path_begining == false && ctx->union_start);
+  ctx->union_start = false;
+  add_vertices(get_bounding_rectangle(ctx->op_points), ctx->op_offset);
+  ctx->op_points.clear();
+  auto& shape = ctx->shape_properties.back();
+  shape.op        = type::ShapeOp::mix;
+  shape.color     = to_vec4(color);
+  shape.thickness = thickness;
+}
+
+auto text_impl(std::string_view text, glm::vec2 const& pos, float size, uint32_t inner_color, type::FontStyle style, uint32_t outer_color) -> glm::vec2
+{
+  if (text.empty()) return {};
+  auto ctx = get_ctx();
+  assert(ctx->begining && ctx->path_begining == false && ctx->union_start == false);
+  auto extent = ctx->engine->parse_text(text, pos, size, style, ctx->vertices, ctx->indices, ctx->shape_offset, ctx->index);
+  add_text_property(type::Shape::glyph, inner_color, outer_color);
+  return extent;
+}
+
+auto text(std::string_view text, glm::vec2 const& pos, float size, uint32_t color, type::FontStyle style) -> glm::vec2
+{
+  return text_impl(text, pos, size, color, style, 0);
+}
+
+auto text(std::string_view text, glm::vec2 const& pos, float size, uint32_t inner_color, uint32_t outer_color) -> glm::vec2
+{
+  return text_impl(text, pos, size, inner_color, type::FontStyle::regular, outer_color);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//                             Mouse Operation
+////////////////////////////////////////////////////////////////////////////////
+
+void event_process()
+{
+  using enum type::MouseState;
+
+  auto ctx = get_ctx();
+
+  ctx->mouse_pos = ctx->window->get_mouse_position();
+
+  // mouse click
+  auto mouse_state = ctx->window->get_mouse_state();
+  if (!ctx->first_down && mouse_state == left_down)
+  {
+    ctx->drag_start_pos = ctx->mouse_pos;
+    ctx->first_down     = true;
+  }
+  else if (ctx->first_down && mouse_state == left_up)
+  {
+    ctx->drag_end_pos = ctx->mouse_pos;
+    ctx->click_finish = true;
+    ctx->first_down   = false;
+  }
+}
+
+auto add_widget(std::string_view name)
+{
+  auto& widgets = get_ctx()->last_layout->widgets;
+
+  // promise widget name is unique for per layout
+  auto it = std::find_if(widgets.begin(), widgets.end(), [&](auto const& widget) { return widget.name == name; });
+  assert(it == widgets.end());
+  widgets.emplace_back(Widget{ name.data() });
+
+  return std::to_address(widgets.rbegin());
+}
+
+auto update_current_hovered_widget(std::string_view name, std::vector<glm::vec2> const& rect)
+{
+  auto ctx = get_ctx();
+  if (hit(ctx->mouse_pos, rect))
+  {
+    ctx->current_hovered_widget.first  = ctx->last_layout->name;
+    ctx->current_hovered_widget.second = name;
+    ctx->current_hovered_widget_rect   = rect;
+  }
+}
+
+bool is_clicked(std::string_view name, std::vector<glm::vec2> const& data)
+{
+  add_widget(name);
+  auto ctx = get_ctx();
+  update_current_hovered_widget(name, data);
+  if (ctx->current_hovered_widget != ctx->last_hovered_widget)
+    return false;
+  return ctx->click_finish ? hit(ctx->drag_start_pos, data) &&
+                             hit(ctx->drag_end_pos,   data)
+                           : false;
+}
+
+bool click_area(std::string_view name, glm::vec2 const& pos0, glm::vec2 const& pos1)
+{
+  return is_clicked(name, { pos0, pos1 });
+}
+
+bool button(std::string_view name, type::Shape shape, std::vector<glm::vec2> const& data, uint32_t color, uint32_t thickness)
+{
+  // draw shape
+  auto num = data.size();
+  std::vector<glm::vec2> detect_data;
+  switch (shape)
+  {
+  case type::Shape::line:
+  case type::Shape::bezier:
+  case type::Shape::path:
+  case type::Shape::line_partition:
+  case type::Shape::bezier_partition:
+  case type::Shape::glyph:
+    throw_if(false, "this type cannot use on button, please use ui::clickarea");
+
+  case type::Shape::triangle:
+    assert(num == 3);
+    triangle(data[0], data[1], data[2], color, thickness);
+    detect_data = data;
+    break;
+    
+  case type::Shape::rectangle:
+    assert(num == 2);
+    rectangle(data[0], data[1], color, thickness);
+    detect_data = { data[0], { data[1].x, data[0].y }, data[1], { data[0].x, data[1].y } };
+    break;
+  
+  case type::Shape::polygon:
+    assert(num > 2);
+    polygon(data, color, thickness);
+    detect_data = data;
+    break;
+
+  case type::Shape::circle:
+    assert(num == 2);
+    circle(data[0], data[1].x, color, thickness);
+    detect_data = { data[0] - data[1], data[0] + data[1] };
+    break;
+  }
+
+  return is_clicked(name, detect_data);
+}
+
+bool is_hover_on(std::string_view name)
+{
+  auto ctx = get_ctx();
+  return ctx->last_hovered_widget.first  == ctx->last_layout->name &&
+         ctx->last_hovered_widget.second == name;
+}
+
+}}
