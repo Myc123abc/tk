@@ -10,10 +10,30 @@ namespace tk { namespace graphics_engine {
 
 auto GraphicsEngine::frame_begin() -> bool
 {
+  // acquire new frame's swapchain image
   if (_frames.acquire_swapchain_image(_wait_fence) == false)
     return false;
 
+  // get current frame's command
   auto& cmd = _frames.get_command();
+
+  // destroy old resources
+  _frames.destroy_old_resources();
+
+  // set resources for a new frame
+  _sdf_buffer.frame_begin();
+  if (_text_engine.frame_begin(cmd))
+  {
+    // TODO: can optimal use bigger descriptor pool and layout, then only update new descriptors?
+    //       only recreate descriptor pool until pool is unenough
+    // destroy old graphics pipeline
+    _frames.push_old_resource([pipeline = this->_sdf_graphics_pipeline] { pipeline.destroy_without_shader_modules(); });  
+    // create new one
+    _sdf_graphics_pipeline.recreate(
+    {
+      { ShaderType::fragment, 0, _text_engine.get_glyph_atlases() },
+    });
+  }
 
   //set_pipeline_state(cmd);
 
@@ -123,15 +143,13 @@ void GraphicsEngine::render_end()
 
 void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> indices, std::span<ShapeProperty> shape_properties)
 {
-  auto& buf = _frames.get_sdf_buffer();
-
   // upload vertices to buffer
-  buf.append_range(vertices);
+  _sdf_buffer.append_range(vertices);
 
   // get offset of indices
-  auto indices_offset = buf.size();
+  auto indices_offset = _sdf_buffer.size();
   // upload indices to buffer
-  buf.append_range(indices);
+  _sdf_buffer.append_range(indices);
 
   // convert shape properties to binary data
   uint32_t total_size{};
@@ -152,28 +170,31 @@ void GraphicsEngine::sdf_render(std::span<Vertex> vertices, std::span<uint16_t> 
       data.emplace_back(std::bit_cast<uint32_t>(value));
   }
   // get offset of shape properties
-  auto shape_properties_offset = util::align_size(buf.size(), 8);
+  auto shape_properties_offset = util::align_size(_sdf_buffer.size(), 8);
   // add padding for 8 bytes alignment
-  buf.append_range(std::vector<std::byte>(shape_properties_offset - buf.size()));
+  _sdf_buffer.append_range(std::vector<std::byte>(shape_properties_offset - _sdf_buffer.size()));
   // upload shape properties to buffer
-  buf.append_range(data);
+  _sdf_buffer.append_range(data);
   
   auto& cmd = _frames.get_command();
 
-  buf.upload();
-  auto [handle, address] = buf.get_handle_and_address();
+  _sdf_buffer.upload();
+
+  auto [handle, address] = _sdf_buffer.get_handle_and_address();
 
   // bind index buffer
-  vkCmdBindIndexBuffer(cmd, handle, buf.get_current_frame_byte_offset() + indices_offset, VK_INDEX_TYPE_UINT16);
+  vkCmdBindIndexBuffer(cmd, handle, _sdf_buffer.get_current_frame_byte_offset() + indices_offset, VK_INDEX_TYPE_UINT16);
 
-  auto pc = FrameResources::PushConstant_SDF
+  auto pc = PushConstant_SDF
   {
     .vertices         = address,
     .shape_properties = address + shape_properties_offset,
     .window_extent    = _window->get_framebuffer_size(),
   };
 
-  _frames.bind_sdf_pipeline(cmd, pc);
+  // bind and set pipeline
+  _sdf_graphics_pipeline.bind(cmd, pc);
+  _sdf_graphics_pipeline.set_pipeline_state(cmd, _swapchain.extent());
 
   vkCmdDrawIndexed(cmd, indices.size(), 1, 0, 0, 0);
 }
@@ -184,13 +205,7 @@ auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 pos, float size
 
   // get some glyphs not cached
   if (_text_engine.has_uncached_glyphs(u32str, style))
-  {
-    // upload them
-    auto cmd = _command_pool.create_command().begin();
-    _text_engine.generate_sdf_bitmaps(cmd);
-    cmd.end().submit_wait_free(_command_pool, _graphics_queue); // TODO: use single cmd every frame after start rendering
-                                                                //       use Semaphores to replace wait
-  }
+    _text_engine.generate_sdf_bitmaps();
 
   // add vertices and indices
   vertices.reserve(vertices.size() + u32str.size() * 4);
@@ -198,8 +213,7 @@ auto GraphicsEngine::parse_text(std::string_view text, glm::vec2 pos, float size
   for (auto i = 0; i < u32str.size(); ++i)
   {
     auto glyph_info = _text_engine.get_cached_glyph_info(u32str[i], style);
-    // TODO: change 0 to atlases index
-    vertices.append_range(glyph_info->get_vertices(pos, size, offset, text_pos_info.max_ascender, 0)); // TODO: vertices and indices generate performance worse
+    vertices.append_range(glyph_info->get_vertices(pos, size, offset, text_pos_info.max_ascender, glyph_info->glyph_atlas_index)); // TODO: vertices and indices generate performance worse
     indices.append_range(GlyphInfo::get_indices(idx));
     pos = GlyphInfo::get_next_position(pos, size, text_pos_info.advances[i]);
   }

@@ -9,14 +9,6 @@
 
 #pragma once
 
-/*
-TODO:
-  use multiple atlas 
-  use vertical layout
-  split text engine from grapihcs engine, supply interface to initialize graphics backend
-  and model vn project, vn-text, vn-graphics, vn-ui
-*/
-
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include <glm/glm.hpp>
@@ -65,24 +57,27 @@ namespace tk { namespace graphics_engine {
   class TextEngine
   {
   public:
-    static constexpr auto Glyph_Atlas_Width  = 1024;
+    static constexpr auto Glyph_Atlas_Width  = 2048;
     static constexpr auto Glyph_Atlas_Height = Glyph_Atlas_Width;
 
     void init(MemoryAllocator& alloc);
     void destroy();
 
+    // return true, need to expand descriptors because of new glyph atlases be created
+    auto frame_begin(Command const& cmd) -> bool;
+
     void preload_glyphs(Command const& cmd);
     void calculate_write_position(glm::vec2 const& extent);
-    void upload_glyphs(Command const& cmd, std::span<SDFBitmap> bitmaps);
+    void upload_glyphs(std::span<SDFBitmap> bitmaps);
     void upload_glyph(Command const& cmd, uint32_t unicode, uint8_t const* data, glm::vec2 extent, float left_offset, float up_offset, type::FontStyle style);
 
     void load_font(std::string_view path);
     
-    auto get_first_glyph_atlas_pointer() noexcept { return &_glyph_atlases[0]; }
+    auto get_glyph_atlases() const noexcept { return _glyph_atlases; }
 
     auto has_uncached_glyphs(std::u32string_view text, type::FontStyle style) -> bool;
     auto get_cached_glyph_info(uint32_t unicode, type::FontStyle style) -> GlyphInfo*;
-    void generate_sdf_bitmaps(Command const& cmd);
+    void generate_sdf_bitmaps();
 
     auto find_glyph(uint32_t unicode, type::FontStyle style) -> std::optional<std::pair<std::reference_wrapper<Font>, uint32_t>>;
     
@@ -119,23 +114,25 @@ namespace tk { namespace graphics_engine {
     template <typename T>
     using TextMap      = std::unordered_map<std::string, T>;
 
-    FT_Library                                           _ft;
-    FontStyleMap<std::vector<Font>>                      _fonts;
-    MemoryAllocator*                                     _mem_alloc{};
-    std::vector<Image>                                   _glyph_atlases;
-    Buffer                                               _glyph_atlas_buffer; // TODO: use common buffer which in graphics engine
-    glm::vec2                                            _current_write_position{};
-    std::vector<glm::vec2>                               _write_positions{};
-    float                                                _current_line_max_glyph_height{};
-    FontStyleMap<UnicodeMap<GlyphInfo>>                  _glyph_infos;
-    FontStyleMap<UnicodeMap<std::pair<Font, uint32_t>>>  _wait_generate_sdf_bitmap_glyphs{};
-    hb_buffer_t*                                         _hb_buffer{};
-    FontStyleMap<TextMap<TextPosInfo>>                   _cached_text_advances;
-    std::vector<std::pair<type::FontStyle, std::string>> _cached_texts_with_missing_glyphs;
-    FontStyleMap<std::unordered_set<uint32_t>>           _missing_glyphs;
-    float                                                _max_ascender{};
-    float                                                _max_height{};
-    // TODO: cache style unicode glyph_atlases_index
+    FT_Library                                            _ft;
+    FontStyleMap<std::vector<Font>>                       _fonts;
+    MemoryAllocator*                                      _mem_alloc{};
+    std::vector<Image>                                    _glyph_atlases;
+    Buffer                                                _glyph_atlas_buffer;
+    glm::vec2                                             _current_write_position{};
+    std::vector<std::pair<uint32_t, glm::vec2>>           _write_positions{};
+    float                                                 _current_line_max_glyph_height{};
+    FontStyleMap<UnicodeMap<GlyphInfo>>                   _glyph_infos;
+    FontStyleMap<UnicodeMap<std::pair<Font, uint32_t>>>   _wait_generate_sdf_bitmap_glyphs{};
+    hb_buffer_t*                                          _hb_buffer{};
+    FontStyleMap<TextMap<TextPosInfo>>                    _cached_text_advances;
+    std::vector<std::pair<type::FontStyle, std::string>>  _cached_texts_with_missing_glyphs;
+    FontStyleMap<std::unordered_set<uint32_t>>            _missing_glyphs;
+    float                                                 _max_ascender{};
+    float                                                 _max_height{};
+    std::unordered_map<uint32_t, std::vector<CopyRegion>> _copy_regions;
+    uint32_t                                              _current_glyph_atlas_index{};
+    bool                                                  _new_glyph_atlas{};
   };
 
   class Font
@@ -165,7 +162,7 @@ namespace tk { namespace graphics_engine {
 
   struct GlyphInfo
   {
-    // TODO: add field represent in which atlas
+    uint32_t  glyph_atlas_index{};
     float     min_x{};
     float     min_y{};
     float     max_x{};
@@ -173,8 +170,8 @@ namespace tk { namespace graphics_engine {
     glm::vec2 extent{};
     glm::vec2 pos_offset{};
 
-    GlyphInfo(glm::vec2 pos, glm::vec2 extent, float left_offset, float up_offset) noexcept
-      : extent(extent), pos_offset(left_offset, up_offset)
+    GlyphInfo(uint32_t glyph_atlas_index, glm::vec2 pos, glm::vec2 extent, float left_offset, float up_offset) noexcept
+      : glyph_atlas_index(glyph_atlas_index), extent(extent), pos_offset(left_offset, up_offset)
     {
       min_x = (pos.x + 0.5f) / TextEngine::Glyph_Atlas_Width;
       min_y = (pos.y + 0.5f) / TextEngine::Glyph_Atlas_Height;

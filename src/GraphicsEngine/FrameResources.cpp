@@ -15,23 +15,12 @@ void FramesDynamicBuffer::init(FrameResources* frame_resources, MemoryAllocator*
   _frame_resources = frame_resources;
   _alloc           = alloc;
   _byte_size_pre_frame = util::align_size(config()->buffer_size, 8);
-  _buffer = alloc->create_buffer(_byte_size_pre_frame * frame_resources->_frames.size(), VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+  _buffer = alloc->create_buffer(_byte_size_pre_frame * frame_resources->size(), VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
 }
 
 void FramesDynamicBuffer::destroy()
 {
   _buffer.destroy();
-  while (!_destructors.empty())
-  {
-    _destructors.front()(0, true);
-    _destructors.pop();
-  }
-}
-
-void FramesDynamicBuffer::destroy_old_buffers()
-{
-  if (!_destructors.empty() && _destructors.front()(_frame_resources->_frame_index, false))
-    _destructors.pop();
 }
 
 auto FramesDynamicBuffer::get_current_frame_byte_offset() const -> uint32_t
@@ -46,30 +35,15 @@ void FramesDynamicBuffer::upload()
   if (_current_frame_data.size() > _byte_size_pre_frame)
   {
     _byte_size_pre_frame = util::align_size(std::max(_current_frame_data.size(), static_cast<size_t>(_byte_size_pre_frame * config()->buffer_expand_ratio)), 8);
-    auto tmp_buf = _alloc->create_buffer(_byte_size_pre_frame * _frame_resources->_frames.size(), VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+    auto tmp_buf = _alloc->create_buffer(_byte_size_pre_frame * _frame_resources->size(), VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
 
     // add destructor for old buffer
-    _destructors.emplace(
-      [buf = this->_buffer, frame_index = this->_frame_resources->_frame_index]
-      (uint32_t current_frame_index, bool directly_destruct)
-      {
-        if (directly_destruct)
-        {
-          buf.destroy();
-          return true;
-        }
-        if (current_frame_index == frame_index)
-        {
-          buf.destroy();
-          return true;
-        }
-        return false;
-      });
+    _frame_resources->push_old_resource([buf = this->_buffer] { buf.destroy(); });
 
     // reset new allocation information
     _buffer.set_realloc_info(tmp_buf);
     // update byte offset of current frame with new byte size per frame
-    _current_frame_byte_offset = _frame_resources->_frame_index * _byte_size_pre_frame;
+    _current_frame_byte_offset = _frame_resources->get_current_frame_index() * _byte_size_pre_frame;
     // re-upload
     upload();
     return;
@@ -96,7 +70,7 @@ auto FramesDynamicBuffer::size() const -> uint32_t
 void FramesDynamicBuffer::frame_begin()
 {
   _current_frame_data.clear();
-  _current_frame_byte_offset = _byte_size_pre_frame * _frame_resources->_frame_index;
+  _current_frame_byte_offset = _byte_size_pre_frame * _frame_resources->get_current_frame_index();
   _state = State::append_data;
 }
 
@@ -147,27 +121,11 @@ void FrameResources::destroy()
     vkDestroySemaphore(_device, frame.acquire_sem, nullptr);
     vkDestroySemaphore(_device, _submit_sems[i], nullptr);
   }
-}
-
-void FrameResources::init_sdf_resource(MemoryAllocator& alloc, TextEngine* text_engine, VkSampler sampler)
-{
-  _sdf_buffer.init(this, &alloc);
-  _sdf_graphics_pipeline.init(
-    _device,
-    {
-      { ShaderType::fragment, 0, DescriptorType::sampler2D, { *text_engine->get_first_glyph_atlas_pointer() }, sampler},
-    },
-    sizeof(PushConstant_SDF),
-    _swapchain->format(),
-    "shader/SDF_vert.spv",
-    "shader/SDF_frag.spv"
-  );
-}
-
-void FrameResources::destroy_sdf_resource()
-{
-  _sdf_buffer.destroy();
-  _sdf_graphics_pipeline.destroy();
+  while (!_destructors.empty())
+  {
+    _destructors.front()(0, true);
+    _destructors.pop();
+  }
 }
 
 auto FrameResources::acquire_swapchain_image(bool wait) -> bool
@@ -180,9 +138,6 @@ auto FrameResources::acquire_swapchain_image(bool wait) -> bool
     return false;
   throw_if(vkResetFences(_device, 1, &frame.fence) != VK_SUCCESS,
            "failed to reset fence");
-
-  // destroy old resources
-  _sdf_buffer.destroy_old_buffers();
 
   // acquire usable swapchain image
   auto res = vkAcquireNextImageKHR(_device, _swapchain->get(), UINT64_MAX, frame.acquire_sem, VK_NULL_HANDLE, &_submit_sem_index);
@@ -202,9 +157,6 @@ auto FrameResources::acquire_swapchain_image(bool wait) -> bool
     .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
   };
   vkBeginCommandBuffer(frame.cmd, &command_begin_info);
-
-  // set resource for a new frame
-  _sdf_buffer.frame_begin();
 
   return true;
 }
@@ -284,6 +236,12 @@ void FrameResources::present_swapchain_image(VkQueue graphics_queue, VkQueue pre
 
   // update next frame frame resource index
   _frame_index = ++_frame_index % _swapchain->size();
+}
+
+void FrameResources::destroy_old_resources()
+{
+  if (!_destructors.empty() && _destructors.front()(_frame_index, false))
+    _destructors.pop();
 }
 
 }}

@@ -8,6 +8,7 @@
 #include "Device.hpp"
 #include "TextEngine/TextEngine.hpp"
 #include "FrameResources.hpp"
+#include "Pipeline/GraphicsPipeline.hpp"
 
 #include <span>
 
@@ -82,8 +83,6 @@ namespace tk { namespace graphics_engine {
     void create_frame_resources();
     void create_sampler();
 
-    //void create_sdf_rendering_resource();
-
     // vk extension funcs
     void load_instance_extension_funcs();
     void load_device_extension_funcs();
@@ -125,6 +124,18 @@ namespace tk { namespace graphics_engine {
     // SDF rendering resources
     //
     void render_sdf();
+    void init_sdf_resources();
+
+    struct PushConstant_SDF
+    {
+      VkDeviceAddress vertices{};
+      VkDeviceAddress shape_properties{};
+      glm::vec2       window_extent{};
+    };
+
+    FramesDynamicBuffer _sdf_buffer;
+    GraphicsPipeline    _sdf_graphics_pipeline;
+
     //void create_buffer(); // FIXME: discard
 
     //

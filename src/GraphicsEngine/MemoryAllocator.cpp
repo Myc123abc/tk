@@ -1,7 +1,6 @@
 #include "tk/GraphicsEngine/MemoryAllocator.hpp"
 #include "tk/ErrorHandling.hpp"
 #include "tk/GraphicsEngine/config.hpp"
-#include "tk/GraphicsEngine/CommandPool.hpp"
 
 #include <cassert>
 
@@ -336,6 +335,40 @@ void copy(Command const& cmd, Buffer const& src, uint32_t buffer_offset, Image& 
     .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
     .regionCount    = 1,
     .pRegions       = &region,
+  };
+  vkCmdCopyBufferToImage2(cmd, &info);
+}
+
+void copy(Command const& cmd, Buffer const& src, Image& dst, std::span<CopyRegion const> regions)
+{
+  if (regions.empty()) return;
+  dst.set_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  auto copy_regions = std::vector<VkBufferImageCopy2>(regions.size());
+  for (auto i = 0; i < regions.size(); ++i)
+  {
+    auto& copy_region = copy_regions[i];
+    auto& region      = regions[i];
+    copy_region.sType             = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2;
+    copy_region.bufferOffset      = region.buffer_offset;
+    copy_region.bufferRowLength   = region.extent.width;
+    copy_region.bufferImageHeight = region.extent.height;
+    copy_region.imageSubresource  =
+    {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .layerCount = 1,
+    };
+    copy_region.imageOffset = { region.image_offset.x, region.image_offset.y, 0 };
+    copy_region.imageExtent = { region.extent.width,   region.extent.height,  1 };
+  }
+
+  VkCopyBufferToImageInfo2 info
+  {
+    .sType          = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2,
+    .srcBuffer      = src.handle(),
+    .dstImage       = dst.handle(),
+    .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    .regionCount    = static_cast<uint32_t>(copy_regions.size()),
+    .pRegions       = copy_regions.data(),
   };
   vkCmdCopyBufferToImage2(cmd, &info);
 }

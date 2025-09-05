@@ -18,6 +18,9 @@ if(WIN32)
   find_package(Vulkan REQUIRED)
 endif()
 
+if (MSVC)
+  add_compile_options(/permissive-)
+endif()
 set(FT_DISABLE_HARFBUZZ ON)
 
 add_subdirectory(vendor/glm)
@@ -36,6 +39,8 @@ endif()
 
 file(GLOB_RECURSE SOURCE src/*.cpp)
 add_library(tk SHARED ${SOURCE})
+
+target_compile_definitions(tk PRIVATE UTF_CPP_CPLUSPLUS=202002L)
 
 target_include_directories(tk
   PUBLIC

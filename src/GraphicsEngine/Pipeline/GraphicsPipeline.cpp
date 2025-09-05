@@ -6,6 +6,7 @@
 #include <vector>
 #include <unordered_map>
 #include <span>
+#include <algorithm>
 
 
 using namespace tk;
@@ -58,8 +59,6 @@ void check_descriptor_infos_valid(std::span<DescriptorInfo const> infos)
 {
   check(infos.size() != 1, "only support single sampler2D now");
   check(infos[0].binding != 0, "binding only 0 now"); // TODO: multiple bindings not have duplicate binding number
-  check(false, "try sampler2D num 1"); // TODO: should single image need variabled descriptor? try to test change shader only one sampler2D
-  check(infos[0].images.size() > 1, "only variable descriptor now");
 }
 
 }
@@ -73,32 +72,44 @@ DescriptorInfo::DescriptorInfo(ShaderType shader_type, uint32_t binding, Descrip
     images(images),
     sampler(sampler) {}
 
-void GraphicsPipeline::init(VkDevice device, std::vector<DescriptorInfo> const& descriptor_infos, uint32_t push_constant_size, VkFormat color_attachment_format, std::string_view vertex, std::string_view fragment)
-{
-  // promise valid
-  check_descriptor_infos_valid(descriptor_infos);
+DescriptorUpdateInfo::DescriptorUpdateInfo(ShaderType shader_type, uint32_t binding, std::vector<Image> const& images)
+  : shader_type(to_vk_type(shader_type)),
+    binding(binding),
+    images(images) {}
 
-  // init
-  _device = device;
+void GraphicsPipeline::init(GraphicsPipelineCreateInfo const& create_info)
+{
+  _create_info = create_info;
+  
+  // promise valid
+  check_descriptor_infos_valid(create_info.descriptor_infos);
 
   // create descriptor resources
-  create_descriptor_set_layout(descriptor_infos);
-  create_descriptor_pool(descriptor_infos);
-  allocate_descriptor_sets(descriptor_infos[0].images.size()); // TODO: only variable descriptor
-  update_descriptor_sets(descriptor_infos);
+  create_descriptor_set_layout(create_info.descriptor_infos);
+  create_descriptor_pool(create_info.descriptor_infos);
+  allocate_descriptor_sets(create_info.descriptor_infos[0].images.size()); // TODO: only variable descriptor
+  update_descriptor_sets(create_info.descriptor_infos);
 
   // create pipeline resources
-  create_pipeline_layout(push_constant_size);
-  create_pipeline(color_attachment_format, vertex, fragment);
+  create_pipeline_layout(create_info.push_constant_size);
+  _vertex_shader_module   = create_shader_module(create_info.vertex);
+  _fragment_shader_module = create_shader_module(create_info.fragment);
+  create_pipeline(create_info.color_attachment_format);
 }
 
-void GraphicsPipeline::destroy()
+void GraphicsPipeline::destroy() const noexcept
 {
-  vkDestroyDescriptorSetLayout(_device, _descriptor_set_layout, nullptr);
-  vkDestroyDescriptorPool(_device, _descriptor_pool, nullptr);
+  destroy_without_shader_modules();
+  vkDestroyShaderModule(_create_info.device, _vertex_shader_module, nullptr);
+  vkDestroyShaderModule(_create_info.device, _fragment_shader_module, nullptr);
+}
 
-  vkDestroyPipelineLayout(_device, _pipeline_layout, nullptr);
-  vkDestroyPipeline(_device, _pipeline, nullptr);
+void GraphicsPipeline::destroy_without_shader_modules() const noexcept
+{
+  vkDestroyDescriptorSetLayout(_create_info.device, _descriptor_set_layout, nullptr);
+  vkDestroyDescriptorPool(_create_info.device, _descriptor_pool, nullptr);
+  vkDestroyPipelineLayout(_create_info.device, _pipeline_layout, nullptr);
+  vkDestroyPipeline(_create_info.device, _pipeline, nullptr);
 }
 
 void GraphicsPipeline::set_pipeline_state(Command const& cmd, VkExtent2D extent) const noexcept
@@ -112,6 +123,31 @@ void GraphicsPipeline::set_pipeline_state(Command const& cmd, VkExtent2D extent)
   vkCmdSetViewport(cmd, 0, 1, &viewport);
   VkRect2D scissor{ .extent = extent, };
   vkCmdSetScissor(cmd, 0, 1, &scissor);
+}
+
+void GraphicsPipeline::recreate(std::vector<DescriptorUpdateInfo> const& infos)
+{
+  // update descriptor infos
+  for (auto const& info : infos)
+  {
+    auto it = std::ranges::find_if(_create_info.descriptor_infos, [&](auto const& desc_info)
+    {
+      return info.shader_type == desc_info.shader_type &&
+             info.binding     == desc_info.binding;
+    });
+    check(it == _create_info.descriptor_infos.end(), "unexist descriptor!");
+    it->images = info.images;
+  }
+
+  // recreate descriptor resources
+  create_descriptor_set_layout(_create_info.descriptor_infos);
+  create_descriptor_pool(_create_info.descriptor_infos);
+  allocate_descriptor_sets(_create_info.descriptor_infos[0].images.size()); // TODO: only variable descriptor
+  update_descriptor_sets(_create_info.descriptor_infos);
+
+  // recreate pipeline resources
+  create_pipeline_layout(_create_info.push_constant_size);
+  create_pipeline(_create_info.color_attachment_format);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -149,7 +185,7 @@ void GraphicsPipeline::create_descriptor_set_layout(std::span<DescriptorInfo con
   layout_create_info.pNext        = &binding_flags_create_info;
     
   // create descriptor set layout
-  throw_if(vkCreateDescriptorSetLayout(_device, &layout_create_info, nullptr, &_descriptor_set_layout) != VK_SUCCESS,
+  throw_if(vkCreateDescriptorSetLayout(_create_info.device, &layout_create_info, nullptr, &_descriptor_set_layout) != VK_SUCCESS,
            "failed to create descriptor set layout");
 }
 
@@ -173,7 +209,7 @@ void GraphicsPipeline::create_descriptor_pool(std::span<DescriptorInfo const> in
   create_info.pPoolSizes    = pool_sizes.data(),
 
   // create descriptor pool
-  throw_if(vkCreateDescriptorPool(_device, &create_info, nullptr, &_descriptor_pool) != VK_SUCCESS,
+  throw_if(vkCreateDescriptorPool(_create_info.device, &create_info, nullptr, &_descriptor_pool) != VK_SUCCESS,
            "failed to create descriptor pool");
 }
 
@@ -199,7 +235,7 @@ void GraphicsPipeline::allocate_descriptor_sets(uint32_t variable_descriptor_cou
   descriptor_set_allocate_info.pNext              = &variable_descriptor_count_allocate_info;
 
   // allocate descriptor sets
-  throw_if(vkAllocateDescriptorSets(_device, &descriptor_set_allocate_info, &_descriptor_set) != VK_SUCCESS,
+  throw_if(vkAllocateDescriptorSets(_create_info.device, &descriptor_set_allocate_info, &_descriptor_set) != VK_SUCCESS,
            "failed to allocate descriptor set");
 }
 
@@ -242,7 +278,7 @@ void GraphicsPipeline::update_descriptor_sets(std::span<DescriptorInfo const> in
   }
 
   // update descriptor sets
-  vkUpdateDescriptorSets(_device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+  vkUpdateDescriptorSets(_create_info.device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -269,17 +305,17 @@ void GraphicsPipeline::create_pipeline_layout(uint32_t push_constant_size)
   pipeline_layout_create_info.pPushConstantRanges    = push_constants.begin();
   
   // create pipeline layout
-  throw_if(vkCreatePipelineLayout(_device, &pipeline_layout_create_info, nullptr, &_pipeline_layout) != VK_SUCCESS,
+  throw_if(vkCreatePipelineLayout(_create_info.device, &pipeline_layout_create_info, nullptr, &_pipeline_layout) != VK_SUCCESS,
            "failed to create pipeline layout");
 }
 
-void GraphicsPipeline::create_pipeline(VkFormat format, std::string_view vertex, std::string_view fragment)
+void GraphicsPipeline::create_pipeline(VkFormat format)
 {
   VkPipelineRenderingCreateInfo rendering_info
   { 
     .sType                   = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
     .colorAttachmentCount    = 1,
-    .pColorAttachmentFormats = &format, // TODO: it should be member variable?
+    .pColorAttachmentFormats = &format,
   };
 
   std::vector<VkPipelineShaderStageCreateInfo> shader_stages
@@ -287,13 +323,13 @@ void GraphicsPipeline::create_pipeline(VkFormat format, std::string_view vertex,
     {
       .sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       .stage  = VK_SHADER_STAGE_VERTEX_BIT,
-      .module = create_shader_module(vertex),
+      .module = _vertex_shader_module,
       .pName  = "main",
     },
     {
       .sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       .stage  = VK_SHADER_STAGE_FRAGMENT_BIT,
-      .module = create_shader_module(fragment),
+      .module = _fragment_shader_module,
       .pName  = "main",
     },
   };
@@ -387,11 +423,8 @@ void GraphicsPipeline::create_pipeline(VkFormat format, std::string_view vertex,
     .pDynamicState       = &dynamic_state,
     .layout              = _pipeline_layout,
   };
-  throw_if(vkCreateGraphicsPipelines(_device, nullptr, 1, &info, nullptr, &_pipeline) != VK_SUCCESS,
+  throw_if(vkCreateGraphicsPipelines(_create_info.device, nullptr, 1, &info, nullptr, &_pipeline) != VK_SUCCESS,
            "failed to create pipeline");
-
-  for (auto shader : shader_stages)
-    vkDestroyShaderModule(_device, shader.module, nullptr);
 }
 
 auto GraphicsPipeline::create_shader_module(std::string_view shader) -> VkShaderModule
@@ -405,7 +438,7 @@ auto GraphicsPipeline::create_shader_module(std::string_view shader) -> VkShader
     .codeSize = data.size() * sizeof(uint32_t),
     .pCode    = reinterpret_cast<uint32_t*>(data.data()),
   };
-  throw_if(vkCreateShaderModule(_device, &info, nullptr, &module) != VK_SUCCESS,
+  throw_if(vkCreateShaderModule(_create_info.device, &info, nullptr, &module) != VK_SUCCESS,
            "failed to create shader from {}", shader);
   return module;
 }

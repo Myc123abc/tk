@@ -8,8 +8,6 @@
 #include "Swapchain.hpp"
 #include "MemoryAllocator.hpp"
 #include "../ErrorHandling.hpp"
-#include "Pipeline/GraphicsPipeline.hpp"
-#include "TextEngine/TextEngine.hpp"
 
 #include <queue>
 #include <functional>
@@ -43,8 +41,6 @@ public:
 
   void init(FrameResources* frame_resources, MemoryAllocator* alloc);
   void destroy();
-
-  void destroy_old_buffers();
 
   void frame_begin();
 
@@ -87,12 +83,10 @@ private:
   std::vector<std::byte> _current_frame_data;
   State                  _state = State::append_data;
   MemoryAllocator*       _alloc{};
-  std::queue<std::function<bool(uint32_t, bool)>> _destructors;
 };
 
 class FrameResources
 {
-  friend class FramesDynamicBuffer;
 public:
   FrameResources()            = default;
   FrameResources(auto const&) = delete;
@@ -109,6 +103,24 @@ public:
   void present_swapchain_image(VkQueue graphics_queue, VkQueue present_queue);
   auto& get_swapchain_image() noexcept { return _swapchain->image(_submit_sem_index); }
 
+  void destroy_old_resources();
+  auto get_current_frame_index() const noexcept { return _frame_index; }
+  auto size() const noexcept { return _frames.size(); }
+  auto push_old_resource(std::function<void()>&& func)
+  {
+    _destructors.push(
+      [frame_index = _frame_index, func]
+      (uint32_t current_frame_index, bool directly_destruct)
+      {
+        if (directly_destruct || current_frame_index == frame_index)
+        {
+          func();
+          return true;
+        }
+        return false;
+      });
+  }
+
 private:
   VkDevice                   _device;
   std::vector<FrameResource> _frames;
@@ -117,30 +129,7 @@ private:
   uint32_t                   _submit_sem_index{};
   Swapchain*                 _swapchain{};
 
-  //
-  // SDF
-  //
-public:
-  void init_sdf_resource(MemoryAllocator& alloc, TextEngine* text_engine, VkSampler sampler);
-  void destroy_sdf_resource();
-  auto& get_sdf_buffer() noexcept { return _sdf_buffer; }
-
-  struct PushConstant_SDF
-  {
-    VkDeviceAddress vertices{};
-    VkDeviceAddress shape_properties{};
-    glm::vec2       window_extent{};
-  };
-
-  void bind_sdf_pipeline(Command const& cmd, PushConstant_SDF const& pc) const noexcept
-  { 
-    _sdf_graphics_pipeline.bind(cmd, pc);
-    _sdf_graphics_pipeline.set_pipeline_state(cmd, _swapchain->extent());
-  }
-
-private:
-  FramesDynamicBuffer _sdf_buffer;
-  GraphicsPipeline    _sdf_graphics_pipeline;
+  std::queue<std::function<bool(uint32_t, bool)>> _destructors;
 };
 
 }}

@@ -34,11 +34,11 @@ void GraphicsEngine::init(Window& window)
   create_sampler();
 
   //create_buffer();
-  init_text_engine();
-  //create_sdf_rendering_resource();
-
   create_frame_resources();
 
+  init_text_engine();
+  init_sdf_resources();
+  
   init_gpu_resource();
 }
 
@@ -218,13 +218,7 @@ void GraphicsEngine::init_command_pool()
 void GraphicsEngine::create_frame_resources()
 {
   _frames.init(_device, _command_pool, &_swapchain);
-  _frames.init_sdf_resource(_mem_alloc, &_text_engine, _sampler);
-
-  _destructors.push([&] 
-  {
-    _frames.destroy();
-    _frames.destroy_sdf_resource();
-  });
+  _destructors.push([&] { _frames.destroy(); });
 }
 
 #if 0
@@ -253,31 +247,6 @@ void GraphicsEngine::resize_swapchain()
 {
   _swapchain.resize();
 }
-
-#if 0
-void GraphicsEngine::create_sdf_rendering_resource()
-{
-  _sdf_render_pipeline = _device.create_render_pipeline(
-    sizeof(PushConstant_SDF), 
-    {
-      { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, { _text_engine.get_first_glyph_atlas_pointer() }, _sampler },
-    },
-    _descriptor_buffer,
-    "sdf",
-    {
-      { VK_SHADER_STAGE_VERTEX_BIT,   "shader/SDF_vert.spv" },
-      { VK_SHADER_STAGE_FRAGMENT_BIT, "shader/SDF_frag.spv" },
-    },
-    _swapchain.format()
-  );
-
-  // destroy resources
-  _destructors.push([&]
-  {
-    _sdf_render_pipeline.destroy();
-  });
-}
-#endif
 
 void GraphicsEngine::create_sampler()
 {
@@ -316,6 +285,27 @@ void GraphicsEngine::init_gpu_resource()
   _text_engine.preload_glyphs(cmd);
 
   cmd.end().submit_wait_free(_command_pool, _graphics_queue);
+}
+
+void GraphicsEngine::init_sdf_resources()
+{
+  _sdf_buffer.init(&_frames, &_mem_alloc);
+  _sdf_graphics_pipeline.init({
+    _device,
+    {
+      { ShaderType::fragment, 0, DescriptorType::sampler2D, _text_engine.get_glyph_atlases(), _sampler },
+    },
+    sizeof(PushConstant_SDF),
+    _swapchain.format(),
+    "shader/SDF_vert.spv",
+    "shader/SDF_frag.spv"
+  });
+
+  _destructors.push([&]
+  {
+    _sdf_buffer.destroy();
+    _sdf_graphics_pipeline.destroy();
+  });
 }
 
 } }

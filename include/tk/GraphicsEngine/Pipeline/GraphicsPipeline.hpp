@@ -31,17 +31,36 @@ struct DescriptorInfo
   VkSampler          sampler{};
 };
 
+struct DescriptorUpdateInfo
+{
+  DescriptorUpdateInfo(ShaderType shader_type, uint32_t binding, std::vector<Image> const& images);
+
+  VkShaderStageFlags shader_type{};
+  uint32_t           binding{};
+  std::vector<Image> images{};
+};
+
+struct GraphicsPipelineCreateInfo
+{
+  VkDevice                    device{};
+  std::vector<DescriptorInfo> descriptor_infos;
+  uint32_t                    push_constant_size{};
+  VkFormat                    color_attachment_format{};
+  std::string_view            vertex;
+  std::string_view            fragment;
+};
+
 class GraphicsPipeline
 {
 public:
   GraphicsPipeline()            = default;
   GraphicsPipeline(auto const&) = delete;
-  GraphicsPipeline(auto&&)      = delete;
   auto operator=(auto const&)   = delete;
   auto operator=(auto&&)        = delete;
 
-  void init(VkDevice device, std::vector<DescriptorInfo> const& descriptor_infos, uint32_t push_constant_size, VkFormat color_attachment_format, std::string_view vertex, std::string_view fragment);
-  void destroy();
+  void init(GraphicsPipelineCreateInfo const& create_info);
+  void destroy() const noexcept;
+  void destroy_without_shader_modules() const noexcept;
 
   void create_descriptor_set_layout(std::span<DescriptorInfo const> infos);
   void create_descriptor_pool(std::span<DescriptorInfo const> infos);
@@ -49,7 +68,7 @@ public:
   void update_descriptor_sets(std::span<DescriptorInfo const> infos);
 
   void create_pipeline_layout(uint32_t push_constant_size);
-  void create_pipeline(VkFormat format, std::string_view vertex, std::string_view fragment);
+  void create_pipeline(VkFormat format);
   auto create_shader_module(std::string_view shader) -> VkShaderModule;
 
   template <typename PushConstant>
@@ -62,8 +81,10 @@ public:
 
   void set_pipeline_state(Command const& cmd, VkExtent2D extent) const noexcept;
 
+  void recreate(std::vector<DescriptorUpdateInfo> const& infos);
+
 private:
-  VkDevice _device{};
+  GraphicsPipelineCreateInfo _create_info;
   
   // descriptor resources
   VkDescriptorSetLayout _descriptor_set_layout{};
@@ -73,6 +94,8 @@ private:
   // pipeline resources
   VkPipelineLayout      _pipeline_layout{};
   VkPipeline            _pipeline{};
+  VkShaderModule        _vertex_shader_module{};
+  VkShaderModule        _fragment_shader_module{};
 };
 
 }}

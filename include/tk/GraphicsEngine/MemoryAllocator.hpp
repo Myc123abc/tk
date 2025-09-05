@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "CommandPool.hpp"
+
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
 #include <glm/glm.hpp>
@@ -128,8 +130,8 @@ namespace tk { namespace graphics_engine {
     auto extent2D()   const noexcept { return VkExtent2D{ _extent.width, _extent.height }; }
     auto format()     const noexcept { return _format;     }
 
-    auto set_layout(class Command const& cmd, VkImageLayout layout)    -> Image&;
-    auto clear(class Command const& cmd, VkClearColorValue value = {}) -> Image&;
+    auto set_layout(Command const& cmd, VkImageLayout layout)    -> Image&;
+    auto clear(Command const& cmd, VkClearColorValue value = {}) -> Image&;
 
   private:
     VmaAllocator  _allocator  = {};
@@ -165,7 +167,19 @@ void copy(Command const& cmd, Image  const& src, Image const& dst);
  * @param dst image
  */
 void copy(Command const& cmd, Buffer const& src, Image& dst);
-// TODO: make pairs, multiple copy in once call
+
+struct CopyRegion
+{
+  uint32_t   buffer_offset{};
+  VkOffset2D image_offset{};
+  VkExtent2D extent{};
+
+  CopyRegion(uint32_t buffer_offset, glm::vec2 const& image_offset, glm::vec2 const& extent)
+    : buffer_offset(buffer_offset),
+      image_offset(static_cast<int32_t>(image_offset.x), static_cast<int32_t>(image_offset.y)),
+      extent(static_cast<uint32_t>(extent.x), static_cast<uint32_t>(extent.y)) {}
+};
+void copy(Command const& cmd, Buffer const& src, Image& dst, std::span<CopyRegion const> regions);
 void copy(Command const& cmd, Buffer const& src, uint32_t buffer_offset, Image& dst, VkOffset2D image_offset, VkExtent2D extent);
 inline void copy(Command const& cmd, Buffer const& src, uint32_t buffer_offset, Image& dst, glm::vec2 image_offset, glm::vec2 extent)
 {
@@ -174,30 +188,30 @@ inline void copy(Command const& cmd, Buffer const& src, uint32_t buffer_offset, 
     VkExtent2D{ static_cast<uint32_t>(extent.x), static_cast<uint32_t>(extent.y) });
 }
 
-  class MemoryAllocator
-  {
-    friend class Buffer;
-  public:
-    MemoryAllocator()  = default;
-    ~MemoryAllocator() = default;
+class MemoryAllocator
+{
+  friend class Buffer;
+public:
+  MemoryAllocator()  = default;
+  ~MemoryAllocator() = default;
 
-    MemoryAllocator(MemoryAllocator const&)            = delete;
-    MemoryAllocator(MemoryAllocator&&)                 = delete;
-    MemoryAllocator& operator=(MemoryAllocator const&) = delete;
-    MemoryAllocator& operator=(MemoryAllocator&&)      = delete;
+  MemoryAllocator(MemoryAllocator const&)            = delete;
+  MemoryAllocator(MemoryAllocator&&)                 = delete;
+  MemoryAllocator& operator=(MemoryAllocator const&) = delete;
+  MemoryAllocator& operator=(MemoryAllocator&&)      = delete;
 
-    void init(VkPhysicalDevice physical_device, VkDevice device, VkInstance instance, uint32_t vulkan_version);
-    void destroy();
+  void init(VkPhysicalDevice physical_device, VkDevice device, VkInstance instance, uint32_t vulkan_version);
+  void destroy();
 
-    auto get()    const noexcept { return _allocator; }
-    auto device() const noexcept { return _device;    }
+  auto get()    const noexcept { return _allocator; }
+  auto device() const noexcept { return _device;    }
 
-    auto create_buffer(uint32_t size, VkBufferUsageFlags usages, VmaAllocationCreateFlags flags = 0) { return Buffer(this, size, usages, flags);  }
-    auto create_image(VkFormat format, uint32_t width, uint32_t height, VkImageUsageFlags usage) { return Image(this, format, { width, height, 1 }, usage); }
+  auto create_buffer(uint32_t size, VkBufferUsageFlags usages, VmaAllocationCreateFlags flags = 0) { return Buffer(this, size, usages, flags);  }
+  auto create_image(VkFormat format, uint32_t width, uint32_t height, VkImageUsageFlags usage) { return Image(this, format, { width, height, 1 }, usage); }
 
-  private:
-    VkDevice     _device    = VK_NULL_HANDLE;
-    VmaAllocator _allocator = VK_NULL_HANDLE;
-  };
+private:
+  VkDevice     _device    = VK_NULL_HANDLE;
+  VmaAllocator _allocator = VK_NULL_HANDLE;
+};
 
 }}
