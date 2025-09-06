@@ -24,7 +24,7 @@ int main(int argc, char** argv)
   try
   {
     tk::audio::play("assets\\1.16.遠い心.wav");
-    return 0;
+    //return 0;
 
     // init main window and engine
     tk::init("tk", 200, 200);
