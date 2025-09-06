@@ -1,5 +1,5 @@
-#include "tk/GraphicsEngine/TextEngine/TextEngine.hpp"
-#include "tk/ErrorHandling.hpp"
+#include "TextEngine.hpp"
+#include "../../ErrorHandling.hpp"
 #include "missing-glyph-sdf-bitmap.hpp"
 
 #include <hb-ft.h>

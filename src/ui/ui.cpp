@@ -1,6 +1,6 @@
 #include "tk/ui/ui.hpp"
 #include "internal.hpp"
-#include "tk/ErrorHandling.hpp"
+#include "../ErrorHandling.hpp"
 
 #include <cassert>
 

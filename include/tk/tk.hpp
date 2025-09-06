@@ -5,7 +5,7 @@
 #pragma once
 
 #include "config.hpp"
-#include "tk/type.hpp"
+#include "type.hpp"
 
 #include <vector>
 #include <string_view>

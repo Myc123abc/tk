@@ -1,5 +1,5 @@
-#include "tk/GraphicsEngine/GraphicsEngine.hpp"
-#include "tk/util.hpp"
+#include "GraphicsEngine.hpp"
+#include "../util.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 

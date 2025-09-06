@@ -1,6 +1,6 @@
-#include "tk/Window.hpp"
-#include "tk/ErrorHandling.hpp"
-#include "tk/GraphicsEngine/GraphicsEngine.hpp"
+#include "Window.hpp"
+#include "ErrorHandling.hpp"
+#include "GraphicsEngine/GraphicsEngine.hpp"
 
 #ifdef _WIN32
 #include <vulkan/vulkan_win32.h>

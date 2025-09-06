@@ -33,11 +33,11 @@ class FramesDynamicBuffer
   }; 
 
 public:
-  FramesDynamicBuffer()            = default;
-  FramesDynamicBuffer(auto const&) = delete;
-  FramesDynamicBuffer(auto&&)      = delete;
-  auto operator=(auto const&)      = delete;
-  auto operator=(auto&&)           = delete;
+  FramesDynamicBuffer()                                      = default;
+  FramesDynamicBuffer(FramesDynamicBuffer const&)            = delete;
+  FramesDynamicBuffer(FramesDynamicBuffer&&)                 = delete;
+  FramesDynamicBuffer& operator=(FramesDynamicBuffer const&) = delete;
+  FramesDynamicBuffer& operator=(FramesDynamicBuffer&&)      = delete;
 
   void init(FrameResources* frame_resources, MemoryAllocator* alloc);
   void destroy();
@@ -88,11 +88,11 @@ private:
 class FrameResources
 {
 public:
-  FrameResources()            = default;
-  FrameResources(auto const&) = delete;
-  FrameResources(auto&&)      = delete;
-  auto operator=(auto const&) = delete;
-  auto operator=(auto&&)      = delete;
+  FrameResources()                                 = default;
+  FrameResources(FrameResources const&)            = delete;
+  FrameResources(FrameResources&&)                 = delete;
+  FrameResources& operator=(FrameResources const&) = delete;
+  FrameResources& operator=(FrameResources&&)      = delete;
 
   void init(VkDevice device, CommandPool& cmd_pool, Swapchain* swapchain);
   void destroy();

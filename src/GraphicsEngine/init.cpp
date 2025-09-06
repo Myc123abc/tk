@@ -1,8 +1,8 @@
-#include "tk/GraphicsEngine/GraphicsEngine.hpp"
+#include "GraphicsEngine.hpp"
 #include "init-util.hpp"
-#include "tk/GraphicsEngine/vk_extension.hpp"
-#include "tk/GraphicsEngine/config.hpp"
-#include "tk/GraphicsEngine/Features.hpp"
+#include "vk_extension.hpp"
+#include "config.hpp"
+#include "Features.hpp"
 
 #include <ranges>
 #include <set>

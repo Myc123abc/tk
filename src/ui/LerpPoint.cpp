@@ -1,5 +1,5 @@
 #include "tk/ui/LerpPoint.hpp"
-#include "tk/util.hpp"
+#include "../util.hpp"
 
 using namespace tk::ui;
 

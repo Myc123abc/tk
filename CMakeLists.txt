@@ -44,10 +44,9 @@ target_compile_definitions(tk PRIVATE UTF_CPP_CPLUSPLUS=202002L)
 
 target_include_directories(tk
   PUBLIC
-    interface
+    include
     vendor/glm
   PRIVATE
-    include
     ${Vulkan_INCLUDE_DIRS}
     vendor/freetype/include
     vendor/utfcpp/source

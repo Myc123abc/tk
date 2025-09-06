@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tk/GraphicsEngine/GraphicsEngine.hpp"
+#include "../GraphicsEngine/GraphicsEngine.hpp"
 
 #include <glm/glm.hpp>
 

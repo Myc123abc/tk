@@ -1,6 +1,6 @@
-#include "tk/GraphicsEngine/Pipeline/GraphicsPipeline.hpp"
-#include "tk/ErrorHandling.hpp"
-#include "tk/util.hpp"
+#include "GraphicsPipeline.hpp"
+#include "../../ErrorHandling.hpp"
+#include "../../util.hpp"
 
 #include <vulkan/vulkan.h>
 #include <vector>

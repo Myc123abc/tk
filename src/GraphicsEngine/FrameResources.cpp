@@ -1,6 +1,6 @@
-#include "tk/GraphicsEngine/FrameResources.hpp"
-#include "tk/GraphicsEngine/config.hpp"
-#include "tk/util.hpp"
+#include "FrameResources.hpp"
+#include "config.hpp"
+#include "../util.hpp"
 
 #include <cassert>
 
