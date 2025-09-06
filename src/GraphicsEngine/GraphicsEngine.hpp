@@ -116,6 +116,8 @@ namespace tk { namespace graphics_engine {
 
     FrameResources _frames;
 
+    Image _offscreen_image;
+
     //
     // SDF rendering resources
     //

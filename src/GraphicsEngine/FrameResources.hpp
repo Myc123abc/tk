@@ -100,6 +100,7 @@ public:
   auto& get_command() const noexcept { return _frames[_frame_index].cmd; }
 
   auto acquire_swapchain_image(bool wait) -> bool;
+  void copy_image_to_swapchain(Image& image);
   void present_swapchain_image(VkQueue graphics_queue, VkQueue present_queue);
   auto& get_swapchain_image() noexcept { return _swapchain->image(_submit_sem_index); }
 

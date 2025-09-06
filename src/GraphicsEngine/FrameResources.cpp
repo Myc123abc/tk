@@ -161,6 +161,16 @@ auto FrameResources::acquire_swapchain_image(bool wait) -> bool
   return true;
 }
 
+void FrameResources::copy_image_to_swapchain(Image& image)
+{
+  auto& cmd             = _frames[_frame_index].cmd;
+  auto& swapchain_image = _swapchain->image(_submit_sem_index);
+
+  swapchain_image.set_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  image.set_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  copy(cmd, image, swapchain_image);
+}
+
 void FrameResources::present_swapchain_image(VkQueue graphics_queue, VkQueue present_queue)
 {
   // get current frame resource and submit semaphore
