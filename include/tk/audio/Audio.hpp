@@ -1,17 +1,11 @@
 #pragma once
 
+#include "../config.hpp"
+
+#include <string_view>
+
 namespace tk { namespace audio {
 
-class Audio
-{
-public:
-  Audio()                        = default;
-  Audio(Audio const&)            = delete;
-  Audio(Audio&&)                 = delete;
-  Audio& operator=(Audio const&) = delete;
-  Audio& operator=(Audio&&)      = delete;
-
-private:
-};
+TK_API void play(std::string_view path);
 
 }}

@@ -5,6 +5,7 @@
 #include "PlayBackButton.hpp"
 #include "tk/tk.hpp"
 #include "tk/log.hpp"
+#include "tk/audio/audio.hpp"
 
 #include <thread>
 #include <chrono>
@@ -18,10 +19,13 @@ bool click = {};
 auto event_process() -> type::WindowState;
 void render();
 
-int main()
+int main(int argc, char** argv)
 {
   try
   {
+    tk::audio::play("assets\\1.16.遠い心.wav");
+    return 0;
+
     // init main window and engine
     tk::init("tk", 200, 200);
 
