@@ -7,8 +7,6 @@
 #include <windowsx.h>
 #endif
 
-#include "tk/log.hpp"
-
 
 namespace
 {
@@ -165,17 +163,20 @@ LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LP
 
   case WM_LBUTTONDOWN:
   {
-    window->_mouse_states.push(type::MouseState::left_down);
-    dragging = true;
-    SetCapture(handle);
     GetCursorPos(&dragging_mouse_pos);
     GetWindowRect(handle, &dragging_window_rect);
+    if (dragging_mouse_pos.y < 25 + dragging_window_rect.top)
+    {
+      dragging = true;
+      SetCapture(handle);
+    }
+    //if (window->get_mouse_position().y < 25)
+    //  PostMessage(handle, WM_NCLBUTTONDOWN, HTCAPTION, l_param);
   }
   break;
 
   case WM_LBUTTONUP:
   {
-    window->_mouse_states.push(type::MouseState::left_up);
     if (dragging)
     {
       dragging = false;
@@ -199,7 +200,6 @@ LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LP
         SWP_DEFERERASE | SWP_NOACTIVATE | SWP_NOCOPYBITS | SWP_NOOWNERZORDER | SWP_NOREDRAW | SWP_NOSENDCHANGING | SWP_NOSIZE | SWP_NOZORDER);
     }
   }
-  
   break;
 
   }
@@ -309,10 +309,7 @@ auto Window::get_mouse_position() const noexcept -> glm::vec2
 
 auto Window::get_mouse_state() noexcept -> type::MouseState
 {
-  if (_mouse_states.empty()) return type::MouseState::left_up;
-  auto state = _mouse_states.front();
-  _mouse_states.pop();
-  return state;
+  return GetKeyState(VK_LBUTTON) & 0x8000 ? type::MouseState::left_down : type::MouseState::left_up;
 }
 
 void CALLBACK Window::message_process(LPVOID) noexcept

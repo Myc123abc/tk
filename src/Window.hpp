@@ -74,8 +74,6 @@ private:
   LPCWSTR           ClassName{ L"main window" };
   HWND              _handle{};
   type::WindowState _state{ type::WindowState::suspended };
-
-  std::queue<type::MouseState> _mouse_states;
 #endif
 
 private:

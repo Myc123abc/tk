@@ -163,4 +163,8 @@ TK_API bool click_area(std::string_view name, glm::vec2 const& pos0, glm::vec2 c
  */
 TK_API bool is_hover_on(std::string_view name);
 
+// TODO: only current window now
+TK_API auto get_mouse_position() -> glm::vec2;
+TK_API auto get_mouse_state() -> type::MouseState;
+
 }}
