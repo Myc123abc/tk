@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../MemoryAllocator.hpp"
-#include "tk/GraphicsEngine/CommandPool.hpp"
+#include "../CommandPool.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -53,11 +53,6 @@ struct GraphicsPipelineCreateInfo
 class GraphicsPipeline
 {
 public:
-  GraphicsPipeline()            = default;
-  GraphicsPipeline(auto const&) = delete;
-  auto operator=(auto const&)   = delete;
-  auto operator=(auto&&)        = delete;
-
   void init(GraphicsPipelineCreateInfo const& create_info);
   void destroy() const noexcept;
   void destroy_without_shader_modules() const noexcept;

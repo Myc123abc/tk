@@ -1,6 +1,6 @@
-#include "tk/GraphicsEngine/FrameResources.hpp"
-#include "tk/GraphicsEngine/config.hpp"
-#include "tk/util.hpp"
+#include "FrameResources.hpp"
+#include "config.hpp"
+#include "../util.hpp"
 
 #include <cassert>
 
@@ -159,6 +159,16 @@ auto FrameResources::acquire_swapchain_image(bool wait) -> bool
   vkBeginCommandBuffer(frame.cmd, &command_begin_info);
 
   return true;
+}
+
+void FrameResources::copy_image_to_swapchain(Image& image)
+{
+  auto& cmd             = _frames[_frame_index].cmd;
+  auto& swapchain_image = _swapchain->image(_submit_sem_index);
+
+  swapchain_image.set_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  image.set_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  copy(cmd, image, swapchain_image);
 }
 
 void FrameResources::present_swapchain_image(VkQueue graphics_queue, VkQueue present_queue)

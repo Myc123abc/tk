@@ -1,6 +1,6 @@
-#include "tk/GraphicsEngine/MemoryAllocator.hpp"
-#include "tk/ErrorHandling.hpp"
-#include "tk/GraphicsEngine/config.hpp"
+#include "MemoryAllocator.hpp"
+#include "../ErrorHandling.hpp"
+#include "config.hpp"
 
 #include <cassert>
 

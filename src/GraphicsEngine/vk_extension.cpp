@@ -1,6 +1,6 @@
-#include "tk/GraphicsEngine/GraphicsEngine.hpp"
-#include "tk/ErrorHandling.hpp"
-#include "tk/GraphicsEngine/vk_extension.hpp"
+#include "GraphicsEngine.hpp"
+#include "../ErrorHandling.hpp"
+#include "vk_extension.hpp"
 
 #include <string_view>
 

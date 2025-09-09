@@ -1,6 +1,6 @@
 #include "tk/ui/ui.hpp"
 #include "internal.hpp"
-#include "tk/ErrorHandling.hpp"
+#include "../ErrorHandling.hpp"
 
 #include <cassert>
 
@@ -350,13 +350,13 @@ void event_process()
   ctx->mouse_pos = ctx->window->get_mouse_position();
 
   // mouse click
-  auto mouse_state = ctx->window->get_mouse_state();
-  if (!ctx->first_down && mouse_state == left_down)
+  ctx->mouse_state = ctx->window->get_mouse_state();
+  if (!ctx->first_down && ctx->mouse_state == left_down)
   {
     ctx->drag_start_pos = ctx->mouse_pos;
     ctx->first_down     = true;
   }
-  else if (ctx->first_down && mouse_state == left_up)
+  else if (ctx->first_down && ctx->mouse_state == left_up)
   {
     ctx->drag_end_pos = ctx->mouse_pos;
     ctx->click_finish = true;
@@ -452,6 +452,16 @@ bool is_hover_on(std::string_view name)
   auto ctx = get_ctx();
   return ctx->last_hovered_widget.first  == ctx->last_layout->name &&
          ctx->last_hovered_widget.second == name;
+}
+
+auto get_mouse_position() -> glm::vec2
+{
+  return get_ctx()->window->get_mouse_position();
+}
+
+auto get_mouse_state() -> type::MouseState
+{
+  return get_ctx()->mouse_state;
 }
 
 }}

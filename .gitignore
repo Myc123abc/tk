@@ -4,3 +4,8 @@ out
 .vs
 shader/*.spv
 CMakeSettings.json
+assets/*.wav
+assets/*.mp3
+assets/*.flac
+assets/*.acc
+assets/*.ogg

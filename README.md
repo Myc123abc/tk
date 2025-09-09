@@ -31,3 +31,4 @@ reserve:
 * https://computergraphics.stackexchange.com/ (CC BY-SA 4.0)
 * https://www.redblobgames.com/x/2404-distance-field-effects/ (Apache-2.0)
 * https://github.com/nemtrif/utfcpp (BSL-1.0)
+* https://github.com/mackron/miniaudio (Public Domain)

@@ -27,6 +27,7 @@ add_subdirectory(vendor/glm)
 add_subdirectory(vendor/vma)
 add_subdirectory(vendor/freetype)
 add_subdirectory(vendor/harfbuzz)
+add_subdirectory(vendor/miniaudio)
 
 # when generator not vs, rc files will be built fail
 if (NOT "${CMAKE_GENERATOR}" MATCHES "Visual Studio")
@@ -44,10 +45,9 @@ target_compile_definitions(tk PRIVATE UTF_CPP_CPLUSPLUS=202002L)
 
 target_include_directories(tk
   PUBLIC
-    interface
+    include
     vendor/glm
   PRIVATE
-    include
     ${Vulkan_INCLUDE_DIRS}
     vendor/freetype/include
     vendor/utfcpp/source
@@ -58,6 +58,7 @@ target_link_libraries(tk
     ${Vulkan_LIBRARIES}
     GPUOpen::VulkanMemoryAllocator
     harfbuzz
+    miniaudio
 )
 
 target_link_directories(tk

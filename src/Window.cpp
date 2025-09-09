@@ -1,9 +1,10 @@
-#include "tk/Window.hpp"
-#include "tk/ErrorHandling.hpp"
-#include "tk/GraphicsEngine/GraphicsEngine.hpp"
+#include "Window.hpp"
+#include "ErrorHandling.hpp"
+#include "GraphicsEngine/GraphicsEngine.hpp"
 
 #ifdef _WIN32
 #include <vulkan/vulkan_win32.h>
+#include <windowsx.h>
 #endif
 
 
@@ -35,6 +36,10 @@ auto to_string(const wchar_t* wstr) -> std::string
 
 constexpr uint32_t Move_Timer{ 0 };
 
+POINT dragging_mouse_pos{};
+RECT  dragging_window_rect{};
+bool  dragging{};
+
 #endif
 
 }
@@ -52,6 +57,36 @@ LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LP
 
   switch (msg)
   {
+  #if 1
+  case WM_NCHITTEST:
+  {
+    // get screen size
+    RECT screen_size;
+    SystemParametersInfo(SPI_GETWORKAREA, 0, &screen_size, 0);
+
+    // get screen coordinate
+    auto pos = POINT{ GET_X_LPARAM(l_param), GET_Y_LPARAM(l_param) };
+
+    // convert to window coordinate
+    ScreenToClient(handle, &pos);
+
+    // get window size
+    RECT rc;
+    GetClientRect(handle, &rc);
+
+    // set move bar area
+    if (pos.x < 5 && pos.y < 5)                         return HTTOPLEFT;
+    if (pos.x < 5 && pos.y > rc.bottom - 5)             return HTBOTTOMLEFT;
+    if (pos.x > rc.right  - 5 && pos.y < 5)             return HTTOPRIGHT;
+    if (pos.x > rc.right  - 5 && pos.y > rc.bottom - 5) return HTBOTTOMRIGHT;
+    if (pos.x < 5)                                      return HTLEFT;
+    if (pos.x > rc.right  - 5)                          return HTRIGHT;
+    if (pos.y < 5)                                      return HTTOP;
+    if (pos.y > rc.bottom - 5)                          return HTBOTTOM;
+
+    return HTCLIENT;
+  }
+  #endif
   case WM_DESTROY:
   {
     PostQuitMessage(0);
@@ -128,13 +163,42 @@ LRESULT WINAPI window_process_callback(HWND handle, UINT msg, WPARAM w_param, LP
 
   case WM_LBUTTONDOWN:
   {
-    window->_mouse_states.push(type::MouseState::left_down);
+    GetCursorPos(&dragging_mouse_pos);
+    GetWindowRect(handle, &dragging_window_rect);
+    if (dragging_mouse_pos.y < 25 + dragging_window_rect.top)
+    {
+      dragging = true;
+      SetCapture(handle);
+    }
+    //if (window->get_mouse_position().y < 25)
+    //  PostMessage(handle, WM_NCLBUTTONDOWN, HTCAPTION, l_param);
   }
   break;
 
   case WM_LBUTTONUP:
   {
-    window->_mouse_states.push(type::MouseState::left_up);
+    if (dragging)
+    {
+      dragging = false;
+      ReleaseCapture();
+    }
+  }
+  break;
+
+  case WM_MOUSEMOVE:
+  {
+    if (dragging)
+    {
+      POINT pos;
+      GetCursorPos(&pos);
+      dragging_window_rect.left += pos.x - dragging_mouse_pos.x;
+      dragging_window_rect.top  += pos.y - dragging_mouse_pos.y;
+      dragging_mouse_pos = pos;
+      SetWindowPos(handle, nullptr,
+        dragging_window_rect.left, dragging_window_rect.top,
+        0, 0,
+        SWP_DEFERERASE | SWP_NOACTIVATE | SWP_NOCOPYBITS | SWP_NOOWNERZORDER | SWP_NOREDRAW | SWP_NOSENDCHANGING | SWP_NOSIZE | SWP_NOZORDER);
+    }
   }
   break;
 
@@ -169,22 +233,23 @@ void Window::init(std::string_view title, uint32_t width, uint32_t height)
   check(RegisterClassExW(&wc), "failed to register class {}", to_string(ClassName));
 
   // adjust width and height as client extent
-  RECT rect{ 0, 0, static_cast<int>(width), static_cast<int>(height) };
-  check(AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE), "failed to adjust window rectangle");
-  width  = rect.right  - rect.left;
-  height = rect.bottom - rect.top;
+  //RECT rect{ 0, 0, static_cast<int>(width), static_cast<int>(height) };
+  //check(AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE), "failed to adjust window rectangle");
+  //width  = rect.right  - rect.left;
+  //height = rect.bottom - rect.top;
   
   // put window in center of screen
   auto x = (GetSystemMetrics(SM_CXSCREEN) - width) / 2;
   auto y = (GetSystemMetrics(SM_CYSCREEN) - height) / 2;
 
   // create window
-  _handle = ::CreateWindowW(wc.lpszClassName, to_wstring(title).c_str(), WS_OVERLAPPEDWINDOW, x, y, width, height, nullptr, nullptr, wc.hInstance, nullptr);
+  _handle = ::CreateWindowW(wc.lpszClassName, to_wstring(title).c_str(), WS_POPUP, x, y, width, height, nullptr, nullptr, wc.hInstance, nullptr);
   check(_handle, "failed to create window");
 
   // set pointer in window
   check(!SetWindowLongPtrW(_handle, GWLP_USERDATA, reinterpret_cast<LONG_PTR >(this)), "failed to set user pointer");
 
+  // initialize keys
   init_keys();
 }
 
@@ -244,10 +309,7 @@ auto Window::get_mouse_position() const noexcept -> glm::vec2
 
 auto Window::get_mouse_state() noexcept -> type::MouseState
 {
-  if (_mouse_states.empty()) return type::MouseState::left_up;
-  auto state = _mouse_states.front();
-  _mouse_states.pop();
-  return state;
+  return GetKeyState(VK_LBUTTON) & 0x8000 ? type::MouseState::left_down : type::MouseState::left_up;
 }
 
 void CALLBACK Window::message_process(LPVOID) noexcept

@@ -4,7 +4,7 @@
 //
 
 #include "tk/tk.hpp"
-#include "tk/GraphicsEngine/GraphicsEngine.hpp"
+#include "GraphicsEngine/GraphicsEngine.hpp"
 #include "ui/internal.hpp"
 
 using namespace tk;

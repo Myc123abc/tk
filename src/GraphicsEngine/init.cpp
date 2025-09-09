@@ -1,8 +1,8 @@
-#include "tk/GraphicsEngine/GraphicsEngine.hpp"
+#include "GraphicsEngine.hpp"
 #include "init-util.hpp"
-#include "tk/GraphicsEngine/vk_extension.hpp"
-#include "tk/GraphicsEngine/config.hpp"
-#include "tk/GraphicsEngine/Features.hpp"
+#include "vk_extension.hpp"
+#include "config.hpp"
+#include "Features.hpp"
 
 #include <ranges>
 #include <set>
@@ -251,10 +251,19 @@ void GraphicsEngine::init_gpu_resource()
 {
   auto cmd = _command_pool.create_command().begin();
 
+  // offscreen image creatation
+  //auto extent = _swapchain.extent();
+  //_offscreen_image = _mem_alloc.create_image(_swapchain.format(), extent.width, extent.height, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+
   // preload glyphs
   _text_engine.preload_glyphs(cmd);
 
   cmd.end().submit_wait_free(_command_pool, _graphics_queue);
+
+  _destructors.push([&]
+  {
+    //_offscreen_image.destroy();
+  });
 }
 
 void GraphicsEngine::init_sdf_resources()

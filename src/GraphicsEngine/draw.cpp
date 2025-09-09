@@ -1,5 +1,5 @@
-#include "tk/GraphicsEngine/GraphicsEngine.hpp"
-#include "tk/util.hpp"
+#include "GraphicsEngine.hpp"
+#include "../util.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -38,6 +38,7 @@ auto GraphicsEngine::frame_begin() -> bool
 
 void GraphicsEngine::frame_end()
 {
+  //_frames.copy_image_to_swapchain(_offscreen_image);
   _frames.present_swapchain_image(_graphics_queue, _present_queue);
 }
 
@@ -68,6 +69,7 @@ void GraphicsEngine::render_begin(Image& image)
 
 void GraphicsEngine::sdf_render_begin()
 {
+  //render_begin(_offscreen_image);
   render_begin(_frames.get_swapchain_image());
 }
 

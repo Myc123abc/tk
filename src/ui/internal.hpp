@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tk/GraphicsEngine/GraphicsEngine.hpp"
+#include "../GraphicsEngine/GraphicsEngine.hpp"
 
 #include <glm/glm.hpp>
 
@@ -40,11 +40,12 @@ struct ui_context
   uint32_t               path_offset{};
   std::vector<float>     paritions{};
 
-  glm::vec2 mouse_pos{};
-  glm::vec2 drag_start_pos{};
-  glm::vec2 drag_end_pos{};
-  bool      click_finish{};
-  bool      first_down{};
+  type::MouseState mouse_state{};
+  glm::vec2        mouse_pos{};
+  glm::vec2        drag_start_pos{};
+  glm::vec2        drag_end_pos{};
+  bool             click_finish{};
+  bool             first_down{};
 
   std::pair<std::string, std::string> current_hovered_widget{};
   std::vector<glm::vec2>              current_hovered_widget_rect{};
