@@ -1,4 +1,6 @@
-module;
+#pragma once
+
+#include "error_handling.hpp"
 
 #include <array>
 #include <vector>
@@ -6,13 +8,9 @@ module;
 #include <assert.h>
 #include <algorithm>
 
-module tk:object_pool;
-
-import :error_handling;
-
 namespace tk {
 
-template <typename T, uint32_t BlockCapacity>
+template <typename T, uint16_t BlockCapacity>
 requires (BlockCapacity > 0)                                     &&
          (BlockCapacity <= std::numeric_limits<uint16_t>::max()) &&
          std::is_nothrow_constructible_v<T>                      &&

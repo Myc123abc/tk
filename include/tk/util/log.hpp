@@ -1,7 +1,9 @@
-module;
+#pragma once
 
 #include <print>
 #include <string_view>
+
+namespace tk {
 
 #define ConsoleColor_Red(x)    "\033[31m"       x "\033[0m"
 #define ConsoleColor_Green(x)  "\033[32m"       x "\033[0m"
@@ -9,44 +11,40 @@ module;
 #define ConsoleColor_Orange(x) "\033[38;5;208m" x "\033[0m"
 #define ConsoleColor_Blue(x)   "\033[34m"       x "\033[0m"
 
-export module tk:log;
-
-export namespace tk {
-
-void error(std::string_view msg) noexcept
+inline void error(std::string_view msg) noexcept
 {
   std::println(stderr, ConsoleColor_Red("[error] {}"), msg);
 }
 
 template <typename... T>
-void error(std::format_string<T...> const fmt, T&&... args) noexcept
+inline void error(std::format_string<T...> const fmt, T&&... args) noexcept
 {
   std::println(stderr, ConsoleColor_Red("[error] {}"), std::format(fmt, std::forward<T>(args)...));
 }
 
-void info(std::string_view msg) noexcept
+inline void info(std::string_view msg) noexcept
 {
   std::println(stderr, ConsoleColor_Green("[info]  {}"), msg);
 }
 
 template <typename... T>
-void info(std::format_string<T...> const fmt, T&&... args) noexcept
+inline void info(std::format_string<T...> const fmt, T&&... args) noexcept
 {
   std::println(stderr, ConsoleColor_Green("[info]  {}"), std::format(fmt, std::forward<T>(args)...));
 }
 
-void warn(std::string_view msg) noexcept
+inline void warn(std::string_view msg) noexcept
 {
   std::println(stderr, ConsoleColor_Orange("[warn]  {}"), msg);
 }
 
 template <typename... T>
-void warn(std::format_string<T...> const fmt, T&&... args) noexcept
+inline void warn(std::format_string<T...> const fmt, T&&... args) noexcept
 {
   std::println(stderr, ConsoleColor_Orange("[warn]  {}"), std::format(fmt, std::forward<T>(args)...));
 }
 
-void debug(std::string_view msg) noexcept
+inline void debug(std::string_view msg) noexcept
 {
 #ifndef NDEBUG
   std::println(stderr, ConsoleColor_Blue("[debug] {}"), msg);
@@ -54,7 +52,7 @@ void debug(std::string_view msg) noexcept
 }
 
 template <typename... T>
-void debug(std::format_string<T...> const fmt, T&&... args) noexcept
+inline void debug(std::format_string<T...> const fmt, T&&... args) noexcept
 {
 #ifndef NDEBUG
   std::println(stderr, ConsoleColor_Blue("[debug] {}"), std::format(fmt, std::forward<T>(args)...));

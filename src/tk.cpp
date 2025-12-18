@@ -1,31 +1,32 @@
-export module tk;
+#include "tk.hpp"
+#include "renderer/renderer.hpp"
+#include "renderer/window/window_manager.hpp"
 
-export import :log;
-
-import :window;
+using namespace tk::renderer;
 
 namespace tk {
 
-using namespace window;
-
-export void init() noexcept
+void init() noexcept
 {
   g_wnd_mgr.init();
+  g_renderer.init();
 }
 
-export void destroy() noexcept
+void destroy() noexcept
 {
+  g_renderer.destroy();
   g_wnd_mgr.destroy();
 }
 
-export auto window_count() noexcept
+auto window_count() noexcept -> uint32_t
 {
   return g_wnd_mgr.window_count();
 }
 
-export void test()
+void test()
 {
   g_wnd_mgr.create_window(20, 20, 200, 200);
+  g_wnd_mgr.create_window(70, 70, 200, 200);
 }
 
 }

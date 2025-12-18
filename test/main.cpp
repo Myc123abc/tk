@@ -1,4 +1,7 @@
-import tk;
+#include "tk/tk.hpp"
+
+#include <thread>
+#include <chrono>
 
 int main()
 {
@@ -8,7 +11,7 @@ int main()
 
   while (tk::window_count())
   {
-
+    std::this_thread::sleep_for(std::chrono::milliseconds(16));
   }
 
   tk::destroy();

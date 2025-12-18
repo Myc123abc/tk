@@ -7,5 +7,3 @@ Now, try multiple threads engine.
 * render thread (directx12 engine)
 
 Render engine also refactor with multi-engines (graphics engine, copy engine, compute engine).
-
-Use cpp modules.

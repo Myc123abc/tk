@@ -2,14 +2,31 @@ cmake_minimum_required(VERSION 3.30)
 project(tk)
 
 set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_library(tk)
-target_sources(tk PUBLIC FILE_SET CXX_MODULES FILES
-  src/tk.cpp
-  src/export/log.cpp
-  src/internal/util/error_handling.cpp
-  src/internal/util/object_pool.cpp
-  src/internal/window.cpp
+add_subdirectory(vendor/DirectX-Headers)
+add_subdirectory(vendor/glm)
+
+file(GLOB_RECURSE SRC src/*.cpp)
+add_library(tk ${SRC})
+target_compile_definitions(tk
+  PRIVATE
+    WIN32_LEAN_AND_MEAN
+    NOMINMAX
+)
+target_include_directories(tk
+  PUBLIC
+    include
+  PRAIVATE
+    include/tk
+)
+target_link_libraries(tk
+  PRIVATE
+    d3d12 dxgi
+    DirectX-Headers
+    glm::glm
 )
 
 add_executable(test test/main.cpp)
