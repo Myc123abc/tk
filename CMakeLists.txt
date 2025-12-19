@@ -15,12 +15,15 @@ target_compile_definitions(tk
   PRIVATE
     WIN32_LEAN_AND_MEAN
     NOMINMAX
+    UTF_CPP_CPLUSPLUS=202002L
 )
 target_include_directories(tk
   PUBLIC
     include
   PRAIVATE
     include/tk
+    vendor/stb
+    vendor/utfcpp/source
 )
 target_link_libraries(tk
   PRIVATE

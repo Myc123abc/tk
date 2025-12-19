@@ -60,7 +60,6 @@ public:
     return *this;
   }
 
-  // TODO: change to use copy engine
   void upload(ID3D12GraphicsCommandList1* cmd, std::span<Vertex const> vertices, std::span<uint16_t const> indices, std::span<ShapeProperty const> shape_properties) noexcept;
 
   auto gpu_handle() const noexcept { return _shape_properties_buffer.gpu_handle(); }

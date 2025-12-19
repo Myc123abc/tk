@@ -39,6 +39,7 @@ void WindowManager::init() noexcept
     err_if(!RegisterClassExW(&wnd_class), "failed register class");
 
     // TODO: create fullscreen window
+
     // create message queue, avoid the first PostMessage failed because message queue is unexit
     PeekMessageW(nullptr, nullptr, 0, 0, PM_NOREMOVE);
     _message_queue_create_complete.count_down();

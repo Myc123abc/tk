@@ -1,9 +1,12 @@
 #pragma once
 
+#include "engine/engine.hpp"
+
 #include <atomic>
 #include <thread>
 #include <functional>
 #include <deque>
+#include <initializer_list>
 
 namespace tk { namespace renderer {
 
@@ -32,8 +35,7 @@ public:
 
   // TODO: image, bitmap view use mdspan?
 
-  // TODO: sperate to graphics engine and copy engine funcs?
-  void add_frame_render_complete_func(std::function<void()>&& func) noexcept;
+  void add_frame_render_complete_func(std::function<void()>&& func, std::initializer_list<Engine*> engines) noexcept;
 
 private:
   std::jthread                      _thread;

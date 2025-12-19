@@ -1,8 +1,10 @@
 #include "descriptor_heap_manager.hpp"
 #include "../../util/error_handling.hpp"
-#include "../core.hpp"
+#include "../device.hpp"
 #include "../renderer.hpp"
 #include "../config.hpp"
+#include "../engine/graphics_engine.hpp"
+#include "../engine/copy_engine.hpp"
 
 #include <algorithm>
 #include <ranges>
@@ -76,7 +78,7 @@ void DescriptorHeapManager::DescriptorHeap::init(DescriptorHeapType type, uint32
   heap_desc.NumDescriptors = capacity;
   heap_desc.Type           = dx12_descriptor_heap_type(type);
   heap_desc.Flags          = type == DescriptorHeapType::cbv_srv_uav ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-  err_if(g_core.device()->CreateDescriptorHeap(&heap_desc, IID_PPV_ARGS(&_heap)), "failed to create descriptor heap");
+  err_if(g_device.get()->CreateDescriptorHeap(&heap_desc, IID_PPV_ARGS(&_heap)), "failed to create descriptor heap");
 
   // initialize handles
   _handles.resize(capacity);
@@ -107,7 +109,8 @@ void DescriptorHeapManager::DescriptorHeap::reserve(uint32_t capacity) noexcept
   if (capacity > _handles.size())
   {
     // destroy old heap
-    g_renderer.add_frame_render_complete_func([_ = _heap] {});
+    // TODO: is graphics engine and copy engine all can lead heap reserve?
+    g_renderer.add_frame_render_complete_func([_ = _heap] {}, { &g_graphics_engine, &g_copy_engine });
 
     // create new bigger one
     auto size = _handles.size();
