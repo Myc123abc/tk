@@ -1,6 +1,6 @@
 #include "pipeline.hpp"
 #include "../util/error_handling.hpp"
-#include "device.hpp"
+#include "core.hpp"
 #include "compiler.hpp"
 
 #include <directx/d3dx12.h>
@@ -47,7 +47,7 @@ void Pipeline::init_graphics(
   {
     // check feature support
     auto options = D3D12_FEATURE_DATA_D3D12_OPTIONS2{};
-    err_if(g_device.get()->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS2, &options, sizeof(options)),
+    err_if(g_core.device()->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS2, &options, sizeof(options)),
             "failed to get feature options");
     err_if(!options.DepthBoundsTestSupported, "unsupport depth bounds test");
 
@@ -69,7 +69,7 @@ void Pipeline::init_graphics(
   stream.BlendState = blend_state;
   
   auto pipeline_state_stream_desc = D3D12_PIPELINE_STATE_STREAM_DESC{ sizeof(stream), &stream };
-  err_if(g_device.get()->CreatePipelineState(&pipeline_state_stream_desc, IID_PPV_ARGS(&_pipeline_state)),
+  err_if(g_core.device()->CreatePipelineState(&pipeline_state_stream_desc, IID_PPV_ARGS(&_pipeline_state)),
           "failed to create pipeline state");
 }
 
@@ -84,7 +84,7 @@ void Pipeline::init_compute(std::string shader, std::string cs, std::string incl
   stream.CS             = compile_result.cs;
 
   auto pipeline_state_stream_desc = D3D12_PIPELINE_STATE_STREAM_DESC{ sizeof(stream), &stream };
-  err_if(g_device.get()->CreatePipelineState(&pipeline_state_stream_desc, IID_PPV_ARGS(&_pipeline_state)),
+  err_if(g_core.device()->CreatePipelineState(&pipeline_state_stream_desc, IID_PPV_ARGS(&_pipeline_state)),
           "failed to create pipeline state");
 }
 

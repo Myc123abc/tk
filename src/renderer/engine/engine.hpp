@@ -21,6 +21,8 @@ public:
 
   auto fence_completed_value() const noexcept { return _fence->GetCompletedValue(); }
 
+  auto queue() const noexcept { return _queue.Get(); }
+
 protected:
   void init(D3D12_COMMAND_LIST_TYPE type) noexcept;
 

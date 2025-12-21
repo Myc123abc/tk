@@ -8,6 +8,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_subdirectory(vendor/DirectX-Headers)
 add_subdirectory(vendor/glm)
+add_subdirectory(vendor/SPSCQueue)
 
 file(GLOB_RECURSE SRC src/*.cpp)
 add_library(tk ${SRC})
@@ -27,9 +28,10 @@ target_include_directories(tk
 )
 target_link_libraries(tk
   PRIVATE
-    d3d12 dxgi
+    d3d12 dxgi dcomp dxguid
     DirectX-Headers
     glm::glm
+    SPSCQueue
 )
 
 add_executable(test test/main.cpp)

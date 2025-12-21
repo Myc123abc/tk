@@ -1,10 +1,8 @@
 #include "image.hpp"
-#include "../device.hpp"
+#include "../core.hpp"
 #include "../renderer.hpp"
 #include "../../util/error_handling.hpp"
 #include "../../util/align.hpp"
-#include "../engine/graphics_engine.hpp"
-#include "../engine/copy_engine.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -138,7 +136,7 @@ auto dxgi_format(ImageFormat format) noexcept -> DXGI_FORMAT
 
 void Image::init(ImageType type, DXGI_FORMAT format, uint32_t width , uint32_t height) noexcept
 {
-  auto device = g_device.get();
+  auto device = g_core.device();
 
   _type   = type;
   _format = format;
@@ -202,7 +200,7 @@ void Image::init(ImageType type, HANDLE handle, uint32_t width, uint32_t height)
   _state  = dx12_resource_state(type);
   _width  = width;
   _height = height;
-  err_if(g_device.get()->OpenSharedHandle(handle, IID_PPV_ARGS(_handle.ReleaseAndGetAddressOf())), "failed to share d3d11 texture");
+  err_if(g_core.device()->OpenSharedHandle(handle, IID_PPV_ARGS(_handle.ReleaseAndGetAddressOf())), "failed to share d3d11 texture");
   create_descriptor();
 }
 
@@ -217,7 +215,7 @@ void Image::set_state(ID3D12GraphicsCommandList1* cmd, ImageState state) noexcep
 
 void Image::create_descriptor() noexcept
 {
-  static auto device = g_device.get();
+  static auto device = g_core.device();
   auto        mgr    = DescriptorHeapManager::instance();
 
   auto create_unordered_access_view = [&]
@@ -318,7 +316,7 @@ auto Image::readback(ID3D12GraphicsCommandList1* cmd, RECT const& rect) noexcept
   auto heap_properties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK);
   view.row_pitch       = align(view.width * per_pixel_size(), D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
   auto heap_desc       = CD3DX12_RESOURCE_DESC::Buffer(align(view.row_pitch * view.height, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT));
-  err_if(g_device.get()->CreateCommittedResource(&heap_properties, D3D12_HEAP_FLAG_NONE, &heap_desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&readback_buffer)),
+  err_if(g_core.device()->CreateCommittedResource(&heap_properties, D3D12_HEAP_FLAG_NONE, &heap_desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&readback_buffer)),
           "failed to create readback buffer");
 
   // get pointer of readback buffer
@@ -450,8 +448,7 @@ void ExternalImageLoader::remove(std::string_view filename) noexcept
   err_if(!_datas.contains(filename.data()), "Failed to remove {}. It's not exist", filename);
   auto& data = _datas[filename.data()];
   if (data.state == State::unuploaded) data.bitmap.destroy();
-  g_renderer.add_frame_render_complete_func([handle = data.handle] mutable { g_image_pool.free(handle); },
-    { &g_graphics_engine, &g_copy_engine });
+  g_renderer.add_frame_render_complete_func([handle = data.handle] mutable { g_image_pool.free(handle); });
   _datas.erase(filename.data());
 }
 
@@ -487,7 +484,7 @@ void ExternalImageLoader::upload(ID3D12GraphicsCommandList1* cmd) noexcept
     {
       g_external_image_loader.upload_finish(filename);
     });
-  }, { &g_copy_engine });
+  });
 
   std::ranges::for_each(unuploaded_datas, [](auto& data)
   {

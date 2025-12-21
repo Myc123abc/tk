@@ -1,12 +1,14 @@
 #pragma once
 
-#include "engine/engine.hpp"
+#include "resource/render_resource.hpp"
+
+#include <rigtorp/SPSCQueue.h>
 
 #include <atomic>
 #include <thread>
 #include <functional>
 #include <deque>
-#include <initializer_list>
+#include <unordered_map>
 
 namespace tk { namespace renderer {
 
@@ -33,15 +35,29 @@ public:
 
   void message_process() noexcept;
 
-  // TODO: image, bitmap view use mdspan?
+  void add_frame_render_complete_func(std::function<void()>&& func) noexcept;
 
-  void add_frame_render_complete_func(std::function<void()>&& func, std::initializer_list<Engine*> engines) noexcept;
+  //
+  // message process
+  //
+
+  void create_window_resource(HWND handle, uint32_t width, uint32_t height) noexcept
+  { _msg_queue.emplace([this, handle, width, height] { msg_create_window_resource(handle, width, height); }); }
+  void destroy_window_resource(HWND handle) noexcept
+  { _msg_queue.emplace([this, handle] { msg_destroy_window_resource(handle); }); }
 
 private:
-  std::jthread                      _thread;
-  std::atomic_bool                  _exit{};
+  void msg_create_window_resource(HWND handle, uint32_t width, uint32_t height) noexcept;
+  void msg_destroy_window_resource(HWND handle) noexcept;
 
-  std::deque<std::function<bool()>> _frame_render_complete_funcs;
+private:
+  std::jthread                              _thread;
+  std::atomic_bool                          _exit{};
+
+  std::deque<std::function<bool()>>         _frame_render_complete_funcs;
+  rigtorp::SPSCQueue<std::function<void()>> _msg_queue{ 16 };
+
+  std::unordered_map<HWND, RenderResource>  _res;
 };
 
 inline static auto& g_renderer{ Renderer::instance() };

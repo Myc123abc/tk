@@ -1,6 +1,6 @@
 #include "compiler.hpp"
 #include "../util/error_handling.hpp"
-#include "device.hpp"
+#include "core.hpp"
 
 #include <utf8.h>
 
@@ -205,7 +205,7 @@ auto Compiler::compile(std::string_view shader, std::string_view vertex_shader_e
     memcpy(msg.data(), error->GetBufferPointer(), msg.size());
     err_if(true, "failed to serialize root signature.\n{}", msg);
   }
-  err_if(g_device.get()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&compile_result.root_signature)),
+  err_if(g_core.device()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&compile_result.root_signature)),
           "failed to create root signature");
 
   return compile_result;
@@ -234,7 +234,7 @@ auto Compiler::compile(std::string_view shader, std::string_view compute_shader_
     memcpy(msg.data(), error->GetBufferPointer(), msg.size());
     err_if(true, "failed to serialize root signature.\n{}", msg);
   }
-  err_if(g_device.get()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&compile_result.root_signature)),
+  err_if(g_core.device()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&compile_result.root_signature)),
           "failed to create root signature");
 
   return compile_result;

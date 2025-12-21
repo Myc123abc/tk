@@ -1,12 +1,12 @@
 #include "engine.hpp"
-#include "../device.hpp"
+#include "../core.hpp"
 #include "../../util/error_handling.hpp"
 
 namespace tk { namespace renderer {
 
 void Engine::init(D3D12_COMMAND_LIST_TYPE type) noexcept
 {
-  auto device = g_device.get();
+  auto device = g_core.device();
 
   // create command queue
   D3D12_COMMAND_QUEUE_DESC queue_desc{};
@@ -22,7 +22,7 @@ void Engine::init(D3D12_COMMAND_LIST_TYPE type) noexcept
   err_if(_cmd->Close(), "failed to close command list");
 
   // create fence
-  err_if(g_device.get()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence)),
+  err_if(g_core.device()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence)),
           "failed to create fence");
 //   _fence_event = CreateEvent(nullptr, false, false, nullptr);
 //   err_if(!_fence_event, "failed to create fence event");

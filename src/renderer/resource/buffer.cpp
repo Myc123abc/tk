@@ -1,10 +1,9 @@
 #include "buffer.hpp"
 #include "../../util/error_handling.hpp"
-#include "../device.hpp"
+#include "../core.hpp"
 #include "../renderer.hpp"
 #include "../../util/align.hpp"
 #include "../config.hpp"
-#include "../engine/graphics_engine.hpp"
 
 #include <directx/d3dx12.h>
 
@@ -48,7 +47,7 @@ void Buffer::init(uint32_t size, bool use_descriptor) noexcept
     srv_desc.ViewDimension           = D3D12_SRV_DIMENSION_BUFFER;
     srv_desc.Buffer.Flags            = D3D12_BUFFER_SRV_FLAG_RAW;
     srv_desc.Buffer.NumElements      = _capacity / 4;
-    g_device.get()->CreateShaderResourceView(_handle.Get(), &srv_desc, _descriptor_handle.cpu_handle());
+    g_core.device()->CreateShaderResourceView(_handle.Get(), &srv_desc, _descriptor_handle.cpu_handle());
   };
 
   if (use_descriptor && !_handle)
@@ -57,7 +56,7 @@ void Buffer::init(uint32_t size, bool use_descriptor) noexcept
   // create buffer
   auto heap_properties = CD3DX12_HEAP_PROPERTIES{ D3D12_HEAP_TYPE_UPLOAD };
   auto resource_desc   = CD3DX12_RESOURCE_DESC::Buffer(_capacity);
-  err_if(g_device.get()->CreateCommittedResource(
+  err_if(g_core.device()->CreateCommittedResource(
     &heap_properties,
     D3D12_HEAP_FLAG_NONE,
     &resource_desc,
@@ -87,7 +86,7 @@ auto Buffer::append(void const* data, uint32_t size) noexcept -> uint32_t
   else
   {
     // add old buffer for destroy
-    g_renderer.add_frame_render_complete_func([_ = _handle] {}, { &g_graphics_engine });
+    g_renderer.add_frame_render_complete_func([_ = _handle] {});
 
     // temporary copy old data
     auto old_data = std::vector<std::byte>(_size);
