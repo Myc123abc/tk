@@ -9,17 +9,17 @@ namespace tk { namespace renderer {
 void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
 {
   // create offscreen images
-  for (auto [i, img] : images | std::views::enumerate)
+  for (auto [i, frame] : _frames | std::views::enumerate)
   {
-    img = g_image_pool.alloc();
-    g_image_pool[img].init(ImageType::rtv, Render_Target_Format, width, height);
+    frame.image = g_image_pool.alloc();
+    g_image_pool[frame.image].init(ImageType::rtv, Render_Target_Format, width, height);
   }
   
   // create depth test image
   if (Enable_Depth_Test)
   {
-    dsv_image = g_image_pool.alloc();
-    g_image_pool[dsv_image].init(ImageType::dsv, ImageFormat::d32, width, height);
+    _dsv_image = g_image_pool.alloc();
+    g_image_pool[_dsv_image].init(ImageType::dsv, ImageFormat::d32, width, height);
   }
 
   // create swapchain
@@ -59,23 +59,54 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
   err_if(!_swapchain_waitable_obj, "failed to get waitable object from swapchain");
 
   // get image from swapchain backbuffers
-  for (auto [i, img] : _swapchain_images | std::views::enumerate)
+  for (auto [i, frame] : _frames | std::views::enumerate)
   {
-    img = g_image_pool.alloc();
-    g_image_pool[img].init(_swapchain.Get(), i);
+    frame.swapchain_image = g_image_pool.alloc();
+    g_image_pool[frame.swapchain_image].init(_swapchain.Get(), i);
   }
+
+  // create command allocator and list
+  for (auto& frame : _frames)
+    err_if(g_core.device()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&frame.cmd_alloc)),
+            "failed to create command allocator");
+  err_if(g_core.device()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _frames[0].cmd_alloc.Get(), nullptr, IID_PPV_ARGS(&_cmd)),
+          "failed to create command list");
+  err_if(_cmd->Close(), "failed to close command list");
 }
 
 void RenderResource::destroy() noexcept
 {
   CloseHandle(_swapchain_waitable_obj);
   if (Enable_Depth_Test)
-    g_image_pool[dsv_image].destroy();
-  for (auto i : std::views::iota(0, Frame_Count))
+    g_image_pool[_dsv_image].destroy();
+  for (auto& frame : _frames)
   {
-    g_image_pool.free(images[i]);
-    g_image_pool.free(_swapchain_images[i]);
+    g_image_pool.free(frame.image);
+    g_image_pool.free(frame.swapchain_image);
   }
+}
+
+auto RenderResource::has_free_frame() const noexcept -> bool
+{
+  // TODO: currently, only wait graphics engine finish?
+  return g_graphics_engine.fence_completed_value() >= _frames[_frame_index].fence_value;
+}
+
+void RenderResource::render_begin() const noexcept
+{
+  err_if(_frames[_frame_index].cmd_alloc->Reset() == E_FAIL, "failed to reset command allocator");
+  err_if(_cmd->Reset(_frames[_frame_index].cmd_alloc.Get(), nullptr), "failed to reset command list");
+
+  g_desc_heap_mgr.bind_heaps(_cmd.Get());
+}
+
+void RenderResource::render_end() noexcept
+{ 
+  g_image_pool[_frames[_frame_index].swapchain_image].set_state(_cmd.Get(), ImageState::present);
+
+  g_graphics_engine.submit({ _cmd.Get() });
+
+  _frame_index = (_frame_index + 1) % Frame_Count;
 }
 
 }}

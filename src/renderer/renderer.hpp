@@ -10,6 +10,7 @@
 #include <functional>
 #include <deque>
 #include <unordered_map>
+#include <span>
 
 namespace tk { namespace renderer {
 
@@ -36,7 +37,9 @@ public:
 
   void message_process() noexcept;
 
-  void add_frame_render_complete_func(std::function<void()>&& func) noexcept;
+  void add_frame_render_complete_func(std::move_only_function<void()>&& func) noexcept;
+
+  void render(HWND handle, std::span<Vertex const> vertices, std::span<uint16_t const> indices, std::span<ShapeProperty const> shape_properties) noexcept;
 
   //
   // message process
@@ -52,14 +55,14 @@ private:
   void msg_destroy_window_resource(HWND handle) noexcept;
 
 private:
-  std::jthread                              _thread;
-  std::atomic_bool                          _exit{};
+  std::jthread                                        _thread;
+  std::atomic_bool                                    _exit{};
 
-  std::deque<std::function<bool()>>         _frame_render_complete_funcs;
-  rigtorp::SPSCQueue<std::function<void()>> _msg_queue{ 16 };
+  std::deque<std::move_only_function<bool()>>         _frame_render_complete_funcs;
+  rigtorp::SPSCQueue<std::move_only_function<void()>> _msg_queue{ 16 };
 
-  std::unordered_map<HWND, RenderResource>  _res;
-  Pipeline                                  _sdf_pipeline;
+  std::unordered_map<HWND, RenderResource>            _res;
+  Pipeline                                            _sdf_pipeline;
 };
 
 inline static auto& g_renderer{ Renderer::instance() };

@@ -4,6 +4,7 @@
 #include <wrl/client.h>
 
 #include <stdint.h>
+#include <initializer_list>
 
 namespace tk { namespace renderer {
 
@@ -18,6 +19,7 @@ public:
   Engine& operator=(Engine&&)      = delete;
 
   auto signal() noexcept -> uint64_t;
+  auto submit(std::initializer_list<ID3D12GraphicsCommandList*> cmds) noexcept -> uint64_t;
 
   auto fence_completed_value() const noexcept { return _fence->GetCompletedValue(); }
 

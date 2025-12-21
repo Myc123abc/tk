@@ -35,4 +35,12 @@ auto Engine::signal() noexcept -> uint64_t
   return _fence_value;
 }
 
+auto Engine::submit(std::initializer_list<ID3D12GraphicsCommandList*> cmds) noexcept -> uint64_t
+{
+  for (auto const& cmd : cmds)
+    err_if(cmd->Close(), "failed to close command list");
+  _queue->ExecuteCommandLists(cmds.size(), reinterpret_cast<ID3D12CommandList* const*>(cmds.begin()));
+  return signal();
+}
+
 }}

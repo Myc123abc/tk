@@ -40,14 +40,14 @@ void Renderer::destroy() noexcept
 }
 
 // HACK: can make fence more detail, this resource is used by which engines
-void Renderer::add_frame_render_complete_func(std::function<void()>&& func) noexcept
+void Renderer::add_frame_render_complete_func(std::move_only_function<void()>&& func) noexcept
 {
   auto last_fence_values = std::vector<std::pair<Engine&, uint64_t>>
   {
     { g_graphics_engine, g_graphics_engine.signal() },
     { g_copy_engine,     g_copy_engine.signal() },
   };
-  _frame_render_complete_funcs.emplace_back([func, last_fence_values = std::move(last_fence_values)]()
+  _frame_render_complete_funcs.emplace_back([func = std::move(func), last_fence_values = std::move(last_fence_values)]() mutable
   {
     for (auto [engine, last_fence_value] : last_fence_values)
     {
@@ -101,5 +101,19 @@ multi-windows render can skip this frame which window is not finish render compl
 singal queue once and execute all windows' command lists per frame (which aslo some window's command list can be discard in current frame)
 
 */
+
+void Renderer::render(HWND handle, std::span<Vertex const> vertices, std::span<uint16_t const> indices, std::span<ShapeProperty const> shape_properties) noexcept
+{
+  err_if(!_res.contains(handle), "failed to render. No render resource exist on handle {}", (size_t)handle);
+
+  auto& res = _res[handle];
+  if (!res.has_free_frame()) return;
+
+  res.render_begin();
+
+
+
+  res.render_end();
+}
 
 }}
