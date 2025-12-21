@@ -25,10 +25,10 @@ public:
   Compiler& operator=(Compiler const&) = delete;
   Compiler& operator=(Compiler&&)      = delete;
 
-  static auto const instance() noexcept
+  static auto instance() noexcept -> Compiler&
   {
     static Compiler instance;
-    return &instance;
+    return instance;
   }
 
   void init() noexcept;
@@ -95,5 +95,7 @@ private:
   Microsoft::WRL::ComPtr<IDxcUtils>          _utils;
   Microsoft::WRL::ComPtr<IDxcIncludeHandler> _include_handler;
 };
+
+inline static auto& g_compiler{ Compiler::instance() };
 
 }}

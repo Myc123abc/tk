@@ -252,7 +252,7 @@ auto Compiler::CompileResult::get_shader_reflection(IDxcResult* result) noexcept
 
   // get shader reflection information
   auto shader_reflection = ComPtr<ID3D12ShaderReflection>{};
-  err_if(Compiler::instance()->_utils->CreateReflection(&buffer, IID_PPV_ARGS(&shader_reflection)), "failed to create shader reflection");
+  err_if(g_compiler._utils->CreateReflection(&buffer, IID_PPV_ARGS(&shader_reflection)), "failed to create shader reflection");
 
   return shader_reflection;
 }

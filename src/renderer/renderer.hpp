@@ -1,6 +1,7 @@
 #pragma once
 
 #include "resource/render_resource.hpp"
+#include "pipeline.hpp"
 
 #include <rigtorp/SPSCQueue.h>
 
@@ -58,6 +59,7 @@ private:
   rigtorp::SPSCQueue<std::function<void()>> _msg_queue{ 16 };
 
   std::unordered_map<HWND, RenderResource>  _res;
+  Pipeline                                  _sdf_pipeline;
 };
 
 inline static auto& g_renderer{ Renderer::instance() };

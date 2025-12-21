@@ -28,7 +28,7 @@ target_include_directories(tk
 )
 target_link_libraries(tk
   PRIVATE
-    d3d12 dxgi dcomp dxguid
+    d3d12 dxgi dcomp dxguid dxcompiler
     DirectX-Headers
     glm::glm
     SPSCQueue
@@ -36,3 +36,9 @@ target_link_libraries(tk
 
 add_executable(test test/main.cpp)
 target_link_libraries(test PRIVATE tk)
+
+add_custom_target(copy_assets ALL
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+          ${CMAKE_SOURCE_DIR}/assets
+          $<TARGET_FILE_DIR:tk>/assets
+)

@@ -4,6 +4,7 @@
 #include "engine/copy_engine.hpp"
 #include "../util/error_handling.hpp"
 #include "resource/descriptor_heap_manager.hpp"
+#include "compiler.hpp"
 
 #include <chrono>
 
@@ -14,9 +15,12 @@ void Renderer::init() noexcept
   _thread = std::jthread([this]
   {
     g_core.init();
+    g_compiler.init();
     g_desc_heap_mgr.init();
     g_graphics_engine.init();
     g_copy_engine.init();
+
+    _sdf_pipeline.init_graphics("assets/shader/sdf.hlsl", "vs", "ps", "assets/shader", RenderResource::Render_Target_Format, true);
 
     while (!_exit.load(std::memory_order_relaxed))
     {

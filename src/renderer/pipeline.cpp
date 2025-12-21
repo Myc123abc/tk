@@ -23,7 +23,7 @@ void Pipeline::init_graphics(
 {
   _is_graphics_pipeline = true;
 
-  auto compile_result = Compiler::instance()->compile(shader, vs, ps, include);
+  auto compile_result = g_compiler.compile(shader, vs, ps, include);
   _root_signature  = compile_result.root_signature;
   _resource_indexs = compile_result.resource_indexs;
 
@@ -75,7 +75,7 @@ void Pipeline::init_graphics(
 
 void Pipeline::init_compute(std::string shader, std::string cs, std::string include) noexcept
 {
-  auto compile_result = Compiler::instance()->compile(shader, cs, include);
+  auto compile_result = g_compiler.compile(shader, cs, include);
   _root_signature  = compile_result.root_signature;
   _resource_indexs = compile_result.resource_indexs;
 
