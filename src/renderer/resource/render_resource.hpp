@@ -2,6 +2,7 @@
 
 #include "image.hpp"
 #include "../config.hpp"
+#include "../engine/engine.hpp"
 
 #include <dcomp.h>
 
@@ -25,16 +26,27 @@ public:
   void destroy() noexcept;
 
   auto has_free_frame() const noexcept -> bool;
-  void render_begin() const noexcept;
+
+  void render_begin() noexcept;
   void render_end() noexcept;
+
+  void clear_image() noexcept;
+  
+  auto graphics_cmd() const noexcept { return _graphics_cmd.Get(); }
+
+  auto& current_frame() noexcept { return _frames[_frame_index]; }
 
 private:
   struct Frame
   {
     ImageHandle                                    image;
     ImageHandle                                    swapchain_image;
-    uint64_t                                       fence_value{};
-    Microsoft::WRL::ComPtr<ID3D12CommandAllocator> cmd_alloc;
+    FrameBuffer                                    buffer;
+
+    uint64_t                                       graphics_fence_value{};
+    Microsoft::WRL::ComPtr<ID3D12CommandAllocator> graphics_cmd_alloc;
+    uint64_t                                       copy_fence_value{};
+    Microsoft::WRL::ComPtr<ID3D12CommandAllocator> copy_cmd_alloc;
   };
 
   std::array<Frame, Frame_Count>                     _frames;
@@ -46,8 +58,9 @@ private:
   Microsoft::WRL::ComPtr<IDCompositionVisual>        _comp_visual;
 
   uint32_t                                           _frame_index{};
-  Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList1> _cmd;
 
+  Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList1> _graphics_cmd;
+  Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList1> _copy_cmd;
 };
 
 

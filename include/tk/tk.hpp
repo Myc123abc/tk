@@ -1,15 +1,13 @@
 #pragma once
 
-#include <stdint.h>
+#include "ui/ui.hpp"
 
 namespace tk {
 
+// initialize tk library
 void init() noexcept;
 
+// destroy the tk library
 void destroy() noexcept;
-
-auto window_count() noexcept -> uint32_t;
-
-void test();
 
 }

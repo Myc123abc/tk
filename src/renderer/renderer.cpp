@@ -7,6 +7,7 @@
 #include "compiler.hpp"
 
 #include <chrono>
+#include <ranges>
 
 namespace tk { namespace renderer {
 
@@ -25,8 +26,10 @@ void Renderer::init() noexcept
     while (!_exit.load(std::memory_order_relaxed))
     {
       message_process();
-      // TODO: sleep when no render task
-      std::this_thread::sleep_for(std::chrono::milliseconds(16));
+      if (!_render_datas.empty())
+        render();
+      else
+        std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
   });
 }
@@ -102,18 +105,87 @@ singal queue once and execute all windows' command lists per frame (which aslo s
 
 */
 
-void Renderer::render(HWND handle, std::span<Vertex const> vertices, std::span<uint16_t const> indices, std::span<ShapeProperty const> shape_properties) noexcept
+void Renderer::render() noexcept
 {
-  err_if(!_res.contains(handle), "failed to render. No render resource exist on handle {}", (size_t)handle);
+  // pop the current frame render resources
+  auto render_res = std::views::iota(0u, _render_datas.size())
+    | std::views::transform([&](auto)
+      {
+        auto data = *_render_datas.front();
+        _render_datas.pop();
+        return data;
+      })
+    | std::ranges::to<std::vector<std::remove_reference_t<decltype(*_render_datas.front())>>>();
 
-  auto& res = _res[handle];
-  if (!res.has_free_frame()) return;
+  // render
+  for (auto [handle, render_data] : render_res)
+  {
+    // promise window is valid
+    err_if(!_res.contains(handle), "failed to render. No render resource exist on handle {}", (size_t)handle);
 
-  res.render_begin();
+    // last frame is complete, rendering, otherwise, discard
+    auto& res = _res[handle];
+    if (res.has_free_frame())
+    {
+      res.render_begin();
+      render_sdf(res, render_data->vertices, render_data->indices, render_data->shape_properties);
+      res.render_end();
+    }
 
+    // mark the render data is used finish
+    render_data->clear();
+    render_data->finish();
+  }
+}
 
+void Renderer::render_sdf(RenderResource& res, std::span<Vertex const> vertices, std::span<uint16_t const> indices, std::span<ShapeProperty const> shape_properties) noexcept
+{
+  auto& frame               = res.current_frame();
+  auto& render_target_image = g_image_pool[frame.image];
+  auto  cmd                 = res.graphics_cmd();
 
-  res.render_end();
+  // bind pipeline
+  _sdf_pipeline.bind(cmd);
+
+  // upload data to buffer
+  frame.buffer.clear().upload(cmd, vertices, indices, shape_properties);
+
+  // set descriptors
+  auto constants = Constants{};
+  constants.window_extent = render_target_image.extent();
+  // constants.window_pos    = window.content_pos();
+  // if (fullscreen_target_window.has_value())
+  // {
+  //   constants.window_pos   = fullscreen_target_window->pos();
+  //   constants.cursor_index = g_image_pool[renderer->_cursors[fullscreen_target_window->cursor_type].handle].index();
+  // }
+  _sdf_pipeline.set_descriptors(cmd, "constants", constants,
+  {
+    // { "images", g_desc_heap_mgr.first_gpu_handle(DescriptorHeapType::cbv_srv_uav) },
+    { "buffer", frame.buffer.gpu_handle()                                         },
+  });
+
+  // draw
+  // if (fullscreen_target_window.has_value())
+  // {
+  //   cmd->RSSetScissorRects(1, &fullscreen_target_window->rect);
+  //   cmd->DrawIndexedInstanced(indices.size() - 6, 1, 0, 0, 0);
+  //   auto rect = window.real_rect();
+  //   cmd->RSSetScissorRects(1, &rect);
+  //   cmd->DrawIndexedInstanced(6, 1, indices.size() - 6, 0, 0);
+  // }
+  // else
+  {
+    auto rect = RECT{};
+    // rect.left   = Window_Shadow_Thickness;
+    // rect.top    = Window_Shadow_Thickness;
+    // rect.right  = rect.left + window.width;
+    // rect.bottom = rect.top  + window.height;
+    rect.right  = constants.window_extent.x;
+    rect.bottom = constants.window_extent.y;
+    cmd->RSSetScissorRects(1, &rect);
+    cmd->DrawIndexedInstanced(indices.size(), 1, 0, 0, 0);
+  }
 }
 
 }}

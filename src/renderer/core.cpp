@@ -41,4 +41,20 @@ void Core::init() noexcept
         "failed to create composition device");
 }
 
+auto Core::create_cmd_alloc(D3D12_COMMAND_LIST_TYPE type) const noexcept -> Microsoft::WRL::ComPtr<ID3D12CommandAllocator>
+{
+  auto alloc = ComPtr<ID3D12CommandAllocator>{};
+  err_if(_device->CreateCommandAllocator(type, IID_PPV_ARGS(&alloc)), "failed to create command allocator");
+  return alloc;
+}
+
+auto Core::create_cmd(D3D12_COMMAND_LIST_TYPE type, ID3D12CommandAllocator* alloc) const noexcept -> Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList1>
+{
+  auto cmd = ComPtr<ID3D12GraphicsCommandList1>{};
+  err_if(_device->CreateCommandList(0, type, alloc, nullptr, IID_PPV_ARGS(&cmd)),
+          "failed to create command list");
+  err_if(cmd->Close(), "failed to close command list");
+  return cmd;
+}
+
 }}

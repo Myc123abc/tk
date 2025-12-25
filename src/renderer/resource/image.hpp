@@ -3,6 +3,7 @@
 #include "descriptor_heap_manager.hpp"
 #include "../../util/object_pool.hpp"
 #include "buffer.hpp"
+#include "../config.hpp"
 
 #include <dxgi1_6.h>
 #include <directx/d3dx12.h>
@@ -221,7 +222,7 @@ void copy(BitmapView const& src, BitmapView const& dst) noexcept;
 ///                             Image Pool
 ////////////////////////////////////////////////////////////////////////////////
 
-using ImagePoolType = ObjectPool<Image, 32>;
+using ImagePoolType = ObjectPool<Image, Image_Pool_Init_Size>;
 using ImageHandle   = ImagePoolType::Handle;
 
 class ImagePool

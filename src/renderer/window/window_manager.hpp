@@ -3,9 +3,9 @@
 #include "window.hpp"
 
 #include <thread>
-#include <atomic>
 #include <latch>
 #include <unordered_map>
+#include <queue>
 
 namespace tk { namespace renderer {
 
@@ -41,8 +41,6 @@ public:
 
   void create_window(int x, int y, uint32_t width, uint32_t height) noexcept;
 
-  auto window_count() const noexcept { return _window_count.load(std::memory_order_acquire); }
-
   void message_process(HWND handle, Message msg, WPARAM w_param, LPARAM l_param) noexcept;
 
   void msg_destroy() noexcept;
@@ -59,8 +57,6 @@ private:
   std::jthread                     _thread;
   DWORD                            _thread_id{};
   std::latch                       _message_queue_create_complete{ 1 };
-  std::atomic_uint32_t             _window_count{};
-
   std::unordered_map<HWND, Window> _windows;
 };
 

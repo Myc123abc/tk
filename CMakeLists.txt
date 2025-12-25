@@ -27,10 +27,11 @@ target_include_directories(tk
     vendor/utfcpp/source
 )
 target_link_libraries(tk
+  PUBLIC
+    glm::glm
   PRIVATE
     d3d12 dxgi dcomp dxguid dxcompiler
     DirectX-Headers
-    glm::glm
     SPSCQueue
 )
 

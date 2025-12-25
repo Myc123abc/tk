@@ -1,6 +1,9 @@
 #include "render_resource.hpp"
 #include "../core.hpp"
 #include "../engine/graphics_engine.hpp"
+#include "../engine/copy_engine.hpp"
+
+#include <directx/d3dx12.h>
 
 using namespace Microsoft::WRL;
 
@@ -49,9 +52,6 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
   err_if(g_core.comp_device()->Commit(),
           "failed to commit composition device");
 
-  // disable alt-enter fullscreen
-  err_if(g_core.factory()->MakeWindowAssociation(handle, DXGI_MWA_NO_ALT_ENTER | DXGI_MWA_NO_WINDOW_CHANGES), "failed to disable alt-enter");
-
   // set swapchain property and get waitable object
   err_if(swapchain.As(&_swapchain), "failed to get swapchain4");
   _swapchain->SetMaximumFrameLatency(Frame_Count);
@@ -67,11 +67,15 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
 
   // create command allocator and list
   for (auto& frame : _frames)
-    err_if(g_core.device()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&frame.cmd_alloc)),
-            "failed to create command allocator");
-  err_if(g_core.device()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _frames[0].cmd_alloc.Get(), nullptr, IID_PPV_ARGS(&_cmd)),
-          "failed to create command list");
-  err_if(_cmd->Close(), "failed to close command list");
+  {
+		frame.graphics_cmd_alloc = g_core.create_cmd_alloc(D3D12_COMMAND_LIST_TYPE_DIRECT);
+		frame.copy_cmd_alloc     = g_core.create_cmd_alloc(D3D12_COMMAND_LIST_TYPE_COPY);
+
+    // initialize frame buffer
+    frame.buffer.init();
+  }
+	_graphics_cmd = g_core.create_cmd(D3D12_COMMAND_LIST_TYPE_DIRECT, _frames[0].graphics_cmd_alloc.Get());
+	_copy_cmd     = g_core.create_cmd(D3D12_COMMAND_LIST_TYPE_COPY, _frames[0].copy_cmd_alloc.Get());
 }
 
 void RenderResource::destroy() noexcept
@@ -83,30 +87,74 @@ void RenderResource::destroy() noexcept
   {
     g_image_pool.free(frame.image);
     g_image_pool.free(frame.swapchain_image);
+    frame.buffer.destroy();
   }
 }
 
 auto RenderResource::has_free_frame() const noexcept -> bool
 {
-  // TODO: currently, only wait graphics engine finish?
-  return g_graphics_engine.fence_completed_value() >= _frames[_frame_index].fence_value;
+  // TODO: need copy?
+  return g_graphics_engine.fence_completed_value() >= _frames[_frame_index].graphics_fence_value;
+		    //  g_copy_engine.fence_completed_value()     >= _frames[_frame_index].copy_fence_value;
 }
 
-void RenderResource::render_begin() const noexcept
+void RenderResource::render_begin() noexcept
 {
-  err_if(_frames[_frame_index].cmd_alloc->Reset() == E_FAIL, "failed to reset command allocator");
-  err_if(_cmd->Reset(_frames[_frame_index].cmd_alloc.Get(), nullptr), "failed to reset command list");
+  auto& frame = current_frame();
 
-  g_desc_heap_mgr.bind_heaps(_cmd.Get());
+  // reset command list
+  err_if(frame.graphics_cmd_alloc->Reset() == E_FAIL, "failed to reset command allocator");
+  err_if(_graphics_cmd->Reset(frame.graphics_cmd_alloc.Get(), nullptr), "failed to reset command list");
+
+  // bind heaps
+  g_desc_heap_mgr.bind_heaps(_graphics_cmd.Get());
+
+  // set render target image clear render target images
+  clear_image();
+
+  // set viewport
+  auto& image    = g_image_pool[frame.image];
+  auto  viewport = CD3DX12_VIEWPORT{ 0.f, 0.f, static_cast<float>(image.width()), static_cast<float>(image.height()) };
+  _graphics_cmd->RSSetViewports(1, &viewport);
 }
 
 void RenderResource::render_end() noexcept
-{ 
-  g_image_pool[_frames[_frame_index].swapchain_image].set_state(_cmd.Get(), ImageState::present);
+{
+	auto& frame = current_frame();
 
-  g_graphics_engine.submit({ _cmd.Get() });
+  // copy offscreen image to swapchain backbuffer
+	copy(_graphics_cmd.Get(), g_image_pool[frame.image], g_image_pool[_frames[_swapchain->GetCurrentBackBufferIndex()].swapchain_image]);
 
+	// submit graphics commands to graphics engine
+	frame.graphics_fence_value = g_graphics_engine.submit({ _graphics_cmd.Get() });
+
+  // move to next frame
   _frame_index = (_frame_index + 1) % Frame_Count;
+}
+
+void RenderResource::clear_image() noexcept
+{
+  auto& frame               = current_frame();
+  auto& render_target_image = g_image_pool[frame.image];
+  auto  rtv_handle          = render_target_image.cpu_handle();
+  auto  dsv_handle          = D3D12_CPU_DESCRIPTOR_HANDLE{};
+  if (Enable_Depth_Test)
+    dsv_handle = g_image_pool[_dsv_image].cpu_handle();
+
+  // set render target view
+  if (Enable_Depth_Test)
+    _graphics_cmd->OMSetRenderTargets(1, &rtv_handle, false, &dsv_handle);
+  else
+    _graphics_cmd->OMSetRenderTargets(1, &rtv_handle, false, nullptr);
+
+  // clear color
+  render_target_image.clear_render_target(_graphics_cmd.Get());
+  if (Enable_Depth_Test)
+  {
+    _graphics_cmd->ClearDepthStencilView(dsv_handle, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
+    // set depth range
+    _graphics_cmd->OMSetDepthBounds(0.f, 1.f);
+  }
 }
 
 }}

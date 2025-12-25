@@ -18,10 +18,14 @@ public:
   Engine& operator=(Engine const&) = delete;
   Engine& operator=(Engine&&)      = delete;
 
+  [[nodiscard]]
   auto signal() noexcept -> uint64_t;
+  [[nodiscard]]
   auto submit(std::initializer_list<ID3D12GraphicsCommandList*> cmds) noexcept -> uint64_t;
 
   auto fence_completed_value() const noexcept { return _fence->GetCompletedValue(); }
+
+  void wait(Engine const& engine) const noexcept { _queue->Wait(engine._fence.Get(), engine._fence_value); }
 
   auto queue() const noexcept { return _queue.Get(); }
 

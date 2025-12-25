@@ -13,7 +13,7 @@ auto to_64_bits(uint32_t x, uint32_t y) noexcept
 
 auto to_32_bits(uint64_t x) noexcept -> std::pair<uint32_t, uint32_t>
 {
-  return { x >> 32, x & 0xffffffff };
+  return { static_cast<uint32_t>(x >> 32), static_cast<uint32_t>(x & 0xffffffff) };
 }
 
 }
@@ -82,7 +82,6 @@ void WindowManager::create_window(int x, int y, uint32_t width, uint32_t height)
 {
   _message_queue_create_complete.wait();
   PostThreadMessageW(_thread_id, static_cast<UINT>(Message::create_window), to_64_bits(x, y), to_64_bits(width, height));
-  _window_count.fetch_add(1, std::memory_order_release);
 }
 
 void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LPARAM l_param) noexcept
@@ -91,7 +90,7 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
   {
   case Message::destroy:
   {
-    msg_destroy(); 
+    msg_destroy();
     break;
   }
 
@@ -122,7 +121,6 @@ void WindowManager::close_window(HWND handle) noexcept
 {
   _windows[handle].destroy();
   _windows.erase(handle);
-  _window_count.fetch_sub(1, std::memory_order_release);
 }
 
 }}
