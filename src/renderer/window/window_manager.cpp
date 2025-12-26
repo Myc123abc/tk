@@ -2,9 +2,6 @@
 #include "../../util/error_handling.hpp"
 #include "../../ui/ui_context.hpp"
 
-#include <algorithm>
-#include <ranges>
-
 namespace {
 
 auto to_64_bits(uint32_t x, uint32_t y) noexcept

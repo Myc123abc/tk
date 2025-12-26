@@ -12,7 +12,7 @@ void Window::init(int x, int y, uint32_t width, uint32_t height) noexcept
   err_if(!_handle, "failed to create window");
 
   // create window render resource
-  g_renderer.create_window_resource(_handle, width, height);
+  g_renderer.send_message(Renderer::Message_Window_Create{ _handle, width, height });
 
   ShowWindow(_handle, SW_SHOW); // TODO: show after first frame render finish and also include some images uploaded finish
 }
@@ -20,7 +20,7 @@ void Window::init(int x, int y, uint32_t width, uint32_t height) noexcept
 void Window::destroy() const noexcept
 {
   ShowWindow(_handle, SW_HIDE);
-  g_renderer.destroy_window_resource(_handle);
+  g_renderer.send_message(Renderer::Message_Window_Destroy{ _handle });
 }
 
 }}

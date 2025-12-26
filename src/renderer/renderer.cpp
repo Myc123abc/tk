@@ -78,30 +78,7 @@ void Renderer::message_process() noexcept
   for (auto it = _frame_render_complete_funcs.begin(); it != _frame_render_complete_funcs.end();)
     (*it)() ? it = _frame_render_complete_funcs.erase(it) : ++it;
 
-  while (!_msg_queue.empty())
-  {
-    (*_msg_queue.front())();
-    _msg_queue.pop();
-  }
-}
-
-void Renderer::msg_create_window_resource(HWND handle, uint32_t width, uint32_t height) noexcept
-{
-  err_if(_res.contains(handle), "failed to create window render resource, it's already exist");
-  auto res = RenderResource{};
-  res.init(handle, width, height);
-  _res.emplace(handle, std::move(res));
-}
-
-void Renderer::msg_destroy_window_resource(HWND handle) noexcept
-{
-  err_if(!_res.contains(handle), "failed to destroy window render resource, it's unexist");
-  add_frame_render_complete_func([handle, res = std::move(_res.at(handle))] mutable
-  {
-    res.destroy();
-    DestroyWindow(handle);
-  });
-  _res.erase(handle);
+  _msg_queue.process(MessageHandler{ g_renderer });
 }
 
 /*

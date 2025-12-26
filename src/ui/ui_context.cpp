@@ -67,10 +67,10 @@ void UIContext::render() noexcept
     }
   }
 
-  _msg_queue.process(MessageHandler{});
+  _msg_queue.process(MessageHandler{ g_ui_ctx });
 }
 
-void UIContext::add_vertices_indices(std::pair<glm::vec2, glm::vec2> const& bounding_rectangle) noexcept
+void UIContext::add_vertices_indices(std::pair<glm::vec2, glm::vec2> bounding_rectangle) noexcept
 {
   auto render_data = _window->data();
   auto [min, max]  = bounding_rectangle;
@@ -116,7 +116,7 @@ void UIContext::add_shape_property(renderer::ShapeProperty::Type type, glm::vec4
   _shape_properties_offset += render_data->shape_properties.back().byte_size();
 }
 
-void UIContext::add_shape(renderer::ShapeProperty::Type type, glm::vec4 color, float thickness, std::vector<float> const& values, std::pair<glm::vec2, glm::vec2> const& bounding_rectangle) noexcept
+void UIContext::add_shape(renderer::ShapeProperty::Type type, glm::vec4 color, float thickness, std::vector<float> const& values, std::pair<glm::vec2, glm::vec2> bounding_rectangle) noexcept
 {
   auto [min, max] = bounding_rectangle;
 

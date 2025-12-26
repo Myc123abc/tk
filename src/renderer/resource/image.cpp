@@ -297,7 +297,7 @@ auto Image::per_pixel_size() const noexcept -> uint32_t
   return byte_size_of(_format);
 }
 
-auto Image::readback(ID3D12GraphicsCommandList1* cmd, RECT const& rect) noexcept -> std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, BitmapView>
+auto Image::readback(ID3D12GraphicsCommandList1* cmd, RECT rect) noexcept -> std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, BitmapView>
 {
   err_if(per_pixel_size() != 4, "readback only support rgba image now");
 

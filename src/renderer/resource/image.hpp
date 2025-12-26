@@ -155,7 +155,7 @@ public:
 
   auto per_pixel_size() const noexcept -> uint32_t;
 
-  auto readback(ID3D12GraphicsCommandList1* cmd, RECT const& rect) noexcept -> std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, BitmapView>;
+  auto readback(ID3D12GraphicsCommandList1* cmd, RECT rect) noexcept -> std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, BitmapView>;
 
   auto cpu_handle() const noexcept { return _descriptor_handle.cpu_handle(); }
   auto gpu_handle() const noexcept { return _descriptor_handle.gpu_handle(); }

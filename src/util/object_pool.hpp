@@ -32,7 +32,7 @@ public:
 
     struct Hash
     {
-      auto operator()(Handle const& h) const noexcept
+      auto operator()(Handle h) const noexcept
       {
         return std::hash<uint64_t >{}(h.pack());
       };

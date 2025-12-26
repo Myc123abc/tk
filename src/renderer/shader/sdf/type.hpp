@@ -76,7 +76,7 @@ struct ShapeProperty
   auto data()      const noexcept { return _data.data();                    }
   auto byte_size() const noexcept { return _data.size() * sizeof(uint32_t); }
 
-  void set_color(glm::vec4 const& color) noexcept
+  void set_color(glm::vec4 color) noexcept
   { 
     _data[1] = std::bit_cast<uint32_t>(color.r);
     _data[2] = std::bit_cast<uint32_t>(color.g);

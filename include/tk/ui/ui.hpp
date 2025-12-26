@@ -22,7 +22,7 @@ struct Color
     a = static_cast<float>((color      ) & 0xFF) / 255;
   }
 
-  Color(glm::vec4 const& color) noexcept
+  Color(glm::vec4 color) noexcept
     : r(color.r), g(color.g), b(color.b), a(color.a) {}
 
   operator glm::vec4() noexcept { return { r, g, b, a }; }

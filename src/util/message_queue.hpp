@@ -33,6 +33,8 @@ public:
     }
   }
 
+  auto empty() const noexcept { return _queue.empty(); }
+
 private:
   rigtorp::SPSCQueue<Message> _queue{ Capacity };
 };
