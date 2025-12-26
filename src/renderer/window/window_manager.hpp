@@ -5,7 +5,6 @@
 #include <thread>
 #include <latch>
 #include <unordered_map>
-#include <queue>
 
 namespace tk { namespace renderer {
 
@@ -39,13 +38,14 @@ public:
 
   static LRESULT CALLBACK wnd_proc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param) noexcept;
 
-  void create_window(int x, int y, uint32_t width, uint32_t height) noexcept;
+  auto create_window(int x, int y, uint32_t width, uint32_t height) noexcept -> HWND;
 
+private:
   void message_process(HWND handle, Message msg, WPARAM w_param, LPARAM l_param) noexcept;
 
   void msg_destroy() noexcept;
 
-  void msg_create_window(int x, int y, uint32_t width, uint32_t height) noexcept;
+  void msg_create_window(WPARAM w_param) noexcept;
 
   void close_window(HWND handle) noexcept;
 

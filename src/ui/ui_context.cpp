@@ -15,9 +15,9 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
   // create window if not have
   if (!_windows.contains(name.data()))
   {
-    g_wnd_mgr.create_window(x, y, width, height);
-
+    auto handle = g_wnd_mgr.create_window(x, y, width, height);
     _window = &_windows[name.data()];
+    _window->handle        = handle;
     _window->can_be_closed = is_closed;
   }
 
@@ -51,7 +51,6 @@ void UIContext::render() noexcept
       auto render_data = window.data();
       if (!render_data->empty() && !render_data->is_using())
       {
-        // FIXME: use WindowPool's WindowHandle replace handle
         if (g_renderer.render(window.handle, window.data()))
           window.next_frame();
       }

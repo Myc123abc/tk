@@ -16,6 +16,14 @@ auto to_32_bits(uint64_t x) noexcept -> std::pair<uint32_t, uint32_t>
   return { static_cast<uint32_t>(x >> 32), static_cast<uint32_t>(x & 0xffffffff) };
 }
 
+struct WindowCreateInfo
+{
+  HANDLE   event{};
+  HWND     handle{};
+  int      x{}, y{};
+  uint32_t width{}, height{};
+};
+
 }
 
 namespace tk { namespace renderer {
@@ -78,10 +86,28 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   return DefWindowProcW(handle, msg, w_param, l_param);
 }
 
-void WindowManager::create_window(int x, int y, uint32_t width, uint32_t height) noexcept
+auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height) noexcept -> HWND
 {
+  // promise window message queue is built in windows os
   _message_queue_create_complete.wait();
-  PostThreadMessageW(_thread_id, static_cast<UINT>(Message::create_window), to_64_bits(x, y), to_64_bits(width, height));
+
+  // create WindowCreateInfo
+  auto ptr = reinterpret_cast<WindowCreateInfo*>(malloc(sizeof(WindowCreateInfo)));
+  ptr->event  = CreateEvent(nullptr, true, false, nullptr);
+  ptr->x      = x;
+  ptr->y      = y;
+  ptr->width  = width;
+  ptr->height = height;
+
+  // send window create message to window thread
+  PostThreadMessageW(_thread_id, static_cast<UINT>(Message::create_window), std::bit_cast<WPARAM>(ptr), 0);
+
+  // wait create window complete
+  WaitForSingleObject(ptr->event, INFINITE);
+  CloseHandle(ptr->event);
+  auto handle = ptr->handle;
+  free(ptr);
+  return handle;
 }
 
 void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LPARAM l_param) noexcept
@@ -96,9 +122,7 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
 
   case Message::create_window:
   {
-    auto [x, y] = to_32_bits(w_param);
-    auto [w, h] = to_32_bits(l_param);
-    msg_create_window(x, y, w, h);
+    msg_create_window(w_param);
     break;
   }
   }
@@ -110,11 +134,21 @@ void WindowManager::msg_destroy() noexcept
   PostThreadMessageW(_thread_id, WM_QUIT, 0, 0);
 }
 
-void WindowManager::msg_create_window(int x, int y, uint32_t width, uint32_t height) noexcept
+void WindowManager::msg_create_window(WPARAM w_param) noexcept
 {
+  // get create info
+  auto info = reinterpret_cast<WindowCreateInfo*>(w_param);
+
+  // init window and set handle
   auto window = Window{};
-  window.init(x, y, width, height);
+  window.init(info->x, info->y, info->width, info->height);
+  info->handle = window._handle;
+
+  // store window
   _windows.emplace(window._handle, std::move(window));
+
+  // notice window create complete
+  SetEvent(info->event);
 }
 
 void WindowManager::close_window(HWND handle) noexcept

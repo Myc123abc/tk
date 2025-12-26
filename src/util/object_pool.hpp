@@ -23,12 +23,31 @@ public:
     friend class ObjectPool;
   public:
     constexpr Handle() noexcept = default;
+
+    constexpr auto valid() const noexcept { return _generation != 0; }
+
+    constexpr explicit operator bool() const noexcept { return valid(); }
+
+    constexpr bool operator==(Handle const&) const noexcept = default;
+
+    struct Hash
+    {
+      auto operator()(Handle const& h) const noexcept
+      {
+        return std::hash<uint64_t >{}(h.pack());
+      };
+    };
+
   private:
     constexpr Handle(uint16_t block_idx, uint16_t slot_idx, uint32_t generation) noexcept
       : _block_idx(block_idx), _slot_idx(slot_idx), _generation(generation) {}
 
-  public:
-    constexpr auto valid() const noexcept { return _generation != 0; }
+    constexpr auto pack() const noexcept
+    {
+      return static_cast<uint64_t>(_generation) << 32 |
+             static_cast<uint64_t>(_slot_idx)  << 16 |
+             static_cast<uint64_t>(_block_idx);
+    }
 
   private:
     uint16_t _block_idx{};
@@ -55,7 +74,7 @@ public:
   ObjectPool& operator=(ObjectPool&&)      = delete;
 
   [[nodiscard]]
-  auto create() noexcept
+  auto alloc() noexcept
   {
     // create new one if free list is empty
     if (_free_list.empty())
@@ -95,15 +114,12 @@ public:
     return slot->get();
   }
 
-  [[nodiscard]]
-  auto get(Handle handle) const noexcept -> T const*
+  auto operator[](Handle handle) noexcept -> T&
   {
-    auto slot = get_slot(handle._block_idx, handle._slot_idx);
-    assert(handle.valid() && slot->alive && slot->generation == handle._generation);
-    return slot->get();
+    return *get(handle);
   }
 
-  void destroy(Handle& handle) noexcept
+  void free(Handle& handle) noexcept
   {
     auto slot = get_slot(handle._block_idx, handle._slot_idx);
     assert(handle.valid() && slot->alive && slot->generation == handle._generation);

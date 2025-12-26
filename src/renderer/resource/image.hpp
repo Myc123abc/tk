@@ -241,14 +241,14 @@ public:
     static ImagePool instance;
     return &instance;
   }
-  auto alloc() noexcept { return _image_pool.create(); }
+  auto alloc() noexcept { return _image_pool.alloc(); }
 
   auto operator[](ImageHandle handle) noexcept -> Image& { return *_image_pool.get(handle); }
 
   void free(ImageHandle& handle) noexcept
   {
     operator[](handle).destroy();
-    _image_pool.destroy(handle);
+    _image_pool.free(handle);
   }
 
 private:

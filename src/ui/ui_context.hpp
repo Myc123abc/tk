@@ -13,6 +13,7 @@ namespace tk { namespace ui {
 
 struct Window
 {
+  HWND handle; 
   bool is_called{};
   bool can_be_closed{};
   bool is_closed{};

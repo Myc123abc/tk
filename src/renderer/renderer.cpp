@@ -97,9 +97,7 @@ void Renderer::msg_destroy_window_resource(HWND handle) noexcept
 /*
 
 TODO:
-per image per graphics and copy command lists
 only wait last frame of window when only single window
-no window render then sleep
 multi-windows render can skip this frame which window is not finish render complete using frame
 singal queue once and execute all windows' command lists per frame (which aslo some window's command list can be discard in current frame)
 
@@ -107,19 +105,12 @@ singal queue once and execute all windows' command lists per frame (which aslo s
 
 void Renderer::render() noexcept
 {
-  // pop the current frame render resources
-  auto render_res = std::views::iota(0u, _render_datas.size())
-    | std::views::transform([&](auto)
-      {
-        auto data = *_render_datas.front();
-        _render_datas.pop();
-        return data;
-      })
-    | std::ranges::to<std::vector<std::remove_reference_t<decltype(*_render_datas.front())>>>();
-
-  // render
-  for (auto [handle, render_data] : render_res)
+  for (auto _ : std::views::iota(0u, _render_datas.size()))
   {
+    // pop render data
+    auto [handle, render_data] = *_render_datas.front();
+    _render_datas.pop();
+
     // promise window is valid
     err_if(!_res.contains(handle), "failed to render. No render resource exist on handle {}", (size_t)handle);
 
