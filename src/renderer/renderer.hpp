@@ -15,6 +15,7 @@
 #include <unordered_map>
 #include <span>
 #include <variant>
+#include <unordered_set>
 
 namespace tk { namespace renderer {
 
@@ -67,6 +68,8 @@ private:
   Pipeline                                            _sdf_pipeline;
 
   rigtorp::SPSCQueue<std::pair<HWND, RenderData*>>    _render_datas{ Render_Data_Queue_Capacity };
+
+  std::unordered_set<HWND>                            _destroied_windows;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                              Message Process

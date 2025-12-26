@@ -43,8 +43,10 @@ void UIContext::check_draw() const noexcept
 
 void UIContext::render() noexcept
 {
-  for (auto& [_, window] : _windows)
+  for (auto it = _windows.begin(); it != _windows.end();)
   {
+    auto& window = it->second;
+
     if (window.is_called)
     {
       // render
@@ -55,15 +57,14 @@ void UIContext::render() noexcept
           window.next_frame();
       }
       window.no_frame_can_use = render_data->is_using();
-      window.is_called = false;
+      window.is_called        = false;
+      ++it;
     }
     else
     {
       // destroy
-      // TODO: begin not be called again, destroy the window
-      //       so it shouldn't be destroy be close window
-      //       only notify user the window can be closed when close window
-      //       then user use the flag to decide whether not render window again
+      g_wnd_mgr.close_window(window.handle);
+      it = _windows.erase(it);
     }
   }
 

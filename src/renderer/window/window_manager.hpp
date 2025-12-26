@@ -29,6 +29,7 @@ public:
   enum class Message
   {
     create_window = WM_APP,
+    close_window,
   };
 
   void init() noexcept;
@@ -38,13 +39,13 @@ public:
   static LRESULT CALLBACK wnd_proc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param) noexcept;
 
   auto create_window(int x, int y, uint32_t width, uint32_t height) noexcept -> HWND;
+  void close_window(HWND handle) noexcept;
 
 private:
   void message_process(HWND handle, Message msg, WPARAM w_param, LPARAM l_param) noexcept;
 
   void msg_create_window(WPARAM w_param) noexcept;
-
-  void close_window(HWND handle) noexcept;
+  void msg_close_window(HWND handle) noexcept;
 
 private:
   static constexpr wchar_t Fullscreen_Class[] = L"vn::window::WindowManager::Fullscreen";

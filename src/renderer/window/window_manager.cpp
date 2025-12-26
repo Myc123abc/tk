@@ -110,6 +110,11 @@ auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height)
   return handle;
 }
 
+void WindowManager::close_window(HWND handle) noexcept
+{
+  PostThreadMessageW(_thread_id, static_cast<UINT>(Message::close_window), std::bit_cast<WPARAM>(handle), 0);
+}
+
 void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LPARAM l_param) noexcept
 {
   switch (msg)
@@ -117,6 +122,11 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
   case Message::create_window:
   {
     msg_create_window(w_param);
+    break;
+  }
+  case Message::close_window:
+  {
+    msg_close_window(std::bit_cast<HWND>(w_param));
     break;
   }
   }
@@ -139,7 +149,7 @@ void WindowManager::msg_create_window(WPARAM w_param) noexcept
   SetEvent(info->event);
 }
 
-void WindowManager::close_window(HWND handle) noexcept
+void WindowManager::msg_close_window(HWND handle) noexcept
 {
   _windows[handle].destroy();
   _windows.erase(handle);

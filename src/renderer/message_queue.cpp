@@ -19,6 +19,7 @@ void Renderer::MessageHandler::operator()(Message_Window_Destroy msg) const noex
     DestroyWindow(handle);
   });
   renderer._res.erase(msg.handle);
+  renderer._destroied_windows.emplace(msg.handle);
 }
 
 }}

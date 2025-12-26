@@ -98,6 +98,9 @@ void Renderer::render() noexcept
     auto [handle, render_data] = *_render_datas.front();
     _render_datas.pop();
 
+    // continue if the window is destoried
+    if (_destroied_windows.contains(handle)) continue;
+
     // promise window is valid
     err_if(!_res.contains(handle), "failed to render. No render resource exist on handle {}", (size_t)handle);
 
@@ -114,6 +117,8 @@ void Renderer::render() noexcept
     render_data->clear();
     render_data->finish();
   }
+
+  _destroied_windows.clear();
 }
 
 void Renderer::render_sdf(RenderResource& res, std::span<Vertex const> vertices, std::span<uint16_t const> indices, std::span<ShapeProperty const> shape_properties) noexcept
