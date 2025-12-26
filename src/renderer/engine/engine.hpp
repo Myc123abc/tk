@@ -29,6 +29,8 @@ public:
 
   auto queue() const noexcept { return _queue.Get(); }
 
+  void wait_gpu_complete() noexcept;
+
 protected:
   void init(D3D12_COMMAND_LIST_TYPE type) noexcept;
 

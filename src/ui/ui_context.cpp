@@ -66,6 +66,8 @@ void UIContext::render() noexcept
       //       then user use the flag to decide whether not render window again
     }
   }
+
+  _msg_queue.process(MessageHandler{});
 }
 
 void UIContext::add_vertices_indices(std::pair<glm::vec2, glm::vec2> const& bounding_rectangle) noexcept

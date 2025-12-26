@@ -21,9 +21,6 @@ void Engine::init(D3D12_COMMAND_LIST_TYPE type) noexcept
   // create fence
   err_if(g_core.device()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence)),
           "failed to create fence");
-//   _fence_event = CreateEvent(nullptr, false, false, nullptr);
-//   err_if(!_fence_event, "failed to create fence event");
-//   err_if(!CloseHandle(_fence_event), "failed to destroy fence event");
 }
 
 auto Engine::signal() noexcept -> uint64_t
@@ -38,6 +35,15 @@ auto Engine::submit(std::initializer_list<ID3D12GraphicsCommandList*> cmds) noex
     err_if(cmd->Close(), "failed to close command list");
   _queue->ExecuteCommandLists(cmds.size(), reinterpret_cast<ID3D12CommandList* const*>(cmds.begin()));
   return signal();
+}
+
+void Engine::wait_gpu_complete() noexcept
+{
+  auto event = CreateEventA(nullptr, true, false, nullptr);
+  err_if(!event, "failed to create win32 event");
+  err_if(_fence->SetEventOnCompletion(signal(), event), "failed to set event on completion");
+  WaitForSingleObject(event, INFINITE);
+  err_if(!CloseHandle(event), "failed to close win32 event");
 }
 
 }}

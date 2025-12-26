@@ -73,12 +73,12 @@ private:
   std::atomic_bool                                    _exit{};
 
   std::deque<std::move_only_function<bool()>>         _frame_render_complete_funcs;
-  rigtorp::SPSCQueue<std::move_only_function<void()>> _msg_queue{ Renderer_Msg_Queue_Size };
+  rigtorp::SPSCQueue<std::move_only_function<void()>> _msg_queue{ Renderer_Msg_Queue_Capacity }; // TODO: change to variant
 
   std::unordered_map<HWND, RenderResource>            _res;
   Pipeline                                            _sdf_pipeline;
 
-  rigtorp::SPSCQueue<std::pair<HWND, RenderData*>>    _render_datas{ Render_Data_Queue_Size };
+  rigtorp::SPSCQueue<std::pair<HWND, RenderData*>>    _render_datas{ Render_Data_Queue_Capacity };
 };
 
 inline static auto& g_renderer{ Renderer::instance() };

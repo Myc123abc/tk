@@ -1,5 +1,6 @@
 #include "window_manager.hpp"
 #include "../../util/error_handling.hpp"
+#include "../../ui/ui_context.hpp"
 
 #include <algorithm>
 #include <ranges>
@@ -66,7 +67,7 @@ void WindowManager::init() noexcept
 
 void WindowManager::destroy() noexcept
 {
-  PostThreadMessageW(_thread_id, static_cast<UINT>(Message::destroy), 0, 0);
+  PostThreadMessageW(_thread_id, WM_QUIT, 0, 0);
   _thread.join();
 }
 
@@ -74,11 +75,13 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
 {
   static auto& wnd_mgr = WindowManager::instance();
 
+  using namespace ui;
+
   switch (msg)
   {
   case WM_CLOSE:
   {
-    wnd_mgr.close_window(handle);
+    g_ui_ctx.send_message(UIContext::Message_Window_Close{ handle });
     return 0;
   }
   }
@@ -114,24 +117,12 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
 {
   switch (msg)
   {
-  case Message::destroy:
-  {
-    msg_destroy();
-    break;
-  }
-
   case Message::create_window:
   {
     msg_create_window(w_param);
     break;
   }
   }
-}
-
-void WindowManager::msg_destroy() noexcept
-{
-  std::ranges::for_each(_windows | std::views::values, [](auto const& window) { window.destroy(); });
-  PostThreadMessageW(_thread_id, WM_QUIT, 0, 0);
 }
 
 void WindowManager::msg_create_window(WPARAM w_param) noexcept

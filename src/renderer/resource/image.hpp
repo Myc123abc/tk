@@ -222,7 +222,7 @@ void copy(BitmapView const& src, BitmapView const& dst) noexcept;
 ///                             Image Pool
 ////////////////////////////////////////////////////////////////////////////////
 
-using ImagePoolType = ObjectPool<Image, Image_Pool_Init_Size>;
+using ImagePoolType = ObjectPool<Image, Image_Pool_Init_Capacity>;
 using ImageHandle   = ImagePoolType::Handle;
 
 class ImagePool

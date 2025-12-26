@@ -36,10 +36,20 @@ void Renderer::init() noexcept
 
 void Renderer::destroy() noexcept
 {
+  // exit render loop
   _exit.store(true, std::memory_order_relaxed);
   _thread.join();
+
+  // pop all message
   while (!_frame_render_complete_funcs.empty() || !_msg_queue.empty())
     message_process();
+
+  // wait gpu complete
+  g_graphics_engine.wait_gpu_complete();
+  g_copy_engine.wait_gpu_complete();
+
+  // destroy render resources
+  for (auto& res : _res | std::views::values) res.destroy();
 }
 
 // HACK: can make fence more detail, this resource is used by which engines

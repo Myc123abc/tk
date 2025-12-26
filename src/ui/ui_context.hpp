@@ -2,6 +2,8 @@
 
 #include "../renderer/resource/render_data.hpp"
 #include "../renderer/config.hpp"
+#include "../util/message_queue.hpp"
+#include "config.hpp"
 
 #include <windows.h>
 
@@ -64,6 +66,32 @@ private:
   Window*                                 _window{};
   uint32_t                                _shape_properties_offset{};
   uint16_t                                _idx_beg{};
+
+////////////////////////////////////////////////////////////////////////////////
+///                              Message Process
+////////////////////////////////////////////////////////////////////////////////
+
+public:
+  struct Message_Window_Close
+  {
+    HWND handle{};
+  };
+
+  using Message = std::variant<
+    Message_Window_Close
+  >;
+
+  void send_message(Message&& msg) noexcept
+  {
+    _msg_queue.send(std::move(msg));
+  }
+
+private:
+  struct MessageHandler
+  {
+    void operator()(Message_Window_Close const& msg) const noexcept;
+  };
+  MessageQueue<Message, UI_Message_Queue_Capacity> _msg_queue;
 };
 
 inline static auto& g_ui_ctx{ UIContext::instance() };

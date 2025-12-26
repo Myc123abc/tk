@@ -28,8 +28,7 @@ public:
 
   enum class Message
   {
-    destroy = WM_APP,
-    create_window,
+    create_window = WM_APP,
   };
 
   void init() noexcept;
@@ -42,8 +41,6 @@ public:
 
 private:
   void message_process(HWND handle, Message msg, WPARAM w_param, LPARAM l_param) noexcept;
-
-  void msg_destroy() noexcept;
 
   void msg_create_window(WPARAM w_param) noexcept;
 
