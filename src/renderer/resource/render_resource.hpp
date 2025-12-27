@@ -2,7 +2,6 @@
 
 #include "image.hpp"
 #include "../config.hpp"
-#include "../engine/engine.hpp"
 
 #include <dcomp.h>
 
@@ -29,6 +28,8 @@ public:
 
   void render_begin() noexcept;
   void render_end() noexcept;
+
+  void present(bool vsync) const noexcept;
 
   void clear_image() noexcept;
   

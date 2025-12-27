@@ -111,6 +111,7 @@ void Renderer::render() noexcept
       res.render_begin();
       render_sdf(res, render_data->vertices, render_data->indices, render_data->shape_properties);
       res.render_end();
+      res.present(true);
     }
 
     // mark the render data is used finish

@@ -59,17 +59,17 @@ private:
   void render_sdf(RenderResource& res, std::span<Vertex const> vertices, std::span<uint16_t const> indices, std::span<ShapeProperty const> shape_properties) noexcept;
 
 private:
-  std::jthread                                        _thread;
-  std::atomic_bool                                    _exit{};
+  std::jthread                                     _thread;
+  std::atomic_bool                                 _exit{};
 
-  std::deque<std::move_only_function<bool()>>         _frame_render_complete_funcs;
+  std::deque<std::move_only_function<bool()>>      _frame_render_complete_funcs;
 
-  std::unordered_map<HWND, RenderResource>            _res;
-  Pipeline                                            _sdf_pipeline;
+  std::unordered_map<HWND, RenderResource>         _res;
+  Pipeline                                         _sdf_pipeline;
 
-  rigtorp::SPSCQueue<std::pair<HWND, RenderData*>>    _render_datas{ Render_Data_Queue_Capacity };
+  rigtorp::SPSCQueue<std::pair<HWND, RenderData*>> _render_datas{ Render_Data_Queue_Capacity };
 
-  std::unordered_set<HWND>                            _destroied_windows;
+  std::unordered_set<HWND>                         _destroied_windows;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                              Message Process

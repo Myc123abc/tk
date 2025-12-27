@@ -1,7 +1,6 @@
 #include "render_resource.hpp"
 #include "../core.hpp"
 #include "../engine/graphics_engine.hpp"
-#include "../engine/copy_engine.hpp"
 
 #include <directx/d3dx12.h>
 
@@ -120,16 +119,27 @@ void RenderResource::render_begin() noexcept
 
 void RenderResource::render_end() noexcept
 {
-	auto& frame = current_frame();
+	auto& frame           = current_frame();
+  auto& swapchain_image = g_image_pool[_frames[_swapchain->GetCurrentBackBufferIndex()].swapchain_image];
 
   // copy offscreen image to swapchain backbuffer
-	copy(_graphics_cmd.Get(), g_image_pool[frame.image], g_image_pool[_frames[_swapchain->GetCurrentBackBufferIndex()].swapchain_image]);
+	copy(_graphics_cmd.Get(), g_image_pool[frame.image], swapchain_image);
+
+  // set to present state
+  swapchain_image.set_state(_graphics_cmd.Get(), ImageState::present);
 
 	// submit graphics commands to graphics engine
 	frame.graphics_fence_value = g_graphics_engine.submit({ _graphics_cmd.Get() });
 
   // move to next frame
   _frame_index = (_frame_index + 1) % Frame_Count;
+}
+
+void RenderResource::present(bool vsync) const noexcept
+{
+  vsync
+    ? err_if(_swapchain->Present(1, 0), "failed to present swapchain")
+    : err_if(_swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING), "failed to present swapchain");
 }
 
 void RenderResource::clear_image() noexcept
