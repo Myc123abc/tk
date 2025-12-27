@@ -1,5 +1,7 @@
 #pragma once
 
+#include "util/log.hpp"
+#include "util/timer.hpp"
 #include "ui/ui.hpp"
 
 namespace tk {

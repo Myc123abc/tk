@@ -44,11 +44,9 @@ void Renderer::destroy() noexcept
   while (!_frame_render_complete_funcs.empty() || !_msg_queue.empty())
     message_process();
 
-  // wait gpu complete
-  g_graphics_engine.wait_gpu_complete();
-  g_copy_engine.wait_gpu_complete();
-
   // destroy render resources
+  g_graphics_engine.destroy();
+  g_copy_engine.destroy();
   for (auto& res : _res | std::views::values) res.destroy();
 }
 
@@ -106,13 +104,11 @@ void Renderer::render() noexcept
 
     // last frame is complete, rendering, otherwise, discard
     auto& res = _res[handle];
-    if (res.has_free_frame())
-    {
-      res.render_begin();
-      render_sdf(res, render_data->vertices, render_data->indices, render_data->shape_properties);
-      res.render_end();
-      res.present(true);
-    }
+    res.wait_frame_complete();
+    res.render_begin();
+    render_sdf(res, render_data->vertices, render_data->indices, render_data->shape_properties);
+    res.render_end();
+    res.present(true);
 
     // mark the render data is used finish
     render_data->clear();

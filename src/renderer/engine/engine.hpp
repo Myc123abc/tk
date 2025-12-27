@@ -29,7 +29,9 @@ public:
 
   auto queue() const noexcept { return _queue.Get(); }
 
-  void wait_gpu_complete() noexcept;
+  auto set_event_on_completion() const noexcept -> HANDLE;
+
+  void destroy() noexcept;
 
 protected:
   void init(D3D12_COMMAND_LIST_TYPE type) noexcept;
@@ -40,6 +42,7 @@ private:
   Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList1> _cmd;
   Microsoft::WRL::ComPtr<ID3D12Fence>                _fence;
   uint64_t                                           _fence_value{};
+  HANDLE                                             _fence_event{};
 };
 
 }}

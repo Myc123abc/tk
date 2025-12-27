@@ -24,7 +24,7 @@ public:
   void init(HWND handle, uint32_t width, uint32_t height) noexcept;
   void destroy() noexcept;
 
-  auto has_free_frame() const noexcept -> bool;
+  void wait_frame_complete() const noexcept;
 
   void render_begin() noexcept;
   void render_end() noexcept;

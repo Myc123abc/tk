@@ -3,6 +3,7 @@
 #include "../engine/graphics_engine.hpp"
 
 #include <directx/d3dx12.h>
+#include <windows.h>
 
 using namespace Microsoft::WRL;
 
@@ -90,11 +91,20 @@ void RenderResource::destroy() noexcept
   }
 }
 
-auto RenderResource::has_free_frame() const noexcept -> bool
+void RenderResource::wait_frame_complete() const noexcept
 {
-  // TODO: need copy?
-  return g_graphics_engine.fence_completed_value() >= _frames[_frame_index].graphics_fence_value;
-		    //  g_copy_engine.fence_completed_value()     >= _frames[_frame_index].copy_fence_value;
+  auto& frame = _frames[_frame_index];
+  if (g_graphics_engine.fence_completed_value() < frame.graphics_fence_value)
+  {
+    auto objs = std::array<HANDLE, 2>
+    {
+      g_graphics_engine.set_event_on_completion(),
+      _swapchain_waitable_obj
+    };
+    WaitForMultipleObjects(objs.size(), objs.data(), true, INFINITE);
+  }
+  else
+    WaitForSingleObjectEx(_swapchain_waitable_obj, INFINITE, false);
 }
 
 void RenderResource::render_begin() noexcept

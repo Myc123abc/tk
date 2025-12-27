@@ -93,7 +93,7 @@ auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height)
 
   // create WindowCreateInfo
   auto ptr = reinterpret_cast<WindowCreateInfo*>(malloc(sizeof(WindowCreateInfo)));
-  ptr->event  = CreateEvent(nullptr, true, false, nullptr);
+  ptr->event  = CreateEvent(nullptr, false, false, nullptr);
   ptr->x      = x;
   ptr->y      = y;
   ptr->width  = width;
