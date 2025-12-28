@@ -5,6 +5,7 @@
 #include "pipeline.hpp"
 #include "config.hpp"
 #include "../util/message_queue.hpp"
+#include "../util/semaphore.hpp"
 
 #include <rigtorp/SPSCQueue.h>
 
@@ -16,7 +17,6 @@
 #include <span>
 #include <variant>
 #include <unordered_set>
-#include <latch>
 
 namespace tk { namespace renderer {
 
@@ -47,24 +47,29 @@ public:
 
   auto render(HWND handle, RenderData* render_data) noexcept
   {
-    if (_render_datas.try_emplace(handle, render_data))
+    if (!render_data->empty()    &&
+        !render_data->is_using() &&
+        _render_datas.try_emplace(handle, render_data))
     {
       render_data->use();
-      release_sem();
+      _sem.release();
       return true;
     }
     return false;
   }
 
+  void render_block(HWND handle, RenderData* render_data) noexcept
+  {
+    if (render_data->empty()) return;
+    while (render_data->is_using());
+    _render_datas.emplace(handle, render_data);
+    render_data->use();
+    _sem.release();
+  }
+
 private:
   void render() noexcept;
   void render_sdf(RenderResource& res, std::span<Vertex const> vertices, std::span<uint16_t const> indices, std::span<ShapeProperty const> shape_properties) noexcept;
-
-  void release_sem() const noexcept
-  {
-    _sem_create_complete.wait();
-    err_if(!ReleaseSemaphore(_sem, 1, nullptr), "failed to send semphore to renderer");
-  }
 
 private:
   std::jthread                                     _thread;
@@ -79,8 +84,7 @@ private:
 
   std::unordered_set<HWND>                         _destroied_windows;
 
-  HANDLE                                           _sem{};
-  std::latch                                       _sem_create_complete{ 1 };
+  Semaphore                                        _sem;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                              Message Process
@@ -106,7 +110,7 @@ public:
   void send_message(Message&& msg) noexcept
   {
     _msg_queue.send(std::move(msg));
-    release_sem();
+    _sem.release();
   }
 
 private:

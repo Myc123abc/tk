@@ -50,13 +50,10 @@ void UIContext::render() noexcept
     if (window.is_called)
     {
       // render
-      auto render_data = window.data();
-      if (!render_data->empty() && !render_data->is_using())
-      {
-        if (g_renderer.render(window.handle, window.data()))
-          window.next_frame();
-      }
-      window.no_frame_can_use = render_data->is_using();
+      if (g_renderer.render(window.handle, window.data()))
+      // g_renderer.render_block(window.handle, window.data());
+        window.next_frame();
+      window.no_frame_can_use = window.data()->is_using();
       window.is_called        = false;
       ++it;
     }

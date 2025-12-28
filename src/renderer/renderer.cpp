@@ -20,15 +20,13 @@ void Renderer::init() noexcept
     g_graphics_engine.init();
     g_copy_engine.init();
 
-    _sem = CreateSemaphoreA(nullptr, 0, LONG_MAX, nullptr);
-    err_if(!_sem, "failed to create renderer semaphore");
-    _sem_create_complete.count_down();
+    _sem.init();
 
     _sdf_pipeline.init_graphics("assets/shader/sdf.hlsl", "vs", "ps", "assets/shader", RenderResource::Render_Target_Format, true);
 
     while (!_exit.load(std::memory_order_relaxed))
     {
-      WaitForSingleObject(_sem, INFINITE);
+      _sem.acquire();
       message_process();
       if (!_render_datas.empty())
         render();
@@ -40,7 +38,7 @@ void Renderer::destroy() noexcept
 {
   // exit render loop
   _exit.store(true, std::memory_order_relaxed);
-  release_sem();
+  _sem.release();
   _thread.join();
 
   // pop all message
@@ -51,7 +49,7 @@ void Renderer::destroy() noexcept
   g_graphics_engine.destroy();
   g_copy_engine.destroy();
   for (auto& res : _res | std::views::values) res.destroy();
-  CloseHandle(_sem);
+  _sem.destroy();
 }
 
 void Renderer::add_frame_render_complete_func(std::move_only_function<void()>&& func) noexcept
