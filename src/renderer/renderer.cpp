@@ -6,7 +6,6 @@
 #include "resource/descriptor_heap_manager.hpp"
 #include "compiler.hpp"
 
-#include <chrono>
 #include <ranges>
 
 namespace tk { namespace renderer {
@@ -21,15 +20,18 @@ void Renderer::init() noexcept
     g_graphics_engine.init();
     g_copy_engine.init();
 
+    _sem = CreateSemaphoreA(nullptr, 0, LONG_MAX, nullptr);
+    err_if(!_sem, "failed to create renderer semaphore");
+    _sem_create_complete.count_down();
+
     _sdf_pipeline.init_graphics("assets/shader/sdf.hlsl", "vs", "ps", "assets/shader", RenderResource::Render_Target_Format, true);
 
     while (!_exit.load(std::memory_order_relaxed))
     {
+      WaitForSingleObject(_sem, INFINITE);
       message_process();
       if (!_render_datas.empty())
         render();
-      else
-        std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
   });
 }
@@ -38,6 +40,7 @@ void Renderer::destroy() noexcept
 {
   // exit render loop
   _exit.store(true, std::memory_order_relaxed);
+  release_sem();
   _thread.join();
 
   // pop all message
@@ -48,15 +51,16 @@ void Renderer::destroy() noexcept
   g_graphics_engine.destroy();
   g_copy_engine.destroy();
   for (auto& res : _res | std::views::values) res.destroy();
+  CloseHandle(_sem);
 }
 
-// HACK: can make fence more detail, this resource is used by which engines
 void Renderer::add_frame_render_complete_func(std::move_only_function<void()>&& func) noexcept
 {
   auto last_fence_values = std::vector<std::pair<Engine&, uint64_t>>
   {
     { g_graphics_engine, g_graphics_engine.signal() },
-    { g_copy_engine,     g_copy_engine.signal() },
+    // TODO: need this?
+    // { g_copy_engine,     g_copy_engine.signal() },
   };
   _frame_render_complete_funcs.emplace_back([func = std::move(func), last_fence_values = std::move(last_fence_values)]() mutable
   {
@@ -78,15 +82,6 @@ void Renderer::message_process() noexcept
 
   _msg_queue.process(MessageHandler{ g_renderer });
 }
-
-/*
-
-TODO:
-only wait last frame of window when only single window
-multi-windows render can skip this frame which window is not finish render complete using frame
-singal queue once and execute all windows' command lists per frame (which aslo some window's command list can be discard in current frame)
-
-*/
 
 void Renderer::render() noexcept
 {

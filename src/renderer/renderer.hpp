@@ -16,6 +16,7 @@
 #include <span>
 #include <variant>
 #include <unordered_set>
+#include <latch>
 
 namespace tk { namespace renderer {
 
@@ -49,6 +50,7 @@ public:
     if (_render_datas.try_emplace(handle, render_data))
     {
       render_data->use();
+      release_sem();
       return true;
     }
     return false;
@@ -57,6 +59,12 @@ public:
 private:
   void render() noexcept;
   void render_sdf(RenderResource& res, std::span<Vertex const> vertices, std::span<uint16_t const> indices, std::span<ShapeProperty const> shape_properties) noexcept;
+
+  void release_sem() const noexcept
+  {
+    _sem_create_complete.wait();
+    err_if(!ReleaseSemaphore(_sem, 1, nullptr), "failed to send semphore to renderer");
+  }
 
 private:
   std::jthread                                     _thread;
@@ -70,6 +78,9 @@ private:
   rigtorp::SPSCQueue<std::pair<HWND, RenderData*>> _render_datas{ Render_Data_Queue_Capacity };
 
   std::unordered_set<HWND>                         _destroied_windows;
+
+  HANDLE                                           _sem{};
+  std::latch                                       _sem_create_complete{ 1 };
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                              Message Process
@@ -95,6 +106,7 @@ public:
   void send_message(Message&& msg) noexcept
   {
     _msg_queue.send(std::move(msg));
+    release_sem();
   }
 
 private:
