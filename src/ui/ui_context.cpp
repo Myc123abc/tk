@@ -43,6 +43,7 @@ void UIContext::check_draw() const noexcept
 
 void UIContext::render() noexcept
 {
+  auto has_render = false;
   for (auto it = _windows.begin(); it != _windows.end();)
   {
     auto& window = it->second;
@@ -51,8 +52,11 @@ void UIContext::render() noexcept
     {
       // render
       if (g_renderer.render(window.handle, window.data()))
-      // g_renderer.render_block(window.handle, window.data());
+      {
+        has_render = true;
         window.next_frame();
+      }
+      // g_renderer.render_block(window.handle, window.data());
       window.no_frame_can_use = window.data()->is_using();
       window.is_called        = false;
       ++it;
@@ -64,6 +68,8 @@ void UIContext::render() noexcept
       it = _windows.erase(it);
     }
   }
+
+  if (has_render) g_renderer.signal_to_render();
 
   _msg_queue.process(MessageHandler{ g_ui_ctx });
 }

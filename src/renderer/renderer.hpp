@@ -52,11 +52,12 @@ public:
         _render_datas.try_emplace(handle, render_data))
     {
       render_data->use();
-      _sem.release();
       return true;
     }
     return false;
   }
+
+  auto signal_to_render() const noexcept { _sem.release(); }
 
   void render_block(HWND handle, RenderData* render_data) noexcept
   {
@@ -64,7 +65,6 @@ public:
     while (render_data->is_using());
     _render_datas.emplace(handle, render_data);
     render_data->use();
-    _sem.release();
   }
 
 private:
