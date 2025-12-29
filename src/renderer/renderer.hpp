@@ -5,7 +5,6 @@
 #include "pipeline.hpp"
 #include "config.hpp"
 #include "../util/message_queue.hpp"
-#include "../util/semaphore.hpp"
 
 #include <rigtorp/SPSCQueue.h>
 
@@ -17,6 +16,7 @@
 #include <span>
 #include <variant>
 #include <unordered_set>
+#include <semaphore>
 
 namespace tk { namespace renderer {
 
@@ -45,27 +45,20 @@ public:
 
   void add_frame_render_complete_func(std::move_only_function<void()>&& func) noexcept;
 
+  void acquire_frame() noexcept { _frame_sem.acquire(); }
+
   auto render(HWND handle, RenderData* render_data) noexcept
   {
-    if (!render_data->empty()    &&
-        !render_data->is_using() &&
-        _render_datas.try_emplace(handle, render_data))
+    if (!render_data->empty())
     {
-      render_data->use();
+      _render_datas.emplace(handle, render_data);
       return true;
     }
     return false;
   }
 
-  auto signal_to_render() const noexcept { _sem.release(); }
-
-  void render_block(HWND handle, RenderData* render_data) noexcept
-  {
-    if (render_data->empty()) return;
-    while (render_data->is_using());
-    _render_datas.emplace(handle, render_data);
-    render_data->use();
-  }
+  auto is_sleeping() const noexcept { return _render_datas.empty(); }
+  void wakeup() noexcept { _render_data_empty_sem.release(); }
 
 private:
   void render() noexcept;
@@ -83,8 +76,10 @@ private:
   rigtorp::SPSCQueue<std::pair<HWND, RenderData*>> _render_datas{ Render_Data_Queue_Capacity };
 
   std::unordered_set<HWND>                         _destroied_windows;
+  std::vector<HWND>                                _rendered_windows;
 
-  Semaphore                                        _sem;
+  std::binary_semaphore                            _frame_sem{ 1 };
+  std::binary_semaphore                            _render_data_empty_sem{ 0 };
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                              Message Process
@@ -110,7 +105,6 @@ public:
   void send_message(Message&& msg) noexcept
   {
     _msg_queue.send(std::move(msg));
-    _sem.release();
   }
 
 private:

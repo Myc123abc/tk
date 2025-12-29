@@ -43,22 +43,27 @@ void UIContext::check_draw() const noexcept
 
 void UIContext::render() noexcept
 {
-  auto has_render = false;
+  // acquire frame, for synchronous with present vsync
+  g_renderer.acquire_frame();
+
+  // wakeup if renderer is sleeping, which is no render data has
+  auto need_wakeup = g_renderer.is_sleeping();
+  auto has_render  = false;
+
+  // process window render datas
   for (auto it = _windows.begin(); it != _windows.end();)
   {
     auto& window = it->second;
-
+    // call ui::begin
     if (window.is_called)
     {
       // render
       if (g_renderer.render(window.handle, window.data()))
       {
-        has_render = true;
         window.next_frame();
+        has_render = true;
       }
-      // g_renderer.render_block(window.handle, window.data());
-      window.no_frame_can_use = window.data()->is_using();
-      window.is_called        = false;
+      window.is_called = false;
       ++it;
     }
     else
@@ -69,7 +74,8 @@ void UIContext::render() noexcept
     }
   }
 
-  if (has_render) g_renderer.signal_to_render();
+  if (need_wakeup && has_render)
+    g_renderer.wakeup();
 
   _msg_queue.process(MessageHandler{ g_ui_ctx });
 }

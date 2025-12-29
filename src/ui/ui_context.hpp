@@ -19,7 +19,6 @@ struct Window
   bool is_called{};
   bool can_be_closed{};
   bool is_closed{};
-  bool no_frame_can_use{};
 
   uint32_t                                                frame_index{};
   std::array<renderer::RenderData, renderer::Frame_Count> datas;
@@ -57,8 +56,6 @@ public:
   void add_vertices_indices(std::pair<glm::vec2, glm::vec2> bounding_rectangle) noexcept;
   void add_shape_property(renderer::ShapeProperty::Type type, glm::vec4 color, float thickness, std::vector<float> const& values) noexcept;
   void add_shape(renderer::ShapeProperty::Type type, glm::vec4 color, float thickness, std::vector<float> const& values, std::pair<glm::vec2, glm::vec2> bounding_rectangle) noexcept;
-
-  auto is_no_frame_can_use() const noexcept { return _window->no_frame_can_use; }
 
 private:
   bool                                    _call_begin{};

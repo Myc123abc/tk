@@ -20,16 +20,18 @@ void Renderer::init() noexcept
     g_graphics_engine.init();
     g_copy_engine.init();
 
-    _sem.init();
-
     _sdf_pipeline.init_graphics("assets/shader/sdf.hlsl", "vs", "ps", "assets/shader", RenderResource::Render_Target_Format, true);
 
     while (!_exit.load(std::memory_order_relaxed))
     {
-      _sem.acquire();
       message_process();
       if (!_render_datas.empty())
+      {
         render();
+        _frame_sem.release();
+      }
+      else
+        _render_data_empty_sem.acquire();
     }
   });
 }
@@ -38,7 +40,8 @@ void Renderer::destroy() noexcept
 {
   // exit render loop
   _exit.store(true, std::memory_order_relaxed);
-  _sem.release();
+  _frame_sem.release();
+  _render_data_empty_sem.release();
   _thread.join();
 
   // pop all message
@@ -49,7 +52,6 @@ void Renderer::destroy() noexcept
   g_graphics_engine.destroy();
   g_copy_engine.destroy();
   for (auto& res : _res | std::views::values) res.destroy();
-  _sem.destroy();
 }
 
 void Renderer::add_frame_render_complete_func(std::move_only_function<void()>&& func) noexcept
@@ -91,6 +93,7 @@ void Renderer::render() noexcept
 
     // continue if the window is destoried
     if (_destroied_windows.contains(handle)) continue;
+    _rendered_windows.emplace_back(handle);
 
     // promise window is valid
     err_if(!_res.contains(handle), "failed to render. No render resource exist on handle {}", (size_t)handle);
@@ -101,14 +104,22 @@ void Renderer::render() noexcept
     res.render_begin();
     render_sdf(res, render_data->vertices, render_data->indices, render_data->shape_properties);
     res.render_end();
-    res.present(true);
 
-    // mark the render data is used finish
     render_data->clear();
-    render_data->finish();
+  }
+
+  // present windows
+  if (_rendered_windows.size() == 1)
+    _res[_rendered_windows.back()].present(true);
+  else if (_rendered_windows.size() > 1)
+  {
+    for (auto handle : _rendered_windows | std::views::take(_rendered_windows.size() - 1))
+      _res[handle].present(false);
+    _res[_rendered_windows.back()].present(true);
   }
 
   _destroied_windows.clear();
+  _rendered_windows.clear();
 }
 
 void Renderer::render_sdf(RenderResource& res, std::span<Vertex const> vertices, std::span<uint16_t const> indices, std::span<ShapeProperty const> shape_properties) noexcept

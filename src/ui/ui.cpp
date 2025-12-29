@@ -3,8 +3,6 @@
 
 using namespace tk::renderer;
 
-#define Frame_Usable_Check() if (g_ui_ctx.is_no_frame_can_use()) return;
-
 namespace tk { namespace ui {
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -38,9 +36,6 @@ void rectangle(glm::vec2 left_top, glm::vec2 right_bottom, Color color, float th
 {
 	g_ui_ctx.check_draw();
 	// TODO: check_not_path_draw
-
-	Frame_Usable_Check();
-
 	// TODO: window_render_pos offset
 
 	g_ui_ctx.add_shape(ShapeProperty::Type::rectangle, color, thickness, { left_top.x, left_top.y, right_bottom.x, right_bottom.y }, { left_top, right_bottom });
