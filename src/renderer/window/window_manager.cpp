@@ -37,14 +37,9 @@ void WindowManager::init() noexcept
     wnd_class.cbSize        = sizeof(wnd_class);
     wnd_class.hInstance     = GetModuleHandleW(nullptr);
     wnd_class.hCursor       = LoadCursorA(nullptr, IDC_ARROW);
-    wnd_class.lpszClassName = Fullscreen_Class;
-    wnd_class.lpfnWndProc   = DefWindowProcW;
-    err_if(!RegisterClassExW(&wnd_class), "failed register class");
     wnd_class.lpszClassName = Window_Class;
     wnd_class.lpfnWndProc   = wnd_proc;
     err_if(!RegisterClassExW(&wnd_class), "failed register class");
-
-    // TODO: create fullscreen window
 
     // create message queue, avoid the first PostMessage failed because message queue is unexit
     PeekMessageW(nullptr, nullptr, 0, 0, PM_NOREMOVE);
@@ -55,9 +50,9 @@ void WindowManager::init() noexcept
     while (GetMessageW(&msg, nullptr, 0, 0))
     {
       if (msg.message == WM_QUIT) return;
-      message_process(msg.hwnd, static_cast<Message>(msg.message), msg.wParam, msg.lParam);
       TranslateMessage(&msg);
       DispatchMessageW(&msg);
+      message_process(msg.hwnd, static_cast<Message>(msg.message), msg.wParam, msg.lParam);
     }
   });
 }
@@ -71,6 +66,23 @@ void WindowManager::destroy() noexcept
 LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param) noexcept
 {
   static auto& wnd_mgr = WindowManager::instance();
+  static auto& windows = wnd_mgr._windows;
+
+  static auto last_cursor_pos                   = glm::vec<2, int>{};
+  static auto window_left_button_down_mouse_pos = std::optional<glm::vec<2, int>>{};
+
+  static auto finish_moving_or_resizing = [&](HWND handle)
+  {
+    ReleaseCapture();
+    window_left_button_down_mouse_pos = {};
+
+    auto& window  = windows.at(handle);
+    window.moving = false;
+
+    // transform new mouse state
+    if (window.mouse_state == MouseState::left_button_down || window.mouse_state == MouseState::left_button_press)
+      window.mouse_state = MouseState::left_button_up;
+  };
 
   using namespace ui;
 
@@ -81,6 +93,48 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     g_ui_ctx.send_message(UIContext::Message_Window_Close{ handle });
     return 0;
   }
+
+  case WM_LBUTTONDOWN:
+  {
+    SetCapture(handle);
+    window_left_button_down_mouse_pos = windows.at(handle).cursor_pos();
+    assert(window_left_button_down_mouse_pos->x >= 0 && window_left_button_down_mouse_pos->y >= 0);
+    windows.at(handle).mouse_state = MouseState::left_button_down;
+    break;
+  }
+
+  case WM_MOUSEMOVE:
+  {
+    auto& window = wnd_mgr._windows.at(handle);
+
+    if (window_left_button_down_mouse_pos)
+    {
+      auto pos = get_cursor_pos();
+      window.x = pos.x - window_left_button_down_mouse_pos->x;
+      window.y = pos.y - window_left_button_down_mouse_pos->y;
+      SetWindowPos(handle, 0, window.x, window.y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+      window.moving = true;
+    }
+    
+    last_cursor_pos = get_cursor_pos();
+    break;
+  }
+
+  case WM_LBUTTONUP:
+  {
+    finish_moving_or_resizing(handle);
+    break;
+  }
+
+  case WM_CANCELMODE:
+  {
+    if (LOWORD(w_param) == WA_INACTIVE)
+    {
+      finish_moving_or_resizing(handle);
+    }
+    break;
+  }
+
   }
 
   return DefWindowProcW(handle, msg, w_param, l_param);
@@ -124,11 +178,36 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
     msg_create_window(w_param);
     break;
   }
+
   case Message::close_window:
   {
     msg_close_window(std::bit_cast<HWND>(w_param));
     break;
   }
+
+  case Message::left_button_press:
+  {
+    _windows.at(handle).mouse_state = MouseState::left_button_press;
+    break;
+  }
+
+  case Message::mouse_idle:
+  {
+    _windows.at(handle).mouse_state = MouseState::idle;
+    break;
+  }
+  }
+
+  for (auto& [handle, window] : _windows)
+  {
+    // TODO:
+    // window.clear_invalid_area();
+
+    // post next mouse state
+    if (window.mouse_state == MouseState::left_button_down)
+      PostMessageW(handle, static_cast<int>(Message::left_button_press), 0, 0);
+    else if (window.mouse_state == MouseState::left_button_up)
+      PostMessageW(handle, static_cast<int>(Message::mouse_idle), 0, 0);
   }
 }
 
@@ -153,6 +232,21 @@ void WindowManager::msg_close_window(HWND handle) noexcept
 {
   _windows[handle].destroy();
   _windows.erase(handle);
+}
+
+auto WindowManager::get_window_z_orders() const noexcept -> std::vector<HWND>
+{
+  auto handles = std::vector<HWND>();
+  handles.reserve(_windows.size());
+
+  auto top = GetTopWindow(nullptr);
+  while (top)
+  {
+    if (_windows.contains(top)) handles.emplace_back(top);
+    top = GetWindow(top, GW_HWNDNEXT);
+  }
+
+  return handles;
 }
 
 }}

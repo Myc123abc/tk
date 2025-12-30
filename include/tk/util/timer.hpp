@@ -50,7 +50,7 @@ private:
       }
       else if (type == Event::Type::repeat)
       {
-        if (get_duration() > duratoin)
+        if (get_duration() >= duratoin)
         {
           func();
           start();

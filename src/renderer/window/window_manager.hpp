@@ -8,6 +8,13 @@
 
 namespace tk { namespace renderer {
 
+inline auto get_cursor_pos() noexcept
+{
+  auto p = POINT{};
+  GetCursorPos(&p);
+  return glm::vec<2, int>{ p.x, p.y };
+}
+
 class WindowManager
 {
   friend class Window;
@@ -30,6 +37,8 @@ public:
   {
     create_window = WM_APP,
     close_window,
+    left_button_press,
+    mouse_idle,
   };
 
   void init() noexcept;
@@ -40,6 +49,9 @@ public:
 
   auto create_window(int x, int y, uint32_t width, uint32_t height) noexcept -> HWND;
   void close_window(HWND handle) noexcept;
+  auto window(HWND handle) const noexcept { return &_windows.at(handle); }
+
+  auto get_window_z_orders() const noexcept -> std::vector<HWND>;
 
 private:
   void message_process(HWND handle, Message msg, WPARAM w_param, LPARAM l_param) noexcept;
@@ -48,8 +60,7 @@ private:
   void msg_close_window(HWND handle) noexcept;
 
 private:
-  static constexpr wchar_t Fullscreen_Class[] = L"vn::window::WindowManager::Fullscreen";
-  static constexpr wchar_t Window_Class[]     = L"vn::window::WindowManager::Window";
+  static constexpr wchar_t Window_Class[] = L"vn::window::WindowManager::Window";
 
 private:
   std::jthread                     _thread;

@@ -3,6 +3,50 @@
 
 using namespace tk::renderer;
 
+namespace {
+
+auto get_bounding_rectangle(std::vector<glm::vec2> const& data) noexcept -> std::pair<glm::vec2, glm::vec2>
+{
+  assert(data.size() > 1);
+
+  auto min = data[0];
+  auto max = data[0];
+
+  for (auto i = 1; i < data.size(); ++i)
+  {
+    auto& p = data[i];
+    if (p.x < min.x) min.x = p.x;
+    if (p.y < min.y) min.y = p.y;
+    if (p.x > max.x) max.x = p.x;
+    if (p.y > max.y) max.y = p.y;
+  }
+
+  if (max.x == min.x)
+  {
+    if (min.x > 1.f)
+      --min.x;
+    else
+      ++max.x;
+  }
+
+  if (max.y == min.y)
+  {
+    if (min.y > 1.f)
+      --min.y;
+    else
+      ++max.y;
+  }
+
+  return { min, max };
+}
+
+auto point_on(glm::vec<2, int> const& p, glm::vec2 const& left_top, glm::vec2 const& right_bottom) noexcept
+{
+  return p.x >= left_top.x && p.x <= right_bottom.x && p.y >= left_top.y && p.y <= right_bottom.y;
+}
+
+}
+
 namespace tk { namespace ui {
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -14,18 +58,45 @@ void render() noexcept
 	g_ui_ctx.render();
 }
 
+auto color_lerp(Color x, Color y, float v) noexcept -> glm::vec4
+{
+  return
+  {
+    std::lerp(x.r, y.r, v),
+    std::lerp(x.g, y.g, v),
+    std::lerp(x.b, y.b, v),
+    std::lerp(x.a, y.a, v)
+  };
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Window
 ////////////////////////////////////////////////////////////////////////////////
 
-void begin(std::string_view name, int x, int y, uint32_t width, uint32_t height, bool* is_closed) noexcept
+void begin(std::string_view name, int x, int y, uint32_t width, uint32_t height, bool* is_closed, WindowConfig cfg) noexcept
 {
-	g_ui_ctx.begin(name, x, y, width, height, is_closed);
+	g_ui_ctx.begin(name, x, y, width, height, is_closed, cfg);
 }
 
 void end() noexcept
 {
 	g_ui_ctx.end();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///                            Shape Operator
+////////////////////////////////////////////////////////////////////////////////
+
+void set_render_pos(int x, int y) noexcept
+{
+  g_ui_ctx.check_draw();
+  g_ui_ctx.set_render_pos(x, y);
+}
+
+auto get_render_pos() noexcept -> glm::vec2
+{
+  g_ui_ctx.check_draw();
+  return g_ui_ctx.get_render_pos();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -35,10 +106,161 @@ void end() noexcept
 void rectangle(glm::vec2 left_top, glm::vec2 right_bottom, Color color, float thickness) noexcept
 {
 	g_ui_ctx.check_draw();
-	// TODO: check_not_path_draw
-	// TODO: window_render_pos offset
+	g_ui_ctx.check_path_not_draw();
+
+	auto offset = g_ui_ctx.render_pos();
+	left_top     += offset;
+	right_bottom += offset;
 
 	g_ui_ctx.add_shape(ShapeProperty::Type::rectangle, color, thickness, { left_top.x, left_top.y, right_bottom.x, right_bottom.y }, { left_top, right_bottom });
+}
+
+void triangle(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color, float thickness) noexcept
+{
+	g_ui_ctx.check_draw();
+	g_ui_ctx.check_path_not_draw();
+
+	auto offset = g_ui_ctx.render_pos();
+	p0 += offset;
+	p1 += offset;
+	p2 += offset;
+
+	g_ui_ctx.add_shape(ShapeProperty::Type::triangle, color, thickness, { p0.x, p0.y, p1.x, p1.y, p2.x, p2.y }, get_bounding_rectangle({ p0, p1, p2 }));
+}
+
+void circle(glm::vec2 center, float radius, Color color, float thickness) noexcept
+{
+	g_ui_ctx.check_draw();
+	g_ui_ctx.check_path_not_draw();
+
+	auto offset = g_ui_ctx.render_pos();
+  center += offset;
+
+  auto r = radius - 1;
+  if (r < 0) r = 1;
+  g_ui_ctx.add_shape(ShapeProperty::Type::circle, color, thickness, { center.x, center.y, r }, { center - radius, center + radius });
+}
+
+void line(glm::vec2 p0, glm::vec2 p1, Color color) noexcept
+{
+	g_ui_ctx.check_draw();
+
+	auto offset = g_ui_ctx.render_pos();
+  p0 += offset;
+  p1 += offset;
+
+  if (g_ui_ctx.is_path_draw())
+  {
+    g_ui_ctx.path_data[0] = std::bit_cast<float>(std::bit_cast<uint32_t>(g_ui_ctx.path_data[0]) + 1);
+    auto points = { p0, p1 };
+    g_ui_ctx.path_points.append_range(points);
+    g_ui_ctx.path_data.emplace_back(std::bit_cast<float>(ShapeProperty::Type::path_line));
+    g_ui_ctx.path_data.append_range(std::ranges::to<std::vector<float>>(points
+      | std::views::transform([](auto const& p) { return std::array<float, 2>{ p.x, p.y }; })
+      | std::views::join));
+  }
+  else
+    g_ui_ctx.add_shape(ShapeProperty::Type::line, color, {}, { p0.x, p0.y, p1.x, p1.y }, get_bounding_rectangle({ p0, p1 }));
+}
+
+void bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color) noexcept
+{
+	g_ui_ctx.check_draw();
+
+	auto offset = g_ui_ctx.render_pos();
+  p0 += offset;
+  p1 += offset;
+  p2 += offset;
+
+  if (g_ui_ctx.is_path_draw())
+  {
+    g_ui_ctx.path_data[0] = std::bit_cast<float>(std::bit_cast<uint32_t>(g_ui_ctx.path_data[0]) + 1);
+    auto points = { p0, p1, p2 };
+    g_ui_ctx.path_points.append_range(points);
+    g_ui_ctx.path_data.emplace_back(std::bit_cast<float>(ShapeProperty::Type::path_bezier));
+    g_ui_ctx.path_data.append_range(std::ranges::to<std::vector<float>>(points
+      | std::views::transform([](auto const& p) { return std::array<float, 2>{ p.x, p.y }; })
+      | std::views::join));
+  }
+  else
+    g_ui_ctx.add_shape(ShapeProperty::Type::bezier, color, {}, { p0.x, p0.y, p1.x, p1.y, p2.x, p2.y }, get_bounding_rectangle({ p0, p1, p2 }));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///                               Widget
+////////////////////////////////////////////////////////////////////////////////
+
+auto is_hover_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
+{
+  g_ui_ctx.check_draw();
+
+  auto offset = g_ui_ctx.render_pos();
+  left_top     += offset;
+  right_bottom += offset;
+
+  if (!g_ui_ctx.window->is_cursor_valid_area() || g_ui_ctx.window->is_moving_or_resizing()) return false;
+  auto p = g_ui_ctx.window->cursor_pos();
+  return p.x >= left_top.x && p.x <= right_bottom.x && p.y >= left_top.y && p.y <= right_bottom.y && g_ui_ctx.cursor_on_window == g_ui_ctx.window->handle();
+}
+
+auto is_click_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
+{
+  g_ui_ctx.check_draw();
+
+  auto offset = g_ui_ctx.render_pos();
+  left_top     += offset;
+  right_bottom += offset;
+
+  auto& window = g_ui_ctx.window;
+  if (!window->is_active()                 ||
+      !window->is_cursor_valid_area()      ||
+		   window->is_moving_or_resizing()     ||
+      !g_ui_ctx.mouse_down_pos.has_value() ||
+      !g_ui_ctx.mouse_up_pos.has_value()   ||
+       g_ui_ctx.mouse_down_window != g_ui_ctx.mouse_up_window) return false;
+  return point_on(g_ui_ctx.mouse_down_pos.value(), left_top, right_bottom) &&
+         point_on(g_ui_ctx.mouse_up_pos.value(),   left_top, right_bottom);
+}
+
+auto button(
+  std::string_view                        name,
+  int                                     x,
+  int                                     y,
+  uint32_t                                width,
+  uint32_t                                height,
+  Color                                   button_color,
+  Color                                   button_hover_color,
+  std::function<void(uint32_t, uint32_t)> icon_update_func,
+  uint32_t                                icon_width,
+  uint32_t                                icon_height,
+  Color                                   icon_color,
+  Color                                   icon_hover_color) noexcept-> bool
+{
+  auto id = g_ui_ctx.generic_id(name);
+
+  auto lerp_anim  = g_ui_ctx.add_lerp_anim(id, 200);
+  auto lerp_value = lerp_anim->get_lerp();
+
+  auto left_top     = glm::vec2{ x,         y          };
+  auto right_bottom = glm::vec2{ x + width, y + height };
+
+  auto hovered = g_ui_ctx.is_hover_on(id, left_top, right_bottom, lerp_anim);
+
+  g_ui_ctx.enable_tmp_color(color_lerp(button_color, button_hover_color, lerp_value));
+  ui::rectangle(left_top, right_bottom);
+  g_ui_ctx.disable_tmp_color();
+
+  auto x_offset = (width  - icon_width)  / 2;
+  auto y_offset = (height - icon_height) / 2;
+
+  Tmp_Render_Pos(x + x_offset, y + y_offset)
+  {
+    g_ui_ctx.enable_tmp_color(color_lerp(icon_color, icon_hover_color, lerp_value));
+    if (icon_update_func) icon_update_func(icon_width, icon_height);
+    g_ui_ctx.disable_tmp_color();
+  }
+
+  return hovered && is_click_on(left_top, right_bottom);
 }
 
 }}

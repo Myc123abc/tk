@@ -12,8 +12,13 @@ int main()
   {
     if (!wnd1_is_closed)
     {
-      ui::begin("wnd1", 50, 50, 200, 200, &wnd1_is_closed);
+      auto cfg = ui::WindowConfig{};
+      cfg.display_title_bar = true;
+      ui::begin("wnd1", 50, 50, 200, 200, &wnd1_is_closed, cfg);
       ui::rectangle({}, { 200, 200 }, 0xffffffff);
+      if (ui::is_click_on({}, { 100, 100 }))
+        info("click");
+      ui::rectangle({}, { 100, 100 }, 0x00ff00ff);
       ui::end();
     }
 
