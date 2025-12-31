@@ -16,9 +16,10 @@ int main()
       cfg.display_title_bar = true;
       ui::begin("wnd1", 50, 50, 200, 200, &wnd1_is_closed, cfg);
       ui::rectangle({}, { 200, 200 }, 0xffffffff);
-      if (ui::is_click_on({}, { 100, 100 }))
-        info("click");
-      ui::rectangle({}, { 100, 100 }, 0x00ff00ff);
+      if (ui::button("btn1", 0, 0, 100, 100, 0x00ff00ff, 0x0000ffff))
+        info("click 11");
+      if (ui::button("btn2", 50, 50, 100, 100, 0x00ff00ff, 0x0000ffff))
+        info("click 22");
       ui::end();
     }
 
@@ -26,6 +27,10 @@ int main()
     {
       ui::begin("wnd2", 100, 100, 200, 200, &wnd2_is_closed);
       ui::rectangle({}, { 200, 200 }, 0x000000ff);
+      if (ui::button("btn1", 0, 0, 100, 100, 0x00ff00ff, 0x0000ffff))
+        info("click 1");
+      if (ui::button("btn2", 50, 50, 100, 100, 0x00ff00ff, 0x0000ffff))
+        info("click 2");
       ui::end();
     }
 

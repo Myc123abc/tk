@@ -16,9 +16,9 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
   // create window if not have
   if (!_windows.contains(name.data()))
   {
-    auto handle = g_wnd_mgr.create_window(x, y, width, height);
+    _windows.emplace(name.data(), g_wnd_mgr.create_window(x, y, width, height));
     _window = &_windows[name.data()];
-    _window->handle        = handle;
+    _window_names.emplace(_window->snap.handle, name.data());
     _window->can_be_closed = is_closed;
   }
 
@@ -30,9 +30,6 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
 
   _shape_properties_offset = 0;
   _idx_beg                 = 0;
-
-  // TODO: use g_wnd_mgr message send to ui context for thread safe
-  window = g_wnd_mgr.window(_window->handle);
 
   if (_window->cfg.display_title_bar)
     set_render_pos(0, Title_Bar_Height);
@@ -77,7 +74,8 @@ void UIContext::render() noexcept
     else
     {
       // destroy
-      g_wnd_mgr.close_window(window.handle);
+      g_wnd_mgr.close_window(window.snap.handle);
+      _window_names.erase(window.snap.handle);
       it = _windows.erase(it);
     }
   }
@@ -93,7 +91,7 @@ void UIContext::render() noexcept
   for (auto it = _windows.begin(); it != _windows.end(); ++it)
   {
     auto& window = it->second;
-    if (g_renderer.render(window.handle, window.data()))
+    if (g_renderer.render(window.snap.handle, window.data()))
     {
       window.next_frame();
       has_render = true;
@@ -106,6 +104,7 @@ void UIContext::render() noexcept
 
   // process message queue
   _msg_queue.process(MessageHandler{ g_ui_ctx });
+  process_mouse_state();
 
   // update state
   update();
@@ -114,9 +113,7 @@ void UIContext::render() noexcept
 void UIContext::update() noexcept
 {
   // clear state
-  _hovered_widget_ids.clear();
   _ids.clear();
-  cursor_on_window = {};
   if (mouse_up_window)
   {
     mouse_down_window = {};
@@ -125,32 +122,29 @@ void UIContext::update() noexcept
     mouse_up_pos      = {};
   }
 
-  // update which window on top of the cursor
-  auto z_orders   = g_wnd_mgr.get_window_z_orders();
-  auto cursor_pos = get_cursor_pos();
-  if (auto it = std::ranges::find_if(z_orders, [=](auto handle) { return g_wnd_mgr.window(handle)->contains_point(cursor_pos); });
-      it != z_orders.end())
-    cursor_on_window = *it;
-
   // update mouse state
-  for (auto const& [_, wnd] : _windows)
+  for (auto const& window : _windows | std::views::values)
   {
-    auto window = g_wnd_mgr.window(wnd.handle);
-    if (window->mouse_state == MouseState::left_button_down)
+    using namespace window;
+    if (!window.is_active()) continue;
+    if (_mouse_state == MouseState::left_button_down)
     {
-      mouse_down_window = wnd.handle;
-      mouse_down_pos    = window->cursor_pos();
+      mouse_down_window = window.snap.handle;
+      mouse_down_pos    = window.cursor_pos();
     }
-    else if (window->mouse_state == MouseState::left_button_up)
+    else if (_mouse_state == MouseState::left_button_up)
     {
-      mouse_up_window = wnd.handle;
-      mouse_up_pos    = window->cursor_pos();
+      mouse_up_window = window.snap.handle;
+      mouse_up_pos    = window.cursor_pos();
     }
   }
 
   // update cursor hovered widget id
   if (!_hovered_widget_ids.empty())
+  {
     _prev_hovered_widget_id = _hovered_widget_ids.back();
+    _hovered_widget_ids.clear();
+  }
   
   // lerp anim update
   _lerp_anim_timer.process_events();
@@ -291,7 +285,7 @@ void add_title_bar() noexcept
 
 auto UIContext::generic_id(std::string_view name) const noexcept -> size_t
 {
-  auto id = generic_hash(_window->handle, name);
+  auto id = generic_hash(_window->snap.handle, name);
   err_if(_ids.contains(id), "cannot duplicate id {}", name);
   return id;
 }

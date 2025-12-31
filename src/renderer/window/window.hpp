@@ -8,24 +8,16 @@
 
 namespace tk { namespace renderer {
 
-enum class MouseState
-{
-  idle,
-  left_button_down,
-  left_button_press,
-  left_button_up,
-};
-
 class Window
 {
   friend class WindowManager;
 public:
   Window()                         = default;
   ~Window()                        = default;
-  Window(Window const&)            = delete;
+  Window(Window const&)            = default;
   Window(Window&&)                 = default;
-  Window& operator=(Window const&) = delete;
-  Window& operator=(Window&&)      = delete;
+  Window& operator=(Window const&) = default;
+  Window& operator=(Window&&)      = default;
 
   void init(int x, int y, uint32_t width, uint32_t height) noexcept;
 
@@ -38,20 +30,23 @@ public:
   auto cursor_pos() const noexcept -> glm::vec<2, int>;
 
   auto is_cursor_valid_area()  const noexcept -> bool;
-  auto is_moving_or_resizing() const noexcept { return moving || resizing; }
   auto is_active() const noexcept { return GetForegroundWindow() == _handle; }
 
-private:
-  HWND _handle{};
+  auto is_moving() const noexcept { return _moving; }
+  auto is_resizing() const noexcept { return _resizing; }
+  auto is_moving_or_resizing() const noexcept { return _moving || _resizing; }
+  void moving_with_pos(int x, int y) noexcept;
+  void moving_end() noexcept;
 
+private:
+  HWND     _handle{};
+  bool     _moving{};
+  bool     _resizing{};
 public:
-  int        x{};
-  int        y{};
-  uint32_t   width{};
-  uint32_t   height{};
-  bool       moving{};
-  bool       resizing{};
-  MouseState mouse_state{};
+  int      x{};
+  int      y{};
+  uint32_t width{};
+  uint32_t height{};
 };
 
 }}

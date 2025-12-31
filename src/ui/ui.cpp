@@ -83,6 +83,12 @@ void end() noexcept
 	g_ui_ctx.end();
 }
 
+auto get_mouse_state() -> window::MouseState
+{
+  g_ui_ctx.check_draw();
+  return g_ui_ctx.get_mouse_state();
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 ///                            Shape Operator
 ////////////////////////////////////////////////////////////////////////////////
@@ -198,9 +204,9 @@ auto is_hover_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
   left_top     += offset;
   right_bottom += offset;
 
-  if (!g_ui_ctx.window->is_cursor_valid_area() || g_ui_ctx.window->is_moving_or_resizing()) return false;
-  auto p = g_ui_ctx.window->cursor_pos();
-  return p.x >= left_top.x && p.x <= right_bottom.x && p.y >= left_top.y && p.y <= right_bottom.y && g_ui_ctx.cursor_on_window == g_ui_ctx.window->handle();
+  if (!g_ui_ctx._window->is_cursor_valid_area() || g_ui_ctx._window->is_moving_or_resizing()) return false;
+  auto p = g_ui_ctx._window->cursor_pos();
+  return p.x >= left_top.x && p.x <= right_bottom.x && p.y >= left_top.y && p.y <= right_bottom.y && g_ui_ctx.cursor_on_window == g_ui_ctx._window->snap.handle;
 }
 
 auto is_click_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
@@ -211,7 +217,7 @@ auto is_click_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
   left_top     += offset;
   right_bottom += offset;
 
-  auto& window = g_ui_ctx.window;
+  auto window = g_ui_ctx._window;
   if (!window->is_active()                 ||
       !window->is_cursor_valid_area()      ||
 		   window->is_moving_or_resizing()     ||

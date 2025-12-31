@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../window/type.hpp"
+
 #include <string_view>
 
 #include <glm/glm.hpp>
@@ -67,6 +69,12 @@ void begin(std::string_view name, int x, int y, uint32_t width, uint32_t height,
 
 // end a window
 void end() noexcept;
+
+/**
+ * get mouse state of current window
+ * @return mouse state
+ */
+auto get_mouse_state() -> window::MouseState;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                            Shape Operator

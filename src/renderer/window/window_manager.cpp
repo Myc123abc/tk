@@ -2,6 +2,9 @@
 #include "../../util/error_handling.hpp"
 #include "../../ui/ui_context.hpp"
 
+using namespace tk::ui;
+using namespace tk::window;
+
 namespace {
 
 auto to_64_bits(uint32_t x, uint32_t y) noexcept
@@ -77,14 +80,15 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     window_left_button_down_mouse_pos = {};
 
     auto& window  = windows.at(handle);
-    window.moving = false;
+    if (window.is_moving())
+      window.moving_end();
 
     // transform new mouse state
-    if (window.mouse_state == MouseState::left_button_down || window.mouse_state == MouseState::left_button_press)
-      window.mouse_state = MouseState::left_button_up;
+    wnd_mgr._mouse_state = MouseState::left_button_up;
+    g_ui_ctx.send_message(UIContext::Message_Update_Mouse_State{ wnd_mgr._mouse_state });
+    KillTimer(nullptr, wnd_mgr._timer_mouse_state);
+    PostMessageW(handle, static_cast<int>(Message::mouse_idle), 0, 0);
   };
-
-  using namespace ui;
 
   switch (msg)
   {
@@ -99,7 +103,11 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     SetCapture(handle);
     window_left_button_down_mouse_pos = windows.at(handle).cursor_pos();
     assert(window_left_button_down_mouse_pos->x >= 0 && window_left_button_down_mouse_pos->y >= 0);
-    windows.at(handle).mouse_state = MouseState::left_button_down;
+
+    wnd_mgr._mouse_state           = MouseState::left_button_down;
+    wnd_mgr._mouse_left_down_start = std::chrono::steady_clock::now();
+    g_ui_ctx.send_message(UIContext::Message_Update_Mouse_State{ wnd_mgr._mouse_state });
+    wnd_mgr._timer_mouse_state = SetTimer(nullptr, 0, USER_TIMER_MINIMUM, nullptr);
     break;
   }
 
@@ -110,10 +118,8 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     if (window_left_button_down_mouse_pos)
     {
       auto pos = get_cursor_pos();
-      window.x = pos.x - window_left_button_down_mouse_pos->x;
-      window.y = pos.y - window_left_button_down_mouse_pos->y;
+      window.moving_with_pos(pos.x - window_left_button_down_mouse_pos->x, pos.y - window_left_button_down_mouse_pos->y);
       SetWindowPos(handle, 0, window.x, window.y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
-      window.moving = true;
     }
     
     last_cursor_pos = get_cursor_pos();
@@ -129,9 +135,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   case WM_CANCELMODE:
   {
     if (LOWORD(w_param) == WA_INACTIVE)
-    {
       finish_moving_or_resizing(handle);
-    }
     break;
   }
 
@@ -140,7 +144,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   return DefWindowProcW(handle, msg, w_param, l_param);
 }
 
-auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height) noexcept -> HWND
+auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height) noexcept -> WindowSnapshot
 {
   // promise window message queue is built in windows os
   _message_queue_create_complete.wait();
@@ -159,9 +163,10 @@ auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height)
   // wait create window complete
   WaitForSingleObject(ptr->event, INFINITE);
   CloseHandle(ptr->event);
-  auto handle = ptr->handle;
+  auto snap = WindowSnapshot{};
+  snap.init(_windows.at(ptr->handle));
   free(ptr);
-  return handle;
+  return snap;
 }
 
 void WindowManager::close_window(HWND handle) noexcept
@@ -185,29 +190,38 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
     break;
   }
 
-  case Message::left_button_press:
-  {
-    _windows.at(handle).mouse_state = MouseState::left_button_press;
-    break;
-  }
-
   case Message::mouse_idle:
   {
-    _windows.at(handle).mouse_state = MouseState::idle;
+    _mouse_state = MouseState::idle;
+    g_ui_ctx.send_message(UIContext::Message_Update_Mouse_State{ _mouse_state });
     break;
   }
+  }
+  
+  if (static_cast<UINT>(msg) == WM_TIMER)
+  {
+    if (w_param == _timer_mouse_state)
+      update_mouse_state();
   }
 
   for (auto& [handle, window] : _windows)
   {
     // TODO:
     // window.clear_invalid_area();
+  }
 
-    // post next mouse state
-    if (window.mouse_state == MouseState::left_button_down)
-      PostMessageW(handle, static_cast<int>(Message::left_button_press), 0, 0);
-    else if (window.mouse_state == MouseState::left_button_up)
-      PostMessageW(handle, static_cast<int>(Message::mouse_idle), 0, 0);
+  // send update message to ui context
+  g_ui_ctx.send_message(UIContext::Message_Cursor_On_Window{ get_cursor_on_window() });
+}
+
+void WindowManager::update_mouse_state() noexcept
+{
+  auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - _mouse_left_down_start).count();
+  if (dur > Mouse_Left_Down_Press_Start_Time)
+  {
+    _mouse_state = MouseState::left_button_press;
+    g_ui_ctx.send_message(UIContext::Message_Update_Mouse_State{ _mouse_state });
+    KillTimer(nullptr, _timer_mouse_state);
   }
 }
 
@@ -247,6 +261,16 @@ auto WindowManager::get_window_z_orders() const noexcept -> std::vector<HWND>
   }
 
   return handles;
+}
+
+auto WindowManager::get_cursor_on_window() const noexcept -> HWND
+{
+  auto z_orders   = g_wnd_mgr.get_window_z_orders();
+  auto cursor_pos = get_cursor_pos();
+  if (auto it = std::ranges::find_if(z_orders, [&](auto handle) { return _windows.at(handle).contains_point(cursor_pos); });
+      it != z_orders.end())
+    return *it;
+  return {};
 }
 
 }}

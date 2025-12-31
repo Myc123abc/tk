@@ -1,11 +1,12 @@
 #pragma once
 
 #include "../renderer/resource/render_data.hpp"
+#include "../renderer/window/window.hpp"
+#include "../renderer/window/window_manager.hpp"
 #include "../renderer/config.hpp"
 #include "../util/message_queue.hpp"
 #include "config.hpp"
 #include "ui/ui.hpp"
-#include "../renderer/window/window.hpp"
 #include "lerp_animation.hpp"
 
 #include <windows.h>
@@ -20,7 +21,24 @@ namespace tk { namespace ui {
 
 struct Window
 {
-  HWND         handle; 
+  renderer::WindowSnapshot snap;
+
+  auto cursor_pos() const noexcept -> glm::vec<2, int>
+  {
+    auto pos = renderer::get_cursor_pos();
+    return { pos.x - snap.x, pos.y - snap.y };
+  }
+
+  auto is_cursor_valid_area() const noexcept -> bool
+  {
+    // TODO:
+    return true;
+  }
+
+  auto is_moving_or_resizing() const noexcept { return snap.moving || snap.resizing; }
+  auto is_active() const noexcept { return GetForegroundWindow() == snap.handle; }
+
+  // ui window content
   bool         is_called{};
   bool         can_be_closed{};
   bool         is_closed{};
@@ -76,18 +94,22 @@ public:
   void disable_tmp_color() noexcept { _tmp_color = {}; }
   void set_render_pos(int x, int y) noexcept { _window->render_pos = { x, y }; }
   auto get_render_pos() const noexcept { return _window->render_pos; }
+  auto get_mouse_state() const noexcept { return _mouse_state; }
 
   auto generic_id(std::string_view name) const noexcept -> size_t;
 
 private:
   void update() noexcept;
+
+  auto& get_window(HWND handle) noexcept { return _windows[_window_names[handle]]; }
+
   void add_title_bar() noexcept;
 
 public:
-  renderer::Window const*                 window;
+  Window*                                 _window{};
 private:
   std::unordered_map<std::string, Window> _windows;
-  Window*                                 _window{};
+  std::unordered_map<HWND, std::string>   _window_names;
   uint32_t                                _shape_properties_offset{};
   uint16_t                                _idx_beg{};
 
@@ -121,6 +143,8 @@ public:
   HWND                            mouse_up_window{};
   std::optional<glm::vec<2, int>> mouse_down_pos;
   std::optional<glm::vec<2, int>> mouse_up_pos;
+private:
+  window::MouseState              _mouse_state{};
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                              Message Process
@@ -131,9 +155,30 @@ public:
   {
     HWND handle{};
   };
+  
+  struct Message_Cursor_On_Window
+  {
+    HWND handle{};
+  };
+
+  struct Message_Update_Mouse_State
+  {
+    window::MouseState state{};
+  };
+
+  struct Message_Update_Moving
+  {
+    HWND handle{};
+    bool moving{};
+    int  x{};
+    int  y{};
+  };
 
   using Message = std::variant<
-    Message_Window_Close
+    Message_Window_Close,
+    Message_Cursor_On_Window,
+    Message_Update_Mouse_State,
+    Message_Update_Moving
   >;
 
   void send_message(Message&& msg) noexcept
@@ -146,8 +191,14 @@ private:
   {
     UIContext& ctx;
     void operator()(Message_Window_Close msg) const noexcept;
+    void operator()(Message_Cursor_On_Window msg) const noexcept;
+    void operator()(Message_Update_Mouse_State msg) const noexcept;
+    void operator()(Message_Update_Moving msg) const noexcept;
   };
   MessageQueue<Message, UI_Message_Queue_Capacity> _msg_queue;
+  std::vector<Message_Update_Mouse_State>          _mouse_state_queue;
+
+  void process_mouse_state() noexcept;
 };
 
 inline static auto& g_ui_ctx{ UIContext::instance() };

@@ -1,6 +1,9 @@
 #include "window.hpp"
 #include "../renderer.hpp"
 #include "window_manager.hpp"
+#include "../../ui/ui_context.hpp"
+
+using namespace tk::ui;
 
 namespace tk { namespace renderer {
 
@@ -42,6 +45,20 @@ auto Window::is_cursor_valid_area() const noexcept -> bool
 auto Window::contains_point(glm::vec<2, int> p) const noexcept -> bool
 {
   return p.x >= x && p.y >= y && p.x <= x + width && p.y <= y + height;
+}
+
+void Window::moving_with_pos(int x, int y) noexcept
+{
+  this->x = x;
+  this->y = y;
+  _moving = true;
+  g_ui_ctx.send_message(UIContext::Message_Update_Moving{ _handle, _moving, x, y });
+}
+
+void Window::moving_end() noexcept
+{
+  _moving = false;
+  g_ui_ctx.send_message(UIContext::Message_Update_Moving{ _handle, _moving, x, y });
 }
 
 }}
