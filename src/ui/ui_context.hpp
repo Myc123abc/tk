@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../renderer/resource/render_data.hpp"
-#include "../renderer/window/window.hpp"
 #include "../renderer/window/window_manager.hpp"
 #include "../renderer/config.hpp"
 #include "../util/message_queue.hpp"
@@ -16,6 +15,7 @@
 #include <string>
 #include <optional>
 #include <unordered_set>
+#include <deque>
 
 namespace tk { namespace ui {
 
@@ -196,7 +196,7 @@ private:
     void operator()(Message_Update_Moving msg) const noexcept;
   };
   MessageQueue<Message, UI_Message_Queue_Capacity> _msg_queue;
-  std::vector<Message_Update_Mouse_State>          _mouse_state_queue;
+  std::deque<Message_Update_Mouse_State>           _mouse_state_queue;
 
   void process_mouse_state() noexcept;
 };

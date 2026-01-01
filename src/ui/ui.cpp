@@ -85,7 +85,6 @@ void end() noexcept
 
 auto get_mouse_state() -> window::MouseState
 {
-  g_ui_ctx.check_draw();
   return g_ui_ctx.get_mouse_state();
 }
 

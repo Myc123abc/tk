@@ -27,9 +27,8 @@ void UIContext::MessageHandler::operator()(Message_Update_Mouse_State msg) const
 void UIContext::process_mouse_state() noexcept
 {
   if (_mouse_state_queue.empty()) return;
-  auto msg = _mouse_state_queue.front();
-  _mouse_state = msg.state;
-  _mouse_state_queue.pop_back();
+  _mouse_state = _mouse_state_queue.front().state;
+  _mouse_state_queue.pop_front();
 }
 
 void UIContext::MessageHandler::operator()(Message_Update_Moving msg) const noexcept
