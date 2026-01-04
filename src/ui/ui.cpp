@@ -69,6 +69,11 @@ auto color_lerp(Color x, Color y, float v) noexcept -> glm::vec4
   };
 }
 
+auto delta_time() noexcept -> double
+{
+  return g_ui_ctx.delta_time();
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Window
 ////////////////////////////////////////////////////////////////////////////////
@@ -195,6 +200,18 @@ void bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color) noexcept
 ///                               Widget
 ////////////////////////////////////////////////////////////////////////////////
 
+auto is_hover_on(std::string_view name, glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
+{
+  g_ui_ctx.check_draw();
+  return g_ui_ctx.is_hover_on(g_ui_ctx.generic_id(name), left_top, right_bottom);
+}
+
+auto is_hover_on(size_t id, glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
+{
+  g_ui_ctx.check_draw();
+  return g_ui_ctx.is_hover_on(id, left_top, right_bottom);
+}
+
 auto is_hover_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
 {
   g_ui_ctx.check_draw();
@@ -203,9 +220,9 @@ auto is_hover_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
   left_top     += offset;
   right_bottom += offset;
 
-  if (!g_ui_ctx._window->is_cursor_valid_area() || g_ui_ctx._window->is_moving_or_resizing()) return false;
+  if (!g_ui_ctx._window->is_cursor_valid_area()) return false;
   auto p = g_ui_ctx._window->cursor_pos();
-  return p.x >= left_top.x && p.x <= right_bottom.x && p.y >= left_top.y && p.y <= right_bottom.y && g_ui_ctx.cursor_on_window == g_ui_ctx._window->snap.handle;
+  return point_on(p, left_top, right_bottom) && g_ui_ctx.cursor_on_window == g_ui_ctx._window->snap.handle;
 }
 
 auto is_click_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
@@ -235,6 +252,7 @@ auto button(
   uint32_t                                height,
   Color                                   button_color,
   Color                                   button_hover_color,
+  std::optional<Color>                    mouse_down_color,
   std::function<void(uint32_t, uint32_t)> icon_update_func,
   uint32_t                                icon_width,
   uint32_t                                icon_height,
@@ -243,6 +261,56 @@ auto button(
 {
   auto id = g_ui_ctx.generic_id(name);
 
+  // what is a button
+  // button is a rectangle with width and height in specific position
+  auto left_top     = glm::vec<2, int>{ x, y };
+  auto right_bottom = glm::vec<2, int>{ x + width, y + height };
+
+  // when cursor hover on it, it will change color to hovered color
+  auto is_hovered = ui::is_hover_on(name, left_top, right_bottom);
+
+  auto color_lerpolator = g_ui_ctx.get_color_lerpolator(id, button_color, button_hover_color, 200'000);
+
+  if (is_hovered)
+  {
+    if (color_lerpolator->is_not_started())
+      color_lerpolator->start();
+  }
+  else
+  {
+    if (color_lerpolator->is_finished())
+    {
+      color_lerpolator->reverse();
+      color_lerpolator->start();
+    }
+    else if (color_lerpolator->is_started() && !color_lerpolator->is_reversed())
+      color_lerpolator->reverse();
+  }
+
+  color_lerpolator->update(ui::delta_time());
+
+  button_color = color_lerpolator->get();
+
+  if (color_lerpolator->is_finished() && color_lerpolator->is_reversed())
+    g_ui_ctx.remove_color_lerpolator(id);
+
+  // when mouse down, color also change
+  if (mouse_down_color &&
+      is_hovered       &&
+      (ui::get_mouse_state() == window::MouseState::left_button_down ||
+       ui::get_mouse_state() == window::MouseState::left_button_press))
+    button_color = mouse_down_color.value();
+
+  // TODO: more detail of click
+
+  // draw button
+  ui::rectangle(left_top, right_bottom, button_color);
+
+  // TODO: draw icon
+
+  return is_hovered && ui::is_click_on(left_top, right_bottom);
+
+#if 0
   auto lerp_anim  = g_ui_ctx.add_lerp_anim(id, 200);
   auto lerp_value = lerp_anim->get_lerp();
 
@@ -266,6 +334,7 @@ auto button(
   }
 
   return hovered && is_click_on(left_top, right_bottom);
+#endif
 }
 
 }}

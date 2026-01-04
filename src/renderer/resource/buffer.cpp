@@ -1,5 +1,5 @@
 #include "buffer.hpp"
-#include "../../util/error_handling.hpp"
+#include "util/error_handling.hpp"
 #include "../core.hpp"
 #include "../renderer.hpp"
 #include "../../util/align.hpp"

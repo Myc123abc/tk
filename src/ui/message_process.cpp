@@ -1,5 +1,7 @@
 #include "ui_context.hpp"
 
+#include <algorithm>
+
 namespace tk { namespace ui {
 
 void UIContext::MessageHandler::operator()(Message_Window_Close msg) const noexcept

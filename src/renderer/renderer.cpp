@@ -2,7 +2,7 @@
 #include "core.hpp"
 #include "engine/graphics_engine.hpp"
 #include "engine/copy_engine.hpp"
-#include "../util/error_handling.hpp"
+#include "util/error_handling.hpp"
 #include "resource/descriptor_heap_manager.hpp"
 #include "compiler.hpp"
 

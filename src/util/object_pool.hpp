@@ -1,6 +1,6 @@
 #pragma once
 
-#include "error_handling.hpp"
+#include "util/error_handling.hpp"
 
 #include <array>
 #include <vector>

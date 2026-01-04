@@ -1,5 +1,5 @@
 #include "window_manager.hpp"
-#include "../../util/error_handling.hpp"
+#include "util/error_handling.hpp"
 #include "../../ui/ui_context.hpp"
 
 using namespace tk::ui;

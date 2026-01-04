@@ -27,9 +27,9 @@ int main()
     {
       ui::begin("wnd2", 100, 100, 200, 200, &wnd2_is_closed);
       ui::rectangle({}, { 200, 200 }, 0x000000ff);
-      if (ui::button("btn1", 0, 0, 100, 100, 0x00ff00ff, 0x0000ffff))
+      if (ui::button("btn1", 0, 0, 100, 100, 0xeeeeeeff, 0xcececeff, 0xb0b0b0ff))
         info("click 1");
-      if (ui::button("btn2", 50, 50, 100, 100, 0x00ff00ff, 0x0000ffff))
+      if (ui::button("btn2", 50, 50, 100, 100, 0xffffffff, 0xddddddff, 0xb0b0b0ff))
         info("click 2");
       ui::end();
     }

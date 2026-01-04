@@ -1,6 +1,6 @@
 #include "engine.hpp"
 #include "../core.hpp"
-#include "../../util/error_handling.hpp"
+#include "util/error_handling.hpp"
 
 namespace tk { namespace renderer {
 

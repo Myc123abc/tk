@@ -1,5 +1,5 @@
 #include "pipeline.hpp"
-#include "../util/error_handling.hpp"
+#include "util/error_handling.hpp"
 #include "core.hpp"
 #include "compiler.hpp"
 

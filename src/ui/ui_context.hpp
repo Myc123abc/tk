@@ -5,8 +5,7 @@
 #include "../renderer/config.hpp"
 #include "../util/message_queue.hpp"
 #include "config.hpp"
-#include "ui/ui.hpp"
-#include "lerp_animation.hpp"
+#include "color_lerpolator.hpp"
 
 #include <windows.h>
 
@@ -84,11 +83,9 @@ public:
   void add_shape_property(renderer::ShapeProperty::Type type, glm::vec4 color, float thickness, std::vector<float> const& values) noexcept;
   void add_shape(renderer::ShapeProperty::Type type, glm::vec4 color, float thickness, std::vector<float> const& values, std::pair<glm::vec2, glm::vec2> bounding_rectangle) noexcept;
 
-  auto add_lerp_anim(size_t id, uint32_t dur) noexcept -> LerpAnimation*;
-
   auto is_path_draw() const noexcept { return _path_begin; }
 
-  bool is_hover_on(size_t id, glm::vec2 left_top, glm::vec2 right_bottom, LerpAnimation* lerp_anim) noexcept;
+  auto is_hover_on(size_t id, glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool;
 
   void enable_tmp_color(glm::vec4 color) noexcept { _tmp_color = color; }
   void disable_tmp_color() noexcept { _tmp_color = {}; }
@@ -97,6 +94,11 @@ public:
   auto get_mouse_state() const noexcept { return _mouse_state; }
 
   auto generic_id(std::string_view name) const noexcept -> size_t;
+
+  auto delta_time() const noexcept { return _delta_time; }
+
+  auto get_color_lerpolator(size_t id, Color beg, Color end, double duration) noexcept -> ColorLerpolator*;
+  void remove_color_lerpolator(size_t id) noexcept;
 
 private:
   void update() noexcept;
@@ -127,14 +129,17 @@ private:
     uint32_t                          offset{};
   } _op_data;
 
+  // FIXME: discard?
   std::optional<glm::vec4> _tmp_color;
 
-  Timer                                     _lerp_anim_timer;
-  std::unordered_map<size_t, LerpAnimation> _lerp_anims;
-  std::vector<size_t>                       _hovered_widget_ids;
-  size_t                                    _prev_hovered_widget_id{};
+  double _delta_time{};
 
-  std::unordered_set<size_t>                _ids;
+  std::unordered_set<size_t>                  _hovered_widget_ids;
+  size_t                                      _last_hovered_widget_id{};
+  size_t                                      _prev_hovered_widget_id{};
+  std::unordered_map<size_t, ColorLerpolator> _color_lerpolators;
+
+  std::unordered_set<size_t> _ids;
 
   // state
 public:

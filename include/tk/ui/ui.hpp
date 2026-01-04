@@ -3,6 +3,7 @@
 #include "../window/type.hpp"
 
 #include <string_view>
+#include <optional>
 
 #include <glm/glm.hpp>
 
@@ -48,6 +49,12 @@ struct WindowConfig
 {
   bool display_title_bar{};
 };
+
+/**
+ * get frame delta time
+ * @return delta time(us)
+ */
+auto delta_time() noexcept -> double;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Window
@@ -157,6 +164,14 @@ void bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color = 0) noexcept;
 auto is_hover_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool;
 
 /**
+ * whether cursor hover on specific region, disable mouse penetration
+ * @param name
+ * @param left_top
+ * @param right_bottom
+ */
+auto is_hover_on(std::string_view name, glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool;
+
+/**
  * whether cursor click on specific region
  * @param left_top
  * @param right_bottom
@@ -174,6 +189,7 @@ auto is_click_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool;
  * @param height
  * @param button_color
  * @param button_hover_color
+ * @param mouse_down_color
  * @param icon_update_func the function be called for draw icon by ui draw api
  * @param icon_width
  * @param icon_height
@@ -188,6 +204,7 @@ auto button(
   uint32_t                                height,
   Color                                   button_color,
   Color                                   button_hover_color,
+  std::optional<Color>                    mouse_down_color = {},
   std::function<void(uint32_t, uint32_t)> icon_update_func = {},
   uint32_t                                icon_width       = {},
   uint32_t                                icon_height      = {},

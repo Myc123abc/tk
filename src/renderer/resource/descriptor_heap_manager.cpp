@@ -1,5 +1,5 @@
 #include "descriptor_heap_manager.hpp"
-#include "../../util/error_handling.hpp"
+#include "util/error_handling.hpp"
 #include "../core.hpp"
 #include "../renderer.hpp"
 #include "../config.hpp"

@@ -1,5 +1,5 @@
 #include "ui_context.hpp"
-#include "../util/error_handling.hpp"
+#include "util/error_handling.hpp"
 #include "../renderer/window/window_manager.hpp"
 #include "../renderer/renderer.hpp"
 #include "../util/hash.hpp"
@@ -142,12 +142,15 @@ void UIContext::update() noexcept
   // update cursor hovered widget id
   if (!_hovered_widget_ids.empty())
   {
-    _prev_hovered_widget_id = _hovered_widget_ids.back();
+    _prev_hovered_widget_id = _last_hovered_widget_id;
     _hovered_widget_ids.clear();
   }
-  
-  // lerp anim update
-  _lerp_anim_timer.process_events();
+
+  // update delta time
+  static auto tp = std::chrono::steady_clock::now();
+  auto now = std::chrono::steady_clock::now();
+  _delta_time = static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(now - tp).count());
+  tp          = now;
 }
 
 void UIContext::add_vertices_indices(std::pair<glm::vec2, glm::vec2> bounding_rectangle) noexcept
@@ -206,28 +209,19 @@ add_shape_property:
   add_shape_property(type, color, thickness, values);
 }
 
-auto UIContext::add_lerp_anim(size_t id, uint32_t dur) noexcept -> LerpAnimation*
+auto UIContext::is_hover_on(size_t id, glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
 {
-  if (!_lerp_anims.contains(id))
-    _lerp_anims[id].init(&_lerp_anim_timer, dur);
-  return &_lerp_anims[id];
-}
-
-auto UIContext::is_hover_on(size_t id, glm::vec2 left_top, glm::vec2 right_bottom, LerpAnimation* lerp_anim) noexcept -> bool
-{
-  return lerp_anim->update([&]
+  if (ui::is_hover_on(left_top, right_bottom))
   {
-    if (ui::is_hover_on(left_top, right_bottom))
-    {
-      g_ui_ctx._hovered_widget_ids.push_back(id);
-      return id == g_ui_ctx._prev_hovered_widget_id;
-    }
-    return false;
-  });
+    g_ui_ctx._hovered_widget_ids.emplace(id);
+    g_ui_ctx._last_hovered_widget_id = id;
+    return id == g_ui_ctx._prev_hovered_widget_id;
+  }
+  return false;
 }
 
 void add_title_bar() noexcept
-{ 
+{
   auto btn_width   = Title_Bar_Button_Width;
   auto btn_height  = Title_Bar_Height;
   auto icon_width  = Title_Bar_Button_Icon_Width;
@@ -288,6 +282,19 @@ auto UIContext::generic_id(std::string_view name) const noexcept -> size_t
   auto id = generic_hash(_window->snap.handle, name);
   err_if(_ids.contains(id), "cannot duplicate id {}", name);
   return id;
+}
+
+auto UIContext::get_color_lerpolator(size_t id, Color beg, Color end, double duration) noexcept -> ColorLerpolator*
+{
+  if (!_color_lerpolators.contains(id))
+    _color_lerpolators[id].init(beg, end, duration);
+  return &_color_lerpolators.at(id);
+}
+
+void UIContext::remove_color_lerpolator(size_t id) noexcept
+{
+  err_if(!_color_lerpolators.contains(id), "remove an unexist color lerpolator");
+  _color_lerpolators.erase(id);
 }
 
 }}

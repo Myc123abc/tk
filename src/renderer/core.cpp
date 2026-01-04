@@ -1,5 +1,5 @@
 #include "core.hpp"
-#include "../util/error_handling.hpp"
+#include "util/error_handling.hpp"
 #include "resource/descriptor_heap_manager.hpp"
 
 using namespace Microsoft::WRL;

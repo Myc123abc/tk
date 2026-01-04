@@ -1,7 +1,7 @@
 #include "image.hpp"
 #include "../core.hpp"
 #include "../renderer.hpp"
-#include "../../util/error_handling.hpp"
+#include "util/error_handling.hpp"
 #include "../../util/align.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
