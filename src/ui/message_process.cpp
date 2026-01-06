@@ -4,7 +4,7 @@
 
 namespace tk { namespace ui {
 
-void UIContext::MessageHandler::operator()(Message_Window_Close msg) const noexcept
+void UIContext::MessageHandler::operator()(Message_Window_Close const& msg) const noexcept
 {
   if (auto it = std::ranges::find(ctx._windows, msg.handle, [](auto const& pair) { return pair.second.snap.handle; }); it != ctx._windows.end())
   {
@@ -14,12 +14,12 @@ void UIContext::MessageHandler::operator()(Message_Window_Close msg) const noexc
   std::unreachable();
 }
 
-void UIContext::MessageHandler::operator()(Message_Cursor_On_Window msg) const noexcept
+void UIContext::MessageHandler::operator()(Message_Cursor_On_Window const& msg) const noexcept
 {
   ctx.cursor_on_window = msg.handle;
 }
 
-void UIContext::MessageHandler::operator()(Message_Update_Mouse_State msg) const noexcept
+void UIContext::MessageHandler::operator()(Message_Update_Mouse_State const& msg) const noexcept
 {
   if (std::ranges::any_of(ctx._mouse_state_queue, [=](auto message) { return message.state == msg.state; }))
     return;
@@ -33,12 +33,42 @@ void UIContext::process_mouse_state() noexcept
   _mouse_state_queue.pop_front();
 }
 
-void UIContext::MessageHandler::operator()(Message_Update_Moving msg) const noexcept
+void UIContext::MessageHandler::operator()(Message_Update_Moving const& msg) const noexcept
 {
   auto& wnd = ctx.get_window(msg.handle);
   wnd.snap.moving = msg.moving;
   wnd.snap.x      = msg.x;
   wnd.snap.y      = msg.y;
+}
+
+void UIContext::MessageHandler::operator()(Message_Update_Resizing const& msg) const noexcept
+{
+  auto& wnd = ctx.get_window(msg.handle);
+  wnd.snap.resizing = msg.resizing;
+  wnd.snap.x        = msg.x;
+  wnd.snap.y        = msg.y;
+  wnd.snap.width    = msg.width;
+  wnd.snap.height   = msg.height;
+}
+
+void UIContext::MessageHandler::operator()(Message_Window_Maximize const& msg) const noexcept
+{
+  auto& wnd = ctx.get_window(msg.handle);
+  wnd.snap.maximized = true;
+  wnd.snap.x         = msg.x;
+  wnd.snap.y         = msg.y;
+  wnd.snap.width     = msg.width;
+  wnd.snap.height    = msg.height;
+}
+
+void UIContext::MessageHandler::operator()(Message_Window_Restore const& msg) const noexcept
+{
+  auto& wnd = ctx.get_window(msg.handle);
+  wnd.snap.maximized = false;
+  wnd.snap.x         = msg.x;
+  wnd.snap.y         = msg.y;
+  wnd.snap.width     = msg.width;
+  wnd.snap.height    = msg.height;
 }
 
 }}

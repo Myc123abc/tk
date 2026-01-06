@@ -241,6 +241,7 @@ public:
     static ImagePool instance;
     return &instance;
   }
+
   auto alloc() noexcept { return _image_pool.alloc(); }
 
   auto operator[](ImageHandle handle) noexcept -> Image& { return *_image_pool.get(handle); }

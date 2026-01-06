@@ -93,6 +93,29 @@ auto get_mouse_state() -> window::MouseState
   return g_ui_ctx.get_mouse_state();
 }
 
+void add_move_invalid_area(glm::vec2 left_top, glm::vec2 right_bottom) noexcept
+{
+  g_ui_ctx.check_draw();
+
+  auto offset = g_ui_ctx.render_pos();
+  left_top     += offset;
+  right_bottom += offset;
+
+  g_ui_ctx._window->add_move_invald_areas(
+  {
+    static_cast<LONG>(left_top.x),
+    static_cast<LONG>(left_top.y),
+    static_cast<LONG>(right_bottom.x),
+    static_cast<LONG>(right_bottom.y)
+  });
+}
+
+auto window_extent() noexcept -> glm::vec2
+{
+  g_ui_ctx.check_draw();
+  return { g_ui_ctx._window->snap.width, g_ui_ctx._window->snap.height };
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 ///                            Shape Operator
 ////////////////////////////////////////////////////////////////////////////////
@@ -107,6 +130,25 @@ auto get_render_pos() noexcept -> glm::vec2
 {
   g_ui_ctx.check_draw();
   return g_ui_ctx.get_render_pos();
+}
+
+void discard_rectangle(glm::vec2 left_top, glm::vec2 right_bottom) noexcept
+{
+  g_ui_ctx.check_draw();
+  
+  auto render_data = g_ui_ctx.render_data();
+  err_if(render_data->shape_properties.empty(), "failed must draw a shape then use discard rectangle");
+  err_if(g_ui_ctx.is_union_draw(), "don't use discard rectangle in union operator, I'm not test for this");
+  err_if(g_ui_ctx.is_path_draw(), "don't use discard rectangle in part draw, I'm not test for this");
+
+  auto& shape_property = render_data->shape_properties.back();
+  shape_property.set_operator(ShapeProperty::Operator::discard);
+
+  auto offset = g_ui_ctx.render_pos();
+  left_top     += offset;
+  right_bottom += offset;
+
+  g_ui_ctx.add_shape_property(ShapeProperty::Type::rectangle, {}, {}, { left_top.x, left_top.y, right_bottom.x, right_bottom.y });
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -234,11 +276,11 @@ auto is_click_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
   right_bottom += offset;
 
   auto window = g_ui_ctx._window;
-  if (!window->is_active()                 ||
-      !window->is_cursor_valid_area()      ||
-		   window->is_moving_or_resizing()     ||
-      !g_ui_ctx.mouse_down_pos.has_value() ||
-      !g_ui_ctx.mouse_up_pos.has_value()   ||
+  if (!window->is_active()             ||
+      !window->is_cursor_valid_area()  ||
+		   window->is_moving_or_resizing() ||
+      !g_ui_ctx.mouse_down_pos         ||
+      !g_ui_ctx.mouse_up_pos           ||
        g_ui_ctx.mouse_down_window != g_ui_ctx.mouse_up_window) return false;
   return point_on(g_ui_ctx.mouse_down_pos.value(), left_top, right_bottom) &&
          point_on(g_ui_ctx.mouse_up_pos.value(),   left_top, right_bottom);
@@ -269,30 +311,8 @@ auto button(
   // when cursor hover on it, it will change color to hovered color
   auto is_hovered = ui::is_hover_on(name, left_top, right_bottom);
 
-  auto color_lerpolator = g_ui_ctx.get_color_lerpolator(id, button_color, button_hover_color, 200'000);
-
-  if (is_hovered)
-  {
-    if (color_lerpolator->is_not_started())
-      color_lerpolator->start();
-  }
-  else
-  {
-    if (color_lerpolator->is_finished())
-    {
-      color_lerpolator->reverse();
-      color_lerpolator->start();
-    }
-    else if (color_lerpolator->is_started() && !color_lerpolator->is_reversed())
-      color_lerpolator->reverse();
-  }
-
-  color_lerpolator->update(ui::delta_time());
-
-  button_color = color_lerpolator->get();
-
-  if (color_lerpolator->is_finished() && color_lerpolator->is_reversed())
-    g_ui_ctx.remove_color_lerpolator(id);
+  auto value = g_ui_ctx.ping_pong_lerp(is_hovered, id, 200'000);
+  button_color = color_lerp(button_color, button_hover_color, value);
 
   // when mouse down, color also change
   if (mouse_down_color &&
@@ -301,40 +321,24 @@ auto button(
        ui::get_mouse_state() == window::MouseState::left_button_press))
     button_color = mouse_down_color.value();
 
-  // TODO: more detail of click
-
   // draw button
   ui::rectangle(left_top, right_bottom, button_color);
 
-  // TODO: draw icon
-
-  return is_hovered && ui::is_click_on(left_top, right_bottom);
-
-#if 0
-  auto lerp_anim  = g_ui_ctx.add_lerp_anim(id, 200);
-  auto lerp_value = lerp_anim->get_lerp();
-
-  auto left_top     = glm::vec2{ x,         y          };
-  auto right_bottom = glm::vec2{ x + width, y + height };
-
-  auto hovered = g_ui_ctx.is_hover_on(id, left_top, right_bottom, lerp_anim);
-
-  g_ui_ctx.enable_tmp_color(color_lerp(button_color, button_hover_color, lerp_value));
-  ui::rectangle(left_top, right_bottom);
-  g_ui_ctx.disable_tmp_color();
-
-  auto x_offset = (width  - icon_width)  / 2;
-  auto y_offset = (height - icon_height) / 2;
-
-  Tmp_Render_Pos(x + x_offset, y + y_offset)
+  // draw icon
+  if (icon_update_func)
   {
-    g_ui_ctx.enable_tmp_color(color_lerp(icon_color, icon_hover_color, lerp_value));
-    if (icon_update_func) icon_update_func(icon_width, icon_height);
-    g_ui_ctx.disable_tmp_color();
+    icon_color = color_lerp(icon_color, icon_hover_color, value);
+    auto x_offset = (width  - icon_width)  / 2;
+    auto y_offset = (height - icon_height) / 2;
+    Tmp_Render_Pos(x + x_offset, y + y_offset)
+    {
+      g_ui_ctx.enable_tmp_color(icon_color);
+      icon_update_func(icon_width, icon_height);
+      g_ui_ctx.disable_tmp_color();
+    }
   }
 
-  return hovered && is_click_on(left_top, right_bottom);
-#endif
+  return is_hovered && ui::is_click_on(left_top, right_bottom);
 }
 
 }}

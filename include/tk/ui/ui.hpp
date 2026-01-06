@@ -83,6 +83,22 @@ void end() noexcept;
  */
 auto get_mouse_state() -> window::MouseState;
 
+/**
+ * set cursor move invalid area
+ * every frame rendering will be reset
+ * @param x
+ * @param y
+ * @param width
+ * @param height
+ */
+void add_move_invalid_area(glm::vec2 left_top, glm::vec2 right_bottom) noexcept;
+
+/**
+ * get window extent in current update function of window
+ * @return extent of window
+ */
+auto window_extent() noexcept -> glm::vec2;
+
 ////////////////////////////////////////////////////////////////////////////////
 ///                            Shape Operator
 ////////////////////////////////////////////////////////////////////////////////
@@ -102,6 +118,13 @@ auto get_render_pos() noexcept -> glm::vec2;
   for (auto __call_once = true; __call_once;) \
     for (auto __old_render_pos = get_render_pos(); __call_once; set_render_pos(__old_render_pos.x, __old_render_pos.y)) \
       for (set_render_pos(__x, __y); __call_once; __call_once = false)
+
+/**
+ * discard the pixel of specific rectangle for last draw shape
+ * @param left_top
+ * @param right_bottom
+ */
+void discard_rectangle(glm::vec2 left_top, glm::vec2 right_bottom) noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                            Geometry

@@ -8,6 +8,29 @@ using namespace tk::renderer;
 
 namespace tk { namespace ui {
 
+void Window::add_move_invald_areas(RECT rect) noexcept
+{
+  auto idx = 1 - move_invalid_areas_idx.load(std::memory_order_relaxed);
+  move_invalid_areas[idx].emplace_back(rect);
+}
+
+void Window::clear_move_invalid_areas() noexcept
+{
+  auto idx = 1 - move_invalid_areas_idx.load(std::memory_order_relaxed);
+  move_invalid_areas[idx].clear();
+}
+
+void Window::switch_move_invalid_areas() noexcept
+{
+  auto idx = 1 - move_invalid_areas_idx.load(std::memory_order_relaxed);
+  move_invalid_areas_idx.store(idx, std::memory_order_release);
+}
+
+auto Window::access_move_invliad_areas() noexcept -> std::vector<RECT>&
+{
+  return move_invalid_areas[move_invalid_areas_idx.load(std::memory_order_acquire)];
+}
+
 void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint32_t height, bool* is_closed, WindowConfig cfg) noexcept
 {
   err_if(_call_begin, "begin is called but end not be called");
@@ -20,6 +43,7 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
     _window = &_windows[name.data()];
     _window_names.emplace(_window->snap.handle, name.data());
     _window->can_be_closed = is_closed;
+    for (auto& handle : _window->datas) handle = g_render_data_pool.alloc();
   }
 
   _window = &_windows[name.data()];
@@ -33,12 +57,17 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
 
   if (_window->cfg.display_title_bar)
     set_render_pos(0, Title_Bar_Height);
+
+  _window->clear_move_invalid_areas();
 }
 
 void UIContext::end() noexcept
 {
   err_if(!_call_begin, "begin is not called but end is called");
+  if (_window->cfg.display_title_bar)
+    add_title_bar();
   _call_begin = false;
+  _window->switch_move_invalid_areas();
 }
 
 void UIContext::check_draw() const noexcept
@@ -56,29 +85,28 @@ void UIContext::check_path_not_draw() const noexcept
   err_if(_path_begin, "calling path begin to draw path, cannot be used in non-path draw");
 }
 
-void UIContext::render() noexcept
+void UIContext::close_window() noexcept
 {
-  // add render data and destroy closed window
-  for (auto it = _windows.begin(); it != _windows.end();)
+  std::erase_if(_windows, [this](auto& pair)
   {
-    auto& window = it->second;
+    auto& window = pair.second;
     if (window.is_called)
     {
-      // TODO: move add title bar to ui::end
-      //       and some clear and init to ui::begin
-      // if (window.cfg.display_title_bar)
-      //   add_title_bar();
       window.is_called = false;
-      ++it;
+      return false;
     }
     else
     {
-      // destroy
-      g_wnd_mgr.close_window(window.snap.handle);
+      g_wnd_mgr.close_window(window.snap.handle, { window.datas.begin(), window.datas.end() });
       _window_names.erase(window.snap.handle);
-      it = _windows.erase(it);
+      return true;
     }
-  }
+  });
+}
+
+void UIContext::render() noexcept
+{
+  close_window();
 
   // acquire frame, for synchronous with present vsync
   g_renderer.acquire_frame();
@@ -220,36 +248,44 @@ auto UIContext::is_hover_on(size_t id, glm::vec2 left_top, glm::vec2 right_botto
   return false;
 }
 
-void add_title_bar() noexcept
+void UIContext::add_title_bar() noexcept
 {
   auto btn_width   = Title_Bar_Button_Width;
   auto btn_height  = Title_Bar_Height;
   auto icon_width  = Title_Bar_Button_Icon_Width;
   auto icon_height = Title_Bar_Button_Icon_Height;
-#if 0
+
   uint32_t background_colors[2] = { 0xffffffff, 0xeeeeeeff };
-  auto i = is_active() || is_moving() || is_resizing();
+  auto is_active        = _window->is_active();
+  auto value            = ping_pong_lerp(is_active, generic_id("tk::ui::update_title_bar_background_color"), 200'000);
+  auto background_color = color_lerp(background_colors[0], background_colors[1], value);
 
-  auto background_color = color_lerp(background_colors[0], background_colors[1], add_lerp_anim(generic_id("__update_title_bar"), 200)->update(i).get_lerp());
+  auto btn_mouse_down_color       = 0xb0b0b0ff;
+  auto btn_hovered_color          = is_active ? 0xcececeff : 0xddddddff;
+  auto close_btn_mouse_down_color = 0xea6a75ff;
+  auto close_btn_hovered_color    = is_active ? 0xe81123ff : 0xe81123ff;
 
-  auto [w, h] = window_extent();
+  auto w = _window->snap.width;
+  auto h = _window->snap.height;
 
   Tmp_Render_Pos(0, 0)
   {
     ui::rectangle({}, { w, btn_height }, background_color);
     ui::add_move_invalid_area({ 0, btn_height }, { w, h });
 
+    auto handle = _window->snap.handle;
+
     // minimize button
-    if (button(w - btn_width * 3, 0, btn_width, btn_height, background_color, 0x0cececeff,
+    if (button("tk::ui::title_bar_minimize_button", w - btn_width * 3, 0, btn_width, btn_height, background_color, btn_hovered_color, btn_mouse_down_color,
       [] (uint32_t width, uint32_t height) { ui::line({ 0, height / 2 }, { width, height / 2 }); },
       icon_width, icon_height, 0x395063ff, 0x395063ff))
-      minimize_window();
+      g_wnd_mgr.minimize_window(handle);
 
     // maximize / restore button
-    if (button(w - btn_width * 2, 0, btn_width, btn_height, background_color, 0x0cececeff,
+    if (button("tk::ui::title_bar_maximize_restore_button", w - btn_width * 2, 0, btn_width, btn_height, background_color, btn_hovered_color, btn_mouse_down_color,
       [&] (uint32_t width, uint32_t height)
       {
-        if (is_maxmized())
+        if (_window->snap.maximized)
         {
           auto padding_x = width / 5;
           auto padding_y = width / 5;
@@ -261,20 +297,19 @@ void add_title_bar() noexcept
           ui::rectangle({}, { width, height }, 0, 1);
       },
       icon_width, icon_height, 0x395063ff, 0x395063ff))
-      is_maxmized() ? restore_window() : maximize_window();
+      _window->snap.maximized ? g_wnd_mgr.restore_window(handle) : g_wnd_mgr.maximize_window(handle);
 
     // close button
-    if (button(w - btn_width, 0, btn_width, btn_height, background_color, 0xeb1123ff,
+    if (button("tk::ui::title_bar_close_button", w - btn_width, 0, btn_width, btn_height, background_color, close_btn_hovered_color, close_btn_mouse_down_color,
       [] (uint32_t width, uint32_t height)
       {
         ui::line({}, { width, height });
         ui::line({ width, 0 }, { 0, height });
       }, icon_width, icon_height, 0x395063ff, 0xffffffff))
-      close_window();
+      _window->is_closed = true;
 
     ui::add_move_invalid_area({ w - btn_width * 3, 0 }, { w, btn_width });
   }
-#endif
 }
 
 auto UIContext::generic_id(std::string_view name) const noexcept -> size_t
@@ -284,17 +319,53 @@ auto UIContext::generic_id(std::string_view name) const noexcept -> size_t
   return id;
 }
 
-auto UIContext::get_color_lerpolator(size_t id, Color beg, Color end, double duration) noexcept -> ColorLerpolator*
+auto UIContext::get_lerpolator(size_t id, double duration) noexcept -> Lerpolator*
 {
-  if (!_color_lerpolators.contains(id))
-    _color_lerpolators[id].init(beg, end, duration);
-  return &_color_lerpolators.at(id);
+  if (!_lerpolators.contains(id))
+    _lerpolators[id].init(duration);
+  return &_lerpolators.at(id);
 }
 
-void UIContext::remove_color_lerpolator(size_t id) noexcept
+void UIContext::remove_lerpolator(size_t id) noexcept
 {
-  err_if(!_color_lerpolators.contains(id), "remove an unexist color lerpolator");
-  _color_lerpolators.erase(id);
+  err_if(!_lerpolators.contains(id), "remove an unexist color lerpolator");
+  _lerpolators.erase(id);
+}
+
+auto UIContext::ping_pong_lerp(bool b, size_t id, double duration) noexcept -> double
+{
+  auto lerpolator = g_ui_ctx.get_lerpolator(id, duration);
+
+  if (b)
+  {
+    if (lerpolator->is_not_started())
+      lerpolator->start();
+  }
+  else
+  {
+    if (lerpolator->is_finished())
+    {
+      lerpolator->reverse();
+      lerpolator->start();
+    }
+    else if (lerpolator->is_started() && !lerpolator->is_reversed())
+      lerpolator->reverse();
+  }
+
+  lerpolator->update(ui::delta_time());
+
+  auto value = lerpolator->get();
+
+  if (lerpolator->is_finished() && lerpolator->is_reversed())
+    g_ui_ctx.remove_lerpolator(id);
+
+  return value;
+}
+
+auto UIContext::access_move_invalid_areas(HWND handle) noexcept -> std::vector<RECT>&
+{
+  auto& window = get_window(handle);
+  return window.access_move_invliad_areas();
 }
 
 }}

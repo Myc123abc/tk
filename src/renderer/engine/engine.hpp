@@ -18,7 +18,6 @@ public:
   Engine& operator=(Engine const&) = delete;
   Engine& operator=(Engine&&)      = delete;
 
-  [[nodiscard]]
   auto signal() noexcept -> uint64_t;
   [[nodiscard]]
   auto submit(std::initializer_list<ID3D12GraphicsCommandList*> cmds) noexcept -> uint64_t;

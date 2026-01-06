@@ -48,11 +48,13 @@ void WindowManager::init() noexcept
     PeekMessageW(nullptr, nullptr, 0, 0, PM_NOREMOVE);
     _message_queue_create_complete.count_down();
 
+    _signal_event = CreateEvent(nullptr, false, false, nullptr);
+
     // message loop
     MSG msg{};
     while (GetMessageW(&msg, nullptr, 0, 0))
     {
-      if (msg.message == WM_QUIT) return;
+      if (msg.message == WM_QUIT) break;
       TranslateMessage(&msg);
       DispatchMessageW(&msg);
       message_process(msg.hwnd, static_cast<Message>(msg.message), msg.wParam, msg.lParam);
@@ -60,10 +62,17 @@ void WindowManager::init() noexcept
   });
 }
 
+void WindowManager::wait_event_process_complete() const noexcept
+{
+  PostThreadMessageW(_thread_id, std::bit_cast<UINT>(Message::signal), 0, 0);
+  WaitForSingleObject(_signal_event, INFINITE);
+}
+
 void WindowManager::destroy() noexcept
 {
   PostThreadMessageW(_thread_id, WM_QUIT, 0, 0);
   _thread.join();
+  CloseHandle(_signal_event);
 }
 
 LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param) noexcept
@@ -71,7 +80,6 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   static auto& wnd_mgr = WindowManager::instance();
   static auto& windows = wnd_mgr._windows;
 
-  static auto last_cursor_pos                   = glm::vec<2, int>{};
   static auto window_left_button_down_mouse_pos = std::optional<glm::vec<2, int>>{};
 
   static auto finish_moving_or_resizing = [&](HWND handle)
@@ -101,7 +109,8 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   case WM_LBUTTONDOWN:
   {
     SetCapture(handle);
-    window_left_button_down_mouse_pos = windows.at(handle).cursor_pos();
+    auto& window = windows.at(handle);
+    window_left_button_down_mouse_pos = window.cursor_pos();
     assert(window_left_button_down_mouse_pos->x >= 0 && window_left_button_down_mouse_pos->y >= 0);
 
     wnd_mgr._mouse_state           = MouseState::left_button_down;
@@ -113,16 +122,26 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
 
   case WM_MOUSEMOVE:
   {
-    auto& window = wnd_mgr._windows.at(handle);
-
-    if (window_left_button_down_mouse_pos)
+    if (wnd_mgr._mouse_state == MouseState::left_button_down ||
+        wnd_mgr._mouse_state == MouseState::left_button_press)
     {
-      auto pos = get_cursor_pos();
-      window.moving_with_pos(pos.x - window_left_button_down_mouse_pos->x, pos.y - window_left_button_down_mouse_pos->y);
-      SetWindowPos(handle, 0, window.x, window.y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+      // TODO: cannot moving when moving from maximize
+      auto pt = POINT{ window_left_button_down_mouse_pos->x, window_left_button_down_mouse_pos->y };
+      if (std::ranges::any_of(g_ui_ctx.access_move_invalid_areas(handle), [pt](auto rect) { return PtInRect(&rect, pt); }))
+        break;
+
+      auto  pos     = get_cursor_pos();
+      auto  new_pos = pos - window_left_button_down_mouse_pos.value();
+      auto& window  = wnd_mgr._windows.at(handle);
+      if (window.maximized)
+      {
+        window.moving_from_maximize(pos.x, pos.y);
+        window_left_button_down_mouse_pos = window.cursor_pos();
+        assert(window_left_button_down_mouse_pos->x >= 0 && window_left_button_down_mouse_pos->y >= 0);
+      }
+      else
+        window.moving_with_pos(new_pos.x, new_pos.y);
     }
-    
-    last_cursor_pos = get_cursor_pos();
     break;
   }
 
@@ -169,9 +188,27 @@ auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height)
   return snap;
 }
 
-void WindowManager::close_window(HWND handle) noexcept
+void WindowManager::close_window(HWND handle, std::vector<RenderDataHandle>&& datas) const noexcept
 {
-  PostThreadMessageW(_thread_id, static_cast<UINT>(Message::close_window), std::bit_cast<WPARAM>(handle), 0);
+  auto size = sizeof(RenderDataHandle) * datas.size();
+  auto ptr  = malloc(size);
+  memcpy(ptr, datas.data(), size);
+  PostThreadMessageW(_thread_id, static_cast<UINT>(Message::close_window), std::bit_cast<WPARAM>(handle), std::bit_cast<LPARAM>(ptr));
+}
+
+void WindowManager::minimize_window(HWND handle) const noexcept
+{
+  PostThreadMessageW(_thread_id, static_cast<UINT>(Message::minimize_window), std::bit_cast<WPARAM>(handle), 0);
+}
+
+void WindowManager::maximize_window(HWND handle) const noexcept
+{
+  PostThreadMessageW(_thread_id, static_cast<UINT>(Message::maximize_window), std::bit_cast<WPARAM>(handle), 0);
+}
+
+void WindowManager::restore_window(HWND handle) const noexcept
+{
+  PostThreadMessageW(_thread_id, static_cast<UINT>(Message::restore_window), std::bit_cast<WPARAM>(handle), 0);
 }
 
 void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LPARAM l_param) noexcept
@@ -184,9 +221,35 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
     break;
   }
 
+  case Message::signal:
+  {
+    SetEvent(_signal_event);
+    break;
+  }
+
   case Message::close_window:
   {
-    msg_close_window(std::bit_cast<HWND>(w_param));
+    auto handle = std::bit_cast<HWND>(w_param);
+    _windows[handle].destroy(std::bit_cast<RenderDataHandle*>(l_param));
+    _windows.erase(handle);
+    break;
+  }
+
+  case Message::minimize_window:
+  {
+    ShowWindow(std::bit_cast<HWND>(w_param), SW_MINIMIZE);
+    break;
+  }
+
+  case Message::maximize_window:
+  {
+    _windows[std::bit_cast<HWND>(w_param)].maximize();
+    break;
+  }
+
+  case Message::restore_window:
+  {
+    _windows[std::bit_cast<HWND>(w_param)].restore();
     break;
   }
 
@@ -202,12 +265,6 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
   {
     if (w_param == _timer_mouse_state)
       update_mouse_state();
-  }
-
-  for (auto& [handle, window] : _windows)
-  {
-    // TODO:
-    // window.clear_invalid_area();
   }
 
   // send update message to ui context
@@ -240,12 +297,6 @@ void WindowManager::msg_create_window(WPARAM w_param) noexcept
 
   // notice window create complete
   SetEvent(info->event);
-}
-
-void WindowManager::msg_close_window(HWND handle) noexcept
-{
-  _windows[handle].destroy();
-  _windows.erase(handle);
 }
 
 auto WindowManager::get_window_z_orders() const noexcept -> std::vector<HWND>

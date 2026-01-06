@@ -12,7 +12,7 @@ namespace tk { namespace renderer {
 void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
 {
   // create offscreen images
-  for (auto [i, frame] : _frames | std::views::enumerate)
+  for (auto& frame : _frames)
   {
     frame.image = g_image_pool.alloc();
     g_image_pool[frame.image].init(ImageType::rtv, Render_Target_Format, width, height);
@@ -89,6 +89,42 @@ void RenderResource::destroy() noexcept
     g_image_pool.free(frame.swapchain_image);
     frame.buffer.destroy();
   }
+}
+
+void RenderResource::resize(uint32_t width, uint32_t height) noexcept
+{
+  // wait gpu complete
+  g_graphics_engine.signal();
+  WaitForSingleObjectEx(g_graphics_engine.set_event_on_completion(), INFINITE, false);
+
+  // reset swapchain relatation resources
+  for (auto& frame : _frames)
+  {
+    g_image_pool[frame.swapchain_image].destroy();
+    g_image_pool[frame.image].destroy();
+  }
+  _comp_visual->SetContent(nullptr);
+  if (Enable_Depth_Test)
+    g_image_pool[_dsv_image].destroy();
+
+  // resize swapchain
+  err_if(_swapchain->ResizeBuffers(Frame_Count, width, height, DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT | DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING),
+          "failed to resize swapchain");
+
+  // rebind composition resources
+  err_if(_comp_visual->SetContent(_swapchain.Get()),
+          "failed to bind swapchain to composition visual");
+  err_if(g_core.comp_device()->Commit(),
+          "failed to commit composition device");
+  
+  // recreate images
+  for (auto [i, frame] : _frames | std::views::enumerate)
+  {
+    g_image_pool[frame.swapchain_image].resize(_swapchain.Get(), i);
+    g_image_pool[frame.image].resize(width, height);
+  }
+  if (Enable_Depth_Test)
+    g_image_pool[_dsv_image].resize(width, height);
 }
 
 void RenderResource::wait_frame_complete() const noexcept

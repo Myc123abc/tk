@@ -24,6 +24,8 @@ public:
   void init(HWND handle, uint32_t width, uint32_t height) noexcept;
   void destroy() noexcept;
 
+  void resize(uint32_t width, uint32_t height) noexcept;
+
   void wait_frame_complete() const noexcept;
 
   void render_begin() noexcept;

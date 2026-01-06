@@ -92,14 +92,24 @@ public:
     uint32_t width{};
     uint32_t height{};
   };
+
   struct Message_Window_Destroy
   {
-    HWND handle{};
+    HWND              handle{};
+    RenderDataHandle* ptr{};
+  };
+
+  struct Message_Window_Update
+  {
+    HWND     handle{};
+    uint32_t width{};
+    uint32_t height{};
   };
 
   using Message = std::variant<
     Message_Window_Create,
-    Message_Window_Destroy
+    Message_Window_Destroy,
+    Message_Window_Update
   >;
 
   void send_message(Message&& msg) noexcept
@@ -111,8 +121,9 @@ private:
   struct MessageHandler
   {
     Renderer& renderer;
-    void operator()(Message_Window_Create msg) const noexcept;
-    void operator()(Message_Window_Destroy msg) const noexcept;
+    void operator()(Message_Window_Create const& msg) const noexcept;
+    void operator()(Message_Window_Destroy const& msg) const noexcept;
+    void operator()(Message_Window_Update const& msg) const noexcept;
   };
   MessageQueue<Message, Renderer_Msg_Queue_Capacity> _msg_queue;
 };

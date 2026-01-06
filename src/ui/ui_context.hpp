@@ -5,7 +5,8 @@
 #include "../renderer/config.hpp"
 #include "../util/message_queue.hpp"
 #include "config.hpp"
-#include "color_lerpolator.hpp"
+#include "ui/ui.hpp"
+#include "lerpolator.hpp"
 
 #include <windows.h>
 
@@ -44,11 +45,19 @@ struct Window
   WindowConfig cfg{};
   glm::vec2    render_pos{};
 
-  uint32_t                                                frame_index{};
-  std::array<renderer::RenderData, renderer::Frame_Count> datas;
+  uint32_t                                                      frame_index{};
+  std::array<renderer::RenderDataHandle, renderer::Frame_Count> datas;
 
-  auto data()       noexcept { return &datas[frame_index];                     }
-  void next_frame() noexcept { frame_index = (frame_index + 1) % datas.size(); }
+  auto data()       noexcept { return &renderer::g_render_data_pool[datas[frame_index]]; }
+  void next_frame() noexcept { frame_index = (frame_index + 1) % datas.size();           }
+
+  std::array<std::vector<RECT>, 2> move_invalid_areas{};
+  std::atomic_uint32_t             move_invalid_areas_idx{};
+
+  void add_move_invald_areas(RECT rect) noexcept;
+  void clear_move_invalid_areas() noexcept;
+  void switch_move_invalid_areas() noexcept;
+  auto access_move_invliad_areas() noexcept -> std::vector<RECT>&;
 };
 
 class UIContext
@@ -68,6 +77,9 @@ public:
     return instance;
   }
 
+  void close_window() noexcept;
+  void destroy() noexcept { close_window(); }
+
   void begin(std::string_view name, int x, int y, uint32_t width, uint32_t height, bool* is_closed, WindowConfig cfg) noexcept;
   void end() noexcept;
 
@@ -84,6 +96,7 @@ public:
   void add_shape(renderer::ShapeProperty::Type type, glm::vec4 color, float thickness, std::vector<float> const& values, std::pair<glm::vec2, glm::vec2> bounding_rectangle) noexcept;
 
   auto is_path_draw() const noexcept { return _path_begin; }
+  auto is_union_draw() const noexcept { return _union_begin; }
 
   auto is_hover_on(size_t id, glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool;
 
@@ -97,8 +110,11 @@ public:
 
   auto delta_time() const noexcept { return _delta_time; }
 
-  auto get_color_lerpolator(size_t id, Color beg, Color end, double duration) noexcept -> ColorLerpolator*;
-  void remove_color_lerpolator(size_t id) noexcept;
+  auto get_lerpolator(size_t id, double duration) noexcept -> Lerpolator*;
+  void remove_lerpolator(size_t id) noexcept;
+  auto ping_pong_lerp(bool b, size_t id, double duration) noexcept -> double;
+
+  auto access_move_invalid_areas(HWND handle) noexcept -> std::vector<RECT>&;
 
 private:
   void update() noexcept;
@@ -117,6 +133,7 @@ private:
 
   bool                                    _call_begin{};
   bool                                    _path_begin{};
+  bool                                    _union_begin{};
 public:
   std::vector<float>                      path_data;
   std::vector<glm::vec2>                  path_points;
@@ -129,15 +146,14 @@ private:
     uint32_t                          offset{};
   } _op_data;
 
-  // FIXME: discard?
   std::optional<glm::vec4> _tmp_color;
 
   double _delta_time{};
 
-  std::unordered_set<size_t>                  _hovered_widget_ids;
-  size_t                                      _last_hovered_widget_id{};
-  size_t                                      _prev_hovered_widget_id{};
-  std::unordered_map<size_t, ColorLerpolator> _color_lerpolators;
+  std::unordered_set<size_t>             _hovered_widget_ids;
+  size_t                                 _last_hovered_widget_id{};
+  size_t                                 _prev_hovered_widget_id{};
+  std::unordered_map<size_t, Lerpolator> _lerpolators;
 
   std::unordered_set<size_t> _ids;
 
@@ -179,11 +195,42 @@ public:
     int  y{};
   };
 
+  struct Message_Update_Resizing
+  {
+    HWND     handle{};
+    bool     resizing{};
+    int      x{};
+    int      y{};
+    uint32_t width{};
+    uint32_t height{};
+  };
+
+  struct Message_Window_Maximize
+  {
+    HWND     handle{};
+    int      x{};
+    int      y{};
+    uint32_t width{};
+    uint32_t height{};
+  };
+
+  struct Message_Window_Restore
+  {
+    HWND     handle{};
+    int      x{};
+    int      y{};
+    uint32_t width{};
+    uint32_t height{};
+  };
+
   using Message = std::variant<
     Message_Window_Close,
     Message_Cursor_On_Window,
     Message_Update_Mouse_State,
-    Message_Update_Moving
+    Message_Update_Moving,
+    Message_Update_Resizing,
+    Message_Window_Maximize,
+    Message_Window_Restore
   >;
 
   void send_message(Message&& msg) noexcept
@@ -195,10 +242,13 @@ private:
   struct MessageHandler
   {
     UIContext& ctx;
-    void operator()(Message_Window_Close msg) const noexcept;
-    void operator()(Message_Cursor_On_Window msg) const noexcept;
-    void operator()(Message_Update_Mouse_State msg) const noexcept;
-    void operator()(Message_Update_Moving msg) const noexcept;
+    void operator()(Message_Window_Close const& msg) const noexcept;
+    void operator()(Message_Cursor_On_Window const& msg) const noexcept;
+    void operator()(Message_Update_Mouse_State const& msg) const noexcept;
+    void operator()(Message_Update_Moving const& msg) const noexcept;
+    void operator()(Message_Update_Resizing const& msg) const noexcept;
+    void operator()(Message_Window_Maximize const& msg) const noexcept;
+    void operator()(Message_Window_Restore const& msg) const noexcept;
   };
   MessageQueue<Message, UI_Message_Queue_Capacity> _msg_queue;
   std::deque<Message_Update_Mouse_State>           _mouse_state_queue;
