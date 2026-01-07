@@ -125,14 +125,14 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     if (wnd_mgr._mouse_state == MouseState::left_button_down ||
         wnd_mgr._mouse_state == MouseState::left_button_press)
     {
-      // TODO: cannot moving when moving from maximize
-      auto pt = POINT{ window_left_button_down_mouse_pos->x, window_left_button_down_mouse_pos->y };
-      if (std::ranges::any_of(g_ui_ctx.access_move_invalid_areas(handle), [pt](auto rect) { return PtInRect(&rect, pt); }))
+      auto& window = wnd_mgr._windows.at(handle);
+      auto  pt     = POINT{ window_left_button_down_mouse_pos->x, window_left_button_down_mouse_pos->y };
+      if (!window._moving_from_maximize &&
+          std::ranges::any_of(g_ui_ctx.access_move_invalid_areas(handle), [pt](auto rect) { return PtInRect(&rect, pt); }))
         break;
 
-      auto  pos     = get_cursor_pos();
-      auto  new_pos = pos - window_left_button_down_mouse_pos.value();
-      auto& window  = wnd_mgr._windows.at(handle);
+      auto pos     = get_cursor_pos();
+      auto new_pos = pos - window_left_button_down_mouse_pos.value();
       if (window.maximized)
       {
         window.moving_from_maximize(pos.x, pos.y);

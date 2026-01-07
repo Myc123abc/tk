@@ -37,7 +37,7 @@ public:
     {
       auto dx = delta / _dur;
       _x += _reversed ? -dx : dx;
-      _x = std::clamp(_x, 0.f, 1.f);
+      _x = std::clamp(_x, 0.0, 1.0);
       if (_x == 1.f || _reversed && _x == 0.f)
         _state = State::finished;
     }
@@ -50,14 +50,13 @@ public:
   }
 
   auto is_started()     const noexcept { return _state == State::started;     }
-  auto is_not_started() const noexcept { return _state == State::not_started; }
   auto is_finished()    const noexcept { return _state == State::finished;    }
   auto is_reversed()    const noexcept { return _reversed;                    }
   auto get()            const noexcept { return _x;                           }
 
 private:
   double _dur{};
-  float  _x{};
+  double _x{};
 
   enum class State
   {

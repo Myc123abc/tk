@@ -164,6 +164,7 @@ public:
   HWND                            mouse_up_window{};
   std::optional<glm::vec<2, int>> mouse_down_pos;
   std::optional<glm::vec<2, int>> mouse_up_pos;
+  bool                            is_moving_from_maximize{};
 private:
   window::MouseState              _mouse_state{};
 
@@ -223,6 +224,22 @@ public:
     uint32_t height{};
   };
 
+  struct Message_Window_Moving_From_Maximize
+  {
+    HWND     handle{};
+    int      x{};
+    int      y{};
+    uint32_t width{};
+    uint32_t height{};
+  };
+
+  struct Message_Window_Moving_From_Maximize_End
+  {
+    HWND handle{};
+    int  x{};
+    int  y{};
+  };
+
   using Message = std::variant<
     Message_Window_Close,
     Message_Cursor_On_Window,
@@ -230,7 +247,9 @@ public:
     Message_Update_Moving,
     Message_Update_Resizing,
     Message_Window_Maximize,
-    Message_Window_Restore
+    Message_Window_Restore,
+    Message_Window_Moving_From_Maximize,
+    Message_Window_Moving_From_Maximize_End
   >;
 
   void send_message(Message&& msg) noexcept
@@ -249,6 +268,8 @@ private:
     void operator()(Message_Update_Resizing const& msg) const noexcept;
     void operator()(Message_Window_Maximize const& msg) const noexcept;
     void operator()(Message_Window_Restore const& msg) const noexcept;
+    void operator()(Message_Window_Moving_From_Maximize const& msg) const noexcept;
+    void operator()(Message_Window_Moving_From_Maximize_End const& msg) const noexcept;
   };
   MessageQueue<Message, UI_Message_Queue_Capacity> _msg_queue;
   std::deque<Message_Update_Mouse_State>           _mouse_state_queue;

@@ -57,6 +57,7 @@ public:
 private:
   HWND     _handle{};
   bool     _moving{};
+  bool     _moving_from_maximize{};
   bool     _resizing{};
   RECT     _rect{};
   RECT     _backup_rect{};

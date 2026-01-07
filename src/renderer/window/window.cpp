@@ -60,11 +60,12 @@ auto Window::contains_point(glm::vec<2, int> p) const noexcept -> bool
 {
   return PtInRect(&_rect, { p.x, p.y });
 }
-static bool log = false;
+
 void Window::moving_from_maximize(int x, int y) noexcept
 {
   auto ratio_x = static_cast<float>(x) / width;
 
+  _moving_from_maximize = true;
   _moving   = true;
   maximized = false;
   width     = _backup_rect.right  - _backup_rect.left;
@@ -73,8 +74,7 @@ void Window::moving_from_maximize(int x, int y) noexcept
   this->y   = 0;
   update_rect();
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, width, height });
-  g_ui_ctx.send_message(UIContext::Message_Update_Moving{ _handle, _moving, this->x, this->y });
-  g_ui_ctx.send_message(UIContext::Message_Window_Restore{ _handle, this->x, this->y, width, height });
+  g_ui_ctx.send_message(UIContext::Message_Window_Moving_From_Maximize{ _handle, this->x, this->y, width, height });
   SetWindowPos(_handle, 0, this->x, this->y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
 };
 
@@ -91,7 +91,13 @@ void Window::moving_with_pos(int x, int y) noexcept
 void Window::moving_end() noexcept
 {
   _moving = false;
-  g_ui_ctx.send_message(UIContext::Message_Update_Moving{ _handle, _moving, x, y });
+  if (_moving_from_maximize)
+  {
+    _moving_from_maximize = false;
+    g_ui_ctx.send_message(UIContext::Message_Window_Moving_From_Maximize_End{ _handle, x, y });
+  }
+  else
+    g_ui_ctx.send_message(UIContext::Message_Update_Moving{ _handle, _moving, x, y });
 }
 
 // TODO: send resizing message

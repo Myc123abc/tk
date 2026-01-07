@@ -140,25 +140,28 @@ void UIContext::render() noexcept
 
 void UIContext::update() noexcept
 {
+  using namespace window;
+
   // clear state
   _ids.clear();
   if (mouse_up_window)
   {
-    mouse_down_window = {};
-    mouse_up_window   = {};
-    mouse_down_pos    = {};
-    mouse_up_pos      = {};
+    mouse_down_window       = {};
+    mouse_up_window         = {};
+    mouse_down_pos          = {};
+    mouse_up_pos            = {};
+    is_moving_from_maximize = {};
   }
 
   // update mouse state
-  for (auto const& window : _windows | std::views::values)
+  if (auto it = std::ranges::find_if(_windows, [](auto const& pair) { return pair.second.is_active(); }); it != _windows.end())
   {
-    using namespace window;
-    if (!window.is_active()) continue;
+    auto& window = it->second;
     if (_mouse_state == MouseState::left_button_down)
     {
-      mouse_down_window = window.snap.handle;
-      mouse_down_pos    = window.cursor_pos();
+      mouse_down_window       = window.snap.handle;
+      mouse_down_pos          = window.cursor_pos();
+      is_moving_from_maximize = window.snap.moving_from_maximize;
     }
     else if (_mouse_state == MouseState::left_button_up)
     {
@@ -179,6 +182,18 @@ void UIContext::update() noexcept
   auto now = std::chrono::steady_clock::now();
   _delta_time = static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(now - tp).count());
   tp          = now;
+
+  // fps
+  static auto acc_time = 0;
+  acc_time += _delta_time;
+  static auto count = 0;
+  ++count;
+  if (acc_time >= 1000'000)
+  {
+    info("fps {}", count);
+    acc_time = 0;
+    count    = 0;
+  }
 }
 
 void UIContext::add_vertices_indices(std::pair<glm::vec2, glm::vec2> bounding_rectangle) noexcept
@@ -255,10 +270,9 @@ void UIContext::add_title_bar() noexcept
   auto icon_width  = Title_Bar_Button_Icon_Width;
   auto icon_height = Title_Bar_Button_Icon_Height;
 
-  uint32_t background_colors[2] = { 0xffffffff, 0xeeeeeeff };
-  auto is_active        = _window->is_active();
-  auto value            = ping_pong_lerp(is_active, generic_id("tk::ui::update_title_bar_background_color"), 200'000);
-  auto background_color = color_lerp(background_colors[0], background_colors[1], value);
+  auto is_active = _window->is_active();
+  auto value     = ping_pong_lerp(is_active, generic_id("tk::ui::update_title_bar_background_color"), 200'000);
+  auto background_color = color_lerp(0xffffffff, 0xeeeeeeff, value);
 
   auto btn_mouse_down_color       = 0xb0b0b0ff;
   auto btn_hovered_color          = is_active ? 0xcececeff : 0xddddddff;
@@ -338,7 +352,7 @@ auto UIContext::ping_pong_lerp(bool b, size_t id, double duration) noexcept -> d
 
   if (b)
   {
-    if (lerpolator->is_not_started())
+    if (!lerpolator->is_finished())
       lerpolator->start();
   }
   else
