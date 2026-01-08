@@ -38,11 +38,9 @@ public:
   }
 
   void init() noexcept;
-
   void destroy() noexcept;
 
   void message_process() noexcept;
-
   void add_frame_render_complete_func(std::move_only_function<void()>&& func) noexcept;
 
   void acquire_frame() noexcept { _frame_sem.acquire(); }

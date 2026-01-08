@@ -64,6 +64,8 @@ private:
 
   Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList1> _graphics_cmd;
   Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList1> _copy_cmd;
+public:
+  bool                                               first_frame{ true };
 };
 
 

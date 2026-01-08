@@ -5,6 +5,7 @@
 #include "util/error_handling.hpp"
 #include "resource/descriptor_heap_manager.hpp"
 #include "compiler.hpp"
+#include "window/window_manager.hpp"
 
 #include <ranges>
 
@@ -104,6 +105,13 @@ void Renderer::render() noexcept
     res.render_begin();
     render_sdf(res, render_data->vertices, render_data->indices, render_data->shape_properties);
     res.render_end();
+
+    // only show window after first frame render complete
+    if (res.first_frame) [[unlikely]]
+    {
+      add_frame_render_complete_func([handle] { g_wnd_mgr.show_window(handle); });
+      res.first_frame = false;
+    }
 
     render_data->clear();
   }

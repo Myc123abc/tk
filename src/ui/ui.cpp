@@ -116,6 +116,14 @@ auto window_extent() noexcept -> glm::vec2
   return { g_ui_ctx._window->snap.width, g_ui_ctx._window->snap.height };
 }
 
+auto window_drawable_extent() noexcept -> glm::vec2
+{
+  auto extent = window_extent();
+  if (g_ui_ctx._window->cfg.display_title_bar)
+    extent.y -= Title_Bar_Height;
+  return extent;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 ///                            Shape Operator
 ////////////////////////////////////////////////////////////////////////////////

@@ -196,6 +196,11 @@ void WindowManager::close_window(HWND handle, std::vector<RenderDataHandle>&& da
   PostThreadMessageW(_thread_id, static_cast<UINT>(Message::close_window), std::bit_cast<WPARAM>(handle), std::bit_cast<LPARAM>(ptr));
 }
 
+void WindowManager::show_window(HWND handle) const noexcept
+{
+  PostThreadMessageW(_thread_id, static_cast<UINT>(Message::show_window), std::bit_cast<WPARAM>(handle), 0);
+}
+
 void WindowManager::minimize_window(HWND handle) const noexcept
 {
   PostThreadMessageW(_thread_id, static_cast<UINT>(Message::minimize_window), std::bit_cast<WPARAM>(handle), 0);
@@ -232,6 +237,12 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
     auto handle = std::bit_cast<HWND>(w_param);
     _windows[handle].destroy(std::bit_cast<RenderDataHandle*>(l_param));
     _windows.erase(handle);
+    break;
+  }
+
+  case Message::show_window:
+  {
+    ShowWindow(std::bit_cast<HWND>(w_param), SW_SHOW);
     break;
   }
 

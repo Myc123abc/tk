@@ -99,6 +99,12 @@ void add_move_invalid_area(glm::vec2 left_top, glm::vec2 right_bottom) noexcept;
  */
 auto window_extent() noexcept -> glm::vec2;
 
+/**
+ * get window extent in current update function of window
+ * @return extent of window without titlebar
+ */
+auto window_drawable_extent() noexcept -> glm::vec2;
+
 ////////////////////////////////////////////////////////////////////////////////
 ///                            Shape Operator
 ////////////////////////////////////////////////////////////////////////////////

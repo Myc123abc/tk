@@ -69,6 +69,7 @@ public:
   {
     create_window = WM_APP,
     close_window,
+    show_window,
     minimize_window,
     maximize_window,
     restore_window,
@@ -84,6 +85,7 @@ public:
 
   auto create_window(int x, int y, uint32_t width, uint32_t height) noexcept -> WindowSnapshot;
   void close_window(HWND handle, std::vector<RenderDataHandle>&& datas) const noexcept;
+  void show_window(HWND handle) const noexcept;
   void minimize_window(HWND handle) const noexcept;
   void maximize_window(HWND handle) const noexcept;
   void restore_window(HWND handle) const noexcept;

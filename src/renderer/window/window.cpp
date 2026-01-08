@@ -21,8 +21,6 @@ void Window::init(int x, int y, uint32_t width, uint32_t height) noexcept
 
   // create window render resource
   g_renderer.send_message(Renderer::Message_Window_Create{ _handle, width, height });
-
-  ShowWindow(_handle, SW_SHOW);
 }
 
 void Window::update_by_rect() noexcept
