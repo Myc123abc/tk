@@ -5,6 +5,7 @@
 #include "../config.hpp"
 
 #include <vector>
+#include <semaphore>
 
 namespace tk { namespace renderer {
 
@@ -13,15 +14,18 @@ struct RenderData
   std::vector<Vertex>        vertices;
   std::vector<uint16_t>      indices;
   std::vector<ShapeProperty> shape_properties;
+  std::binary_semaphore      sem{ 1 };
 
   auto clear() noexcept
   {
     vertices.clear();
     indices.clear();
     shape_properties.clear();
+    sem.release();
   }
 
   auto empty() const noexcept { return vertices.empty(); }
+  void wait() noexcept { sem.acquire(); }
 };
 
 using RenderDataPoolType = ObjectPool<RenderData, RenderData_Pool_Init_Capacity>;

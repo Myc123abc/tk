@@ -7,7 +7,7 @@ int main()
   tk::init();
 
   auto wnd1_is_closed = false;
-  auto wnd2_is_closed = true;
+  auto wnd2_is_closed = false;
   while (!wnd1_is_closed || !wnd2_is_closed)
   {
     auto cfg = ui::WindowConfig{};
@@ -19,10 +19,11 @@ int main()
       // ui::rectangle({}, ui::window_extent(), 0xffffffff);
       auto size = ui::window_drawable_extent();
       ui::triangle({ size.x / 2, 0 }, size, { 0, size.y }, 0x00ff004f, 10);
-      // if (ui::button("btn1", 0, 0, 100, 100, 0x00ff00ff, 0x0000ffff))
-      //   info("click 11");
-      // if (ui::button("btn2", 50, 50, 100, 100, 0x00ff00ff, 0x0000ffff))
-      //   info("click 22");
+      if (ui::button("btn1", 0, 0, 100, 100, 0x00ff00ff, 0x0000ffff))
+        info("click 11");
+      if (ui::button("btn2", 50, 50, 100, 100, 0x00ff00ff, 0x0000ffff))
+        info("click 22");
+      ui::add_move_invalid_area({}, { 150, 150 });
       ui::end();
     }
 

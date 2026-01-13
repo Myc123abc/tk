@@ -7,6 +7,7 @@
 #include <thread>
 #include <latch>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace tk { namespace renderer {
 
@@ -69,7 +70,6 @@ public:
   {
     create_window = WM_APP,
     close_window,
-    show_window,
     minimize_window,
     maximize_window,
     restore_window,
@@ -85,7 +85,6 @@ public:
 
   auto create_window(int x, int y, uint32_t width, uint32_t height) noexcept -> WindowSnapshot;
   void close_window(HWND handle, std::vector<RenderDataHandle>&& datas) const noexcept;
-  void show_window(HWND handle) const noexcept;
   void minimize_window(HWND handle) const noexcept;
   void maximize_window(HWND handle) const noexcept;
   void restore_window(HWND handle) const noexcept;
@@ -113,6 +112,8 @@ private:
   std::latch                       _message_queue_create_complete{ 1 };
   std::unordered_map<HWND, Window> _windows;
   HANDLE                           _signal_event{};
+  std::unordered_set<HWND>         _using_mouse_pass_through_windows;
+  UINT_PTR                         _timer_mouse_pass_through{};
 };
 
 inline static auto& g_wnd_mgr{ WindowManager::instance() };

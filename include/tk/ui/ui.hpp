@@ -110,22 +110,6 @@ auto window_drawable_extent() noexcept -> glm::vec2;
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
- * set render position
- * @param x
- * @param y
- */
-void set_render_pos(int x, int y) noexcept;
-
-/// get render position
-auto get_render_pos() noexcept -> glm::vec2;
-
-// help macro, use for tmporary render in specific position
-#define Tmp_Render_Pos(__x, __y) \
-  for (auto __call_once = true; __call_once;) \
-    for (auto __old_render_pos = get_render_pos(); __call_once; set_render_pos(__old_render_pos.x, __old_render_pos.y)) \
-      for (set_render_pos(__x, __y); __call_once; __call_once = false)
-
-/**
  * discard the pixel of specific rectangle for last draw shape
  * @param left_top
  * @param right_bottom

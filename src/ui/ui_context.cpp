@@ -57,8 +57,11 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
 
   if (_window->cfg.display_title_bar)
     set_render_pos(0, Title_Bar_Height);
+  else
+    set_render_pos(0, 0);
 
   _window->clear_move_invalid_areas();
+  _window->data()->wait();
 }
 
 void UIContext::end() noexcept
@@ -66,6 +69,16 @@ void UIContext::end() noexcept
   err_if(!_call_begin, "begin is not called but end is called");
   if (_window->cfg.display_title_bar)
     add_title_bar();
+
+  // draw real window wireframe, and virtual window wireframe
+#ifndef NDEBUG
+  set_render_pos(-Window_Shadow_Thickness, -Window_Shadow_Thickness);
+  auto extent = window_extent();
+  ui::rectangle({}, { extent.x + Window_Shadow_Thickness * 2, extent.y + Window_Shadow_Thickness * 2 }, 0x00ff00ff, 1);
+  set_render_pos(0, 0);
+  ui::rectangle({}, extent, 0xffff00ff, 1);
+#endif
+
   _call_begin = false;
   _window->switch_move_invalid_areas();
 }
@@ -153,6 +166,13 @@ void UIContext::update() noexcept
     is_moving_from_maximize = {};
   }
 
+  // update cursor hovered widget id
+  if (!_hovered_widget_ids.empty())
+  {
+    _prev_hovered_widget_id = _last_hovered_widget_id;
+    _hovered_widget_ids.clear();
+  }
+
   // update mouse state
   if (auto it = std::ranges::find_if(_windows, [](auto const& pair) { return pair.second.is_active(); }); it != _windows.end())
   {
@@ -168,13 +188,6 @@ void UIContext::update() noexcept
       mouse_up_window = window.snap.handle;
       mouse_up_pos    = window.cursor_pos();
     }
-  }
-
-  // update cursor hovered widget id
-  if (!_hovered_widget_ids.empty())
-  {
-    _prev_hovered_widget_id = _last_hovered_widget_id;
-    _hovered_widget_ids.clear();
   }
 
   // update delta time
@@ -252,6 +265,15 @@ add_shape_property:
   add_shape_property(type, color, thickness, values);
 }
 
+void UIContext::render_on(int x, int y, std::move_only_function<void()>&& func) noexcept
+{
+  assert(func);
+  auto org_pos = g_ui_ctx.get_render_pos();
+  g_ui_ctx.set_render_pos(x, y);
+  func();
+  g_ui_ctx.set_render_pos(org_pos.x - Window_Shadow_Thickness, org_pos.y - Window_Shadow_Thickness);
+}
+
 auto UIContext::is_hover_on(size_t id, glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
 {
   if (ui::is_hover_on(left_top, right_bottom))
@@ -282,48 +304,49 @@ void UIContext::add_title_bar() noexcept
   auto w = _window->snap.width;
   auto h = _window->snap.height;
 
-  Tmp_Render_Pos(0, 0)
-  {
-    ui::rectangle({}, { w, btn_height }, background_color);
-    ui::add_move_invalid_area({ 0, btn_height }, { w, h });
+  set_render_pos(0, 0);
 
-    auto handle = _window->snap.handle;
+  ui::rectangle({}, { w, btn_height }, background_color);
+  ui::add_move_invalid_area({ 0, btn_height }, { w, h });
 
-    // minimize button
-    if (button("tk::ui::title_bar_minimize_button", w - btn_width * 3, 0, btn_width, btn_height, background_color, btn_hovered_color, btn_mouse_down_color,
-      [] (uint32_t width, uint32_t height) { ui::line({ 0, height / 2 }, { width, height / 2 }); },
-      icon_width, icon_height, 0x395063ff, 0x395063ff))
-      g_wnd_mgr.minimize_window(handle);
+  auto handle = _window->snap.handle;
+  draw_title_bar = true;
 
-    // maximize / restore button
-    if (button("tk::ui::title_bar_maximize_restore_button", w - btn_width * 2, 0, btn_width, btn_height, background_color, btn_hovered_color, btn_mouse_down_color,
-      [&] (uint32_t width, uint32_t height)
+  // minimize button
+  if (button("tk::ui::title_bar_minimize_button", w - btn_width * 3, 0, btn_width, btn_height, background_color, btn_hovered_color, btn_mouse_down_color,
+    [] (uint32_t width, uint32_t height) { ui::line({ 0, height / 2 }, { width, height / 2 }); },
+    icon_width, icon_height, 0x395063ff, 0x395063ff))
+    g_wnd_mgr.minimize_window(handle);
+
+  // maximize / restore button
+  if (button("tk::ui::title_bar_maximize_restore_button", w - btn_width * 2, 0, btn_width, btn_height, background_color, btn_hovered_color, btn_mouse_down_color,
+    [&] (uint32_t width, uint32_t height)
+    {
+      if (_window->snap.maximized)
       {
-        if (_window->snap.maximized)
-        {
-          auto padding_x = width / 5;
-          auto padding_y = width / 5;
-          ui::rectangle({ padding_x, 0 }, { width, height - padding_y }, 0, 1);
-          ui::discard_rectangle({ 0, padding_y }, { width - padding_x, height });
-          ui::rectangle({ 0, padding_y }, { width - padding_x, height }, 0, 1);
-        }
-        else
-          ui::rectangle({}, { width, height }, 0, 1);
-      },
-      icon_width, icon_height, 0x395063ff, 0x395063ff))
-      _window->snap.maximized ? g_wnd_mgr.restore_window(handle) : g_wnd_mgr.maximize_window(handle);
+        auto padding_x = width / 5;
+        auto padding_y = width / 5;
+        ui::rectangle({ padding_x, 0 }, { width, height - padding_y }, 0, 1);
+        ui::discard_rectangle({ 0, padding_y }, { width - padding_x, height });
+        ui::rectangle({ 0, padding_y }, { width - padding_x, height }, 0, 1);
+      }
+      else
+        ui::rectangle({}, { width, height }, 0, 1);
+    },
+    icon_width, icon_height, 0x395063ff, 0x395063ff))
+    _window->snap.maximized ? g_wnd_mgr.restore_window(handle) : g_wnd_mgr.maximize_window(handle);
 
-    // close button
-    if (button("tk::ui::title_bar_close_button", w - btn_width, 0, btn_width, btn_height, background_color, close_btn_hovered_color, close_btn_mouse_down_color,
-      [] (uint32_t width, uint32_t height)
-      {
-        ui::line({}, { width, height });
-        ui::line({ width, 0 }, { 0, height });
-      }, icon_width, icon_height, 0x395063ff, 0xffffffff))
-      _window->is_closed = true;
+  // close button
+  if (button("tk::ui::title_bar_close_button", w - btn_width, 0, btn_width, btn_height, background_color, close_btn_hovered_color, close_btn_mouse_down_color,
+    [] (uint32_t width, uint32_t height)
+    {
+      ui::line({}, { width, height });
+      ui::line({ width, 0 }, { 0, height });
+    }, icon_width, icon_height, 0x395063ff, 0xffffffff))
+    _window->is_closed = true;
 
-    ui::add_move_invalid_area({ w - btn_width * 3, 0 }, { w, btn_width });
-  }
+  ui::add_move_invalid_area({ w - btn_width * 3, 0 }, { w, btn_width });
+  draw_title_bar = false;
 }
 
 auto UIContext::generic_id(std::string_view name) const noexcept -> size_t

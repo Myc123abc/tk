@@ -85,6 +85,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   static auto finish_moving_or_resizing = [&](HWND handle)
   {
     ReleaseCapture();
+    ClipCursor(nullptr);
     window_left_button_down_mouse_pos = {};
 
     auto& window  = windows.at(handle);
@@ -111,7 +112,6 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     SetCapture(handle);
     auto& window = windows.at(handle);
     window_left_button_down_mouse_pos = window.cursor_pos();
-    assert(window_left_button_down_mouse_pos->x >= 0 && window_left_button_down_mouse_pos->y >= 0);
 
     wnd_mgr._mouse_state           = MouseState::left_button_down;
     wnd_mgr._mouse_left_down_start = std::chrono::steady_clock::now();
@@ -122,15 +122,36 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
 
   case WM_MOUSEMOVE:
   {
-    if (wnd_mgr._mouse_state == MouseState::left_button_down ||
+    auto& window = wnd_mgr._windows.at(handle);
+
+    // update window mode for mouse pass through
+    if (!window.is_resizing() && !window.is_moving() &&
+        !wnd_mgr._using_mouse_pass_through_windows.contains(handle) &&
+        window.is_mouse_pass_through_area())
+    {
+      auto style = GetWindowLong(handle, GWL_EXSTYLE);
+      SetWindowLongPtrA(handle, GWL_EXSTYLE, style | WS_EX_TRANSPARENT | WS_EX_LAYERED);
+      wnd_mgr._using_mouse_pass_through_windows.emplace(handle); 
+      if (!wnd_mgr._timer_mouse_pass_through)
+        wnd_mgr._timer_mouse_pass_through = SetTimer(nullptr, 0, USER_TIMER_MINIMUM, nullptr);
+    }
+
+    if (wnd_mgr._mouse_state &  MouseState::left_button_down ||
         wnd_mgr._mouse_state == MouseState::left_button_press)
     {
-      auto& window = wnd_mgr._windows.at(handle);
-      auto  pt     = POINT{ window_left_button_down_mouse_pos->x, window_left_button_down_mouse_pos->y };
+      auto pt = POINT{ window_left_button_down_mouse_pos->x, window_left_button_down_mouse_pos->y };
       if (!window._moving_from_maximize &&
           std::ranges::any_of(g_ui_ctx.access_move_invalid_areas(handle), [pt](auto rect) { return PtInRect(&rect, pt); }))
         break;
 
+      // limit cursor move area
+      if (!window.is_moving())
+      {
+        auto rect = get_maximize_rect();
+        ClipCursor(&rect);
+      }
+
+      // moving
       auto pos     = get_cursor_pos();
       auto new_pos = pos - window_left_button_down_mouse_pos.value();
       if (window.maximized)
@@ -196,11 +217,6 @@ void WindowManager::close_window(HWND handle, std::vector<RenderDataHandle>&& da
   PostThreadMessageW(_thread_id, static_cast<UINT>(Message::close_window), std::bit_cast<WPARAM>(handle), std::bit_cast<LPARAM>(ptr));
 }
 
-void WindowManager::show_window(HWND handle) const noexcept
-{
-  PostThreadMessageW(_thread_id, static_cast<UINT>(Message::show_window), std::bit_cast<WPARAM>(handle), 0);
-}
-
 void WindowManager::minimize_window(HWND handle) const noexcept
 {
   PostThreadMessageW(_thread_id, static_cast<UINT>(Message::minimize_window), std::bit_cast<WPARAM>(handle), 0);
@@ -237,12 +253,7 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
     auto handle = std::bit_cast<HWND>(w_param);
     _windows[handle].destroy(std::bit_cast<RenderDataHandle*>(l_param));
     _windows.erase(handle);
-    break;
-  }
-
-  case Message::show_window:
-  {
-    ShowWindow(std::bit_cast<HWND>(w_param), SW_SHOW);
+    _using_mouse_pass_through_windows.erase(handle);
     break;
   }
 
@@ -276,6 +287,26 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
   {
     if (w_param == _timer_mouse_state)
       update_mouse_state();
+    else if (w_param == _timer_mouse_pass_through)
+    {
+      // update window mouse pass through state
+      for (auto it = _using_mouse_pass_through_windows.begin(); it != _using_mouse_pass_through_windows.end();)
+      {
+        auto handle = *it;
+        if (!_windows.at(handle).is_mouse_pass_through_area())
+        {
+          SetWindowLongPtrA(handle, GWL_EXSTYLE, GetWindowLong(handle, GWL_EXSTYLE) & ~(WS_EX_TRANSPARENT | WS_EX_LAYERED));
+          it = _using_mouse_pass_through_windows.erase(it);
+        }
+        else
+          ++it;
+      }
+      if (_using_mouse_pass_through_windows.empty())
+      {
+        KillTimer(nullptr, _timer_mouse_pass_through);
+        _timer_mouse_pass_through = {};
+      }
+    }
   }
 
   // send update message to ui context
@@ -284,6 +315,12 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
 
 void WindowManager::update_mouse_state() noexcept
 {
+  if (_mouse_state == MouseState::left_button_down)
+  {
+    _mouse_state = MouseState::left_button_down_idle;
+    g_ui_ctx.send_message(UIContext::Message_Update_Mouse_State{ _mouse_state });
+  }
+
   auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - _mouse_left_down_start).count();
   if (dur > Mouse_Left_Down_Press_Start_Time)
   {

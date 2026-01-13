@@ -183,9 +183,16 @@ void RenderResource::render_end() noexcept
 
 void RenderResource::present(bool vsync) const noexcept
 {
+  auto res = HRESULT{};
   vsync
-    ? err_if(_swapchain->Present(1, 0), "failed to present swapchain")
-    : err_if(_swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING), "failed to present swapchain");
+    ? res = _swapchain->Present(1, 0)
+    : res = _swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
+  if (FAILED(res))
+  {
+    res = g_core.device()->GetDeviceRemovedReason();
+    err_if(res == DXGI_ERROR_DEVICE_HUNG, "failed to present, device hung");
+    err_if(true, "failed to present : {}", static_cast<uint32_t>(res));
+  }
 }
 
 void RenderResource::clear_image() noexcept

@@ -16,7 +16,6 @@
 #include <span>
 #include <variant>
 #include <unordered_set>
-#include <semaphore>
 
 namespace tk { namespace renderer {
 
@@ -71,11 +70,10 @@ private:
   std::unordered_map<HWND, RenderResource>         _res;
   Pipeline                                         _sdf_pipeline;
 
-  rigtorp::SPSCQueue<std::pair<HWND, RenderData*>> _render_datas{ Render_Data_Queue_Capacity };
-
   std::unordered_set<HWND>                         _destroied_windows;
   std::vector<HWND>                                _rendered_windows;
 
+  rigtorp::SPSCQueue<std::pair<HWND, RenderData*>> _render_datas{ Render_Data_Queue_Capacity };
   std::binary_semaphore                            _frame_sem{ 1 };
   std::binary_semaphore                            _render_data_empty_sem{ 0 };
 

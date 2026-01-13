@@ -88,8 +88,6 @@ public:
   void check_path_not_draw() const noexcept;
 
   void render() noexcept;
-  auto render_data() noexcept { return _window->data(); }
-  auto render_pos() noexcept { return _window->render_pos; }
 
   void add_vertices_indices(std::pair<glm::vec2, glm::vec2> bounding_rectangle) noexcept;
   void add_shape_property(renderer::ShapeProperty::Type type, glm::vec4 color, float thickness, std::vector<float> const& values) noexcept;
@@ -102,9 +100,12 @@ public:
 
   void enable_tmp_color(glm::vec4 color) noexcept { _tmp_color = color; }
   void disable_tmp_color() noexcept { _tmp_color = {}; }
-  void set_render_pos(int x, int y) noexcept { _window->render_pos = { x, y }; }
+  auto get_render_data() noexcept { return _window->data(); }
+  void set_render_pos(int x, int y) noexcept { _window->render_pos = { x + renderer::Window_Shadow_Thickness, y + renderer::Window_Shadow_Thickness }; }
   auto get_render_pos() const noexcept { return _window->render_pos; }
   auto get_mouse_state() const noexcept { return _mouse_state; }
+
+  void render_on(int x, int y, std::move_only_function<void()>&& func) noexcept;
 
   auto generic_id(std::string_view name) const noexcept -> size_t;
 
@@ -165,6 +166,7 @@ public:
   std::optional<glm::vec<2, int>> mouse_down_pos;
   std::optional<glm::vec<2, int>> mouse_up_pos;
   bool                            is_moving_from_maximize{};
+  bool                            draw_title_bar{};
 private:
   window::MouseState              _mouse_state{};
 
