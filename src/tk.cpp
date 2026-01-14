@@ -12,6 +12,7 @@ void init() noexcept
 {
   g_wnd_mgr.init();
   g_renderer.init();
+  g_ui_ctx.init();
 }
 
 void destroy() noexcept

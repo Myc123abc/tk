@@ -25,6 +25,16 @@ inline auto get_maximize_rect() noexcept
   return rect;
 }
 
+inline auto point_on(glm::vec<2, int> const& p, glm::vec2 const& left_top, glm::vec2 const& right_bottom) noexcept
+{
+  return p.x >= left_top.x && p.x <= right_bottom.x && p.y >= left_top.y && p.y <= right_bottom.y;
+}
+
+inline auto point_on(glm::vec<2, int> const& p, RECT rect) noexcept
+{
+  return p.x >= rect.left && p.x <= rect.right && p.y >= rect.top && p.y <= rect.bottom;
+}
+
 struct WindowSnapshot
 {
   HWND     handle{};
@@ -104,7 +114,8 @@ private:
   std::chrono::steady_clock::time_point _mouse_left_down_start{};
 
 private:
-  static constexpr wchar_t Window_Class[] = L"vn::window::WindowManager::Window";
+  static constexpr wchar_t Fullscreen_Class[] = L"vn::window::WindowManager::Window";
+  static constexpr wchar_t Window_Class[]     = L"vn::window::WindowManager::FullscreenWindow";
 
 private:
   std::jthread                     _thread;

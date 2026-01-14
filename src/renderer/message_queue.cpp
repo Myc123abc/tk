@@ -22,9 +22,12 @@ void Renderer::MessageHandler::operator()(Message_Window_Destroy const& msg) con
   renderer._destroied_windows.emplace(msg.handle);
 
   // free render data
-  for (auto i : std::views::iota(0, Frame_Count))
-    g_render_data_pool.free(*(msg.ptr + i));
-  free(msg.ptr);
+  if (msg.ptr)
+  {
+    for (auto i : std::views::iota(0, Frame_Count))
+      g_render_data_pool.free(*(msg.ptr + i));
+    free(msg.ptr);
+  }
 }
 
 void Renderer::MessageHandler::operator()(Message_Window_Update const& msg) const noexcept

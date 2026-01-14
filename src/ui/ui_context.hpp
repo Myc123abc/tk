@@ -77,8 +77,10 @@ public:
     return instance;
   }
 
+  void init() noexcept;
+  void destroy() noexcept;
+
   void close_window() noexcept;
-  void destroy() noexcept { close_window(); }
 
   void begin(std::string_view name, int x, int y, uint32_t width, uint32_t height, bool* is_closed, WindowConfig cfg) noexcept;
   void end() noexcept;
@@ -127,6 +129,7 @@ private:
 public:
   Window*                                 _window{};
 private:
+  Window                                  _fullscreen_window{};
   std::unordered_map<std::string, Window> _windows;
   std::unordered_map<HWND, std::string>   _window_names;
   uint32_t                                _shape_properties_offset{};
@@ -201,11 +204,15 @@ public:
   struct Message_Update_Resizing
   {
     HWND     handle{};
-    bool     resizing{};
     int      x{};
     int      y{};
     uint32_t width{};
     uint32_t height{};
+  };
+
+  struct Message_Resize_End
+  {
+    HWND handle{};
   };
 
   struct Message_Window_Maximize
@@ -248,6 +255,7 @@ public:
     Message_Update_Mouse_State,
     Message_Update_Moving,
     Message_Update_Resizing,
+    Message_Resize_End,
     Message_Window_Maximize,
     Message_Window_Restore,
     Message_Window_Moving_From_Maximize,
@@ -268,6 +276,7 @@ private:
     void operator()(Message_Update_Mouse_State const& msg) const noexcept;
     void operator()(Message_Update_Moving const& msg) const noexcept;
     void operator()(Message_Update_Resizing const& msg) const noexcept;
+    void operator()(Message_Resize_End const& msg) const noexcept;
     void operator()(Message_Window_Maximize const& msg) const noexcept;
     void operator()(Message_Window_Restore const& msg) const noexcept;
     void operator()(Message_Window_Moving_From_Maximize const& msg) const noexcept;

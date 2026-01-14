@@ -31,6 +31,18 @@ auto Window::access_move_invliad_areas() noexcept -> std::vector<RECT>&
   return move_invalid_areas[move_invalid_areas_idx.load(std::memory_order_acquire)];
 }
 
+void UIContext::init() noexcept
+{
+  auto rect = get_maximize_rect();
+  _fullscreen_window.snap = g_wnd_mgr.create_window(rect.left, rect.top, rect.right, rect.bottom);
+}
+
+void UIContext::destroy() noexcept
+{
+  close_window();
+  g_wnd_mgr.close_window(_fullscreen_window.snap.handle, {});
+}
+
 void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint32_t height, bool* is_closed, WindowConfig cfg) noexcept
 {
   err_if(_call_begin, "begin is called but end not be called");

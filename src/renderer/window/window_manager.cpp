@@ -40,6 +40,9 @@ void WindowManager::init() noexcept
     wnd_class.cbSize        = sizeof(wnd_class);
     wnd_class.hInstance     = GetModuleHandleW(nullptr);
     wnd_class.hCursor       = LoadCursorA(nullptr, IDC_ARROW);
+    wnd_class.lpszClassName = Fullscreen_Class;
+    wnd_class.lpfnWndProc   = DefWindowProcW;
+    err_if(!RegisterClassExW(&wnd_class), "failed register class");
     wnd_class.lpszClassName = Window_Class;
     wnd_class.lpfnWndProc   = wnd_proc;
     err_if(!RegisterClassExW(&wnd_class), "failed register class");
@@ -211,6 +214,12 @@ auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height)
 
 void WindowManager::close_window(HWND handle, std::vector<RenderDataHandle>&& datas) const noexcept
 {
+  if (datas.empty())
+  {
+    PostThreadMessageW(_thread_id, static_cast<UINT>(Message::close_window), std::bit_cast<WPARAM>(handle), {});
+    return;
+  } 
+
   auto size = sizeof(RenderDataHandle) * datas.size();
   auto ptr  = malloc(size);
   memcpy(ptr, datas.data(), size);
@@ -370,6 +379,26 @@ auto WindowManager::get_cursor_on_window() const noexcept -> HWND
       it != z_orders.end())
     return *it;
   return {};
+}
+
+void SwapWindows(HWND hShow, HWND hHide)
+{
+  HDWP hdwp = BeginDeferWindowPos(2);
+  if (!hdwp) return;
+
+  // show new window
+  hdwp = DeferWindowPos(
+      hdwp, hShow, nullptr,
+      0, 0, 0, 0,
+      SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_SHOWWINDOW);
+
+  // hide old window
+  hdwp = DeferWindowPos(
+      hdwp, hHide, nullptr,
+      0, 0, 0, 0,
+      SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_HIDEWINDOW);
+
+  EndDeferWindowPos(hdwp);   // both changes become active together
 }
 
 }}

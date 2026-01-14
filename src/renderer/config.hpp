@@ -11,8 +11,7 @@ constexpr auto CBV_SRV_UAV_Heap_Size            = 256;
 constexpr auto RTV_Heap_Size                    = 256;
 constexpr auto dSV_Heap_Size                    = 32;
 
-constexpr auto Window_Resize_Width              = 5;
-constexpr auto Window_Resize_Height             = 5;
+constexpr auto Window_Resize_Thickness          = 5;
 constexpr auto Window_Shadow_Thickness          = 20;
 
 constexpr auto Enable_Depth_Test                = false;

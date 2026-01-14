@@ -40,11 +40,6 @@ auto get_bounding_rectangle(std::vector<glm::vec2> const& data) noexcept -> std:
   return { min, max };
 }
 
-auto point_on(glm::vec<2, int> const& p, glm::vec2 const& left_top, glm::vec2 const& right_bottom) noexcept
-{
-  return p.x >= left_top.x && p.x <= right_bottom.x && p.y >= left_top.y && p.y <= right_bottom.y;
-}
-
 }
 
 namespace tk { namespace ui {

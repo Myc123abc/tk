@@ -81,7 +81,7 @@ void Window::moving_from_maximize(int x, int y) noexcept
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
   g_ui_ctx.send_message(UIContext::Message_Window_Moving_From_Maximize{ _handle, this->x, this->y, width, height });
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
-};
+}
 
 void Window::moving_with_pos(int x, int y) noexcept
 {

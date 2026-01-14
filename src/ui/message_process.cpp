@@ -44,11 +44,17 @@ void UIContext::MessageHandler::operator()(Message_Update_Moving const& msg) con
 void UIContext::MessageHandler::operator()(Message_Update_Resizing const& msg) const noexcept
 {
   auto& wnd = ctx.get_window(msg.handle);
-  wnd.snap.resizing = msg.resizing;
+  wnd.snap.resizing = true;
   wnd.snap.x        = msg.x;
   wnd.snap.y        = msg.y;
   wnd.snap.width    = msg.width;
   wnd.snap.height   = msg.height;
+}
+
+void UIContext::MessageHandler::operator()(Message_Resize_End const& msg) const noexcept
+{
+  auto& wnd = ctx.get_window(msg.handle);
+  wnd.snap.resizing = false;
 }
 
 void UIContext::MessageHandler::operator()(Message_Window_Maximize const& msg) const noexcept
