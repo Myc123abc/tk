@@ -5,6 +5,8 @@
 #include <directx/d3dx12.h>
 #include <windows.h>
 
+#include <ranges>
+
 using namespace Microsoft::WRL;
 
 namespace tk { namespace renderer {
@@ -69,13 +71,10 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
   for (auto& frame : _frames)
   {
 		frame.graphics_cmd_alloc = g_core.create_cmd_alloc(D3D12_COMMAND_LIST_TYPE_DIRECT);
-		frame.copy_cmd_alloc     = g_core.create_cmd_alloc(D3D12_COMMAND_LIST_TYPE_COPY);
 
     // initialize frame buffer
     frame.buffer.init();
   }
-	_graphics_cmd = g_core.create_cmd(D3D12_COMMAND_LIST_TYPE_DIRECT, _frames[0].graphics_cmd_alloc.Get());
-	_copy_cmd     = g_core.create_cmd(D3D12_COMMAND_LIST_TYPE_COPY, _frames[0].copy_cmd_alloc.Get());
 }
 
 void RenderResource::destroy() noexcept
@@ -146,13 +145,10 @@ void RenderResource::wait_frame_complete() const noexcept
 void RenderResource::render_begin() noexcept
 {
   auto& frame = current_frame();
-
-  // reset command list
-  err_if(frame.graphics_cmd_alloc->Reset() == E_FAIL, "failed to reset command allocator");
-  err_if(_graphics_cmd->Reset(frame.graphics_cmd_alloc.Get(), nullptr), "failed to reset command list");
+  auto  cmd   = g_graphics_engine.reset_cmd(frame.graphics_cmd_alloc.Get());
 
   // bind heaps
-  g_desc_heap_mgr.bind_heaps(_graphics_cmd.Get());
+  g_desc_heap_mgr.bind_heaps(cmd);
 
   // set render target image clear render target images
   clear_image();
@@ -160,22 +156,23 @@ void RenderResource::render_begin() noexcept
   // set viewport
   auto& image    = g_image_pool[frame.image];
   auto  viewport = CD3DX12_VIEWPORT{ 0.f, 0.f, static_cast<float>(image.width()), static_cast<float>(image.height()) };
-  _graphics_cmd->RSSetViewports(1, &viewport);
+  cmd->RSSetViewports(1, &viewport);
 }
 
 void RenderResource::render_end() noexcept
 {
 	auto& frame           = current_frame();
   auto& swapchain_image = g_image_pool[_frames[_swapchain->GetCurrentBackBufferIndex()].swapchain_image];
+  auto  cmd             = g_graphics_engine.cmd();
 
   // copy offscreen image to swapchain backbuffer
-	copy(_graphics_cmd.Get(), g_image_pool[frame.image], swapchain_image);
+	copy(cmd, g_image_pool[frame.image], swapchain_image);
 
   // set to present state
-  swapchain_image.set_state(_graphics_cmd.Get(), ImageState::present);
+  swapchain_image.set_state(cmd, ImageState::present);
 
 	// submit graphics commands to graphics engine
-	frame.graphics_fence_value = g_graphics_engine.submit({ _graphics_cmd.Get() });
+	frame.graphics_fence_value = g_graphics_engine.submit();
 
   // move to next frame
   _frame_index = (_frame_index + 1) % Frame_Count;
@@ -199,6 +196,7 @@ void RenderResource::clear_image() noexcept
 {
   auto& frame               = current_frame();
   auto& render_target_image = g_image_pool[frame.image];
+  auto  cmd                 = g_graphics_engine.cmd();
   auto  rtv_handle          = render_target_image.cpu_handle();
   auto  dsv_handle          = D3D12_CPU_DESCRIPTOR_HANDLE{};
   if (Enable_Depth_Test)
@@ -206,17 +204,17 @@ void RenderResource::clear_image() noexcept
 
   // set render target view
   if (Enable_Depth_Test)
-    _graphics_cmd->OMSetRenderTargets(1, &rtv_handle, false, &dsv_handle);
+    cmd->OMSetRenderTargets(1, &rtv_handle, false, &dsv_handle);
   else
-    _graphics_cmd->OMSetRenderTargets(1, &rtv_handle, false, nullptr);
+    cmd->OMSetRenderTargets(1, &rtv_handle, false, nullptr);
 
   // clear color
-  render_target_image.clear_render_target(_graphics_cmd.Get());
+  render_target_image.clear_render_target(cmd);
   if (Enable_Depth_Test)
   {
-    _graphics_cmd->ClearDepthStencilView(dsv_handle, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
+    cmd->ClearDepthStencilView(dsv_handle, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
     // set depth range
-    _graphics_cmd->OMSetDepthBounds(0.f, 1.f);
+    cmd->OMSetDepthBounds(0.f, 1.f);
   }
 }
 

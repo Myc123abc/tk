@@ -388,51 +388,7 @@ void copy(BitmapView const& src, BitmapView const& dst) noexcept
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-///                             Upload Buffer
-////////////////////////////////////////////////////////////////////////////////
-
-void UploadBuffer::add_images(std::vector<ImageHandle> const& image_handles, std::vector<BitmapView> const& bitmaps) noexcept
-{
-  assert(image_handles.size() == bitmaps.size());
-
-  _infos.reserve(_infos.size() + image_handles.size());
-  for (auto i = 0; i < image_handles.size(); ++i)
-  {
-    auto info = Info{};
-    info.handle          = image_handles[i];
-    info.data.pData      = bitmaps[i].data;
-    info.data.RowPitch   = bitmaps[i].row_pitch;
-    info.data.SlicePitch = bitmaps[i].row_pitch * bitmaps[i].height;
-    _infos.emplace_back(std::move(info));
-  }
-}
-
-void UploadBuffer::upload(ID3D12GraphicsCommandList1* cmd) noexcept
-{
-  // calculate required intermediate sizes
-  auto intermediate_sizes = std::vector<uint32_t>{};
-  intermediate_sizes.reserve(_infos.size());
-  for (auto const& info : _infos)
-    intermediate_sizes.emplace_back(
-      align(GetRequiredIntermediateSize(g_image_pool[info.handle].handle(), 0, 1), D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT));
-
-  // initialize buffer
-  auto size = std::ranges::fold_left(intermediate_sizes, 0, std::plus<>{});
-  if (_buffer.capacity() < size)
-    _buffer.init(size, false);
-
-  // copy bitmap data to image by upload buffer
-  auto offset = uint32_t{};
-  for (auto i = 0; i < _infos.size(); ++i)
-  {
-    copy(cmd, g_image_pool[_infos[i].handle], _buffer.handle(), offset, _infos[i].data);
-    offset += intermediate_sizes[i];
-  }
-
-  _infos.clear();
-}
-
+#if 0
 ////////////////////////////////////////////////////////////////////////////////
 ///                        External Image Loaderer
 ////////////////////////////////////////////////////////////////////////////////
@@ -520,5 +476,6 @@ auto ExternalImageLoader::is_uploaded(std::string_view filename) const noexcept 
   err_if(!_datas.contains(filename.data()), "Failed to remove {}. It's not exist", filename);
   return _datas.at(filename.data()).state == State::uploaded;
 }
+#endif
 
 }}

@@ -33,14 +33,13 @@ auto Window::access_move_invliad_areas() noexcept -> std::vector<RECT>&
 
 void UIContext::init() noexcept
 {
-  auto rect = get_maximize_rect();
-  _fullscreen_window.snap = g_wnd_mgr.create_window(rect.left, rect.top, rect.right, rect.bottom);
+  _fullscreen_window.snap = g_wnd_mgr.create_fullscreen_window();
 }
 
 void UIContext::destroy() noexcept
 {
   close_window();
-  g_wnd_mgr.close_window(_fullscreen_window.snap.handle, {});
+  g_wnd_mgr.close_fullscreen_window();
 }
 
 void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint32_t height, bool* is_closed, WindowConfig cfg) noexcept
@@ -176,6 +175,7 @@ void UIContext::update() noexcept
     mouse_down_pos          = {};
     mouse_up_pos            = {};
     is_moving_from_maximize = {};
+    _btn_state              = {};
   }
 
   // update cursor hovered widget id
@@ -202,6 +202,14 @@ void UIContext::update() noexcept
     }
   }
 
+  // update button state
+  if (_btn_state.id)
+  {
+    auto pos = get_cursor_pos();
+    if (!point_on(get_cursor_pos(), _btn_state.left_top, _btn_state.right_bottom))
+      _btn_state.move_out = true;
+  }
+
   // update delta time
   static auto tp = std::chrono::steady_clock::now();
   auto now = std::chrono::steady_clock::now();
@@ -219,6 +227,23 @@ void UIContext::update() noexcept
     acc_time = 0;
     count    = 0;
   }
+}
+
+void UIContext::add_mouse_state(size_t id, glm::vec2 left_top, glm::vec2 right_bottom) noexcept
+{
+  check_draw();
+  if (!_btn_state.id)
+  {
+    auto pos = get_render_pos() + _window->real_pos();
+    left_top     += pos;
+    right_bottom += pos;
+    _btn_state = { id, left_top, right_bottom };
+  }
+}
+
+auto UIContext::is_cursor_move_out(size_t id) noexcept -> bool
+{
+  return _btn_state.id != id ? false : _btn_state.move_out;
 }
 
 void UIContext::add_vertices_indices(std::pair<glm::vec2, glm::vec2> bounding_rectangle) noexcept

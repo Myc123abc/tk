@@ -25,6 +25,11 @@ struct WindowCreateInfo
   uint32_t width{}, height{};
 };
 
+auto get_screen_size() noexcept -> glm::vec<2, uint32_t>
+{
+  return { GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN) };
+}
+
 }
 
 namespace tk { namespace renderer {
@@ -40,7 +45,7 @@ void WindowManager::init() noexcept
     wnd_class.cbSize        = sizeof(wnd_class);
     wnd_class.hInstance     = GetModuleHandleW(nullptr);
     wnd_class.hCursor       = LoadCursorA(nullptr, IDC_ARROW);
-    wnd_class.lpszClassName = Fullscreen_Class;
+    wnd_class.lpszClassName = Auxiliary_Class;
     wnd_class.lpfnWndProc   = DefWindowProcW;
     err_if(!RegisterClassExW(&wnd_class), "failed register class");
     wnd_class.lpszClassName = Window_Class;
@@ -51,7 +56,7 @@ void WindowManager::init() noexcept
     PeekMessageW(nullptr, nullptr, 0, 0, PM_NOREMOVE);
     _message_queue_create_complete.count_down();
 
-    _signal_event = CreateEvent(nullptr, false, false, nullptr);
+    _signal_event = CreateEventW(nullptr, false, false, nullptr);
 
     // message loop
     MSG msg{};
@@ -91,15 +96,15 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     ClipCursor(nullptr);
     window_left_button_down_mouse_pos = {};
 
-    auto& window  = windows.at(handle);
-    if (window.is_moving())
-      window.moving_end();
-
     // transform new mouse state
     wnd_mgr._mouse_state = MouseState::left_button_up;
     g_ui_ctx.send_message(UIContext::Message_Update_Mouse_State{ wnd_mgr._mouse_state });
     KillTimer(nullptr, wnd_mgr._timer_mouse_state);
-    PostMessageW(handle, static_cast<int>(Message::mouse_idle), 0, 0);
+    PostMessageW(nullptr, static_cast<int>(Message::mouse_idle), 0, 0);
+
+    auto& window = windows.at(handle);
+    if (window.is_moving())
+      window.moving_end();
   };
 
   switch (msg)
@@ -187,14 +192,30 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   return DefWindowProcW(handle, msg, w_param, l_param);
 }
 
-auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height) noexcept -> WindowSnapshot
+auto WindowManager::create_fullscreen_window() noexcept -> WindowSnapshot
 {
   // promise window message queue is built in windows os
   _message_queue_create_complete.wait();
 
+  // create event for wait render resource create complete
+  auto event = CreateEventW(nullptr, false, false, nullptr);
+
+  // send window create message to window thread
+  PostThreadMessageW(_thread_id, static_cast<UINT>(Message::create_fullscreen_window), std::bit_cast<WPARAM>(event), 0);
+
+  // wait create window complete
+  WaitForSingleObject(event, INFINITE);
+  CloseHandle(event);
+  auto snap = WindowSnapshot{};
+  snap.init(_fullscreen_window);
+  return snap;
+}
+
+auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height) noexcept -> WindowSnapshot
+{
   // create WindowCreateInfo
   auto ptr = reinterpret_cast<WindowCreateInfo*>(malloc(sizeof(WindowCreateInfo)));
-  ptr->event  = CreateEvent(nullptr, false, false, nullptr);
+  ptr->event  = CreateEventW(nullptr, false, false, nullptr);
   ptr->x      = x;
   ptr->y      = y;
   ptr->width  = width;
@@ -214,16 +235,15 @@ auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height)
 
 void WindowManager::close_window(HWND handle, std::vector<RenderDataHandle>&& datas) const noexcept
 {
-  if (datas.empty())
-  {
-    PostThreadMessageW(_thread_id, static_cast<UINT>(Message::close_window), std::bit_cast<WPARAM>(handle), {});
-    return;
-  } 
-
   auto size = sizeof(RenderDataHandle) * datas.size();
   auto ptr  = malloc(size);
   memcpy(ptr, datas.data(), size);
   PostThreadMessageW(_thread_id, static_cast<UINT>(Message::close_window), std::bit_cast<WPARAM>(handle), std::bit_cast<LPARAM>(ptr));
+}
+
+void WindowManager::close_fullscreen_window() const noexcept
+{
+  PostThreadMessageW(_thread_id, static_cast<UINT>(Message::close_fullscreen_window), {}, {});
 }
 
 void WindowManager::minimize_window(HWND handle) const noexcept
@@ -245,6 +265,14 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
 {
   switch (msg)
   {
+  case Message::create_fullscreen_window:
+  {
+    auto size = get_screen_size(); // TODO: consider multiple monitors
+    _fullscreen_window.init_auxiliary(0, 0, size.x, size.y);
+    SetEvent(std::bit_cast<HANDLE>(w_param));
+    break;
+  }
+
   case Message::create_window:
   {
     msg_create_window(w_param);
@@ -260,9 +288,15 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
   case Message::close_window:
   {
     auto handle = std::bit_cast<HWND>(w_param);
-    _windows[handle].destroy(std::bit_cast<RenderDataHandle*>(l_param));
+    _windows.at(handle).destroy(std::bit_cast<RenderDataHandle*>(l_param));
     _windows.erase(handle);
     _using_mouse_pass_through_windows.erase(handle);
+    break;
+  }
+
+  case Message::close_fullscreen_window:
+  {
+    _fullscreen_window.destroy(nullptr);
     break;
   }
 
@@ -274,13 +308,13 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
 
   case Message::maximize_window:
   {
-    _windows[std::bit_cast<HWND>(w_param)].maximize();
+    _windows.at(std::bit_cast<HWND>(w_param)).maximize();
     break;
   }
 
   case Message::restore_window:
   {
-    _windows[std::bit_cast<HWND>(w_param)].restore();
+    _windows.at(std::bit_cast<HWND>(w_param)).restore();
     break;
   }
 

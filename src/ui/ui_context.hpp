@@ -29,6 +29,8 @@ struct Window
     return { pos.x - snap.x, pos.y - snap.y };
   }
 
+  auto real_pos() const noexcept -> glm::vec2 { return { snap.x - renderer::Window_Shadow_Thickness, snap.y - renderer::Window_Shadow_Thickness }; }
+
   auto is_cursor_valid_area() const noexcept -> bool
   {
     // TODO:
@@ -161,7 +163,9 @@ private:
 
   std::unordered_set<size_t> _ids;
 
+  //
   // state
+  //
 public:
   HWND                            cursor_on_window{};
   HWND                            mouse_down_window{};
@@ -172,6 +176,18 @@ public:
   bool                            draw_title_bar{};
 private:
   window::MouseState              _mouse_state{};
+
+  // button state
+  struct ButtonState
+  {
+    size_t    id{};
+    glm::vec2 left_top{};
+    glm::vec2 right_bottom{};
+    bool      move_out{};
+  } _btn_state;
+public:
+  void add_mouse_state(size_t id, glm::vec2 left_top, glm::vec2 right_bottom) noexcept;
+  auto is_cursor_move_out(size_t id) noexcept -> bool;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                              Message Process

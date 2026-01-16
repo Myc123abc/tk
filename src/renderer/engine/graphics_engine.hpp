@@ -4,12 +4,8 @@
 
 namespace tk { namespace renderer {
 
-class GraphicsEngine : public Engine
+class GraphicsEngine final : public Engine
 {
-private:
-  GraphicsEngine()                                 = default;
-  ~GraphicsEngine()                                = default;
-
 public:
   static auto instance() noexcept -> GraphicsEngine&
   {

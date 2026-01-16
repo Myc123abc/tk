@@ -5,9 +5,60 @@
 #include "util/error_handling.hpp"
 #include "resource/descriptor_heap_manager.hpp"
 #include "compiler.hpp"
-#include "window/window_manager.hpp"
 
 #include <ranges>
+
+using namespace tk;
+using namespace tk::renderer;
+
+namespace {
+
+auto load_cursor_bitmap(LPCSTR idc_cursor) noexcept
+{
+  auto cursor = LoadCursorA(nullptr, idc_cursor);
+  err_if(!cursor, "failed to load cursor");
+
+  auto info = ICONINFO{};
+  err_if(!GetIconInfo(cursor, &info), "failed to get cursor information");
+
+  auto bitmap = BITMAP{};
+  err_if(!GetObjectA(info.hbmColor, sizeof(bitmap), &bitmap), "failed to get bitmap of cursor");
+
+  auto cursor_bitmap = Bitmap{};
+  cursor_bitmap.init(bitmap.bmWidth, bitmap.bmHeight, bitmap.bmWidthBytes / bitmap.bmWidth);
+  GetBitmapBits(info.hbmColor, cursor_bitmap.size(), cursor_bitmap.data());
+
+  err_if(!DeleteObject(info.hbmColor), "failed to delete cursor information object");
+  err_if(!DeleteObject(info.hbmMask), "failed to delete cursor information object");
+
+  // get cursor position of bitmap
+  auto min_x = uint32_t{};
+  auto min_y = uint32_t{};
+  auto max_x = uint32_t{};
+  auto max_y = uint32_t{};
+  auto p     = reinterpret_cast<uint8_t*>(cursor_bitmap.data());
+  assert(bitmap.bmWidthBytes / bitmap.bmWidth == 4);
+  for (int y = 0; y < cursor_bitmap.height(); ++y)
+  {
+    for (int x = 0; x < cursor_bitmap.width(); ++x)
+    {
+      auto idx = y * cursor_bitmap.row_pitch() + x * 4;
+      if (p[idx] != 0 || p[idx + 1] != 0 || p[idx + 2] != 0)
+      {
+        if (x < min_x) min_x = x;
+        if (y < min_y) min_y = y;
+        if (x > max_x) max_x= x;
+        if (y > max_y) max_y = y;
+      }
+    }
+  }
+
+  cursor_bitmap.set_pos((max_x - min_x) / 2 + min_x, (max_y - min_y) / 2 + min_y);
+
+  return cursor_bitmap;
+}
+
+}
 
 namespace tk { namespace renderer {
 
@@ -22,6 +73,8 @@ void Renderer::init() noexcept
     g_copy_engine.init();
 
     _sdf_pipeline.init_graphics("assets/shader/sdf.hlsl", "vs", "ps", "assets/shader", RenderResource::Render_Target_Format, true);
+
+    load_cursor_images();
 
     while (!_exit.load(std::memory_order_relaxed))
     {
@@ -49,10 +102,54 @@ void Renderer::destroy() noexcept
   while (!_frame_render_complete_funcs.empty() || !_msg_queue.empty())
     message_process();
 
+  // destroy cursors
+  for (auto image : _cursors | std::views::values)
+    g_image_pool.free(image.handle);
+
   // destroy render resources
   g_graphics_engine.destroy();
   g_copy_engine.destroy();
   for (auto& res : _res | std::views::values) res.destroy();
+}
+
+void Renderer::load_cursor_images() noexcept
+{
+  // get bitmaps of all cursor types
+  auto bitmaps = std::unordered_map<CursorType, Bitmap>{};
+  using enum CursorType;
+  bitmaps[arrow]         = load_cursor_bitmap(IDC_ARROW);
+  bitmaps[up_down]       = load_cursor_bitmap(IDC_SIZENS);
+  bitmaps[left_rigtht]   = load_cursor_bitmap(IDC_SIZEWE);
+  bitmaps[diagonal]      = load_cursor_bitmap(IDC_SIZENESW);
+  bitmaps[anti_diagonal] = load_cursor_bitmap(IDC_SIZENWSE);
+
+  // create cursors
+  for (auto& [cursor_type, bitmap] : bitmaps)
+  {
+    _cursors[cursor_type].handle = g_image_pool.alloc();
+    g_image_pool[_cursors[cursor_type].handle].init(ImageType::srv, ImageFormat::rgba8_unorm, bitmap.width(), bitmap.height());
+    _cursors[cursor_type].pos = { bitmap.x(), bitmap.y() };
+  }
+
+  // copy bitmaps to cursor images
+  g_copy_engine.acquire_slot();
+  g_copy_engine.copy(
+    bitmaps
+      | std::views::values
+      | std::views::transform([](auto& bitmap) { return bitmap.view(); })
+      | std::ranges::to<std::vector<BitmapView>>(),
+    _cursors
+      | std::views::values
+      | std::views::transform([](auto& image) { return image.handle; })
+      | std::ranges::to<std::vector<ImageHandle>>());
+  // TODO: use g_graphics_engine.wait() this value to promise upload complete
+  auto cursors_upload_complete_fence_value = g_copy_engine.submit_slot();
+
+  // TODO: before use cursor images, set image state, or should i need to atomic state?
+  // std::ranges::for_each(_cursors | std::views::values, [&](auto& cursor)
+  //   { g_image_pool[cursor.handle].set_state(cmd, ImageState::pixel_shader_resource); });
+
+  std::ranges::for_each(bitmaps | std::views::values, [](auto& image) { image.destroy(); });
 }
 
 void Renderer::add_frame_render_complete_func(std::move_only_function<void()>&& func) noexcept
@@ -127,7 +224,7 @@ void Renderer::render_sdf(RenderResource& res, std::span<Vertex const> vertices,
 {
   auto& frame               = res.current_frame();
   auto& render_target_image = g_image_pool[frame.image];
-  auto  cmd                 = res.graphics_cmd();
+  auto  cmd                 = g_graphics_engine.cmd();
 
   // bind pipeline
   _sdf_pipeline.bind(cmd);

@@ -21,7 +21,7 @@ void Engine::init(D3D12_COMMAND_LIST_TYPE type) noexcept
   // create fence
   err_if(g_core.device()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence)),
           "failed to create fence");
-  _fence_event = CreateEventA(nullptr, false, false, nullptr);
+  _fence_event = CreateEventW(nullptr, false, false, nullptr);
   err_if(!_fence_event, "failed to create win32 event");
 }
 
@@ -31,12 +31,18 @@ auto Engine::signal() noexcept -> uint64_t
   return _fence_value;
 }
 
-auto Engine::submit(std::initializer_list<ID3D12GraphicsCommandList*> cmds) noexcept -> uint64_t
+auto Engine::submit() noexcept -> uint64_t
 {
+  auto cmds = { _cmd.Get() };
   for (auto const& cmd : cmds)
     err_if(cmd->Close(), "failed to close command list");
   _queue->ExecuteCommandLists(cmds.size(), reinterpret_cast<ID3D12CommandList* const*>(cmds.begin()));
   return signal();
+}
+
+void Engine::wait(Engine const& engine, std::optional<uint64_t> fence_value) const noexcept
+{
+  _queue->Wait(engine._fence.Get(), fence_value ? fence_value.value() : engine._fence_value);
 }
 
 auto Engine::set_event_on_completion() const noexcept -> HANDLE
@@ -50,6 +56,13 @@ void Engine::destroy() noexcept
   err_if(_fence->SetEventOnCompletion(signal(), _fence_event), "failed to set event on completion");
   WaitForSingleObjectEx(_fence_event, INFINITE, false);
   CloseHandle(_fence_event);
+}
+
+auto Engine::reset_cmd(ID3D12CommandAllocator* alloc) const noexcept -> ID3D12GraphicsCommandList1*
+{
+  err_if(alloc->Reset() == E_FAIL, "failed to reset command allocator");
+  err_if(_cmd->Reset(alloc, nullptr), "failed to reset command list");
+  return _cmd.Get();
 }
 
 }}

@@ -25,6 +25,24 @@ void Window::init(int x, int y, uint32_t width, uint32_t height) noexcept
   ShowWindow(_handle, SW_SHOW);
 }
 
+void Window::init_auxiliary(int x, int y, uint32_t width, uint32_t height) noexcept
+{
+  this->x      = x;
+  this->y      = y;
+  this->width  = width;
+  this->height = height;
+  update_rect();
+
+  _handle = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
+    WindowManager::Auxiliary_Class, nullptr, WS_POPUP, x, y, width, height, 0, 0, GetModuleHandleW(nullptr), 0);
+  err_if(!_handle, "failed to create window");
+
+  // create window render resource
+  g_renderer.send_message(Renderer::Message_Window_Create{ _handle, real_width(), real_height() });
+
+  ShowWindow(_handle, SW_SHOW);
+}
+
 void Window::update_by_rect() noexcept
 {
   x      = _rect.left;

@@ -5,6 +5,7 @@
 #include "pipeline.hpp"
 #include "config.hpp"
 #include "../util/message_queue.hpp"
+#include "window/window.hpp"
 
 #include <rigtorp/SPSCQueue.h>
 
@@ -58,6 +59,8 @@ public:
   void wakeup() noexcept { _render_data_empty_sem.release(); }
 
 private:
+  void load_cursor_images() noexcept;
+
   void render() noexcept;
   void render_sdf(RenderResource& res, std::span<Vertex const> vertices, std::span<uint16_t const> indices, std::span<ShapeProperty const> shape_properties) noexcept;
 
@@ -76,6 +79,14 @@ private:
   rigtorp::SPSCQueue<std::pair<HWND, RenderData*>> _render_datas{ Render_Data_Queue_Capacity };
   std::binary_semaphore                            _frame_sem{ 1 };
   std::binary_semaphore                            _render_data_empty_sem{ 0 };
+
+  // cursor images
+  struct Cursor
+  {
+    ImageHandle handle;
+    glm::vec2   pos;
+  };
+  std::unordered_map<CursorType, Cursor> _cursors;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                              Message Process

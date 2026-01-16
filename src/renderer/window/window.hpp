@@ -10,6 +10,15 @@
 
 namespace tk { namespace renderer {
 
+enum class CursorType
+{
+  arrow,
+  up_down,
+  left_rigtht,
+  diagonal,
+  anti_diagonal
+};
+
 class Window
 {
   friend class WindowManager;
@@ -22,6 +31,7 @@ public:
   Window& operator=(Window&&)      = default;
 
   void init(int x, int y, uint32_t width, uint32_t height) noexcept;
+  void init_auxiliary(int x, int y, uint32_t width, uint32_t height) noexcept;
   void destroy(RenderDataHandle* ptr) const noexcept;
 
   auto real_x()      const noexcept { return x      - Window_Shadow_Thickness;     }

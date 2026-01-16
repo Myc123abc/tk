@@ -79,7 +79,9 @@ public:
   enum class Message
   {
     create_window = WM_APP,
+    create_fullscreen_window,
     close_window,
+    close_fullscreen_window,
     minimize_window,
     maximize_window,
     restore_window,
@@ -93,8 +95,10 @@ public:
 
   static LRESULT CALLBACK wnd_proc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param) noexcept;
 
+  auto create_fullscreen_window() noexcept -> WindowSnapshot;
   auto create_window(int x, int y, uint32_t width, uint32_t height) noexcept -> WindowSnapshot;
   void close_window(HWND handle, std::vector<RenderDataHandle>&& datas) const noexcept;
+  void close_fullscreen_window() const noexcept;
   void minimize_window(HWND handle) const noexcept;
   void maximize_window(HWND handle) const noexcept;
   void restore_window(HWND handle) const noexcept;
@@ -114,13 +118,14 @@ private:
   std::chrono::steady_clock::time_point _mouse_left_down_start{};
 
 private:
-  static constexpr wchar_t Fullscreen_Class[] = L"vn::window::WindowManager::Window";
-  static constexpr wchar_t Window_Class[]     = L"vn::window::WindowManager::FullscreenWindow";
+  static constexpr wchar_t Auxiliary_Class[] = L"vn::window::WindowManager::AuxiliaryWindow";
+  static constexpr wchar_t Window_Class[]    = L"vn::window::WindowManager::Window";
 
 private:
   std::jthread                     _thread;
   DWORD                            _thread_id{};
   std::latch                       _message_queue_create_complete{ 1 };
+  Window                           _fullscreen_window;
   std::unordered_map<HWND, Window> _windows;
   HANDLE                           _signal_event{};
   std::unordered_set<HWND>         _using_mouse_pass_through_windows;

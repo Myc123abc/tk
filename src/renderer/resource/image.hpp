@@ -2,16 +2,12 @@
 
 #include "descriptor_heap_manager.hpp"
 #include "../../util/object_pool.hpp"
-#include "buffer.hpp"
 #include "../config.hpp"
 
 #include <dxgi1_6.h>
 #include <directx/d3dx12.h>
 
 #include <glm/glm.hpp>
-
-#include <algorithm>
-#include <ranges>
 
 namespace tk { namespace renderer {
 
@@ -119,6 +115,7 @@ struct Win32Bitmap
 ///                               Image
 ////////////////////////////////////////////////////////////////////////////////
 
+// TODO: implict Image, only use ImageHandle
 class Image
 {
 public:
@@ -258,27 +255,7 @@ private:
 
 inline static auto& g_image_pool{ *ImagePool::instance() };
 
-////////////////////////////////////////////////////////////////////////////////
-///                             Upload Buffer
-////////////////////////////////////////////////////////////////////////////////
-
-class UploadBuffer
-{
-public:
-  void add_images(std::vector<ImageHandle> const& image_handles, std::vector<BitmapView> const& bitmaps) noexcept;
-  void upload(ID3D12GraphicsCommandList1* cmd) noexcept;
-
-private:
-  struct Info
-  {
-    D3D12_SUBRESOURCE_DATA data{};
-    ImageHandle            handle;
-  };
-
-  Buffer            _buffer;
-  std::vector<Info> _infos;
-};
-
+#if 0
 ////////////////////////////////////////////////////////////////////////////////
 ///                        External Image Loaderer
 ////////////////////////////////////////////////////////////////////////////////
@@ -338,5 +315,6 @@ private:
 };
 
 inline static auto& g_external_image_loader{ *ExternalImageLoader::instance() };
+#endif
 
 }}

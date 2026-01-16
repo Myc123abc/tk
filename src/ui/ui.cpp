@@ -298,12 +298,18 @@ auto button(
   }
 
   // when cursor hover on it, it will change color to hovered color
-  auto is_hovered = ui::is_hover_on(name, left_top, right_bottom);
+  auto is_hovered  = ui::is_hover_on(name, left_top, right_bottom);
+  auto is_move_out = g_ui_ctx.is_cursor_move_out(id);
   if (is_hovered && g_ui_ctx.mouse_down_pos)
-    is_hovered = point_on(g_ui_ctx.mouse_down_pos.value(), left_top, right_bottom) &&
+  {
+    g_ui_ctx.add_mouse_state(id, left_top, right_bottom);
+    is_hovered = !is_move_out                                                      &&
+                 point_on(g_ui_ctx.mouse_down_pos.value(), left_top, right_bottom) &&
                  g_ui_ctx.mouse_down_window == g_ui_ctx._window->snap.handle;
+  }
 
   auto value = g_ui_ctx.ping_pong_lerp(is_hovered, id, 200'000);
+  if (mouse_down_color && is_move_out) button_hover_color = mouse_down_color.value();
   button_color = color_lerp(button_color, button_hover_color, value);
 
   // when mouse down, color also change
