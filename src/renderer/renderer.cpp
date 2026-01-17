@@ -103,8 +103,8 @@ void Renderer::destroy() noexcept
     message_process();
 
   // destroy cursors
-  for (auto image : _cursors | std::views::values)
-    g_image_pool.free(image.handle);
+  for (auto cursor : _cursors | std::views::values)
+    cursor.image.destroy();
 
   // destroy render resources
   g_graphics_engine.destroy();
@@ -126,8 +126,7 @@ void Renderer::load_cursor_images() noexcept
   // create cursors
   for (auto& [cursor_type, bitmap] : bitmaps)
   {
-    _cursors[cursor_type].handle = g_image_pool.alloc();
-    g_image_pool[_cursors[cursor_type].handle].init(ImageType::srv, ImageFormat::rgba8_unorm, bitmap.width(), bitmap.height());
+    _cursors[cursor_type].image.init(ImageType::srv, ImageFormat::rgba8_unorm, bitmap.width(), bitmap.height());
     _cursors[cursor_type].pos = { bitmap.x(), bitmap.y() };
   }
 
@@ -140,8 +139,8 @@ void Renderer::load_cursor_images() noexcept
       | std::ranges::to<std::vector<BitmapView>>(),
     _cursors
       | std::views::values
-      | std::views::transform([](auto& image) { return image.handle; })
-      | std::ranges::to<std::vector<ImageHandle>>());
+      | std::views::transform([](auto& cursor) { return &cursor.image; })
+      | std::ranges::to<std::vector<Image*>>());
   // TODO: use g_graphics_engine.wait() this value to promise upload complete
   auto cursors_upload_complete_fence_value = g_copy_engine.submit_slot();
 
@@ -223,7 +222,7 @@ void Renderer::render() noexcept
 void Renderer::render_sdf(RenderResource& res, std::span<Vertex const> vertices, std::span<uint16_t const> indices, std::span<ShapeProperty const> shape_properties) noexcept
 {
   auto& frame               = res.current_frame();
-  auto& render_target_image = g_image_pool[frame.image];
+  auto& render_target_image = frame.image;
   auto  cmd                 = g_graphics_engine.cmd();
 
   // bind pipeline

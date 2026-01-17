@@ -11,21 +11,20 @@ namespace tk { namespace renderer {
 class UploadBuffer
 {
 public:
-  void add_images(std::vector<ImageHandle> const& image_handles, std::vector<BitmapView> const& bitmaps) noexcept;
+  void add_images(std::vector<Image*> const& images, std::vector<BitmapView> const& bitmaps) noexcept;
   void upload(ID3D12GraphicsCommandList1* cmd) noexcept;
 
 private:
   struct Info
   {
     D3D12_SUBRESOURCE_DATA data{};
-    ImageHandle            handle;
+    Image*                 image{};
   };
 
   Buffer            _buffer;
   std::vector<Info> _infos;
 };
 
-// TODO: don't use inherate?
 class CopyEngine final : public Engine
 {
 public:
@@ -40,7 +39,7 @@ public:
 
   void acquire_slot() noexcept;
 
-  void copy(std::vector<BitmapView> const& bitmaps, std::vector<ImageHandle> const& image_handles) noexcept;
+  void copy(std::vector<BitmapView> const& bitmaps, std::vector<Image*> const& images) noexcept;
 
   auto submit_slot() noexcept -> uint64_t;
 

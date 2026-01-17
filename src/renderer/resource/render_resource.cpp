@@ -15,17 +15,11 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
 {
   // create offscreen images
   for (auto& frame : _frames)
-  {
-    frame.image = g_image_pool.alloc();
-    g_image_pool[frame.image].init(ImageType::rtv, Render_Target_Format, width, height);
-  }
+    frame.image.init(ImageType::rtv, Render_Target_Format, width, height);
   
   // create depth test image
   if (Enable_Depth_Test)
-  {
-    _dsv_image = g_image_pool.alloc();
-    g_image_pool[_dsv_image].init(ImageType::dsv, ImageFormat::d32, width, height);
-  }
+    _dsv_image.init(ImageType::dsv, ImageFormat::d32, width, height);
 
   // create swapchain
   ComPtr<IDXGISwapChain1> swapchain;
@@ -62,10 +56,7 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
 
   // get image from swapchain backbuffers
   for (auto [i, frame] : _frames | std::views::enumerate)
-  {
-    frame.swapchain_image = g_image_pool.alloc();
-    g_image_pool[frame.swapchain_image].init(_swapchain.Get(), i);
-  }
+    frame.swapchain_image.init(_swapchain.Get(), i);
 
   // create command allocator and list
   for (auto& frame : _frames)
@@ -81,11 +72,11 @@ void RenderResource::destroy() noexcept
 {
   CloseHandle(_swapchain_waitable_obj);
   if (Enable_Depth_Test)
-    g_image_pool[_dsv_image].destroy();
+    _dsv_image.destroy();
   for (auto& frame : _frames)
   {
-    g_image_pool.free(frame.image);
-    g_image_pool.free(frame.swapchain_image);
+    frame.image.destroy();
+    frame.swapchain_image.destroy();
     frame.buffer.destroy();
   }
 }
@@ -99,12 +90,12 @@ void RenderResource::resize(uint32_t width, uint32_t height) noexcept
   // reset swapchain relatation resources
   for (auto& frame : _frames)
   {
-    g_image_pool[frame.swapchain_image].destroy();
-    g_image_pool[frame.image].destroy();
+    frame.swapchain_image.destroy();
+    frame.image.destroy();
   }
   _comp_visual->SetContent(nullptr);
   if (Enable_Depth_Test)
-    g_image_pool[_dsv_image].destroy();
+    _dsv_image.destroy();
 
   // resize swapchain
   err_if(_swapchain->ResizeBuffers(Frame_Count, width, height, DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT | DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING),
@@ -119,11 +110,11 @@ void RenderResource::resize(uint32_t width, uint32_t height) noexcept
   // recreate images
   for (auto [i, frame] : _frames | std::views::enumerate)
   {
-    g_image_pool[frame.swapchain_image].resize(_swapchain.Get(), i);
-    g_image_pool[frame.image].resize(width, height);
+    frame.swapchain_image.resize(_swapchain.Get(), i);
+    frame.image.resize(width, height);
   }
   if (Enable_Depth_Test)
-    g_image_pool[_dsv_image].resize(width, height);
+    _dsv_image.resize(width, height);
 }
 
 void RenderResource::wait_frame_complete() const noexcept
@@ -154,19 +145,18 @@ void RenderResource::render_begin() noexcept
   clear_image();
 
   // set viewport
-  auto& image    = g_image_pool[frame.image];
-  auto  viewport = CD3DX12_VIEWPORT{ 0.f, 0.f, static_cast<float>(image.width()), static_cast<float>(image.height()) };
+  auto  viewport = CD3DX12_VIEWPORT{ 0.f, 0.f, static_cast<float>(frame.image.width()), static_cast<float>(frame.image.height()) };
   cmd->RSSetViewports(1, &viewport);
 }
 
 void RenderResource::render_end() noexcept
 {
 	auto& frame           = current_frame();
-  auto& swapchain_image = g_image_pool[_frames[_swapchain->GetCurrentBackBufferIndex()].swapchain_image];
+  auto& swapchain_image = _frames[_swapchain->GetCurrentBackBufferIndex()].swapchain_image;
   auto  cmd             = g_graphics_engine.cmd();
 
   // copy offscreen image to swapchain backbuffer
-	copy(cmd, g_image_pool[frame.image], swapchain_image);
+	copy(cmd, frame.image, swapchain_image);
 
   // set to present state
   swapchain_image.set_state(cmd, ImageState::present);
@@ -195,12 +185,12 @@ void RenderResource::present(bool vsync) const noexcept
 void RenderResource::clear_image() noexcept
 {
   auto& frame               = current_frame();
-  auto& render_target_image = g_image_pool[frame.image];
+  auto& render_target_image = frame.image;
   auto  cmd                 = g_graphics_engine.cmd();
   auto  rtv_handle          = render_target_image.cpu_handle();
   auto  dsv_handle          = D3D12_CPU_DESCRIPTOR_HANDLE{};
   if (Enable_Depth_Test)
-    dsv_handle = g_image_pool[_dsv_image].cpu_handle();
+    dsv_handle = _dsv_image.cpu_handle();
 
   // set render target view
   if (Enable_Depth_Test)

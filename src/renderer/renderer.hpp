@@ -83,8 +83,8 @@ private:
   // cursor images
   struct Cursor
   {
-    ImageHandle handle;
-    glm::vec2   pos;
+    Image     image;
+    glm::vec2 pos;
   };
   std::unordered_map<CursorType, Cursor> _cursors;
 

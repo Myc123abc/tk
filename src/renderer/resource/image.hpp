@@ -115,14 +115,13 @@ struct Win32Bitmap
 ///                               Image
 ////////////////////////////////////////////////////////////////////////////////
 
-// TODO: implict Image, only use ImageHandle
 class Image
 {
 public:
   Image()                        = default;
   ~Image()                       = default;
   Image(Image const&)            = default;
-  Image(Image&&)                 = delete;
+  Image(Image&&)                 = default;
   Image& operator=(Image const&) = default;
   Image& operator=(Image&&)      = delete;
 
@@ -215,6 +214,7 @@ void copy(
 
 void copy(BitmapView const& src, BitmapView const& dst) noexcept;
 
+#if 0
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Image Pool
 ////////////////////////////////////////////////////////////////////////////////
@@ -254,7 +254,7 @@ private:
 };
 
 inline static auto& g_image_pool{ *ImagePool::instance() };
-
+#endif
 #if 0
 ////////////////////////////////////////////////////////////////////////////////
 ///                        External Image Loaderer
