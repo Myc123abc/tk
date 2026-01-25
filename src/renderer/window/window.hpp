@@ -19,6 +19,19 @@ enum class CursorType
   anti_diagonal
 };
 
+enum class ResizeType
+{
+  none,
+  left_top,
+  right_top,
+  left_bottom,
+  right_bottom,
+  left,
+  right,
+  top,
+  bottom,
+};
+
 class Window
 {
   friend class WindowManager;
@@ -49,23 +62,33 @@ public:
   auto pos() const noexcept { return glm::vec<2, int>{ x, y }; }
   auto cursor_pos() const noexcept -> glm::vec<2, int>;
 
-  auto is_cursor_valid_area()  const noexcept -> bool;
   auto is_active() const noexcept { return GetForegroundWindow() == _handle; }
   auto is_mouse_pass_through_area() const noexcept -> bool;
 
   auto is_moving() const noexcept { return _moving; }
   auto is_resizing() const noexcept { return _resizing; }
   auto is_moving_or_resizing() const noexcept { return _moving || _resizing; }
-  void moving_with_pos(int x, int y) noexcept;
-  void moving_from_maximize(int x, int y) noexcept;
-  void moving_end() noexcept;
+  void move_with_pos(int x, int y) noexcept;
+  void move_from_maximize(int x, int y) noexcept;
+  void move_end() noexcept;
+  void adjust_offset(ResizeType type, glm::vec<2, int> const& point, int& dx, int& dy) const noexcept;
+  void resize(ResizeType type, int dx, int dy) noexcept;
+  void resize_end() noexcept;
 
   void maximize() noexcept;
   void restore() noexcept;
 
+  auto get_resize_type(glm::vec<2, int> const& p) const noexcept -> ResizeType;
+
 private:
   void update_by_rect() noexcept;
   void update_rect() noexcept;
+  auto cursor_valid_area()  const noexcept -> RECT;
+
+  void left_offset(int dx)   noexcept;
+  void top_offset(int dy)    noexcept;
+  void right_offset(int dx)  noexcept;
+  void bottom_offset(int dy) noexcept;
 
 public:
   int      x{};
@@ -77,10 +100,12 @@ public:
 private:
   HWND     _handle{};
   bool     _moving{};
-  bool     _moving_from_maximize{};
+  bool     _move_from_maximize{};
   bool     _resizing{};
   RECT     _rect{};
   RECT     _backup_rect{};
+  uint32_t _min_width{ 50 };
+  uint32_t _min_height{ 50 };
 };
 
 }}

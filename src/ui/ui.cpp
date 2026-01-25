@@ -248,10 +248,9 @@ auto is_hover_on(size_t id, glm::vec2 left_top, glm::vec2 right_bottom) noexcept
 auto is_hover_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
 {
   g_ui_ctx.check_draw();
-  if (!g_ui_ctx._window->is_cursor_valid_area()) return false;
   auto p = g_ui_ctx._window->cursor_pos();
   return g_ui_ctx.cursor_on_window == g_ui_ctx._window->snap.handle &&
-         !g_ui_ctx._window->snap.moving_from_maximize               &&
+         !g_ui_ctx._window->snap.move_from_maximize                 &&
          point_on(p, left_top, right_bottom);
 }
 
@@ -260,12 +259,11 @@ auto is_click_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
   g_ui_ctx.check_draw();
   auto window = g_ui_ctx._window;
   if (!window->is_active()             ||
-      !window->is_cursor_valid_area()  ||
 		   window->is_moving_or_resizing() ||
       !g_ui_ctx.mouse_down_pos         ||
       !g_ui_ctx.mouse_up_pos           ||
        g_ui_ctx.mouse_down_window != g_ui_ctx.mouse_up_window) return false;
-  return !g_ui_ctx.is_moving_from_maximize                                 &&
+  return !g_ui_ctx.is_move_from_maximize                                 &&
          point_on(g_ui_ctx.mouse_down_pos.value(), left_top, right_bottom) &&
          point_on(g_ui_ctx.mouse_up_pos.value(),   left_top, right_bottom);
 }

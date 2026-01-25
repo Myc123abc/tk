@@ -8,7 +8,7 @@ namespace tk {
 
 inline void err_if(bool b, std::string_view msg) noexcept
 {
-  if (b)
+  if (b) [[unlikely]]
   {
     error(msg);
     exit(EXIT_FAILURE);
@@ -18,7 +18,7 @@ inline void err_if(bool b, std::string_view msg) noexcept
 template <typename... T>
 inline void err_if(bool b, std::format_string<T...> const fmt, T&&... args) noexcept
 {
-  if (b)
+  if (b) [[unlikely]]
   {
     error(fmt, std::forward<T>(args)...);
     exit(EXIT_FAILURE);

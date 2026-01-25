@@ -45,7 +45,7 @@ struct WindowSnapshot
   bool     moving{};
   bool     resizing{};
   bool     maximized{};
-  bool     moving_from_maximize{};
+  bool     move_from_maximize{};
   
   void init(Window const& window) noexcept
   {

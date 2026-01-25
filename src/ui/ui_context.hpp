@@ -23,19 +23,20 @@ struct Window
 {
   renderer::WindowSnapshot snap;
 
+  auto rect() const noexcept { return RECT{ snap.x, snap.y, static_cast<LONG>(snap.x + snap.width), static_cast<LONG>(snap.y + snap.height) }; }
+
   auto cursor_pos() const noexcept -> glm::vec<2, int>
   {
     auto pos = renderer::get_cursor_pos();
     return { pos.x - snap.x, pos.y - snap.y };
   }
 
-  auto real_pos() const noexcept -> glm::vec2 { return { snap.x - renderer::Window_Shadow_Thickness, snap.y - renderer::Window_Shadow_Thickness }; }
-
-  auto is_cursor_valid_area() const noexcept -> bool
+  auto real_cursor_pos() const noexcept -> glm::vec<2, int>
   {
-    // TODO:
-    return true;
+    return cursor_pos() + glm::vec<2, int>{ renderer::Window_Shadow_Thickness };
   }
+
+  auto real_pos() const noexcept -> glm::vec2 { return { snap.x - renderer::Window_Shadow_Thickness, snap.y - renderer::Window_Shadow_Thickness }; }
 
   auto is_moving_or_resizing() const noexcept { return snap.moving || snap.resizing; }
   auto is_active() const noexcept { return GetForegroundWindow() == snap.handle; }
@@ -46,6 +47,7 @@ struct Window
   bool         is_closed{};
   WindowConfig cfg{};
   glm::vec2    render_pos{};
+  bool         need_clear{};
 
   uint32_t                                                      frame_index{};
   std::array<renderer::RenderDataHandle, renderer::Frame_Count> datas;
@@ -140,6 +142,7 @@ private:
   bool                                    _call_begin{};
   bool                                    _path_begin{};
   bool                                    _union_begin{};
+
 public:
   std::vector<float>                      path_data;
   std::vector<glm::vec2>                  path_points;
@@ -150,18 +153,19 @@ private:
     renderer::ShapeProperty::Operator op;
     std::vector<glm::vec2>            points;
     uint32_t                          offset{};
-  } _op_data;
-
+  };
+  OperatorShapeRenderData  _op_data;
   std::optional<glm::vec4> _tmp_color;
+  double                   _delta_time{};
 
-  double _delta_time{};
-
+  //
+  // widget ids
+  //
   std::unordered_set<size_t>             _hovered_widget_ids;
   size_t                                 _last_hovered_widget_id{};
   size_t                                 _prev_hovered_widget_id{};
   std::unordered_map<size_t, Lerpolator> _lerpolators;
-
-  std::unordered_set<size_t> _ids;
+  std::unordered_set<size_t>             _ids;
 
   //
   // state
@@ -172,7 +176,7 @@ public:
   HWND                            mouse_up_window{};
   std::optional<glm::vec<2, int>> mouse_down_pos;
   std::optional<glm::vec<2, int>> mouse_up_pos;
-  bool                            is_moving_from_maximize{};
+  bool                            is_move_from_maximize{};
   bool                            draw_title_bar{};
 private:
   window::MouseState              _mouse_state{};

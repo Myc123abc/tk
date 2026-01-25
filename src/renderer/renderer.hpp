@@ -17,6 +17,7 @@
 #include <span>
 #include <variant>
 #include <unordered_set>
+#include <latch>
 
 namespace tk { namespace renderer {
 
@@ -45,24 +46,14 @@ public:
 
   void acquire_frame() noexcept { _frame_sem.acquire(); }
 
-  auto render(HWND handle, RenderData* render_data) noexcept
-  {
-    if (!render_data->empty())
-    {
-      _render_datas.emplace(handle, render_data);
-      return true;
-    }
-    return false;
-  }
+  void render(HWND handle, RenderData* render_data) noexcept { _render_datas.emplace(handle, render_data); }
 
   auto is_sleeping() const noexcept { return _render_datas.empty(); }
   void wakeup() noexcept { _render_data_empty_sem.release(); }
 
 private:
-  void load_cursor_images() noexcept;
-
   void render() noexcept;
-  void render_sdf(RenderResource& res, std::span<Vertex const> vertices, std::span<uint16_t const> indices, std::span<ShapeProperty const> shape_properties) noexcept;
+  void render_sdf(RenderResource& res, RenderData* data) noexcept;
 
 private:
   std::jthread                                     _thread;
@@ -79,14 +70,6 @@ private:
   rigtorp::SPSCQueue<std::pair<HWND, RenderData*>> _render_datas{ Render_Data_Queue_Capacity };
   std::binary_semaphore                            _frame_sem{ 1 };
   std::binary_semaphore                            _render_data_empty_sem{ 0 };
-
-  // cursor images
-  struct Cursor
-  {
-    Image     image;
-    glm::vec2 pos;
-  };
-  std::unordered_map<CursorType, Cursor> _cursors;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                              Message Process

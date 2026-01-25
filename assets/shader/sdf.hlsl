@@ -19,15 +19,13 @@ struct PSParameter
 
 struct Constants
 {
-  uint2    window_extent;
-  float2   window_pos;
-  uint32_t cursor_index;
+  uint2  window_extent;
+  float2 window_pos;
 };
 
 enum : uint32_t
 {
-  type_cursor = 1,
-  type_triangle,
+  type_triangle = 1,
   type_rectangle,
   type_circle,
   type_line,
@@ -258,9 +256,6 @@ float4 ps(PSParameter args) : SV_TARGET
   ShapeProperty shape_property = get_shape_property(offset);
 
   float4 color = args.color;
-
-  if (shape_property.type == type_cursor)
-    return images[constants.cursor_index].Sample(g_sampler, args.uv);
 
   if (shape_property.type == type_image)
     return images[get_uint(offset)].Sample(g_sampler, args.uv);

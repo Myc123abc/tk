@@ -4,6 +4,7 @@
 
 using namespace tk::ui;
 using namespace tk::window;
+using namespace tk::renderer;
 
 namespace {
 
@@ -30,6 +31,34 @@ auto get_screen_size() noexcept -> glm::vec<2, uint32_t>
   return { GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN) };
 }
 
+void set_cursor(HWND handle, ResizeType type) noexcept
+{
+  using enum ResizeType;
+  auto cursor = IDC_ARROW;
+  switch (type)
+  {
+  case top:
+  case bottom:
+    cursor = IDC_SIZENS;
+    break;
+  case left:
+  case right:
+    cursor = IDC_SIZEWE;
+    break;
+  case right_top:
+  case left_bottom:
+    cursor = IDC_SIZENESW;
+    break;
+  case left_top:
+  case right_bottom:
+    cursor = IDC_SIZENWSE;
+    break;
+  case none:
+    break;
+  }
+  SetClassLongPtrA(handle, GCLP_HCURSOR, reinterpret_cast<LONG_PTR>(LoadCursorA(nullptr, cursor)));
+}
+
 }
 
 namespace tk { namespace renderer {
@@ -39,6 +68,9 @@ void WindowManager::init() noexcept
   _thread = std::jthread([this]
   {
     _thread_id = GetCurrentThreadId();
+
+    // enable DPI awareness
+    SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
     // register window class
     auto wnd_class = WNDCLASSEXW{};
@@ -88,13 +120,15 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   static auto& wnd_mgr = WindowManager::instance();
   static auto& windows = wnd_mgr._windows;
 
-  static auto window_left_button_down_mouse_pos = std::optional<glm::vec<2, int>>{};
+  static auto last_cursor_pos              = glm::vec<2, int>{};
+  static auto left_button_down_window_pos  = glm::vec<2, int>{};
+  static auto last_resize_type             = ResizeType{};
+  static auto left_button_down_resize_type = ResizeType{};
 
   static auto finish_moving_or_resizing = [&](HWND handle)
   {
     ReleaseCapture();
     ClipCursor(nullptr);
-    window_left_button_down_mouse_pos = {};
 
     // transform new mouse state
     wnd_mgr._mouse_state = MouseState::left_button_up;
@@ -104,7 +138,9 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
 
     auto& window = windows.at(handle);
     if (window.is_moving())
-      window.moving_end();
+      window.move_end();
+    else if (window.is_resizing())
+      window.resize_end();
   };
 
   switch (msg)
@@ -119,7 +155,9 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   {
     SetCapture(handle);
     auto& window = windows.at(handle);
-    window_left_button_down_mouse_pos = window.cursor_pos();
+    last_cursor_pos              = get_cursor_pos();
+    left_button_down_window_pos  = window.cursor_pos();
+    left_button_down_resize_type = window.get_resize_type(left_button_down_window_pos);
 
     wnd_mgr._mouse_state           = MouseState::left_button_down;
     wnd_mgr._mouse_left_down_start = std::chrono::steady_clock::now();
@@ -130,7 +168,15 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
 
   case WM_MOUSEMOVE:
   {
-    auto& window = wnd_mgr._windows.at(handle);
+    auto& window     = wnd_mgr._windows.at(handle);
+    auto  cursor_pos = window.cursor_pos();
+
+    // update cursor
+    if (auto type = window.get_resize_type(cursor_pos); type != last_resize_type)
+    {
+      last_resize_type = type;
+      set_cursor(handle, type);
+    }
 
     // update window mode for mouse pass through
     if (!window.is_resizing() && !window.is_moving() &&
@@ -147,29 +193,39 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     if (wnd_mgr._mouse_state &  MouseState::left_button_down ||
         wnd_mgr._mouse_state == MouseState::left_button_press)
     {
-      auto pt = POINT{ window_left_button_down_mouse_pos->x, window_left_button_down_mouse_pos->y };
-      if (!window._moving_from_maximize &&
-          std::ranges::any_of(g_ui_ctx.access_move_invalid_areas(handle), [pt](auto rect) { return PtInRect(&rect, pt); }))
-        break;
-
       // limit cursor move area
-      if (!window.is_moving())
-      {
-        auto rect = get_maximize_rect();
-        ClipCursor(&rect);
-      }
+      auto rect = get_maximize_rect();
+      ClipCursor(&rect);
 
       // moving
-      auto pos     = get_cursor_pos();
-      auto new_pos = pos - window_left_button_down_mouse_pos.value();
-      if (window.maximized)
+      auto pos = get_cursor_pos();
+      if (left_button_down_resize_type == ResizeType::none)
       {
-        window.moving_from_maximize(pos.x, pos.y);
-        window_left_button_down_mouse_pos = window.cursor_pos();
-        assert(window_left_button_down_mouse_pos->x >= 0 && window_left_button_down_mouse_pos->y >= 0);
+        // only moving in cursor valid areas
+        auto pt = POINT{ left_button_down_window_pos.x, left_button_down_window_pos.y };
+        if (!window._move_from_maximize &&
+            std::ranges::any_of(g_ui_ctx.access_move_invalid_areas(handle), [pt](auto rect) { return PtInRect(&rect, pt); }))
+          break;
+
+        if (window.maximized)
+        {
+          window.move_from_maximize(pos.x, pos.y);
+          left_button_down_window_pos = window.cursor_pos();
+        }
+        else
+        {
+          pos -= left_button_down_window_pos;
+          window.move_with_pos(pos.x, pos.y);
+        }
       }
+      // resizing
       else
-        window.moving_with_pos(new_pos.x, new_pos.y);
+      {
+        auto offset = pos - last_cursor_pos;
+        window.adjust_offset(left_button_down_resize_type, pos, offset.x, offset.y);
+        window.resize(left_button_down_resize_type, offset.x, offset.y);
+      }
+      last_cursor_pos = pos;
     }
     break;
   }
@@ -413,26 +469,6 @@ auto WindowManager::get_cursor_on_window() const noexcept -> HWND
       it != z_orders.end())
     return *it;
   return {};
-}
-
-void SwapWindows(HWND hShow, HWND hHide)
-{
-  HDWP hdwp = BeginDeferWindowPos(2);
-  if (!hdwp) return;
-
-  // show new window
-  hdwp = DeferWindowPos(
-      hdwp, hShow, nullptr,
-      0, 0, 0, 0,
-      SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_SHOWWINDOW);
-
-  // hide old window
-  hdwp = DeferWindowPos(
-      hdwp, hHide, nullptr,
-      0, 0, 0, 0,
-      SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_HIDEWINDOW);
-
-  EndDeferWindowPos(hdwp);   // both changes become active together
 }
 
 }}

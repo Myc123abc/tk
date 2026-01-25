@@ -44,17 +44,25 @@ void UIContext::MessageHandler::operator()(Message_Update_Moving const& msg) con
 void UIContext::MessageHandler::operator()(Message_Update_Resizing const& msg) const noexcept
 {
   auto& wnd = ctx.get_window(msg.handle);
-  wnd.snap.resizing = true;
-  wnd.snap.x        = msg.x;
-  wnd.snap.y        = msg.y;
-  wnd.snap.width    = msg.width;
-  wnd.snap.height   = msg.height;
+
+  // when not resizing, first need to clear current window for rendering in fullscreen window
+  if (wnd.snap.resizing == false)
+  {
+    wnd.snap.resizing = true;
+    wnd.need_clear    = true;
+  }
+
+  wnd.snap.x      = msg.x;
+  wnd.snap.y      = msg.y;
+  wnd.snap.width  = msg.width;
+  wnd.snap.height = msg.height;
 }
 
 void UIContext::MessageHandler::operator()(Message_Resize_End const& msg) const noexcept
 {
   auto& wnd = ctx.get_window(msg.handle);
-  wnd.snap.resizing = false;
+  wnd.snap.resizing                 = false;
+  ctx._fullscreen_window.need_clear = true;
 }
 
 void UIContext::MessageHandler::operator()(Message_Window_Maximize const& msg) const noexcept
@@ -86,7 +94,7 @@ void UIContext::MessageHandler::operator()(Message_Window_Moving_From_Maximize c
   wnd.snap.y                    = msg.y;
   wnd.snap.width                = msg.width;
   wnd.snap.height               = msg.height;
-  wnd.snap.moving_from_maximize = true;
+  wnd.snap.move_from_maximize = true;
 }
 
 void UIContext::MessageHandler::operator()(Message_Window_Moving_From_Maximize_End const& msg) const noexcept
@@ -95,7 +103,7 @@ void UIContext::MessageHandler::operator()(Message_Window_Moving_From_Maximize_E
   wnd.snap.moving               = false;
   wnd.snap.x                    = msg.x;
   wnd.snap.y                    = msg.y;
-  wnd.snap.moving_from_maximize = false;
+  wnd.snap.move_from_maximize = false;
 }
 
 }}

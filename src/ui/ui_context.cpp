@@ -137,21 +137,44 @@ void UIContext::render() noexcept
 
   // wakeup if renderer is sleeping, which is no render data has
   auto need_wakeup = g_renderer.is_sleeping();
-  auto has_render  = false;
 
   // process window render datas
-  for (auto it = _windows.begin(); it != _windows.end(); ++it)
+  static auto render = [](Window& wnd, RenderData* data)
   {
-    auto& window = it->second;
-    if (g_renderer.render(window.snap.handle, window.data()))
+    g_renderer.render(wnd.snap.handle, data);
+    if (data) wnd.next_frame();
+  };
+  for (auto& wnd : _windows | std::views::values)
+  {
+    auto data = wnd.data();
+    if (!wnd.snap.resizing)
     {
-      window.next_frame();
-      has_render = true;
+      data->scissor_rect.left   = Window_Shadow_Thickness;
+      data->scissor_rect.top    = Window_Shadow_Thickness;
+      data->scissor_rect.right  = data->scissor_rect.left + wnd.snap.width;
+      data->scissor_rect.bottom = data->scissor_rect.top  + wnd.snap.height;
+      render(wnd, wnd.data());
     }
+    else
+    {
+      if (wnd.need_clear)
+      {
+        wnd.need_clear = false;
+        render(wnd, {});
+      }
+      data->scissor_rect        = wnd.rect();
+      data->resizing_window_pos = wnd.real_pos();
+      render(_fullscreen_window, wnd.data());
+    }
+  }
+  if (_fullscreen_window.need_clear)
+  {
+    _fullscreen_window.need_clear = false;
+    render(_fullscreen_window, {});
   }
 
   // wakeup renderer if prev frame no render data
-  if (need_wakeup && has_render)
+  if (need_wakeup && !_windows.empty())
     g_renderer.wakeup();
 
   // process message queue
@@ -174,7 +197,7 @@ void UIContext::update() noexcept
     mouse_up_window         = {};
     mouse_down_pos          = {};
     mouse_up_pos            = {};
-    is_moving_from_maximize = {};
+    is_move_from_maximize = {};
     _btn_state              = {};
   }
 
@@ -193,7 +216,7 @@ void UIContext::update() noexcept
     {
       mouse_down_window       = window.snap.handle;
       mouse_down_pos          = window.cursor_pos();
-      is_moving_from_maximize = window.snap.moving_from_maximize;
+      is_move_from_maximize = window.snap.move_from_maximize;
     }
     else if (_mouse_state == MouseState::left_button_up)
     {
@@ -343,11 +366,12 @@ void UIContext::add_title_bar() noexcept
 
   set_render_pos(0, 0);
 
+  draw_title_bar = true;
+
   ui::rectangle({}, { w, btn_height }, background_color);
   ui::add_move_invalid_area({ 0, btn_height }, { w, h });
 
   auto handle = _window->snap.handle;
-  draw_title_bar = true;
 
   // minimize button
   if (button("tk::ui::title_bar_minimize_button", w - btn_width * 3, 0, btn_width, btn_height, background_color, btn_hovered_color, btn_mouse_down_color,

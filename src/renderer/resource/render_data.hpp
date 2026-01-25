@@ -15,6 +15,8 @@ struct RenderData
   std::vector<uint16_t>      indices;
   std::vector<ShapeProperty> shape_properties;
   std::binary_semaphore      sem{ 1 };
+  glm::vec2                  resizing_window_pos;
+  RECT                       scissor_rect{};
 
   auto clear() noexcept
   {
@@ -22,6 +24,8 @@ struct RenderData
     indices.clear();
     shape_properties.clear();
     sem.release();
+    resizing_window_pos = {};
+    scissor_rect        = {};
   }
 
   auto empty() const noexcept { return vertices.empty(); }
