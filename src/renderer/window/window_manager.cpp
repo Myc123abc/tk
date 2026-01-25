@@ -239,7 +239,10 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   case WM_CANCELMODE:
   {
     if (LOWORD(w_param) == WA_INACTIVE)
+    {
       finish_moving_or_resizing(handle);
+      g_ui_ctx.send_message(UIContext::Message_Interruption{});
+    }
     break;
   }
 

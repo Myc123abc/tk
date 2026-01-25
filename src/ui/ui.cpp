@@ -91,7 +91,7 @@ auto get_mouse_state() -> window::MouseState
 void add_move_invalid_area(glm::vec2 left_top, glm::vec2 right_bottom) noexcept
 {
   g_ui_ctx.check_draw();
-  if (!g_ui_ctx.draw_title_bar)
+  if (g_ui_ctx._window->cfg.display_title_bar && !g_ui_ctx.draw_title_bar)
   {
     left_top.y     += Title_Bar_Height;
     right_bottom.y += Title_Bar_Height;
@@ -289,7 +289,7 @@ auto button(
   // button is a rectangle with width and height in specific position
   auto left_top     = glm::vec<2, int>{ x, y };
   auto right_bottom = glm::vec<2, int>{ x + width, y + height };
-  if (!g_ui_ctx.draw_title_bar)
+  if (g_ui_ctx._window->cfg.display_title_bar && !g_ui_ctx.draw_title_bar)
   {
     left_top.y     += Title_Bar_Height;
     right_bottom.y += Title_Bar_Height;

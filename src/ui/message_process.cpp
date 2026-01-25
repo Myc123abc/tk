@@ -106,4 +106,9 @@ void UIContext::MessageHandler::operator()(Message_Window_Moving_From_Maximize_E
   wnd.snap.move_from_maximize = false;
 }
 
+void UIContext::MessageHandler::operator()(Message_Interruption const& msg) const noexcept
+{
+  ctx._interrupte = true;
+}
+
 }}

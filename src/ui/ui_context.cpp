@@ -191,14 +191,15 @@ void UIContext::update() noexcept
 
   // clear state
   _ids.clear();
-  if (mouse_up_window)
+  if (mouse_up_window || _interrupte)
   {
-    mouse_down_window       = {};
-    mouse_up_window         = {};
-    mouse_down_pos          = {};
-    mouse_up_pos            = {};
+    mouse_down_window     = {};
+    mouse_up_window       = {};
+    mouse_down_pos        = {};
+    mouse_up_pos          = {};
     is_move_from_maximize = {};
-    _btn_state              = {};
+    _btn_state            = {};
+    _interrupte           = {};
   }
 
   // update cursor hovered widget id
@@ -257,7 +258,7 @@ void UIContext::add_mouse_state(size_t id, glm::vec2 left_top, glm::vec2 right_b
   check_draw();
   if (!_btn_state.id)
   {
-    auto pos = get_render_pos() + _window->real_pos();
+    auto pos = _window->pos();
     left_top     += pos;
     right_bottom += pos;
     _btn_state = { id, left_top, right_bottom };

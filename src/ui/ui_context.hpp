@@ -37,6 +37,7 @@ struct Window
   }
 
   auto real_pos() const noexcept -> glm::vec2 { return { snap.x - renderer::Window_Shadow_Thickness, snap.y - renderer::Window_Shadow_Thickness }; }
+  auto pos()      const noexcept -> glm::vec2 { return { snap.x, snap.y }; }
 
   auto is_moving_or_resizing() const noexcept { return snap.moving || snap.resizing; }
   auto is_active() const noexcept { return GetForegroundWindow() == snap.handle; }
@@ -189,6 +190,7 @@ private:
     glm::vec2 right_bottom{};
     bool      move_out{};
   } _btn_state;
+  bool _interrupte{};
 public:
   void add_mouse_state(size_t id, glm::vec2 left_top, glm::vec2 right_bottom) noexcept;
   auto is_cursor_move_out(size_t id) noexcept -> bool;
@@ -269,6 +271,8 @@ public:
     int  y{};
   };
 
+  struct Message_Interruption {};
+
   using Message = std::variant<
     Message_Window_Close,
     Message_Cursor_On_Window,
@@ -279,7 +283,8 @@ public:
     Message_Window_Maximize,
     Message_Window_Restore,
     Message_Window_Moving_From_Maximize,
-    Message_Window_Moving_From_Maximize_End
+    Message_Window_Moving_From_Maximize_End,
+    Message_Interruption
   >;
 
   void send_message(Message&& msg) noexcept
@@ -301,6 +306,7 @@ private:
     void operator()(Message_Window_Restore const& msg) const noexcept;
     void operator()(Message_Window_Moving_From_Maximize const& msg) const noexcept;
     void operator()(Message_Window_Moving_From_Maximize_End const& msg) const noexcept;
+    void operator()(Message_Interruption const& msg) const noexcept;
   };
   MessageQueue<Message, UI_Message_Queue_Capacity> _msg_queue;
   std::deque<Message_Update_Mouse_State>           _mouse_state_queue;
