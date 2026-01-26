@@ -47,6 +47,8 @@ public:
   void init_auxiliary(int x, int y, uint32_t width, uint32_t height) noexcept;
   void destroy(RenderDataHandle* ptr) const noexcept;
 
+  void monitor_change() noexcept;
+
   auto real_x()      const noexcept { return x      - Window_Shadow_Thickness;     }
   auto real_y()      const noexcept { return y      - Window_Shadow_Thickness;     }
   auto real_width()  const noexcept { return width  + Window_Shadow_Thickness * 2; }
@@ -69,7 +71,7 @@ public:
   auto is_resizing() const noexcept { return _resizing; }
   auto is_moving_or_resizing() const noexcept { return _moving || _resizing; }
   void move_with_pos(int x, int y) noexcept;
-  void move_from_maximize(int x, int y) noexcept;
+  void move_from_maximize() noexcept;
   void move_end() noexcept;
   void adjust_offset(ResizeType type, glm::vec<2, int> const& point, int& dx, int& dy) const noexcept;
   void resize(ResizeType type, int dx, int dy) noexcept;

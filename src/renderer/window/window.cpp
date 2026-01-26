@@ -49,7 +49,7 @@ void Window::init_auxiliary(int x, int y, uint32_t width, uint32_t height) noexc
   err_if(!_handle, "failed to create window");
 
   // create window render resource
-  g_renderer.send_message(Renderer::Message_Window_Create{ _handle, real_width(), real_height() });
+  g_renderer.send_message(Renderer::Message_Window_Create{ _handle, width, height });
 
   ShowWindow(_handle, SW_SHOW);
 }
@@ -58,7 +58,7 @@ void Window::update_by_rect() noexcept
 {
   x      = _rect.left;
   y      = _rect.top;
-  width  = _rect.right - _rect.left;
+  width  = _rect.right  - _rect.left;
   height = _rect.bottom - _rect.top;
 }
 
@@ -81,7 +81,7 @@ auto Window::cursor_pos() const noexcept -> glm::vec<2, int>
 
 auto Window::cursor_valid_area() const noexcept -> RECT
 {
-  auto rect =_rect;
+  auto rect = _rect;
   rect.left   -= Window_Resize_Thickness;
   rect.top    -= Window_Resize_Thickness;
   rect.right  += Window_Resize_Thickness;
@@ -101,21 +101,62 @@ auto Window::contains_point(glm::vec<2, int> p) const noexcept -> bool
   return PtInRect(&_rect, { p.x, p.y });
 }
 
-void Window::move_from_maximize(int x, int y) noexcept
+void Window::move_from_maximize() noexcept
 {
-  auto ratio_x = static_cast<float>(x) / width;
+  auto pos     = cursor_pos();
+  auto ratio_x = static_cast<float>(pos.x) / width;
 
-  _move_from_maximize = true;
-  _moving   = true;
-  maximized = false;
-  width     = _backup_rect.right  - _backup_rect.left;
-  height    = _backup_rect.bottom - _backup_rect.top;
-  this->x   = x - width * ratio_x;
-  this->y   = y < Window_Y_Pos_Moving_From_Maximize ? -Window_Y_Pos_Moving_From_Maximize : 0;
+  _move_from_maximize =  true;
+  _moving             =  true;
+  maximized           =  false;
+  width               =  _backup_rect.right  - _backup_rect.left;
+  height              =  _backup_rect.bottom - _backup_rect.top;
+  x                   = get_cursor_pos().x - width * ratio_x;
+  if (pos.y < Window_Y_Pos_Moving_From_Maximize)
+    y -= Window_Y_Pos_Moving_From_Maximize;
   update_rect();
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
-  g_ui_ctx.send_message(UIContext::Message_Window_Moving_From_Maximize{ _handle, this->x, this->y, width, height });
+  g_ui_ctx.send_message(UIContext::Message_Window_Moving_From_Maximize{ _handle, x, y, width, height });
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+void Window::monitor_change() noexcept
+{
+  auto rect = RECT{};
+
+  // If the window is minimized (e.g., due to monitor removal), GetWindowRect
+  // returns off-screen sentinel around (-32000, -32000). Use the normal position.
+  if (IsIconic(_handle))
+  {
+    WINDOWPLACEMENT wp{ sizeof(wp) };
+    if (GetWindowPlacement(_handle, &wp))
+      rect = wp.rcNormalPosition;
+    else
+      GetWindowRect(_handle, &rect);
+  }
+  else
+    GetWindowRect(_handle, &rect);
+
+  rect.left   += Window_Shadow_Thickness;
+  rect.top    += Window_Shadow_Thickness;
+  rect.right  -= Window_Shadow_Thickness;
+  rect.bottom -= Window_Shadow_Thickness;
+  _rect     = rect;
+  maximized = false;
+  update_by_rect();
+  g_ui_ctx.send_message(UIContext::Message_Window_Restore{ _handle, x, y, width, height });
+
+  // update fullscreen window
+  g_wnd_mgr._fullscreen_window._rect = get_virtual_screen_rect();
+  g_wnd_mgr._fullscreen_window.update_by_rect();
+  g_renderer.send_message(Renderer::Message_Window_Update{
+    g_wnd_mgr._fullscreen_window.handle(), g_wnd_mgr._fullscreen_window.width, g_wnd_mgr._fullscreen_window.height });
+  g_ui_ctx.send_message(UIContext::Message_Update_Fullscreen_Window{ g_wnd_mgr._fullscreen_window.width, g_wnd_mgr._fullscreen_window.height });
+  SetWindowPos(
+    g_wnd_mgr._fullscreen_window.handle(), 0,
+    g_wnd_mgr._fullscreen_window.x, g_wnd_mgr._fullscreen_window.y,
+    g_wnd_mgr._fullscreen_window.width, g_wnd_mgr._fullscreen_window.height,
+    SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 void Window::move_with_pos(int x, int y) noexcept
@@ -247,7 +288,7 @@ void Window::resize_end() noexcept
 
 void Window::left_offset(int dx) noexcept
 {
-  auto rc = get_maximize_rect();
+  auto rc = get_virtual_screen_rect();
   _rect.left = std::clamp(
     _rect.left + dx,
     rc.left,
@@ -260,7 +301,7 @@ void Window::left_offset(int dx) noexcept
 
 void Window::top_offset(int dy) noexcept
 {
-  auto rc = get_maximize_rect();
+  auto rc = get_virtual_screen_rect();
   _rect.top = std::clamp(
     _rect.top + dy,
     rc.top,
@@ -273,7 +314,7 @@ void Window::top_offset(int dy) noexcept
 
 void Window::right_offset(int dx) noexcept
 {
-  auto rc = get_maximize_rect();
+  auto rc = get_virtual_screen_rect();
   _rect.right = std::clamp(
     _rect.right + dx,
     static_cast<LONG>(std::max(_rect.left, rc.left) + _min_width),
@@ -287,7 +328,7 @@ void Window::right_offset(int dx) noexcept
 
 void Window::bottom_offset(int dy) noexcept
 {
-  auto rc = get_maximize_rect();
+  auto rc = get_virtual_screen_rect();
   _rect.bottom = std::clamp(
     _rect.bottom + dy,
     static_cast<LONG>(std::max(_rect.top, rc.top) + _min_height),
@@ -303,7 +344,7 @@ void Window::maximize() noexcept
 {
   maximized    = true;
   _backup_rect =_rect;
-  _rect        = get_maximize_rect();
+  _rect        = get_window_monitor_work_rect(_handle);
   update_by_rect();
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
   g_ui_ctx.send_message(UIContext::Message_Window_Maximize{ _handle, x, y, width, height });

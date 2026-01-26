@@ -111,4 +111,10 @@ void UIContext::MessageHandler::operator()(Message_Interruption const& msg) cons
   ctx._interrupte = true;
 }
 
+void UIContext::MessageHandler::operator()(Message_Update_Fullscreen_Window const& msg) const noexcept
+{
+  ctx._fullscreen_window.snap.width  = msg.width;
+  ctx._fullscreen_window.snap.height = msg.height;
+}
+
 }}

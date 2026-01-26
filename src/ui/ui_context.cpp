@@ -407,7 +407,7 @@ void UIContext::add_title_bar() noexcept
     }, icon_width, icon_height, 0x395063ff, 0xffffffff))
     _window->is_closed = true;
 
-  ui::add_move_invalid_area({ w - btn_width * 3, 0 }, { w, btn_width });
+  ui::add_move_invalid_area({ w - btn_width * 3, 0 }, { w, btn_height });
   draw_title_bar = false;
 }
 

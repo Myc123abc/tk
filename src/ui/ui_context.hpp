@@ -272,6 +272,11 @@ public:
   };
 
   struct Message_Interruption {};
+  struct Message_Update_Fullscreen_Window
+  {
+    uint32_t width{};
+    uint32_t height{};
+  };
 
   using Message = std::variant<
     Message_Window_Close,
@@ -284,7 +289,8 @@ public:
     Message_Window_Restore,
     Message_Window_Moving_From_Maximize,
     Message_Window_Moving_From_Maximize_End,
-    Message_Interruption
+    Message_Interruption,
+    Message_Update_Fullscreen_Window
   >;
 
   void send_message(Message&& msg) noexcept
@@ -307,6 +313,7 @@ private:
     void operator()(Message_Window_Moving_From_Maximize const& msg) const noexcept;
     void operator()(Message_Window_Moving_From_Maximize_End const& msg) const noexcept;
     void operator()(Message_Interruption const& msg) const noexcept;
+    void operator()(Message_Update_Fullscreen_Window const& msg) const noexcept;
   };
   MessageQueue<Message, UI_Message_Queue_Capacity> _msg_queue;
   std::deque<Message_Update_Mouse_State>           _mouse_state_queue;

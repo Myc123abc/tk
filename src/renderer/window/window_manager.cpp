@@ -26,11 +26,6 @@ struct WindowCreateInfo
   uint32_t width{}, height{};
 };
 
-auto get_screen_size() noexcept -> glm::vec<2, uint32_t>
-{
-  return { GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN) };
-}
-
 void set_cursor(HWND handle, ResizeType type) noexcept
 {
   using enum ResizeType;
@@ -151,6 +146,17 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     return 0;
   }
 
+  // when another monitor remove or add, update window position
+  case WM_DISPLAYCHANGE:
+  {
+    if (windows.contains(handle))
+    {
+      auto& window = windows.at(handle);
+      window.monitor_change();
+    }
+    return 0;
+  }
+
   case WM_LBUTTONDOWN:
   {
     SetCapture(handle);
@@ -190,15 +196,15 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
         wnd_mgr._timer_mouse_pass_through = SetTimer(nullptr, 0, USER_TIMER_MINIMUM, nullptr);
     }
 
+    auto pos = get_cursor_pos();
     if (wnd_mgr._mouse_state &  MouseState::left_button_down ||
         wnd_mgr._mouse_state == MouseState::left_button_press)
     {
       // limit cursor move area
-      auto rect = get_maximize_rect();
+      auto rect = get_virtual_workarea_rect();
       ClipCursor(&rect);
 
       // moving
-      auto pos = get_cursor_pos();
       if (left_button_down_resize_type == ResizeType::none)
       {
         // only moving in cursor valid areas
@@ -209,7 +215,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
 
         if (window.maximized)
         {
-          window.move_from_maximize(pos.x, pos.y);
+          window.move_from_maximize();
           left_button_down_window_pos = window.cursor_pos();
         }
         else
@@ -225,8 +231,8 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
         window.adjust_offset(left_button_down_resize_type, pos, offset.x, offset.y);
         window.resize(left_button_down_resize_type, offset.x, offset.y);
       }
-      last_cursor_pos = pos;
     }
+    last_cursor_pos = pos;
     break;
   }
 
@@ -326,8 +332,8 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
   {
   case Message::create_fullscreen_window:
   {
-    auto size = get_screen_size(); // TODO: consider multiple monitors
-    _fullscreen_window.init_auxiliary(0, 0, size.x, size.y);
+    auto rect = get_virtual_screen_rect();
+    _fullscreen_window.init_auxiliary(0, 0, rect.right - rect.left, rect.bottom - rect.top);
     SetEvent(std::bit_cast<HANDLE>(w_param));
     break;
   }
