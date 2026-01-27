@@ -19,6 +19,9 @@
 
 namespace tk { namespace ui {
 
+auto get_bounding_rectangle(std::vector<glm::vec2> const& data) noexcept -> std::pair<glm::vec2, glm::vec2>;
+auto is_hover_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool;
+
 struct Window
 {
   renderer::WindowSnapshot snap;
@@ -94,13 +97,18 @@ public:
   void check_path_draw() const noexcept;
   void check_path_not_draw() const noexcept;
 
+  void begin_path() noexcept;
+  void end_path(Color color, float thickness) noexcept;
+  void begin_union() noexcept;
+  void end_union(Color color, float thickness) noexcept;
+
   void render() noexcept;
 
   void add_vertices_indices(std::pair<glm::vec2, glm::vec2> bounding_rectangle) noexcept;
   void add_shape_property(renderer::ShapeProperty::Type type, glm::vec4 color, float thickness, std::vector<float> const& values) noexcept;
   void add_shape(renderer::ShapeProperty::Type type, glm::vec4 color, float thickness, std::vector<float> const& values, std::pair<glm::vec2, glm::vec2> bounding_rectangle) noexcept;
 
-  auto is_path_draw() const noexcept { return _path_begin; }
+  auto is_path_draw()  const noexcept { return _path_begin;  }
   auto is_union_draw() const noexcept { return _union_begin; }
 
   auto is_hover_on(size_t id, glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool;
@@ -120,7 +128,7 @@ public:
 
   auto get_lerpolator(size_t id, double duration) noexcept -> Lerpolator*;
   void remove_lerpolator(size_t id) noexcept;
-  auto ping_pong_lerp(bool b, size_t id, double duration) noexcept -> double;
+  auto lerp_ping_pong(bool b, size_t id, double duration) noexcept -> double;
 
   auto access_move_invalid_areas(HWND handle) noexcept -> std::vector<RECT>&;
 

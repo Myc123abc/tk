@@ -8,6 +8,41 @@ using namespace tk::renderer;
 
 namespace tk { namespace ui {
 
+auto get_bounding_rectangle(std::vector<glm::vec2> const& data) noexcept -> std::pair<glm::vec2, glm::vec2>
+{
+  assert(data.size() > 1);
+
+  auto min = data[0];
+  auto max = data[0];
+
+  for (auto i = 1; i < data.size(); ++i)
+  {
+    auto& p = data[i];
+    if (p.x < min.x) min.x = p.x;
+    if (p.y < min.y) min.y = p.y;
+    if (p.x > max.x) max.x = p.x;
+    if (p.y > max.y) max.y = p.y;
+  }
+
+  if (max.x == min.x)
+  {
+    if (min.x > 1.f)
+      --min.x;
+    else
+      ++max.x;
+  }
+
+  if (max.y == min.y)
+  {
+    if (min.y > 1.f)
+      --min.y;
+    else
+      ++max.y;
+  }
+
+  return { min, max };
+}
+
 void Window::add_move_invald_areas(RECT rect) noexcept
 {
   auto idx = 1 - move_invalid_areas_idx.load(std::memory_order_relaxed);
@@ -339,9 +374,9 @@ auto UIContext::is_hover_on(size_t id, glm::vec2 left_top, glm::vec2 right_botto
 {
   if (ui::is_hover_on(left_top, right_bottom))
   {
-    g_ui_ctx._hovered_widget_ids.emplace(id);
-    g_ui_ctx._last_hovered_widget_id = id;
-    return id == g_ui_ctx._prev_hovered_widget_id;
+    _hovered_widget_ids.emplace(id);
+    _last_hovered_widget_id = id;
+    return id == _prev_hovered_widget_id;
   }
   return false;
 }
@@ -353,9 +388,9 @@ void UIContext::add_title_bar() noexcept
   auto icon_width  = Title_Bar_Button_Icon_Width;
   auto icon_height = Title_Bar_Button_Icon_Height;
 
-  auto is_active = _window->is_active();
-  auto value     = ping_pong_lerp(is_active, generic_id("tk::ui::update_title_bar_background_color"), 200'000);
-  auto background_color = color_lerp(0xffffffff, 0xeeeeeeff, value);
+  auto is_active        = _window->is_active();
+  auto value            = lerp_ping_pong(is_active, generic_id("tk::ui::update_title_bar_background_color"), 200'000);
+  auto background_color = lerp(0xffffffff, 0xeeeeeeff, value);
 
   auto btn_mouse_down_color       = 0xb0b0b0ff;
   auto btn_hovered_color          = is_active ? 0xcececeff : 0xddddddff;
@@ -431,7 +466,7 @@ void UIContext::remove_lerpolator(size_t id) noexcept
   _lerpolators.erase(id);
 }
 
-auto UIContext::ping_pong_lerp(bool b, size_t id, double duration) noexcept -> double
+auto UIContext::lerp_ping_pong(bool b, size_t id, double duration) noexcept -> double
 {
   auto lerpolator = g_ui_ctx.get_lerpolator(id, duration);
 
@@ -465,6 +500,55 @@ auto UIContext::access_move_invalid_areas(HWND handle) noexcept -> std::vector<R
 {
   auto& window = get_window(handle);
   return window.access_move_invliad_areas();
+}
+
+void UIContext::begin_path() noexcept
+{
+  check_draw();
+  check_path_not_draw();
+  _path_begin = true;
+  path_data.push_back(std::bit_cast<float>(0u)); // record count
+}
+
+void UIContext::end_path(Color color, float thickness) noexcept
+{
+  check_draw();
+  check_path_draw();
+  err_if(path_data.empty(), "path drawing not have any data");
+
+  add_shape(ShapeProperty::Type::path, color, thickness, path_data, get_bounding_rectangle(path_points));
+
+  _path_begin = {};
+  path_data.clear();
+  path_points.clear();
+}
+
+void UIContext::begin_union() noexcept
+{
+  check_draw();
+  check_path_not_draw();
+  err_if(_union_begin, "cannot call begin union twice");
+  _union_begin    = true;
+  _op_data.op     = ShapeProperty::Operator::u;
+  _op_data.offset = _shape_properties_offset;
+}
+
+void UIContext::end_union(Color color, float thickness) noexcept
+{
+  check_draw();
+  err_if(!_union_begin, "cannot call end union in an uncomplete unino operator");
+  err_if(_path_begin, "cannot call end union in an uncomplete path draw");
+  _union_begin = false;
+  auto render_data = _window->data();
+  render_data->shape_properties.back().set_color(_tmp_color.value_or(color));
+  render_data->shape_properties.back().set_thickness(thickness);
+  render_data->shape_properties.back().set_operator({});
+
+  add_vertices_indices(get_bounding_rectangle(_op_data.points));
+
+  _op_data.op     = {};
+  _op_data.offset = {};
+  _op_data.points.clear();
 }
 
 }}

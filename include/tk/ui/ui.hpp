@@ -40,7 +40,16 @@ struct Color
  * @param v lerp value
  * @return lerp color
  */
-auto color_lerp(Color x, Color y, float v) noexcept -> glm::vec4;
+auto lerp(Color x, Color y, float v) noexcept -> glm::vec4;
+
+/**
+ * get lerp value of two points
+ * @param x
+ * @param y
+ * @param v
+ * @return lerp value
+ */
+auto lerp(glm::vec2 x, glm::vec2 y, float v) noexcept -> glm::vec2;
 
 // render windows
 void render() noexcept;
@@ -55,6 +64,15 @@ struct WindowConfig
  * @return delta time(us)
  */
 auto delta_time() noexcept -> double;
+
+/**
+ * get a lerp value in ping pong
+ * @param name unique global name
+ * @param b drive boolean value
+ * @param duration duration (us)
+ * @return lerp value (0.0 ~ 1.0)
+ */
+auto lerp_ping_pong(std::string_view name, bool b, double duration) noexcept -> double;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Window
@@ -116,6 +134,26 @@ auto window_drawable_extent() noexcept -> glm::vec2;
  */
 void discard_rectangle(glm::vec2 left_top, glm::vec2 right_bottom) noexcept;
 
+/// use path draw between lines and beziers
+void begin_path() noexcept;
+
+/**
+ * end the path draw
+ * @param color
+ * @param thickness
+ */
+void end_path(Color color = {}, float thickness = {}) noexcept;
+
+/// use union operator between shapes
+void begin_union() noexcept;
+
+/**
+ * end the union operator
+ * @param color
+ * @param thickness
+ */
+void end_union(Color color, float thickness = {}) noexcept;
+
 ////////////////////////////////////////////////////////////////////////////////
 ///                            Geometry
 ////////////////////////////////////////////////////////////////////////////////
@@ -170,26 +208,23 @@ void bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color = 0) noexcept;
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
- * whether cursor hover on specific region
- * @param left_top
- * @param right_bottom
+ * normal button
+ * @param name name cannot be duplicate in the window
+ * @param x
+ * @param y
+ * @param width
+ * @param height
+ * @param button_color
+ * @param button_hover_color
  */
-auto is_hover_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool;
-
-/**
- * whether cursor hover on specific region, disable mouse penetration
- * @param name
- * @param left_top
- * @param right_bottom
- */
-auto is_hover_on(std::string_view name, glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool;
-
-/**
- * whether cursor click on specific region
- * @param left_top
- * @param right_bottom
- */
-auto is_click_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool;
+auto button(
+  std::string_view name,
+  int              x,
+  int              y,
+  uint32_t         width,
+  uint32_t         height,
+  Color            button_color,
+  Color            button_hover_color) noexcept-> bool;
 
 /**
  * draw a button, can draw an icon in the center of button
@@ -217,11 +252,11 @@ auto button(
   uint32_t                                height,
   Color                                   button_color,
   Color                                   button_hover_color,
-  std::optional<Color>                    mouse_down_color = {},
-  std::function<void(uint32_t, uint32_t)> icon_update_func = {},
-  uint32_t                                icon_width       = {},
-  uint32_t                                icon_height      = {},
-  Color                                   icon_color       = {},
-  Color                                   icon_hover_color = {}) noexcept-> bool;
+  std::optional<Color>                    mouse_down_color,
+  std::function<void(uint32_t, uint32_t)> icon_update_func,
+  uint32_t                                icon_width,
+  uint32_t                                icon_height,
+  Color                                   icon_color,
+  Color                                   icon_hover_color) noexcept-> bool;
 
 }}
