@@ -6,7 +6,7 @@
 #include "../util/message_queue.hpp"
 #include "config.hpp"
 #include "ui/ui.hpp"
-#include "lerpolator.hpp"
+#include "ui/lerpolator.hpp"
 
 #include <windows.h>
 
@@ -96,6 +96,8 @@ public:
   void check_draw() const noexcept;
   void check_path_draw() const noexcept;
   void check_path_not_draw() const noexcept;
+  void check_union_draw() const noexcept;
+  void check_union_not_draw() const noexcept;
 
   void begin_path() noexcept;
   void end_path(Color color, float thickness) noexcept;
@@ -122,12 +124,14 @@ public:
 
   void render_on(int x, int y, std::move_only_function<void()>&& func) noexcept;
 
-  auto generic_id(std::string_view name) const noexcept -> size_t;
+  auto generic_id(std::string_view name) noexcept -> size_t;
+  auto get_id(std::string_view name) const noexcept -> size_t;
 
   auto delta_time() const noexcept { return _delta_time; }
 
   auto get_lerpolator(size_t id, double duration) noexcept -> Lerpolator*;
   void remove_lerpolator(size_t id) noexcept;
+  void reset_lerpolator(size_t id) noexcept;
   auto lerp_ping_pong(bool b, size_t id, double duration) noexcept -> double;
 
   auto access_move_invalid_areas(HWND handle) noexcept -> std::vector<RECT>&;

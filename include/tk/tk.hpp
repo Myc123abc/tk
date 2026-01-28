@@ -2,6 +2,7 @@
 
 #include "util/log.hpp"
 #include "ui/ui.hpp"
+#include "ui/lerpolator.hpp"
 
 namespace tk {
 

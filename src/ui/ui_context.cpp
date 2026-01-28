@@ -24,21 +24,8 @@ auto get_bounding_rectangle(std::vector<glm::vec2> const& data) noexcept -> std:
     if (p.y > max.y) max.y = p.y;
   }
 
-  if (max.x == min.x)
-  {
-    if (min.x > 1.f)
-      --min.x;
-    else
-      ++max.x;
-  }
-
-  if (max.y == min.y)
-  {
-    if (min.y > 1.f)
-      --min.y;
-    else
-      ++max.y;
-  }
+  min -= 1;
+  max += 1;
 
   return { min, max };
 }
@@ -142,6 +129,16 @@ void UIContext::check_path_draw() const noexcept
 void UIContext::check_path_not_draw() const noexcept
 {
   err_if(_path_begin, "calling path begin to draw path, cannot be used in non-path draw");
+}
+
+void UIContext::check_union_draw() const noexcept
+{
+  err_if(!_union_begin, "not called union begin");
+}
+
+void UIContext::check_union_not_draw() const noexcept
+{
+  err_if(_union_begin, "union begin is called");
 }
 
 void UIContext::close_window() noexcept
@@ -446,10 +443,16 @@ void UIContext::add_title_bar() noexcept
   draw_title_bar = false;
 }
 
-auto UIContext::generic_id(std::string_view name) const noexcept -> size_t
+auto UIContext::get_id(std::string_view name) const noexcept -> size_t
 {
-  auto id = generic_hash(_window->snap.handle, name);
+  return generic_hash(_window->snap.handle, name);
+}
+
+auto UIContext::generic_id(std::string_view name) noexcept -> size_t
+{
+  auto id = get_id(name);
   err_if(_ids.contains(id), "cannot duplicate id {}", name);
+  _ids.emplace(id);
   return id;
 }
 
@@ -466,6 +469,12 @@ void UIContext::remove_lerpolator(size_t id) noexcept
   _lerpolators.erase(id);
 }
 
+void UIContext::reset_lerpolator(size_t id) noexcept
+{
+  err_if(!_lerpolators.contains(id), "remove an unexist color lerpolator");
+  _lerpolators.at(id).reset();
+}
+
 auto UIContext::lerp_ping_pong(bool b, size_t id, double duration) noexcept -> double
 {
   auto lerpolator = g_ui_ctx.get_lerpolator(id, duration);
@@ -473,7 +482,11 @@ auto UIContext::lerp_ping_pong(bool b, size_t id, double duration) noexcept -> d
   if (b)
   {
     if (!lerpolator->is_finished())
+    {
+      if (lerpolator->is_reversed())
+        lerpolator->reverse();
       lerpolator->start();
+    }
   }
   else
   {

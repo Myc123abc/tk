@@ -49,6 +49,7 @@ public:
     if (_state == State::finished) _state = State::not_started;
   }
 
+  auto is_not_started() const noexcept { return _state == State::not_started; }
   auto is_started()     const noexcept { return _state == State::started;     }
   auto is_finished()    const noexcept { return _state == State::finished;    }
   auto is_reversed()    const noexcept { return _reversed;                    }

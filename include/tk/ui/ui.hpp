@@ -74,6 +74,12 @@ auto delta_time() noexcept -> double;
  */
 auto lerp_ping_pong(std::string_view name, bool b, double duration) noexcept -> double;
 
+/**
+ * reset lerpolator
+ * @param name name of lerpolator, TODO: now name only unique in single window, not global unique
+ */
+void reset_lerpolator(std::string_view name) noexcept;
+
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Window
 ////////////////////////////////////////////////////////////////////////////////
@@ -207,6 +213,29 @@ void bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color = 0) noexcept;
 ///                               Widget
 ////////////////////////////////////////////////////////////////////////////////
 
+struct ButtonState
+{
+  bool clicked{};
+  bool hovered{};
+  bool move_out{};
+
+  constexpr operator bool() const noexcept
+  {
+    return clicked;
+  }  
+};
+
+/**
+ * a button feature can custom shape
+ * @param name name cannot be duplicate in the window
+ * @param x
+ * @param y
+ * @param width
+ * @param height
+ * @return button state
+ */
+auto button(std::string_view name, int x, int y, uint32_t width, uint32_t height) noexcept-> ButtonState;
+
 /**
  * normal button
  * @param name name cannot be duplicate in the window
@@ -216,6 +245,7 @@ void bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color = 0) noexcept;
  * @param height
  * @param button_color
  * @param button_hover_color
+ * @return button state
  */
 auto button(
   std::string_view name,
@@ -224,7 +254,7 @@ auto button(
   uint32_t         width,
   uint32_t         height,
   Color            button_color,
-  Color            button_hover_color) noexcept-> bool;
+  Color            button_hover_color) noexcept-> ButtonState;
 
 /**
  * draw a button, can draw an icon in the center of button
@@ -243,6 +273,7 @@ auto button(
  * @param icon_height
  * @param icon_color
  * @param icon_hover_color
+ * @return button state
  */
 auto button(
   std::string_view                        name,
@@ -257,6 +288,6 @@ auto button(
   uint32_t                                icon_width,
   uint32_t                                icon_height,
   Color                                   icon_color,
-  Color                                   icon_hover_color) noexcept-> bool;
+  Color                                   icon_hover_color) noexcept-> ButtonState;
 
 }}

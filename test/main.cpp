@@ -2,82 +2,117 @@
 
 using namespace tk;
 
-auto point_on_circle(glm::vec2 center, float radius, float theta) noexcept -> glm::vec2
+using Vec2 = glm::vec2;
+
+auto point_on_circle(Vec2 center, float radius, float theta) noexcept -> Vec2
 {
   auto a = glm::radians(theta);
   return { center.x + radius * std::cos(a), center.y + radius * std::sin(a) };
 }
 
-struct LerpPoint
+class PlaybackButton
 {
-  glm::vec2 p0{};
-  glm::vec2 p1{};
-};
-
-auto playback_btn(int x, int y, uint32_t width, uint32_t height, ui::Color color, ui::Color hovered_color, float thickness) noexcept -> bool
-{
-  auto b = ui::button("playback btn", x, y, width, height, {}, {});
-
-  static auto res = false;
-  if (b) res = !res;
-  auto v = ui::lerp_ping_pong("playback btn lerp value", res, 1'000'000);
-
-  auto p0 = glm::vec2{ x, y };
-  auto p1 = glm::vec2{ x + width, y + height / 2 };
-  auto p2 = glm::vec2{ x, y + height };
-
-  auto lerp_pts = std::vector<LerpPoint>
+public:
+  void init(std::string_view name) noexcept
   {
-    // pause button                                           // playback buttin
-    { p0,                                                    p0,                                    },
-    { p0 + glm::vec2( width / 3, 0),                         p0 + glm::vec2(width / 2,  height / 4) },
-    { p2 + glm::vec2( width / 3, 0),                         p2 + glm::vec2(width / 2, -height / 4) },
-    { p2,                                                    p2,                                    },
-    { glm::vec2(p1.x - static_cast<float>(width) / 3, p0.y), p0 + glm::vec2(width / 2,  height / 4) },
-    { glm::vec2(p1.x, p0.y),                                 p1,                                    },
-    { glm::vec2(p1.x, p2.y),                                 p1,                                    },
-    { glm::vec2(p1.x - static_cast<float>(width) / 3, p2.y), p2 + glm::vec2(width / 2, -height / 4) },
-    { p0 + glm::vec2(width / 3, height / 2),                 p1,                                    },
-    { glm::vec2(p1.x - static_cast<float>(width) / 3, p1.y), glm::vec2(p0.x, p1.y),                 },
+    _name = name;
+    _lerp_name = std::string(name) + "lerp value";
+  }
+
+  auto operator()(Vec2 p0, Vec2 p1, Vec2 p2, ui::Color color, ui::Color hovered_color, float thickness) noexcept -> bool
+  {
+    auto width  = p1.x - p0.x;
+    auto height = p2.y - p0.y;
+    auto [clicked, hovered, _] = ui::button(_name, p0.x, p0.y, width, height);
+    if (hovered) color = hovered_color;
+
+    if (clicked) _paused = !_paused;
+    auto v = ui::lerp_ping_pong(_lerp_name, !_paused, 100'000);
+
+    _lerp_pts = std::vector<LerpPoint>
+    {
+      //         playback button                    pause button
+      { p0,                                p0,                              },
+      { p0 + Vec2(width / 2,  height / 4), p0 + Vec2( width / 3, 0)         },
+      { p2 + Vec2(width / 2, -height / 4), p2 + Vec2( width / 3, 0)         },
+      { p2,                                p2,                              },
+      { p0 + Vec2(width / 2,  height / 4), { p1.x - width / 3, p0.y },      },
+      { p1,                                { p1.x, p0.y },                  },
+      { p1,                                { p1.x, p2.y },                  },
+      { p2 + Vec2(width / 2, -height / 4), { p1.x - width / 3, p2.y },      },
+      { p1,                                p0 + Vec2(width / 3, height / 2) },
+      { { p0.x, p1.y },                    { p1.x - width / 3, p1.y },      },
+    };
+
+    _pts.clear();
+    for (auto const& pt : _lerp_pts)
+      _pts.emplace_back(ui::lerp(pt.p0, pt.p1, v));
+
+    auto change = _pts[1].x != _pts[8].x;
+
+    ui::begin_union();
+
+    ui::begin_path();
+    ui::line(_pts[0], _pts[1]);
+    if (change)
+      ui::bezier(_pts[1], _pts[8], _pts[2]);
+    else
+      ui::line(_pts[1], _pts[2]);
+    ui::line(_pts[2], _pts[3]);
+    ui::line(_pts[3], _pts[0]);
+    ui::end_path();
+
+    ui::begin_path();
+    ui::line(_pts[4], _pts[5]);
+    ui::line(_pts[5], _pts[6]);
+    ui::line(_pts[6], _pts[7]);
+    if (change)
+      ui::bezier(_pts[7], _pts[9], _pts[4]);
+    else
+      ui::line(_pts[7], _pts[4]);
+    ui::end_path();
+
+    ui::end_union(color, thickness);
+
+    return clicked;
+  }
+
+  void pause() noexcept { _paused = true;  }
+  void play()  noexcept { _paused = false; }
+
+  void reset() noexcept
+  {
+    _paused = true;
+    ui::reset_lerpolator(_lerp_name);
+  }
+
+  auto is_paused() const noexcept { return _paused; }
+
+private:
+  struct LerpPoint
+  {
+    Vec2 p0{};
+    Vec2 p1{};
   };
 
-  auto pts = std::vector<glm::vec2>{};
-  pts.reserve(lerp_pts.size());
-  for (auto const& pt : lerp_pts)
-    pts.emplace_back(ui::lerp(pt.p0, pt.p1, v));
-
-  ui::begin_union();
-
-  ui::begin_path();
-  ui::line(pts[0], pts[1]);
-  // if (change)
-    ui::bezier(pts[1], pts[8], pts[2]);
-  // else
-  //   ui::line(pts[1], pts[2]);
-  ui::line(pts[2], pts[3]);
-  ui::line(pts[3], pts[0]);
-  ui::end_path();
-  
-  ui::begin_path();
-  ui::line(pts[4], pts[5]);
-  ui::line(pts[5], pts[6]);
-  ui::line(pts[6], pts[7]);
-  // if (change)
-    ui::bezier(pts[7], pts[9], pts[4]);
-  // else
-  //   ui::line(pts[7], pts[4]);
-  ui::end_path();
-
-  ui::end_union(color, thickness);
-
-  return b;
-}
+  std::string            _name;
+  std::string            _lerp_name;
+  std::vector<LerpPoint> _lerp_pts;
+  std::vector<Vec2>      _pts{};
+  bool                   _paused{ true };
+};
 
 int main()
 {
   tk::init();
 
-  auto wnd1_is_closed = false;
+  auto playback_btn = PlaybackButton{};
+  playback_btn.init("playback button");
+
+  auto progress_lerpolator = ui::Lerpolator{};
+  progress_lerpolator.init(1'000'000);
+
+  auto wnd1_is_closed = true;
   auto wnd2_is_closed = false;
   while (!wnd1_is_closed || !wnd2_is_closed)
   {
@@ -101,22 +136,27 @@ int main()
     if (!wnd2_is_closed)
     {
       ui::begin("wnd2", 100, 100, 200, 200, &wnd2_is_closed, cfg);
-      ui::rectangle({}, ui::window_extent(), 0xffffffff);
+      ui::rectangle({}, ui::window_extent(), 0x282c34ff);
 
-      playback_btn(5, 5, 22.67499992, 30, 0x00ff00ff, 0x00ffffff, 1);
+      // playback button
+      auto p0 = Vec2{ 5, 5 };
+      auto p1 = p0 + Vec2{ 12.5 * 1.414, 12.5 };
+      auto p2 = p0 + Vec2{ 0, 25 };
+      if (playback_btn(p0, p1, p2, 0xffffffff, 0xdcdcdcff, 1))
+        if (progress_lerpolator.is_not_started()) progress_lerpolator.start();
 
-      // ui::begin_union();
+      if (!playback_btn.is_paused()) progress_lerpolator.update(ui::delta_time());
+      if (progress_lerpolator.is_finished())
+      {
+        progress_lerpolator.reset();
+        playback_btn.pause();
+      }
 
-      // ui::begin_path();
-      // ui::line({ 0, 50 }, { 50, 0 });
-      // ui::bezier({ 50, 0 }, { 50, 50 }, { 100, 100 });
-      // ui::line({ 100, 100 }, { 0, 50 });
-      // ui::end_path();
-
-      // ui::circle({ 50, 50 }, ui::lerp_ping_pong("circle radius", 0, 50, 3'000));
-      // ui::circle({ 50, 50 }, 40);
-
-      // ui::end_union(0x000000ff, 3);
+      // progress bar
+      auto p = p1 + Vec2{ 5, 0 };
+      auto progress = progress_lerpolator.get() * 100;
+      ui::rectangle(p, p + Vec2{ 100,      3 }, 0x808080ff);
+      ui::rectangle(p, p + Vec2{ progress, 3 }, 0x0000ffff);
 
       // circle point
       static auto dur  = 0;
@@ -127,7 +167,7 @@ int main()
       auto theta = static_cast<double>(dur) / time * target_value;
 
       auto size = ui::window_drawable_extent();
-      ui::circle(point_on_circle({ size.x - 60, size.y - 60}, 50, theta), 3, 0x000000ff);
+      ui::circle(point_on_circle({ size.x - 30, size.y - 30}, 20, theta), 3, 0xffffffff);
 
       ui::end();
     }

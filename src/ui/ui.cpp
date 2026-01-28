@@ -174,6 +174,8 @@ void circle(glm::vec2 center, float radius, Color color, float thickness) noexce
 
 void line(glm::vec2 p0, glm::vec2 p1, Color color) noexcept
 {
+  if (p0 == p1) return;
+
 	g_ui_ctx.check_draw();
 
 	auto offset = g_ui_ctx.get_render_pos();
@@ -221,12 +223,6 @@ void bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color) noexcept
 ///                               Widget
 ////////////////////////////////////////////////////////////////////////////////
 
-auto is_hover_on(std::string_view name, glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
-{
-  g_ui_ctx.check_draw();
-  return g_ui_ctx.is_hover_on(g_ui_ctx.generic_id(name), left_top, right_bottom);
-}
-
 auto is_hover_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
 {
   g_ui_ctx.check_draw();
@@ -234,12 +230,6 @@ auto is_hover_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
   return g_ui_ctx.cursor_on_window == g_ui_ctx._window->snap.handle &&
          !g_ui_ctx._window->snap.move_from_maximize                 &&
          point_on(p, left_top, right_bottom);
-}
-
-auto is_hover_on(size_t id, glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
-{
-  g_ui_ctx.check_draw();
-  return g_ui_ctx.is_hover_on(id, left_top, right_bottom);
 }
 
 auto is_click_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
@@ -261,16 +251,16 @@ auto lerp_ping_pong(std::string_view name, bool b, double duration) noexcept -> 
   return g_ui_ctx.lerp_ping_pong(b, g_ui_ctx.generic_id(name), duration);
 }
 
-auto button(
-  std::string_view name,
-  int              x,
-  int              y,
-  uint32_t         width,
-  uint32_t         height,
-  Color            button_color,
-  Color            button_hover_color) noexcept-> bool
+void reset_lerpolator(std::string_view name) noexcept
 {
-  auto id = g_ui_ctx.generic_id(name);
+  g_ui_ctx.reset_lerpolator(g_ui_ctx.get_id(name));
+}
+
+auto button(size_t id, int x, int y, uint32_t width, uint32_t height) noexcept-> ButtonState
+{
+  g_ui_ctx.check_draw();
+  g_ui_ctx.check_path_not_draw();
+  g_ui_ctx.check_union_not_draw();
 
   // what is a button
   // button is a rectangle with width and height in specific position
@@ -283,7 +273,7 @@ auto button(
   }
 
   // when cursor hover on it, it will change color to hovered color
-  auto is_hovered  = ui::is_hover_on(name, left_top, right_bottom);
+  auto is_hovered  = g_ui_ctx.is_hover_on(id, left_top, right_bottom);
   auto is_move_out = g_ui_ctx.is_cursor_move_out(id);
   if (is_hovered && g_ui_ctx.mouse_down_pos)
   {
@@ -293,10 +283,26 @@ auto button(
                  g_ui_ctx.mouse_down_window == g_ui_ctx._window->snap.handle;
   }
 
-  // draw button
-  ui::rectangle({ x, y }, { x + width, y + height }, is_hovered ? button_hover_color : button_color);
+  return { is_hovered && ui::is_click_on(left_top, right_bottom), is_hovered, is_move_out };
+}
 
-  return is_hovered && ui::is_click_on(left_top, right_bottom);
+auto button(std::string_view name, int x, int y, uint32_t width, uint32_t height) noexcept-> ButtonState
+{
+  return button(g_ui_ctx.generic_id(name), x, y, width, height);
+}
+
+auto button(
+  std::string_view name,
+  int              x,
+  int              y,
+  uint32_t         width,
+  uint32_t         height,
+  Color            button_color,
+  Color            button_hover_color) noexcept-> ButtonState
+{
+  auto state = button(name, x, y, width, height);
+  ui::rectangle({ x, y }, { x + width, y + height }, state.hovered ? button_hover_color : button_color);
+  return state;
 }
 
 auto button(
@@ -312,38 +318,18 @@ auto button(
   uint32_t                                icon_width,
   uint32_t                                icon_height,
   Color                                   icon_color,
-  Color                                   icon_hover_color) noexcept-> bool
+  Color                                   icon_hover_color) noexcept-> ButtonState
 {
-  auto id = g_ui_ctx.generic_id(name);
+  auto id    = g_ui_ctx.generic_id(name);
+  auto state = button(id, x, y, width, height);
 
-  // what is a button
-  // button is a rectangle with width and height in specific position
-  auto left_top     = glm::vec<2, int>{ x, y };
-  auto right_bottom = glm::vec<2, int>{ x + width, y + height };
-  if (g_ui_ctx._window->cfg.display_title_bar && !g_ui_ctx.draw_title_bar)
-  {
-    left_top.y     += Title_Bar_Height;
-    right_bottom.y += Title_Bar_Height;
-  }
-
-  // when cursor hover on it, it will change color to hovered color
-  auto is_hovered  = ui::is_hover_on(name, left_top, right_bottom);
-  auto is_move_out = g_ui_ctx.is_cursor_move_out(id);
-  if (is_hovered && g_ui_ctx.mouse_down_pos)
-  {
-    g_ui_ctx.add_mouse_state(id, left_top, right_bottom);
-    is_hovered = !is_move_out                                                      &&
-                 point_on(g_ui_ctx.mouse_down_pos.value(), left_top, right_bottom) &&
-                 g_ui_ctx.mouse_down_window == g_ui_ctx._window->snap.handle;
-  }
-
-  auto value = g_ui_ctx.lerp_ping_pong(is_hovered, id, 200'000);
-  if (mouse_down_color && is_move_out) button_hover_color = mouse_down_color.value();
+  auto value = g_ui_ctx.lerp_ping_pong(state.hovered, id, 200'000);
+  if (mouse_down_color && state.move_out) button_hover_color = mouse_down_color.value();
   button_color = lerp(button_color, button_hover_color, value);
 
   // when mouse down, color also change
   if (mouse_down_color &&
-      is_hovered       &&
+      state.hovered    &&
       (ui::get_mouse_state() &  window::MouseState::left_button_down ||
        ui::get_mouse_state() == window::MouseState::left_button_press))
     button_color = mouse_down_color.value();
@@ -366,7 +352,7 @@ auto button(
     });
   }
 
-  return is_hovered && ui::is_click_on(left_top, right_bottom);
+  return state;
 }
 
 }}
