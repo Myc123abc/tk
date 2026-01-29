@@ -21,6 +21,7 @@ namespace tk { namespace ui {
 
 auto get_bounding_rectangle(std::vector<glm::vec2> const& data) noexcept -> std::pair<glm::vec2, glm::vec2>;
 auto is_hover_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool;
+auto is_caps_locked() noexcept -> bool;
 
 struct Window
 {
@@ -120,7 +121,6 @@ public:
   auto get_render_data() noexcept { return _window->data(); }
   void set_render_pos(int x, int y) noexcept { _window->render_pos = { x + renderer::Window_Shadow_Thickness, y + renderer::Window_Shadow_Thickness }; }
   auto get_render_pos() const noexcept { return _window->render_pos; }
-  auto get_mouse_state() const noexcept { return _mouse_state; }
 
   void render_on(int x, int y, std::move_only_function<void()>&& func) noexcept;
 
@@ -181,7 +181,7 @@ private:
   std::unordered_set<size_t>             _ids;
 
   //
-  // state
+  // mouse state
   //
 public:
   HWND                            cursor_on_window{};
@@ -191,10 +191,11 @@ public:
   std::optional<glm::vec<2, int>> mouse_up_pos;
   bool                            is_move_from_maximize{};
   bool                            draw_title_bar{};
-private:
-  window::MouseState              _mouse_state{};
 
+  //
   // button state
+  //
+private:
   struct ButtonState
   {
     size_t    id{};
@@ -204,8 +205,30 @@ private:
   } _btn_state;
   bool _interrupte{};
 public:
-  void add_mouse_state(size_t id, glm::vec2 left_top, glm::vec2 right_bottom) noexcept;
+  void add_mouse_left_button_state(size_t id, glm::vec2 left_top, glm::vec2 right_bottom) noexcept;
   auto is_cursor_move_out(size_t id) noexcept -> bool;
+
+  //
+  // key state
+  //
+private:
+  void update_keys() noexcept;
+
+  struct KeyContext
+  {
+    KeyState state{};
+    double   dur{};
+  };
+  std::unordered_map<Key, KeyContext> _keys
+  {
+#define X(name, value) { Key::name, {} },
+    KEY_LIST(X)
+#undef X
+  };
+  std::unordered_set<Key> _down_keys;
+
+public:
+  auto get_key(Key key) noexcept -> KeyState;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                              Message Process
@@ -220,11 +243,6 @@ public:
   struct Message_Cursor_On_Window
   {
     HWND handle{};
-  };
-
-  struct Message_Update_Mouse_State
-  {
-    window::MouseState state{};
   };
 
   struct Message_Update_Moving
@@ -293,7 +311,6 @@ public:
   using Message = std::variant<
     Message_Window_Close,
     Message_Cursor_On_Window,
-    Message_Update_Mouse_State,
     Message_Update_Moving,
     Message_Update_Resizing,
     Message_Resize_End,
@@ -316,7 +333,6 @@ private:
     UIContext& ctx;
     void operator()(Message_Window_Close const& msg) const noexcept;
     void operator()(Message_Cursor_On_Window const& msg) const noexcept;
-    void operator()(Message_Update_Mouse_State const& msg) const noexcept;
     void operator()(Message_Update_Moving const& msg) const noexcept;
     void operator()(Message_Update_Resizing const& msg) const noexcept;
     void operator()(Message_Resize_End const& msg) const noexcept;
@@ -328,9 +344,6 @@ private:
     void operator()(Message_Update_Fullscreen_Window const& msg) const noexcept;
   };
   MessageQueue<Message, UI_Message_Queue_Capacity> _msg_queue;
-  std::deque<Message_Update_Mouse_State>           _mouse_state_queue;
-
-  void process_mouse_state() noexcept;
 };
 
 inline static auto& g_ui_ctx{ UIContext::instance() };

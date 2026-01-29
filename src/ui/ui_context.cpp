@@ -30,6 +30,15 @@ auto get_bounding_rectangle(std::vector<glm::vec2> const& data) noexcept -> std:
   return { min, max };
 }
 
+auto is_caps_locked() noexcept -> bool
+{
+  return GetKeyState(VK_CAPITAL) & 0b1;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///                             Window
+////////////////////////////////////////////////////////////////////////////////
+
 void Window::add_move_invald_areas(RECT rect) noexcept
 {
   auto idx = 1 - move_invalid_areas_idx.load(std::memory_order_relaxed);
@@ -52,6 +61,10 @@ auto Window::access_move_invliad_areas() noexcept -> std::vector<RECT>&
 {
   return move_invalid_areas[move_invalid_areas_idx.load(std::memory_order_acquire)];
 }
+
+////////////////////////////////////////////////////////////////////////////////
+///                             UIContext
+////////////////////////////////////////////////////////////////////////////////
 
 void UIContext::init() noexcept
 {
@@ -211,7 +224,6 @@ void UIContext::render() noexcept
 
   // process message queue
   _msg_queue.process(MessageHandler{ g_ui_ctx });
-  process_mouse_state();
 
   // update state
   update();
@@ -219,8 +231,6 @@ void UIContext::render() noexcept
 
 void UIContext::update() noexcept
 {
-  using namespace window;
-
   // clear state
   _ids.clear();
   if (mouse_up_window || _interrupte)
@@ -242,16 +252,17 @@ void UIContext::update() noexcept
   }
 
   // update mouse state
+  auto mouse_left_button_state = get_key(Key::Mouse_Left_Button);
   if (auto it = std::ranges::find_if(_windows, [](auto const& pair) { return pair.second.is_active(); }); it != _windows.end())
   {
     auto& window = it->second;
-    if (_mouse_state == MouseState::left_button_down)
+    if (mouse_left_button_state == KeyState::down)
     {
       mouse_down_window       = window.snap.handle;
       mouse_down_pos          = window.cursor_pos();
       is_move_from_maximize = window.snap.move_from_maximize;
     }
-    else if (_mouse_state == MouseState::left_button_up)
+    else if (mouse_left_button_state == KeyState::up)
     {
       mouse_up_window = window.snap.handle;
       mouse_up_pos    = window.cursor_pos();
@@ -265,6 +276,8 @@ void UIContext::update() noexcept
     if (!point_on(get_cursor_pos(), _btn_state.left_top, _btn_state.right_bottom))
       _btn_state.move_out = true;
   }
+
+  update_keys();
 
   // update delta time
   static auto tp = std::chrono::steady_clock::now();
@@ -285,7 +298,7 @@ void UIContext::update() noexcept
   }
 }
 
-void UIContext::add_mouse_state(size_t id, glm::vec2 left_top, glm::vec2 right_bottom) noexcept
+void UIContext::add_mouse_left_button_state(size_t id, glm::vec2 left_top, glm::vec2 right_bottom) noexcept
 {
   check_draw();
   if (!_btn_state.id)
@@ -562,6 +575,60 @@ void UIContext::end_union(Color color, float thickness) noexcept
   _op_data.op     = {};
   _op_data.offset = {};
   _op_data.points.clear();
+}
+
+void UIContext::update_keys() noexcept
+{
+  using enum KeyState;
+
+  for (auto it = _down_keys.begin(); it != _down_keys.end();)
+  {
+    auto& ctx = _keys.at(*it);
+
+    if (ctx.state == down)
+    {
+      ctx.state = down_idle;
+      ctx.dur += delta_time();
+    }
+    else if (ctx.state == down_idle)
+    {
+      ctx.dur += delta_time();
+      if (ctx.dur > Key_Repeate_Start_Duration)
+      {
+        ctx.dur   = {};
+        ctx.state = press;
+      }
+    }
+    
+    if (ctx.state == up)
+    {
+      ctx.state = idle;
+      it = _down_keys.erase(it);
+      continue;
+    }
+    else if (GetAsyncKeyState(static_cast<SHORT>(*it)) == 0)
+    {
+      ctx.state = up;
+      ctx.dur   = {};
+    }
+
+    ++it;
+  }
+}
+
+auto UIContext::get_key(Key key) noexcept -> KeyState
+{
+  using enum KeyState;
+
+  auto& ctx = _keys.at(key);
+  if (ctx.state == idle && GetAsyncKeyState(static_cast<SHORT>(key)) < 0)
+  {
+    assert(!_down_keys.contains(key));
+    ctx.state = down;
+    _down_keys.emplace(key);
+  }
+
+  return ctx.state;
 }
 
 }}

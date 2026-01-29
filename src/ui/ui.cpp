@@ -51,11 +51,6 @@ void end() noexcept
 	g_ui_ctx.end();
 }
 
-auto get_mouse_state() -> window::MouseState
-{
-  return g_ui_ctx.get_mouse_state();
-}
-
 void add_move_invalid_area(glm::vec2 left_top, glm::vec2 right_bottom) noexcept
 {
   g_ui_ctx.check_draw();
@@ -277,7 +272,7 @@ auto button(size_t id, int x, int y, uint32_t width, uint32_t height) noexcept->
   auto is_move_out = g_ui_ctx.is_cursor_move_out(id);
   if (is_hovered && g_ui_ctx.mouse_down_pos)
   {
-    g_ui_ctx.add_mouse_state(id, left_top, right_bottom);
+    g_ui_ctx.add_mouse_left_button_state(id, left_top, right_bottom);
     is_hovered = !is_move_out                                                      &&
                  point_on(g_ui_ctx.mouse_down_pos.value(), left_top, right_bottom) &&
                  g_ui_ctx.mouse_down_window == g_ui_ctx._window->snap.handle;
@@ -328,11 +323,12 @@ auto button(
   button_color = lerp(button_color, button_hover_color, value);
 
   // when mouse down, color also change
-  if (mouse_down_color &&
-      state.hovered    &&
-      (ui::get_mouse_state() &  window::MouseState::left_button_down ||
-       ui::get_mouse_state() == window::MouseState::left_button_press))
-    button_color = mouse_down_color.value();
+  if (mouse_down_color && state.hovered)
+  {
+    auto state = g_ui_ctx.get_key(Key::Mouse_Left_Button);
+    if (state &  KeyState::down || state == KeyState::press)
+      button_color = mouse_down_color.value();
+  }
 
   // draw button
   ui::rectangle({ x, y }, { x + width, y + height }, button_color);
@@ -353,6 +349,24 @@ auto button(
   }
 
   return state;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///                               Key
+////////////////////////////////////////////////////////////////////////////////
+
+auto GetKeyResult::is_uppercase() const noexcept -> bool
+{
+  if (is_caps_locked()) return !get_key(Key::Shift).has_down();
+  return get_key(Key::Shift).has_down();
+}
+
+auto get_key(Key key) noexcept -> GetKeyResult
+{
+  g_ui_ctx.check_draw();
+  if (g_ui_ctx._window->is_active())
+    return { g_ui_ctx.get_key(key) };
+  return {};
 }
 
 }}

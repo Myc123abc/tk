@@ -3,7 +3,6 @@
 #include "../../ui/ui_context.hpp"
 
 using namespace tk::ui;
-using namespace tk::window;
 using namespace tk::renderer;
 
 namespace {
@@ -119,17 +118,14 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   static auto left_button_down_window_pos  = glm::vec<2, int>{};
   static auto last_resize_type             = ResizeType{};
   static auto left_button_down_resize_type = ResizeType{};
+  static auto left_button_down             = false;
 
   static auto finish_moving_or_resizing = [&](HWND handle)
   {
     ReleaseCapture();
     ClipCursor(nullptr);
 
-    // transform new mouse state
-    wnd_mgr._mouse_state = MouseState::left_button_up;
-    g_ui_ctx.send_message(UIContext::Message_Update_Mouse_State{ wnd_mgr._mouse_state });
-    KillTimer(nullptr, wnd_mgr._timer_mouse_state);
-    PostMessageW(nullptr, static_cast<int>(Message::mouse_idle), 0, 0);
+    left_button_down = false;
 
     auto& window = windows.at(handle);
     if (window.is_moving())
@@ -164,11 +160,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     last_cursor_pos              = get_cursor_pos();
     left_button_down_window_pos  = window.cursor_pos();
     left_button_down_resize_type = window.get_resize_type(left_button_down_window_pos);
-
-    wnd_mgr._mouse_state           = MouseState::left_button_down;
-    wnd_mgr._mouse_left_down_start = std::chrono::steady_clock::now();
-    g_ui_ctx.send_message(UIContext::Message_Update_Mouse_State{ wnd_mgr._mouse_state });
-    wnd_mgr._timer_mouse_state = SetTimer(nullptr, 0, USER_TIMER_MINIMUM, nullptr);
+    left_button_down             = true;
     break;
   }
 
@@ -197,8 +189,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     }
 
     auto pos = get_cursor_pos();
-    if (wnd_mgr._mouse_state &  MouseState::left_button_down ||
-        wnd_mgr._mouse_state == MouseState::left_button_press)
+    if (left_button_down)
     {
       // limit cursor move area
       auto rect = get_virtual_workarea_rect();
@@ -382,20 +373,11 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
     _windows.at(std::bit_cast<HWND>(w_param)).restore();
     break;
   }
-
-  case Message::mouse_idle:
-  {
-    _mouse_state = MouseState::idle;
-    g_ui_ctx.send_message(UIContext::Message_Update_Mouse_State{ _mouse_state });
-    break;
-  }
   }
   
   if (static_cast<UINT>(msg) == WM_TIMER)
   {
-    if (w_param == _timer_mouse_state)
-      update_mouse_state();
-    else if (w_param == _timer_mouse_pass_through)
+    if (w_param == _timer_mouse_pass_through)
     {
       // update window mouse pass through state
       for (auto it = _using_mouse_pass_through_windows.begin(); it != _using_mouse_pass_through_windows.end();)
@@ -419,23 +401,6 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
 
   // send update message to ui context
   g_ui_ctx.send_message(UIContext::Message_Cursor_On_Window{ get_cursor_on_window() });
-}
-
-void WindowManager::update_mouse_state() noexcept
-{
-  if (_mouse_state == MouseState::left_button_down)
-  {
-    _mouse_state = MouseState::left_button_down_idle;
-    g_ui_ctx.send_message(UIContext::Message_Update_Mouse_State{ _mouse_state });
-  }
-
-  auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - _mouse_left_down_start).count();
-  if (dur > Mouse_Left_Down_Press_Start_Time)
-  {
-    _mouse_state = MouseState::left_button_press;
-    g_ui_ctx.send_message(UIContext::Message_Update_Mouse_State{ _mouse_state });
-    KillTimer(nullptr, _timer_mouse_state);
-  }
 }
 
 void WindowManager::msg_create_window(WPARAM w_param) noexcept

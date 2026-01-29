@@ -19,20 +19,6 @@ void UIContext::MessageHandler::operator()(Message_Cursor_On_Window const& msg) 
   ctx.cursor_on_window = msg.handle;
 }
 
-void UIContext::MessageHandler::operator()(Message_Update_Mouse_State const& msg) const noexcept
-{
-  if (std::ranges::any_of(ctx._mouse_state_queue, [=](auto message) { return message.state == msg.state; }))
-    return;
-  ctx._mouse_state_queue.emplace_back(msg);
-}
-
-void UIContext::process_mouse_state() noexcept
-{
-  if (_mouse_state_queue.empty()) return;
-  _mouse_state = _mouse_state_queue.front().state;
-  _mouse_state_queue.pop_front();
-}
-
 void UIContext::MessageHandler::operator()(Message_Update_Moving const& msg) const noexcept
 {
   auto& wnd = ctx.get_window(msg.handle);

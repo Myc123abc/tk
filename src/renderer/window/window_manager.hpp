@@ -1,7 +1,6 @@
 #pragma once
 
 #include "window.hpp"
-#include "window/type.hpp"
 #include "../resource/render_data.hpp"
 
 #include <thread>
@@ -130,7 +129,6 @@ public:
     minimize_window,
     maximize_window,
     restore_window,
-    mouse_idle,
     signal,
   };
 
@@ -155,12 +153,6 @@ private:
   void message_process(HWND handle, Message msg, WPARAM w_param, LPARAM l_param) noexcept;
 
   void msg_create_window(WPARAM w_param) noexcept;
-
-  // mouse state process
-  void update_mouse_state() noexcept;
-  UINT_PTR                              _timer_mouse_state{};
-  window::MouseState                    _mouse_state{};
-  std::chrono::steady_clock::time_point _mouse_left_down_start{};
 
 private:
   static constexpr wchar_t Auxiliary_Class[] = L"vn::window::WindowManager::AuxiliaryWindow";

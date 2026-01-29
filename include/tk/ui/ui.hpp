@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../window/type.hpp"
+#include <windows.h>
 
 #include <string_view>
 #include <optional>
@@ -100,12 +100,6 @@ void begin(std::string_view name, int x, int y, uint32_t width, uint32_t height,
 
 // end a window
 void end() noexcept;
-
-/**
- * get mouse state of current window
- * @return mouse state
- */
-auto get_mouse_state() -> window::MouseState;
 
 /**
  * set cursor move invalid area
@@ -289,5 +283,60 @@ auto button(
   uint32_t                                icon_height,
   Color                                   icon_color,
   Color                                   icon_hover_color) noexcept-> ButtonState;
+
+////////////////////////////////////////////////////////////////////////////////
+///                               Key
+////////////////////////////////////////////////////////////////////////////////
+
+#define KEY_LIST(X)                \
+  X(Q,                 'Q')        \
+  X(Shift,             VK_SHIFT)   \
+  X(Space,             VK_SPACE)   \
+  X(Mouse_Left_Button, VK_LBUTTON)
+
+enum class Key
+{
+#define X(name, value) name = value,
+  KEY_LIST(X)
+#undef X
+};
+
+enum class KeyState
+{
+  idle      = 0b0000,
+  down      = 0b0001,
+  down_idle = 0b0011,
+  press     = 0b0101,
+  up        = 0b1000,
+};
+
+constexpr auto operator&(KeyState lhs, KeyState rhs) noexcept
+{
+  using T = std::underlying_type_t<KeyState>;
+  return static_cast<T>(lhs) & static_cast<T>(rhs);
+}
+
+struct GetKeyResult
+{
+  KeyState state{};
+
+  constexpr operator bool() const noexcept
+  {
+    return state == KeyState::down ||
+           state == KeyState::press;
+  }
+
+  auto has_down() const noexcept { return state & KeyState::down; }
+
+  auto is_uppercase() const noexcept -> bool;
+  auto is_lowercase() const noexcept -> bool { return !is_uppercase(); }
+};
+
+/**
+ * get key state
+ * @param key
+ * @return result of key state
+ */
+auto get_key(Key key) noexcept -> GetKeyResult;
 
 }}

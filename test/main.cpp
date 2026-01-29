@@ -1,5 +1,7 @@
 #include "tk/tk.hpp"
 
+#include <windows.h>
+
 using namespace tk;
 
 using Vec2 = glm::vec2;
@@ -112,7 +114,7 @@ int main()
   auto progress_lerpolator = ui::Lerpolator{};
   progress_lerpolator.init(1'000'000);
 
-  auto wnd1_is_closed = true;
+  auto wnd1_is_closed = false;
   auto wnd2_is_closed = false;
   while (!wnd1_is_closed || !wnd2_is_closed)
   {
@@ -128,7 +130,7 @@ int main()
       if (ui::button("btn1", 0, 0, 100, 100, 0x00ff00ff, 0x0000ffff))
         info("click 11");
       if (ui::button("btn2", 50, 50, 100, 100, 0x00ff00ff, 0x0000ffff))
-        info("click 22");
+        wnd2_is_closed = false;
       ui::add_move_invalid_area({}, { 150, 150 });
       ui::end();
     }
@@ -137,6 +139,8 @@ int main()
     {
       ui::begin("wnd2", 100, 100, 200, 200, &wnd2_is_closed, cfg);
       ui::rectangle({}, ui::window_extent(), 0x282c34ff);
+
+      if (ui::get_key(ui::Key::Q)) wnd2_is_closed = true;
 
       // playback button
       auto p0 = Vec2{ 5, 5 };
@@ -150,6 +154,17 @@ int main()
       {
         progress_lerpolator.reset();
         playback_btn.pause();
+      }
+      if (ui::get_key(ui::Key::Space))
+      {
+        if (playback_btn.is_paused())
+        {
+          playback_btn.play();
+          if (progress_lerpolator.is_not_started())
+            progress_lerpolator.start();
+        }
+        else
+         playback_btn.pause();
       }
 
       // progress bar
