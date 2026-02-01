@@ -1,5 +1,6 @@
 #include "ui/ui.hpp"
 #include "ui_context.hpp"
+#include "../renderer/image_manager.hpp"
 
 using namespace tk::renderer;
 
@@ -35,6 +36,20 @@ auto lerp(glm::vec2 x, glm::vec2 y, float v) noexcept -> glm::vec2
 auto delta_time() noexcept -> double
 {
   return g_ui_ctx.delta_time();
+}
+
+void image(std::string_view path, glm::vec2 pos) noexcept
+{
+  g_ui_ctx.check_draw();
+  g_ui_ctx.check_path_not_draw();
+  g_ui_ctx.check_union_not_draw();
+
+  pos += g_ui_ctx.get_render_pos();
+
+  auto info = g_img_mgr.load(path);
+  if (info.is_not_uploaded())
+    g_ui_ctx.add_wait_upload_images();
+  g_ui_ctx.add_shape(ShapeProperty::Type::image, {}, {}, { std::bit_cast<float>(info.index) }, { { pos.x, pos.y }, { pos.x + info.width, pos.y + info.height }});
 }
 
 ////////////////////////////////////////////////////////////////////////////////

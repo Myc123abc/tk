@@ -45,7 +45,9 @@ void Renderer::destroy() noexcept
   _thread.join();
 
   // pop all message
-  while (!_frame_render_complete_funcs.empty() || !_msg_queue.empty())
+  while (!_frame_render_complete_funcs.empty() ||
+         !_msg_queue.empty()                   ||
+         !_ui_ctx_msg_queue.empty())
     message_process();
 
   // destroy render resources
@@ -81,6 +83,7 @@ void Renderer::message_process() noexcept
     (*it)() ? it = _frame_render_complete_funcs.erase(it) : ++it;
 
   _msg_queue.process(MessageHandler{ g_renderer });
+  _ui_ctx_msg_queue.process(UIContextMessageHandler{ g_renderer });
 }
 
 void Renderer::render() noexcept

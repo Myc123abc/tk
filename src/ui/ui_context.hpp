@@ -15,7 +15,6 @@
 #include <string>
 #include <optional>
 #include <unordered_set>
-#include <deque>
 
 namespace tk { namespace ui {
 
@@ -110,6 +109,7 @@ public:
   void add_vertices_indices(std::pair<glm::vec2, glm::vec2> bounding_rectangle) noexcept;
   void add_shape_property(renderer::ShapeProperty::Type type, glm::vec4 color, float thickness, std::vector<float> const& values) noexcept;
   void add_shape(renderer::ShapeProperty::Type type, glm::vec4 color, float thickness, std::vector<float> const& values, std::pair<glm::vec2, glm::vec2> bounding_rectangle) noexcept;
+  void add_wait_upload_images() noexcept;
 
   auto is_path_draw()  const noexcept { return _path_begin;  }
   auto is_union_draw() const noexcept { return _union_begin; }
@@ -137,7 +137,8 @@ public:
   auto access_move_invalid_areas(HWND handle) noexcept -> std::vector<RECT>&;
 
 private:
-  void update() noexcept;
+  void preprocess_render() noexcept;
+  void postprocess_render() noexcept;
 
   auto& get_window(HWND handle) noexcept { return _windows[_window_names[handle]]; }
 
@@ -155,6 +156,8 @@ private:
   bool                                    _call_begin{};
   bool                                    _path_begin{};
   bool                                    _union_begin{};
+
+  std::unordered_map<HWND, std::vector<uint32_t>> _wait_upload_images{};
 
 public:
   std::vector<float>                      path_data;

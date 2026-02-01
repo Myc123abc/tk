@@ -168,14 +168,23 @@ void UIContext::close_window() noexcept
     {
       g_wnd_mgr.close_window(window.snap.handle, { window.datas.begin(), window.datas.end() });
       _window_names.erase(window.snap.handle);
+      _wait_upload_images.erase(window.snap.handle);
       return true;
     }
   });
 }
 
-void UIContext::render() noexcept
+void UIContext::preprocess_render() noexcept
 {
   close_window();
+
+  // TODO: wait images upload complete
+
+}
+
+void UIContext::render() noexcept
+{
+  preprocess_render();
 
   // acquire frame, for synchronous with present vsync
   g_renderer.acquire_frame();
@@ -225,11 +234,10 @@ void UIContext::render() noexcept
   // process message queue
   _msg_queue.process(MessageHandler{ g_ui_ctx });
 
-  // update state
-  update();
+  postprocess_render();
 }
 
-void UIContext::update() noexcept
+void UIContext::postprocess_render() noexcept
 {
   // clear state
   _ids.clear();
@@ -629,6 +637,14 @@ auto UIContext::get_key(Key key) noexcept -> KeyState
   }
 
   return ctx.state;
+}
+
+void UIContext::add_wait_upload_images() noexcept
+{
+  g_ui_ctx.check_draw();
+  g_ui_ctx.check_path_not_draw();
+  g_ui_ctx.check_union_not_draw();
+  _wait_upload_images[_window->snap.handle].emplace_back(_window->data()->shape_properties.size());
 }
 
 }}

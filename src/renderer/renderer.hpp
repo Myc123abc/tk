@@ -107,6 +107,22 @@ public:
     _msg_queue.send(std::move(msg));
   }
 
+  struct Message_Upload_Image
+  {
+    int   width;
+    int   height;
+    void* data;
+  };
+
+  using UIContextMessage = std::variant<
+    Message_Upload_Image
+  >;
+
+  void send_message(UIContextMessage&& msg) noexcept
+  {
+    _ui_ctx_msg_queue.send(std::move(msg));
+  }
+
 private:
   struct MessageHandler
   {
@@ -115,7 +131,13 @@ private:
     void operator()(Message_Window_Destroy const& msg) const noexcept;
     void operator()(Message_Window_Update const& msg) const noexcept;
   };
-  MessageQueue<Message, Renderer_Msg_Queue_Capacity> _msg_queue;
+  struct UIContextMessageHandler
+  {
+    Renderer& renderer;
+    void operator()(Message_Upload_Image const& msg) const noexcept;
+  };
+  MessageQueue<Message, Renderer_Msg_Queue_Capacity>          _msg_queue;
+  MessageQueue<UIContextMessage, Renderer_Msg_Queue_Capacity> _ui_ctx_msg_queue;
 };
 
 inline static auto& g_renderer{ Renderer::instance() };

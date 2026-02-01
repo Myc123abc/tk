@@ -220,7 +220,7 @@ void Image::create_descriptor() noexcept
 
   auto create_unordered_access_view = [&]
   {
-    auto uav_desc = D3D12_UNORDERED_ACCESS_VIEW_DESC{};
+    auto uav_desc          = D3D12_UNORDERED_ACCESS_VIEW_DESC{};
     uav_desc.Format        = _format;
     uav_desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
     device->CreateUnorderedAccessView(_handle.Get(), nullptr, &uav_desc, _descriptor_handle.cpu_handle());

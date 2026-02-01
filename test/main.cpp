@@ -173,6 +173,10 @@ int main()
       ui::rectangle(p, p + Vec2{ 100,      3 }, 0x808080ff);
       ui::rectangle(p, p + Vec2{ progress, 3 }, 0x0000ffff);
 
+      // image
+      ui::image("assets/image/test.png", p2 + Vec2{ 0, 5 });
+      // ui::rectangle(p2 + Vec2{ 0, 5 }, p2 + Vec2{ 100, 105 }, 0x00ff00ff);
+
       // circle point
       static auto dur  = 0;
       static auto time = 250;

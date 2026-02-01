@@ -80,6 +80,13 @@ auto lerp_ping_pong(std::string_view name, bool b, double duration) noexcept -> 
  */
 void reset_lerpolator(std::string_view name) noexcept;
 
+/**
+ * display image
+ * @param path
+ * @param pos
+ */
+void image(std::string_view path, glm::vec2 pos) noexcept;
+
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Window
 ////////////////////////////////////////////////////////////////////////////////
