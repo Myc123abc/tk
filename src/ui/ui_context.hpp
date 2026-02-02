@@ -109,7 +109,6 @@ public:
   void add_vertices_indices(std::pair<glm::vec2, glm::vec2> bounding_rectangle) noexcept;
   void add_shape_property(renderer::ShapeProperty::Type type, glm::vec4 color, float thickness, std::vector<float> const& values) noexcept;
   void add_shape(renderer::ShapeProperty::Type type, glm::vec4 color, float thickness, std::vector<float> const& values, std::pair<glm::vec2, glm::vec2> bounding_rectangle) noexcept;
-  void add_wait_upload_images() noexcept;
 
   auto is_path_draw()  const noexcept { return _path_begin;  }
   auto is_union_draw() const noexcept { return _union_begin; }
@@ -136,6 +135,8 @@ public:
 
   auto access_move_invalid_areas(HWND handle) noexcept -> std::vector<RECT>&;
 
+  void image(std::string_view path, glm::vec2 pos) noexcept;
+
 private:
   void preprocess_render() noexcept;
   void postprocess_render() noexcept;
@@ -156,8 +157,6 @@ private:
   bool                                    _call_begin{};
   bool                                    _path_begin{};
   bool                                    _union_begin{};
-
-  std::unordered_map<HWND, std::vector<uint32_t>> _wait_upload_images{};
 
 public:
   std::vector<float>                      path_data;
@@ -232,6 +231,19 @@ private:
 
 public:
   auto get_key(Key key) noexcept -> KeyState;
+
+  //
+  // image
+  //
+private:
+  struct ImageInfo
+  {
+    uint32_t width{};
+    uint32_t height{};
+    uint32_t channel{};
+    uint32_t index{};
+  };
+  std::unordered_map<std::string, ImageInfo> _images;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                              Message Process

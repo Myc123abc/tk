@@ -77,6 +77,7 @@ namespace tk { namespace renderer {
 ///                               Bitmap
 ////////////////////////////////////////////////////////////////////////////////
 
+#if 0
 void Win32Bitmap::init(uint32_t width, uint32_t height) noexcept
 {
   view.init(width, height, 4);
@@ -115,6 +116,7 @@ void Bitmap::destroy() noexcept
     : free(_view.data);
   _use_stb = false;
 }
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                                 Image
@@ -297,7 +299,7 @@ auto Image::per_pixel_size() const noexcept -> uint32_t
   return byte_size_of(_format);
 }
 
-auto Image::readback(ID3D12GraphicsCommandList1* cmd, RECT rect) noexcept -> std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, BitmapView>
+auto Image::readback(ID3D12GraphicsCommandList1* cmd, RECT rect) noexcept -> std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, Bitmap>
 {
   err_if(per_pixel_size() != 4, "readback only support rgba image now");
 
@@ -305,7 +307,7 @@ auto Image::readback(ID3D12GraphicsCommandList1* cmd, RECT rect) noexcept -> std
   auto top  = std::max(rect.top, 0l);
 
   // create bitmap view
-  auto view = BitmapView{};
+  auto view = Bitmap{};
   view.x      = left;
   view.y      = top;
   view.width  = rect.right  - view.x;
@@ -376,7 +378,7 @@ void copy(
   cmd->CopyTextureRegion(&dst_loc, 0, 0, 0, &src_loc, &region_box);
 }
 
-void copy(BitmapView const& src, BitmapView const& dst) noexcept
+void copy(Bitmap const& src, Bitmap const& dst) noexcept
 {
   auto src_data = reinterpret_cast<std::byte*>(src.data);
   auto dst_data = reinterpret_cast<std::byte*>(dst.data);
@@ -425,7 +427,7 @@ void ExternalImageLoader::upload(ID3D12GraphicsCommandList1* cmd) noexcept
     | std::ranges::to<std::vector<ImageHandle>>();
   auto views = unuploaded_datas
     | std::views::transform([](auto const& data) { return data.bitmap.view(); })
-    | std::ranges::to<std::vector<BitmapView>>();
+    | std::ranges::to<std::vector<Bitmap>>();
 
   _upload_buffer.add_images(handles, views);
   _upload_buffer.upload(cmd);

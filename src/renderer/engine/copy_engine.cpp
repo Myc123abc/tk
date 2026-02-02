@@ -8,7 +8,7 @@ namespace tk { namespace renderer {
 ///                             Upload Buffer
 ////////////////////////////////////////////////////////////////////////////////
 
-void UploadBuffer::add_images(std::vector<Image*> const& images, std::vector<BitmapView> const& bitmaps) noexcept
+void UploadBuffer::add_images(std::vector<Image*> const& images, std::vector<Bitmap> const& bitmaps) noexcept
 {
   assert(images.size() == bitmaps.size());
 
@@ -91,7 +91,7 @@ void CopyEngine::acquire_slot() noexcept
   }
 }
 
-void CopyEngine::copy(std::vector<BitmapView> const& bitmaps, std::vector<Image*> const& images) noexcept
+void CopyEngine::copy(std::vector<Bitmap> const& bitmaps, std::vector<Image*> const& images) noexcept
 {
   auto& slot = _slot_pool[_slot];
   assert(slot.is_idle());

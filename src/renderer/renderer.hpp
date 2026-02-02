@@ -5,7 +5,6 @@
 #include "pipeline.hpp"
 #include "config.hpp"
 #include "../util/message_queue.hpp"
-#include "window/window.hpp"
 
 #include <rigtorp/SPSCQueue.h>
 
@@ -14,10 +13,8 @@
 #include <functional>
 #include <deque>
 #include <unordered_map>
-#include <span>
 #include <variant>
 #include <unordered_set>
-#include <latch>
 
 namespace tk { namespace renderer {
 
@@ -71,6 +68,9 @@ private:
   std::binary_semaphore                            _frame_sem{ 1 };
   std::binary_semaphore                            _render_data_empty_sem{ 0 };
 
+  // images
+  std::vector<Image>                               _images;
+
 ////////////////////////////////////////////////////////////////////////////////
 ///                              Message Process
 ////////////////////////////////////////////////////////////////////////////////
@@ -107,11 +107,16 @@ public:
     _msg_queue.send(std::move(msg));
   }
 
+  struct UploadImageInfo
+  {
+    Bitmap   bitmap;
+    HANDLE   event{};
+    uint32_t index{};
+  };
+
   struct Message_Upload_Image
   {
-    int   width;
-    int   height;
-    void* data;
+    UploadImageInfo* ptr{};
   };
 
   using UIContextMessage = std::variant<

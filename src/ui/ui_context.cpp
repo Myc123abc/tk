@@ -4,6 +4,8 @@
 #include "../renderer/renderer.hpp"
 #include "../util/hash.hpp"
 
+#include <stb_image.h>
+
 using namespace tk::renderer;
 
 namespace tk { namespace ui {
@@ -168,7 +170,6 @@ void UIContext::close_window() noexcept
     {
       g_wnd_mgr.close_window(window.snap.handle, { window.datas.begin(), window.datas.end() });
       _window_names.erase(window.snap.handle);
-      _wait_upload_images.erase(window.snap.handle);
       return true;
     }
   });
@@ -639,12 +640,41 @@ auto UIContext::get_key(Key key) noexcept -> KeyState
   return ctx.state;
 }
 
-void UIContext::add_wait_upload_images() noexcept
+void UIContext::image(std::string_view path, glm::vec2 pos) noexcept
 {
-  g_ui_ctx.check_draw();
-  g_ui_ctx.check_path_not_draw();
-  g_ui_ctx.check_union_not_draw();
-  _wait_upload_images[_window->snap.handle].emplace_back(_window->data()->shape_properties.size());
+  check_draw();
+  check_path_not_draw();
+  check_union_not_draw();
+
+  if (_images.contains(path.data()))
+  {
+    auto const& img = _images.at(path.data());
+    pos += get_render_pos();
+    add_shape(ShapeProperty::Type::image, {}, {}, { std::bit_cast<float>(img.index) }, { { pos.x, pos.y }, { pos.x + img.width, pos.y + img.height }});
+    return;
+  }
+
+  int  w, h, ch;
+  auto data = stbi_load(path.data(), &w, &h, &ch, 4);
+  if (!data)
+  {
+    warn("not found image {}", path);
+    return;
+  }
+
+  auto ptr = reinterpret_cast<Renderer::UploadImageInfo*>(malloc(sizeof(Renderer::UploadImageInfo)));
+  ptr->bitmap.init(w, h, 4, data);
+  ptr->event = CreateEventW(nullptr, false, false, nullptr);
+  g_renderer.send_message(Renderer::Message_Upload_Image{ ptr });
+  g_renderer.wakeup();
+  WaitForSingleObject(ptr->event, INFINITE);
+  CloseHandle(ptr->event);
+
+  pos += get_render_pos();
+  add_shape(ShapeProperty::Type::image, {}, {}, { std::bit_cast<float>(ptr->index) }, { { pos.x, pos.y }, { pos.x + w, pos.y + h }});
+  _images.emplace(path, ImageInfo{ ptr->bitmap.width, ptr->bitmap.height, 4u, ptr->index });
+
+  free(ptr);
 }
 
 }}

@@ -48,7 +48,7 @@ auto dxgi_format(ImageFormat format) noexcept -> DXGI_FORMAT;
 ///                             Bitmap
 ////////////////////////////////////////////////////////////////////////////////
 
-struct BitmapView
+struct Bitmap
 {
   void*    data{};
   uint32_t width{};
@@ -59,8 +59,9 @@ struct BitmapView
   uint32_t x{};
   uint32_t y{};
 
-  void init(uint32_t width, uint32_t height, uint32_t channel) noexcept
+  void init(uint32_t width, uint32_t height, uint32_t channel, void* data = nullptr) noexcept
   {
+    this->data    = data;
     this->width   = width;
     this->height  = height;
     this->channel = channel;
@@ -69,6 +70,7 @@ struct BitmapView
   }
 };
 
+#if 0
 class Bitmap
 {
 public:
@@ -98,18 +100,19 @@ public:
   void init(std::string_view filename) noexcept;
 
 private:
-  BitmapView _view;
+  Bitmap _view;
   bool       _use_stb{};
 };
 
 struct Win32Bitmap
 {
   HBITMAP    handle{};
-  BitmapView view{};
+  Bitmap view{};
 
   void init(uint32_t width, uint32_t height) noexcept;
   void destroy() const noexcept;
 };
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                               Image
@@ -151,7 +154,7 @@ public:
 
   auto per_pixel_size() const noexcept -> uint32_t;
 
-  auto readback(ID3D12GraphicsCommandList1* cmd, RECT rect) noexcept -> std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, BitmapView>;
+  auto readback(ID3D12GraphicsCommandList1* cmd, RECT rect) noexcept -> std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, Bitmap>;
 
   auto cpu_handle() const noexcept { return _descriptor_handle.cpu_handle(); }
   auto gpu_handle() const noexcept { return _descriptor_handle.gpu_handle(); }
@@ -199,7 +202,7 @@ inline void copy(
   D3D12_SUBRESOURCE_DATA&     data
 ) noexcept
 {
-  image.set_state(cmd, ImageState::copy_dst);
+  image.set_state(cmd, cmd->GetType() == D3D12_COMMAND_LIST_TYPE_COPY ? ImageState::common : ImageState::copy_dst);
   UpdateSubresources(cmd, image.handle(), upload_heap, offset, 0, 1, &data);
 }
 
@@ -212,7 +215,7 @@ void copy(
   LONG                        bottom,
   ID3D12Resource*             readback_buffer) noexcept;
 
-void copy(BitmapView const& src, BitmapView const& dst) noexcept;
+void copy(Bitmap const& src, Bitmap const& dst) noexcept;
 
 #if 0
 ////////////////////////////////////////////////////////////////////////////////

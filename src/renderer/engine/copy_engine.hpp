@@ -11,7 +11,7 @@ namespace tk { namespace renderer {
 class UploadBuffer
 {
 public:
-  void add_images(std::vector<Image*> const& images, std::vector<BitmapView> const& bitmaps) noexcept;
+  void add_images(std::vector<Image*> const& images, std::vector<Bitmap> const& bitmaps) noexcept;
   void upload(ID3D12GraphicsCommandList1* cmd) noexcept;
 
 private:
@@ -39,8 +39,9 @@ public:
 
   void acquire_slot() noexcept;
 
-  void copy(std::vector<BitmapView> const& bitmaps, std::vector<Image*> const& images) noexcept;
+  void copy(std::vector<Bitmap> const& bitmaps, std::vector<Image*> const& images) noexcept;
 
+  [[nodiscard]]
   auto submit_slot() noexcept -> uint64_t;
 
 private:

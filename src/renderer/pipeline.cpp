@@ -103,9 +103,8 @@ void Pipeline::bind(ID3D12GraphicsCommandList1* cmd) const noexcept
 void Pipeline::set_descriptors(ID3D12GraphicsCommandList1* cmd, std::initializer_list<std::pair<std::string_view, D3D12_GPU_DESCRIPTOR_HANDLE>> handles) const noexcept
 {
   for (auto const& [name, handle] : handles)
-    if (_resource_indexs.contains(name.data()))
+    if (_resource_indexs.contains(name.data()) && handle.ptr)
     {
-      err_if(!handle.ptr, "failed to set descriptor table, the invalid gpu handle of 0");
       if (_is_graphics_pipeline)
         cmd->SetGraphicsRootDescriptorTable(_resource_indexs.at(name.data()), handle);
       else

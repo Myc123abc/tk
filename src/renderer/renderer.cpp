@@ -145,8 +145,9 @@ void Renderer::render_sdf(RenderResource& res, RenderData* data) noexcept
   constants.window_pos    = data->resizing_window_pos;
   _sdf_pipeline.set_descriptors(cmd, "constants", constants,
   {
-    // { "images", g_desc_heap_mgr.first_gpu_handle(DescriptorHeapType::cbv_srv_uav) },
-    { "buffer", frame.buffer.gpu_handle()                                         },
+    { "images", _images.empty() ? D3D12_GPU_DESCRIPTOR_HANDLE{}
+                                : g_desc_heap_mgr.first_gpu_handle(DescriptorHeapType::cbv_srv_uav) },
+    { "buffer", frame.buffer.gpu_handle() },
   });
 
   // draw
