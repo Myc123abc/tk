@@ -3,8 +3,7 @@
 #include "../renderer/window/window_manager.hpp"
 #include "../renderer/renderer.hpp"
 #include "../util/hash.hpp"
-
-#include <stb_image.h>
+#include "image_manager.hpp"
 
 using namespace tk::renderer;
 
@@ -178,9 +177,6 @@ void UIContext::close_window() noexcept
 void UIContext::preprocess_render() noexcept
 {
   close_window();
-
-  // TODO: wait images upload complete
-
 }
 
 void UIContext::render() noexcept
@@ -640,41 +636,20 @@ auto UIContext::get_key(Key key) noexcept -> KeyState
   return ctx.state;
 }
 
-void UIContext::image(std::string_view path, glm::vec2 pos) noexcept
+void UIContext::image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha) noexcept
 {
   check_draw();
   check_path_not_draw();
   check_union_not_draw();
 
-  if (_images.contains(path.data()))
-  {
-    auto const& img = _images.at(path.data());
-    pos += get_render_pos();
-    add_shape(ShapeProperty::Type::image, {}, {}, { std::bit_cast<float>(img.index) }, { { pos.x, pos.y }, { pos.x + img.width, pos.y + img.height }});
-    return;
-  }
+  if (!g_img_mgr.contains(path)) g_img_mgr.load(path);
 
-  int  w, h, ch;
-  auto data = stbi_load(path.data(), &w, &h, &ch, 4);
-  if (!data)
-  {
-    warn("not found image {}", path);
-    return;
-  }
-
-  auto ptr = reinterpret_cast<Renderer::UploadImageInfo*>(malloc(sizeof(Renderer::UploadImageInfo)));
-  ptr->bitmap.init(w, h, 4, data);
-  ptr->event = CreateEventW(nullptr, false, false, nullptr);
-  g_renderer.send_message(Renderer::Message_Upload_Image{ ptr });
-  g_renderer.wakeup();
-  WaitForSingleObject(ptr->event, INFINITE);
-  CloseHandle(ptr->event);
-
-  pos += get_render_pos();
-  add_shape(ShapeProperty::Type::image, {}, {}, { std::bit_cast<float>(ptr->index) }, { { pos.x, pos.y }, { pos.x + w, pos.y + h }});
-  _images.emplace(path, ImageInfo{ ptr->bitmap.width, ptr->bitmap.height, 4u, ptr->index });
-
-  free(ptr);
+  auto offset = get_render_pos();
+  left_top     += offset;
+  right_bottom += offset;
+  add_shape(ShapeProperty::Type::image, {}, {},
+    { std::bit_cast<float>(g_img_mgr.at(path).index), static_cast<float>(alpha) / 0xff },
+    { left_top, right_bottom });
 }
 
 }}

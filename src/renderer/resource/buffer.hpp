@@ -1,12 +1,10 @@
 #pragma once
 
-#include "../shader/sdf/type.hpp"
 #include "descriptor_heap_manager.hpp"
+#include "render_data.hpp"
 
 #include <d3d12.h>
 #include <wrl/client.h>
-
-#include <span>
 
 namespace tk { namespace renderer {
 
@@ -51,22 +49,26 @@ public:
   {
     _vertices_indices_buffer.destroy();
     _shape_properties_buffer.destroy();
+    _image_indexs.destroy();
   }
 
   auto clear() noexcept -> FrameBuffer&
   {
     _vertices_indices_buffer.clear();
     _shape_properties_buffer.clear();
+    _image_indexs.clear();
     return *this;
   }
 
-  void upload(ID3D12GraphicsCommandList1* cmd, std::span<Vertex const> vertices, std::span<uint16_t const> indices, std::span<ShapeProperty const> shape_properties) noexcept;
+  void upload(ID3D12GraphicsCommandList1* cmd, RenderData* data) noexcept;
 
-  auto gpu_handle() const noexcept { return _shape_properties_buffer.gpu_handle(); }
+  auto shape_properties_gpu_handle() const noexcept { return _shape_properties_buffer.gpu_handle(); }
+  auto image_indexs_gpu_handle()     const noexcept { return _image_indexs.gpu_handle();            }
 
 private:
   Buffer _vertices_indices_buffer;
   Buffer _shape_properties_buffer;
+  Buffer _image_indexs;
 };
 
 }}

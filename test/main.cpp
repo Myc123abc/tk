@@ -138,7 +138,9 @@ int main()
     if (!wnd2_is_closed)
     {
       ui::begin("wnd2", 100, 100, 200, 200, &wnd2_is_closed, cfg);
-      ui::rectangle({}, ui::window_extent(), 0x282c34ff);
+
+      auto wnd_ext = ui::window_drawable_extent();
+      ui::rectangle({}, wnd_ext, 0x282c34ff);
 
       if (ui::get_key(ui::Key::Q)) wnd2_is_closed = true;
 
@@ -174,8 +176,9 @@ int main()
       ui::rectangle(p, p + Vec2{ progress, 3 }, 0x0000ffff);
 
       // image
-      ui::image("assets/image/test.png", p2 + Vec2{ 0, 5 });
-      // ui::rectangle(p2 + Vec2{ 0, 5 }, p2 + Vec2{ 100, 105 }, 0x00ff00ff);
+      auto img_ext = ui::image_extent("assets/image/test.png");
+      ui::image("assets/image/test.png", p2, p2 + Vec2{ img_ext.x / 4, img_ext.y / 4 });
+      ui::image("assets/image/test.jpg", {}, wnd_ext, 0x44);
 
       // circle point
       static auto dur  = 0;

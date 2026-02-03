@@ -94,7 +94,7 @@ public:
 
   auto usable_handle_count(DescriptorHeapType type) const noexcept { return _heaps.at(type).usable_handle_count(); }
 
-  auto first_gpu_handle(DescriptorHeapType type) const noexcept { return _heaps.at(type)._handles[0].second.gpu_handle(); }
+  auto first_gpu_handle(DescriptorHeapType type) const noexcept { return _heaps.at(type)._heap->GetGPUDescriptorHandleForHeapStart(); }
 
 private:
   std::unordered_map<DescriptorHeapType, DescriptorHeap> _heaps;

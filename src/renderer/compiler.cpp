@@ -330,7 +330,14 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
     {
       resource_indexs[resource_desc.Name] = _root_params.size();
 
-      range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, resource_desc.BindPoint, resource_desc.Space, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+      // For arrays, reflection reports BindCount > 1. For unbounded arrays, BindCount is commonly 0.
+      // D3D12 root signature supports unbounded descriptor ranges via NumDescriptors = UINT_MAX.
+      auto const num_descriptors = resource_desc.BindCount ? resource_desc.BindCount : UINT_MAX;
+      auto const range_flags = (num_descriptors == 1)
+        ? D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC
+        : (D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+
+      range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, num_descriptors, resource_desc.BindPoint, resource_desc.Space, range_flags);
       _ranges.emplace(range);
 
       root_param.InitAsDescriptorTable(1, &_ranges.back(), D3D12_SHADER_VISIBILITY_PIXEL);
@@ -339,10 +346,16 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
     }
 
     case D3D_SIT_BYTEADDRESS:
+    case D3D_SIT_STRUCTURED:
     {
       resource_indexs[resource_desc.Name] = _root_params.size();
 
-      range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, resource_desc.BindPoint, resource_desc.Space, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+      auto const num_descriptors = resource_desc.BindCount ? resource_desc.BindCount : UINT_MAX;
+      auto const range_flags = (num_descriptors == 1)
+        ? D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC
+        : (D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+
+      range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, num_descriptors, resource_desc.BindPoint, resource_desc.Space, range_flags);
       _ranges.emplace(range);
 
       root_param.InitAsDescriptorTable(1, &_ranges.back(), D3D12_SHADER_VISIBILITY_ALL);
@@ -354,7 +367,12 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
     {
       resource_indexs[resource_desc.Name] = _root_params.size();
 
-      range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, resource_desc.BindPoint, resource_desc.Space, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+      auto const num_descriptors = resource_desc.BindCount ? resource_desc.BindCount : UINT_MAX;
+      auto const range_flags = (num_descriptors == 1)
+        ? D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC
+        : (D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+
+      range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, num_descriptors, resource_desc.BindPoint, resource_desc.Space, range_flags);
       _ranges.emplace(range);
 
       root_param.InitAsDescriptorTable(1, &_ranges.back(), D3D12_SHADER_VISIBILITY_ALL);

@@ -81,11 +81,20 @@ auto lerp_ping_pong(std::string_view name, bool b, double duration) noexcept -> 
 void reset_lerpolator(std::string_view name) noexcept;
 
 /**
+ * get extent of image
+ * @param path
+ * @return width and height of image, if not exist, return (0, 0)
+ */
+auto image_extent(std::string_view path) noexcept -> glm::vec2;
+
+/**
  * display image
  * @param path
- * @param pos
+ * @param left_top
+ * @param right_bottom
+ * @param alpha
  */
-void image(std::string_view path, glm::vec2 pos) noexcept;
+void image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha = 0xff) noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Window

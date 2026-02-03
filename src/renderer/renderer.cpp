@@ -6,6 +6,8 @@
 #include "resource/descriptor_heap_manager.hpp"
 #include "compiler.hpp"
 
+#include <stb_image.h>
+
 #include <ranges>
 
 namespace tk { namespace renderer {
@@ -86,8 +88,48 @@ void Renderer::message_process() noexcept
   _ui_ctx_msg_queue.process(UIContextMessageHandler{ g_renderer });
 }
 
+void Renderer::preprocess_render() noexcept
+{
+  // upload images
+  if (!_upload_images.empty())
+  {
+    assert(_upload_images.size() == _bitmaps.size());
+    
+    // upload images by copy engine
+    g_copy_engine.acquire_slot();
+    g_copy_engine.copy(
+      _bitmaps
+        | std::views::values
+        | std::ranges::to<std::vector<Bitmap>>(),
+      _upload_images
+        | std::views::values
+        | std::views::transform([](auto& img) { return &img; })
+        | std::ranges::to<std::vector<Image*>>());
+    // wait upload images complete before rendering
+    g_graphics_engine.wait(g_copy_engine, g_copy_engine.submit_slot());
+
+    // move upload images to images
+    for (auto& [idx, img] : _upload_images)
+      _images[idx] = img;
+
+    // free bitmaps
+    for (auto const& bitmap : _bitmaps | std::views::values) stbi_image_free(bitmap.data);
+
+    _upload_images.clear();
+    _bitmaps.clear();
+  }
+}
+
+void Renderer::postprocess_render() noexcept
+{
+  _destroied_windows.clear();
+  _rendered_windows.clear();
+}
+
 void Renderer::render() noexcept
 {
+  preprocess_render();
+
   for (auto _ : std::views::iota(0u, _render_datas.size()))
   {
     // pop render data
@@ -123,8 +165,7 @@ void Renderer::render() noexcept
     _res[_rendered_windows.back()].present(true);
   }
 
-  _destroied_windows.clear();
-  _rendered_windows.clear();
+  postprocess_render();
 }
 
 void Renderer::render_sdf(RenderResource& res, RenderData* data) noexcept
@@ -137,7 +178,7 @@ void Renderer::render_sdf(RenderResource& res, RenderData* data) noexcept
   _sdf_pipeline.bind(cmd);
 
   // upload data to buffer
-  frame.buffer.clear().upload(cmd, data->vertices, data->indices, data->shape_properties);
+  frame.buffer.clear().upload(cmd, data);
 
   // set descriptors
   auto constants = Constants{};
@@ -145,9 +186,10 @@ void Renderer::render_sdf(RenderResource& res, RenderData* data) noexcept
   constants.window_pos    = data->resizing_window_pos;
   _sdf_pipeline.set_descriptors(cmd, "constants", constants,
   {
-    { "images", _images.empty() ? D3D12_GPU_DESCRIPTOR_HANDLE{}
-                                : g_desc_heap_mgr.first_gpu_handle(DescriptorHeapType::cbv_srv_uav) },
-    { "buffer", frame.buffer.gpu_handle() },
+    { "images",       _images.empty() ? D3D12_GPU_DESCRIPTOR_HANDLE{}
+                                      : g_desc_heap_mgr.first_gpu_handle(DescriptorHeapType::cbv_srv_uav) },
+    { "buffer",       frame.buffer.shape_properties_gpu_handle()                                          },
+    { "image_indexs", frame.buffer.image_indexs_gpu_handle()                                              },
   });
 
   // draw

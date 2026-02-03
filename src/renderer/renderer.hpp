@@ -49,6 +49,8 @@ public:
   void wakeup() noexcept { _render_data_empty_sem.release(); }
 
 private:
+  void preprocess_render()  noexcept;
+  void postprocess_render() noexcept;
   void render() noexcept;
   void render_sdf(RenderResource& res, RenderData* data) noexcept;
 
@@ -68,8 +70,17 @@ private:
   std::binary_semaphore                            _frame_sem{ 1 };
   std::binary_semaphore                            _render_data_empty_sem{ 0 };
 
+  //
   // images
-  std::vector<Image>                               _images;
+  //
+public:
+  auto get_image_indexs() const noexcept { return _image_indexs; }
+
+private:
+  std::unordered_map<uint32_t, Image>  _images;
+  std::unordered_map<uint32_t, Bitmap> _bitmaps;
+  std::unordered_map<uint32_t, Image>  _upload_images;
+  std::vector<uint32_t>                _image_indexs;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                              Message Process
@@ -107,20 +118,20 @@ public:
     _msg_queue.send(std::move(msg));
   }
 
-  struct UploadImageInfo
+  struct Message_Upload_Image
   {
     Bitmap   bitmap;
-    HANDLE   event{};
     uint32_t index{};
   };
 
-  struct Message_Upload_Image
+  struct Message_Remove_Image
   {
-    UploadImageInfo* ptr{};
+    uint32_t index{};
   };
 
   using UIContextMessage = std::variant<
-    Message_Upload_Image
+    Message_Upload_Image,
+    Message_Remove_Image
   >;
 
   void send_message(UIContextMessage&& msg) noexcept
@@ -140,6 +151,7 @@ private:
   {
     Renderer& renderer;
     void operator()(Message_Upload_Image const& msg) const noexcept;
+    void operator()(Message_Remove_Image const& msg) const noexcept;
   };
   MessageQueue<Message, Renderer_Msg_Queue_Capacity>          _msg_queue;
   MessageQueue<UIContextMessage, Renderer_Msg_Queue_Capacity> _ui_ctx_msg_queue;

@@ -1,6 +1,8 @@
 #include "ui/ui.hpp"
 #include "ui_context.hpp"
 
+#include <stb_image.h>
+
 using namespace tk::renderer;
 
 namespace tk { namespace ui {
@@ -37,9 +39,16 @@ auto delta_time() noexcept -> double
   return g_ui_ctx.delta_time();
 }
 
-void image(std::string_view path, glm::vec2 pos) noexcept
+auto image_extent(std::string_view path) noexcept -> glm::vec2
 {
-  g_ui_ctx.image(path, pos);
+  int w, h, ch;
+  if (stbi_info(path.data(), &w, &h, &ch))  return { w, h };
+  return {};
+}
+
+void image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha) noexcept
+{
+  g_ui_ctx.image(path, left_top, right_bottom, alpha);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

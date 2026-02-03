@@ -135,7 +135,7 @@ public:
 
   auto access_move_invalid_areas(HWND handle) noexcept -> std::vector<RECT>&;
 
-  void image(std::string_view path, glm::vec2 pos) noexcept;
+  void image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha) noexcept;
 
 private:
   void preprocess_render() noexcept;
@@ -231,19 +231,6 @@ private:
 
 public:
   auto get_key(Key key) noexcept -> KeyState;
-
-  //
-  // image
-  //
-private:
-  struct ImageInfo
-  {
-    uint32_t width{};
-    uint32_t height{};
-    uint32_t channel{};
-    uint32_t index{};
-  };
-  std::unordered_map<std::string, ImageInfo> _images;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                              Message Process

@@ -1,11 +1,7 @@
 #include "image.hpp"
 #include "../core.hpp"
-#include "../renderer.hpp"
 #include "util/error_handling.hpp"
 #include "../../util/align.hpp"
-
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
 
 using namespace tk;
 using namespace tk::renderer;
@@ -72,55 +68,6 @@ auto byte_size_of(DXGI_FORMAT format) noexcept
 }
 
 namespace tk { namespace renderer {
-
-////////////////////////////////////////////////////////////////////////////////
-///                               Bitmap
-////////////////////////////////////////////////////////////////////////////////
-
-#if 0
-void Win32Bitmap::init(uint32_t width, uint32_t height) noexcept
-{
-  view.init(width, height, 4);
-
-  auto hdc_mem = CreateCompatibleDC(nullptr);
-  err_if(!hdc_mem, "failed to create compatible DC");
-  auto info = BITMAPINFO{};
-  info.bmiHeader.biSize     = sizeof(BITMAPINFOHEADER);
-  info.bmiHeader.biWidth    = width;
-  info.bmiHeader.biHeight   = -height;
-  info.bmiHeader.biPlanes   = 1;
-  info.bmiHeader.biBitCount = 32;
-  handle = CreateDIBSection(hdc_mem, &info, DIB_RGB_COLORS, reinterpret_cast<void**>(&view.data), nullptr, 0);
-  err_if(!handle, "failed to create DIBSection");
-  DeleteDC(hdc_mem);
-}
-
-void Win32Bitmap::destroy() const noexcept
-{
-  err_if(!DeleteObject(handle), "failed to destroy win32 bitmap");
-}
-
-void Bitmap::init(std::string_view filename) noexcept
-{
-  _use_stb = true;
-  _view.data = stbi_load(filename.data(), reinterpret_cast<int*>(&_view.width), reinterpret_cast<int*>(&_view.height), reinterpret_cast<int*>(&_view.channel), 4);
-  err_if(!_view.data, "failed to load image {}", filename);
-  _view.channel = 4;
-  _view.init(_view.width, _view.height, _view.channel);
-}
-
-void Bitmap::destroy() noexcept
-{
-  _use_stb
-    ? stbi_image_free(_view.data)
-    : free(_view.data);
-  _use_stb = false;
-}
-#endif
-
-////////////////////////////////////////////////////////////////////////////////
-///                                 Image
-////////////////////////////////////////////////////////////////////////////////
 
 auto dxgi_format(ImageFormat format) noexcept -> DXGI_FORMAT
 {
@@ -389,95 +336,5 @@ void copy(Bitmap const& src, Bitmap const& dst) noexcept
     dst_data += dst.row_pitch;
   }
 }
-
-#if 0
-////////////////////////////////////////////////////////////////////////////////
-///                        External Image Loaderer
-////////////////////////////////////////////////////////////////////////////////
-
-void ExternalImageLoader::load(std::string_view filename) noexcept
-{
-  err_if(_datas.contains(filename.data()), "Failed to load {}. It's already loaded", filename);
-  _datas[filename.data()].init(filename);
-}
-
-void ExternalImageLoader::remove(std::string_view filename) noexcept
-{
-  err_if(!_datas.contains(filename.data()), "Failed to remove {}. It's not exist", filename);
-  auto& data = _datas[filename.data()];
-  if (data.state == State::unuploaded) data.bitmap.destroy();
-  g_renderer.add_frame_render_complete_func([handle = data.handle] mutable { g_image_pool.free(handle); });
-  _datas.erase(filename.data());
-}
-
-void ExternalImageLoader::Data::init(std::string_view filename) noexcept
-{
-  bitmap.init(filename);
-  handle = g_image_pool.alloc();
-  g_image_pool[handle].init(ImageType::srv, ImageFormat::rgba8_unorm, bitmap.width(), bitmap.height());
-}
-
-void ExternalImageLoader::upload(ID3D12GraphicsCommandList1* cmd) noexcept
-{
-  auto unuploaded_datas = _datas
-    | std::views::values
-    | std::views::filter([](auto const& data) { return data.state == State::unuploaded; });
-  auto handles = unuploaded_datas
-    | std::views::transform([](auto const& data) { return data.handle; })
-    | std::ranges::to<std::vector<ImageHandle>>();
-  auto views = unuploaded_datas
-    | std::views::transform([](auto const& data) { return data.bitmap.view(); })
-    | std::ranges::to<std::vector<Bitmap>>();
-
-  _upload_buffer.add_images(handles, views);
-  _upload_buffer.upload(cmd);
-
-  auto unuploaded_data_filenames = _datas
-    | std::views::filter([](auto const& pair) { return pair.second.state == State::unuploaded; })
-    | std::views::keys
-    | std::ranges::to<std::vector<std::string>>();
-  g_renderer.add_frame_render_complete_func([unuploaded_data_filenames]
-  {
-    std::ranges::for_each(unuploaded_data_filenames, [](auto& filename)
-    {
-      g_external_image_loader.upload_finish(filename);
-    });
-  });
-
-  std::ranges::for_each(unuploaded_datas, [](auto& data)
-  {
-    data.bitmap.destroy();
-    data.state = State::uploading;
-  });
-}
-
-void ExternalImageLoader::destroy() noexcept
-{
-  std::ranges::for_each(_datas | std::views::values, [](auto& data)
-  {
-    if (data.state == State::unuploaded) data.bitmap.destroy();
-    g_image_pool.free(data.handle);
-  });
-  _datas.clear();
-}
-
-auto ExternalImageLoader::operator[](std::string_view filename) noexcept -> Image&
-{
-  err_if(!_datas.contains(filename.data()), "Failed to remove {}. It's not exist", filename);
-  return g_image_pool[_datas[filename.data()].handle];
-}
-
-void ExternalImageLoader::upload_finish(std::string_view filename) noexcept
-{
-  err_if(!_datas.contains(filename.data()), "Failed to remove {}. It's not exist", filename);
-  _datas[filename.data()].state = State::uploaded;
-}
-
-auto ExternalImageLoader::is_uploaded(std::string_view filename) const noexcept -> bool
-{
-  err_if(!_datas.contains(filename.data()), "Failed to remove {}. It's not exist", filename);
-  return _datas.at(filename.data()).state == State::uploaded;
-}
-#endif
 
 }}

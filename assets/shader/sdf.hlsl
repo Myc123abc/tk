@@ -68,10 +68,11 @@ struct ShapeProperty
 ///                              Binding
 ////////////////////////////////////////////////////////////////////////////////
 
-ConstantBuffer<Constants> constants : register(b0);
-SamplerState              g_sampler : register(s0);
-Texture2D                 images[]  : register(t0);
-ByteAddressBuffer         buffer    : register(t0, space1);
+ConstantBuffer<Constants> constants    : register(b0);
+SamplerState              g_sampler    : register(s0);
+Texture2D                 images[]     : register(t0);
+ByteAddressBuffer         buffer       : register(t0, space1);
+StructuredBuffer<uint>    image_indexs : register(t0, space2);
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                              Functions
@@ -258,7 +259,11 @@ float4 ps(PSParameter args) : SV_TARGET
   float4 color = args.color;
 
   if (shape_property.type == type_image)
-    return images[get_uint(offset)].Sample(g_sampler, args.uv);
+  {
+    color = images[NonUniformResourceIndex(image_indexs[get_uint(offset)])].Sample(g_sampler, args.uv);
+    color.a *= get_float(offset);
+    return color;
+  }
 
   float w = length(float2(ddx_fine(args.pos.x), ddy_fine(args.pos.y)));
   float d = get_sd(args.pos.xy, shape_property.type, offset);

@@ -1,8 +1,6 @@
 #pragma once
 
 #include "descriptor_heap_manager.hpp"
-#include "../../util/object_pool.hpp"
-#include "../config.hpp"
 
 #include <dxgi1_6.h>
 #include <directx/d3dx12.h>
@@ -69,50 +67,6 @@ struct Bitmap
     size          = row_pitch * height;
   }
 };
-
-#if 0
-class Bitmap
-{
-public:
-  auto data()            noexcept { return _view.data;      }
-  auto size()      const noexcept { return _view.size;      }
-  auto row_pitch() const noexcept { return _view.row_pitch; }
-  auto width()     const noexcept { return _view.width;     }
-  auto height()    const noexcept { return _view.height;    }
-  auto x()         const noexcept { return _view.x;         }
-  auto y()         const noexcept { return _view.y;         }
-  auto view()      const noexcept { return _view;           }
-
-  void set_pos(uint32_t x, uint32_t y) noexcept
-  {
-    _view.x = x;
-    _view.y = y;
-  }
-
-  void init(uint32_t width, uint32_t height, uint32_t channel) noexcept
-  {
-    _view.init(width, height, channel);
-    _view.data = malloc(width * height * channel);
-  }
-
-  void destroy() noexcept;
-
-  void init(std::string_view filename) noexcept;
-
-private:
-  Bitmap _view;
-  bool       _use_stb{};
-};
-
-struct Win32Bitmap
-{
-  HBITMAP    handle{};
-  Bitmap view{};
-
-  void init(uint32_t width, uint32_t height) noexcept;
-  void destroy() const noexcept;
-};
-#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                               Image
@@ -216,108 +170,5 @@ void copy(
   ID3D12Resource*             readback_buffer) noexcept;
 
 void copy(Bitmap const& src, Bitmap const& dst) noexcept;
-
-#if 0
-////////////////////////////////////////////////////////////////////////////////
-///                             Image Pool
-////////////////////////////////////////////////////////////////////////////////
-
-using ImagePoolType = ObjectPool<Image, Image_Pool_Init_Capacity>;
-using ImageHandle   = ImagePoolType::Handle;
-
-class ImagePool
-{
-private:
-  ImagePool()                            = default;
-  ~ImagePool()                           = default;
-public:
-  ImagePool(ImagePool const&)            = delete;
-  ImagePool(ImagePool&&)                 = delete;
-  ImagePool& operator=(ImagePool const&) = delete;
-  ImagePool& operator=(ImagePool&&)      = delete;
-
-  static auto const instance() noexcept
-  {
-    static ImagePool instance;
-    return &instance;
-  }
-
-  auto alloc() noexcept { return _image_pool.alloc(); }
-
-  auto operator[](ImageHandle handle) noexcept -> Image& { return *_image_pool.get(handle); }
-
-  void free(ImageHandle& handle) noexcept
-  {
-    operator[](handle).destroy();
-    _image_pool.free(handle);
-  }
-
-private:
-  ImagePoolType _image_pool;
-};
-
-inline static auto& g_image_pool{ *ImagePool::instance() };
-#endif
-#if 0
-////////////////////////////////////////////////////////////////////////////////
-///                        External Image Loaderer
-////////////////////////////////////////////////////////////////////////////////
-
-class ExternalImageLoader
-{
-private:
-  ExternalImageLoader()                                      = default;
-  ~ExternalImageLoader()                                     = default;
-public:
-  ExternalImageLoader(ExternalImageLoader const&)            = delete;
-  ExternalImageLoader(ExternalImageLoader&&)                 = delete;
-  ExternalImageLoader& operator=(ExternalImageLoader const&) = delete;
-  ExternalImageLoader& operator=(ExternalImageLoader&&)      = delete;
-
-  static auto const instance() noexcept
-  {
-    static ExternalImageLoader instance;
-    return &instance;
-  }
-
-  void load(std::string_view filename) noexcept;
-  void remove(std::string_view filename) noexcept;
-  void upload(ID3D12GraphicsCommandList1* cmd) noexcept;
-  void destroy() noexcept;
-
-  auto operator[](std::string_view filename) noexcept -> Image&;
-
-  auto contains(std::string_view filename) const noexcept { return _datas.contains(filename.data()); }
-
-  auto have_unuploaded_images() const noexcept
-  {
-    return std::ranges::any_of(_datas | std::views::values, [](auto const& data) { return data.state == State::unuploaded; });
-  }
-
-  void upload_finish(std::string_view filename) noexcept;
-
-  auto is_uploaded(std::string_view filename) const noexcept -> bool;
-
-private:
-  enum class State
-  {
-    unuploaded,
-    uploading,
-		uploaded,
-  };
-  struct Data
-  {
-    ImageHandle handle;
-    Bitmap      bitmap;
-    State       state;
-
-    void init(std::string_view filename) noexcept;
-  };
-  std::unordered_map<std::string, Data> _datas;
-  UploadBuffer                          _upload_buffer;
-};
-
-inline static auto& g_external_image_loader{ *ExternalImageLoader::instance() };
-#endif
 
 }}

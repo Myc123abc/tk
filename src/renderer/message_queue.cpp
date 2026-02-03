@@ -1,7 +1,4 @@
 #include "renderer.hpp"
-#include "engine/copy_engine.hpp"
-
-#include <stb_image.h>
 
 namespace tk { namespace renderer {
 
@@ -43,20 +40,31 @@ void Renderer::UIContextMessageHandler::operator()(Message_Upload_Image const& m
 {
   // create image resource
   auto image = Image{};
-  image.init(ImageType::srv, ImageFormat::rgba8_unorm, msg.ptr->bitmap.width, msg.ptr->bitmap.height);
-  msg.ptr->index = image.index();
-  renderer._images.emplace_back(std::move(image));
+  image.init(ImageType::srv, ImageFormat::rgba8_unorm, msg.bitmap.width, msg.bitmap.height);
 
-  // upload data to gpu
-  g_copy_engine.acquire_slot();
-  g_copy_engine.copy({ msg.ptr->bitmap }, { &renderer._images.back() });
-  auto _ = g_copy_engine.submit_slot();
+  // store image indexs
+  renderer._image_indexs.resize(msg.index + 1);
+  renderer._image_indexs.at(msg.index) = image.index();
 
-  // free bitmap data
-  stbi_image_free(msg.ptr->bitmap.data);
+  // store image and bitmap for upload
+  renderer._upload_images[msg.index] = image;
+  renderer._bitmaps[msg.index]       = msg.bitmap;
+}
 
-  // notify image create complete, can get index of descriptor now
-  SetEvent(msg.ptr->event);
+void Renderer::UIContextMessageHandler::operator()(Message_Remove_Image const& msg) const noexcept
+{
+  renderer._image_indexs.at(msg.index) = {};
+  if (renderer._upload_images.contains(msg.index))
+  {
+    assert(renderer._bitmaps.contains(msg.index));
+
+    // not upload yet, remove upload image
+    renderer._upload_images.erase(msg.index);
+    renderer._bitmaps.erase(msg.index);
+  }
+  else
+    // already uploaded, release image resource
+    renderer._images.at(msg.index).destroy();
 }
 
 }}

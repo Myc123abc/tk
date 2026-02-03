@@ -107,12 +107,13 @@ void FrameBuffer::init() noexcept
 {
   _vertices_indices_buffer.init(Vertices_Indices_Buffer_Size, false);
   _shape_properties_buffer.init(Shape_Properties_Buffer_Size, true);
+  _image_indexs.init(Image_Indexs_Buffer_Size, true);
 }
 
-void FrameBuffer::upload(ID3D12GraphicsCommandList1* cmd, std::span<Vertex const> vertices, std::span<uint16_t const> indices, std::span<ShapeProperty const> shape_properties) noexcept
+void FrameBuffer::upload(ID3D12GraphicsCommandList1* cmd, RenderData* data) noexcept
 {
-  auto vertices_offset = _vertices_indices_buffer.append_range(vertices);
-  auto indices_offset  = _vertices_indices_buffer.append_range(indices);
+  auto vertices_offset = _vertices_indices_buffer.append_range(data->vertices);
+  auto indices_offset  = _vertices_indices_buffer.append_range(data->indices);
 
   // get current buffer gpu address
   auto address = _vertices_indices_buffer.gpu_address();
@@ -135,8 +136,11 @@ void FrameBuffer::upload(ID3D12GraphicsCommandList1* cmd, std::span<Vertex const
   cmd->IASetIndexBuffer(&index_buffer_view);
 
   // shape properties
-  for (auto const& shape_property : shape_properties)
+  for (auto const& shape_property : data->shape_properties)
     _shape_properties_buffer.append(shape_property.data(), shape_property.byte_size());
+
+  // image indexs
+  _image_indexs.append_range(g_renderer.get_image_indexs());
 }
 
 }}
