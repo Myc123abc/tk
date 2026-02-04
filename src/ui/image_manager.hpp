@@ -1,8 +1,12 @@
 #pragma once
 
+#include "../renderer/resource/image.hpp"
+#include "../util/object_pool.hpp"
+#include "config.hpp"
+
 #include <string>
 #include <unordered_map>
-#include <queue>
+#include <unordered_set>
 
 namespace tk { namespace ui {
 
@@ -10,8 +14,6 @@ struct ImageInfo
 {
   uint32_t width{};
   uint32_t height{};
-  uint32_t index{};
-  uint32_t channel{};
 };
 
 class ImageManager
@@ -31,23 +33,28 @@ public:
     return instance;
   }
 
-  void load(std::string_view path) noexcept;
+  void destroy() noexcept;
 
+private:
+  using PoolType    = ObjectPool<ImageInfo, Image_Pool_Init_Capacity>;
+public:
+  using ImageHandle = PoolType::Handle;
+
+  auto create_image(uint32_t width, uint32_t height, renderer::ImageFormat format) noexcept -> ImageHandle;
+  void destroy_image(ImageHandle handle) noexcept;
+
+  void load(std::string_view path) noexcept;
   // TODO: only call when images so much even exceed gpu memory
   void unload(std::string_view path) noexcept;
 
-  auto contains(std::string_view path) const noexcept { return _slot_indexs.contains(path.data()); }
+  auto contains(std::string_view path) const noexcept { return _loaded_images.contains(path.data()); }
 
-  auto at(std::string_view path) const noexcept -> ImageInfo const& { return _slots.at(_slot_indexs.at(path.data())).info; }
+  auto index(std::string_view path) const noexcept { return _loaded_images.at(path.data()).index(); }
 
 private:
-  struct Slot
-  {
-    ImageInfo info;
-  };
-  std::vector<Slot>                         _slots;
-  std::unordered_map<std::string, uint32_t> _slot_indexs;
-  std::queue<uint32_t>                      _free_slots;
+  PoolType _pool;
+  std::unordered_map<std::string, ImageHandle>       _loaded_images;
+  std::unordered_set<ImageHandle, ImageHandle::Hash> _images;
 };
 
 inline static auto& g_img_mgr{ ImageManager::instance() };

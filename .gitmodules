@@ -13,3 +13,12 @@
 [submodule "vendor/SPSCQueue"]
 	path = vendor/SPSCQueue
 	url = https://github.com/rigtorp/SPSCQueue.git
+[submodule "vendor/freetype"]
+	path = vendor/freetype
+	url = https://gitlab.freedesktop.org/freetype/freetype.git
+[submodule "vendor/harfbuzz"]
+	path = vendor/harfbuzz
+	url = https://github.com/harfbuzz/harfbuzz.git
+[submodule "vendor/libunibreak"]
+	path = vendor/libunibreak
+	url = https://github.com/adah1972/libunibreak.git

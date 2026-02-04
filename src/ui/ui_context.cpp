@@ -4,6 +4,7 @@
 #include "../renderer/renderer.hpp"
 #include "../util/hash.hpp"
 #include "image_manager.hpp"
+#include "text_engine.hpp"
 
 using namespace tk::renderer;
 
@@ -70,10 +71,13 @@ auto Window::access_move_invliad_areas() noexcept -> std::vector<RECT>&
 void UIContext::init() noexcept
 {
   _fullscreen_window.snap = g_wnd_mgr.create_fullscreen_window();
+  g_text_engine.init();
 }
 
 void UIContext::destroy() noexcept
 {
+  g_text_engine.destroy();
+  g_img_mgr.destroy();
   close_window();
   g_wnd_mgr.close_fullscreen_window();
 }
@@ -648,8 +652,35 @@ void UIContext::image(std::string_view path, glm::vec2 left_top, glm::vec2 right
   left_top     += offset;
   right_bottom += offset;
   add_shape(ShapeProperty::Type::image, {}, {},
-    { std::bit_cast<float>(g_img_mgr.at(path).index), static_cast<float>(alpha) / 0xff },
+    { std::bit_cast<float>(g_img_mgr.index(path)), static_cast<float>(alpha) / 0xff },
     { left_top, right_bottom });
+}
+
+auto UIContext::text(std::string_view text, glm::vec2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> glm::vec2
+{
+  if (text.empty()) return {};
+
+  check_draw();
+  check_path_not_draw();
+  check_union_not_draw();
+
+  auto res = g_text_engine.parse(text);
+
+  // text use single glyph shape property and multiple glyph boxs which share the shape property
+  auto values = std::vector<float>{};
+  values.emplace_back(res.glyph_atlas_index);
+  values.emplace_back(inner_color.r);
+  values.emplace_back(inner_color.g);
+  values.emplace_back(inner_color.b);
+  values.emplace_back(inner_color.a);
+  values.emplace_back(outer_color.r);
+  values.emplace_back(outer_color.g);
+  values.emplace_back(outer_color.b);
+  values.emplace_back(outer_color.a);
+  values.emplace_back(.05f); // outline width, TODO: can be set by user
+  add_shape_property(ShapeProperty::Type::glyph, {}, {}, values);
+
+  return res.extent;
 }
 
 }}

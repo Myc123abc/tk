@@ -51,7 +51,18 @@ void Renderer::UIContextMessageHandler::operator()(Message_Upload_Image const& m
   renderer._bitmaps[msg.index]       = msg.bitmap;
 }
 
-void Renderer::UIContextMessageHandler::operator()(Message_Remove_Image const& msg) const noexcept
+void Renderer::UIContextMessageHandler::operator()(Message_Create_Image const& msg) const noexcept
+{
+  // create image resource
+  auto image = Image{};
+  image.init(ImageType::srv, msg.format, msg.width, msg.height);
+
+  // store image indexs
+  renderer._image_indexs.resize(msg.index + 1);
+  renderer._image_indexs.at(msg.index) = image.index();
+}
+
+void Renderer::UIContextMessageHandler::operator()(Message_Destroy_Image const& msg) const noexcept
 {
   renderer._image_indexs.at(msg.index) = {};
   if (renderer._upload_images.contains(msg.index))

@@ -9,61 +9,72 @@ using namespace tk::renderer;
 
 namespace tk { namespace ui {
 
+void ImageManager::destroy() noexcept
+{
+  for (auto handle : _loaded_images | std::views::values) _pool.free(handle);
+  for (auto handle : _images) _pool.free(handle);
+}
+
+auto ImageManager::create_image(uint32_t width, uint32_t height, ImageFormat format) noexcept -> ImageHandle
+{
+  auto handle = _pool.alloc();
+  _images.emplace(handle);
+  auto& info = _pool[handle];
+  info.width  = width;
+  info.height = height;
+  g_renderer.send_message(Renderer::Message_Create_Image{ width, height, format, handle.index() });
+  return handle;
+}
+
+void ImageManager::destroy_image(ImageHandle handle) noexcept
+{
+  assert(_images.contains(handle));
+
+  // remove image resource by index
+  g_renderer.send_message(Renderer::Message_Destroy_Image{ handle.index() });
+
+  // remove image
+  _images.erase(handle);
+
+  // release image handle
+  _pool.free(handle);
+}
+
 void ImageManager::load(std::string_view path) noexcept
 {
-  assert(!_slot_indexs.contains(path.data()));
+  assert(!_loaded_images.contains(path.data()));
+
+  auto handle = _pool.alloc();
+  _loaded_images.emplace(path, handle);
+
+  auto& info = _pool[handle];
 
   // load bitmap
-  int  w, h, ch;
-  auto data = stbi_load(path.data(), &w, &h, &ch, 4);
+  auto data = stbi_load(path.data(), reinterpret_cast<int*>(&info.width), reinterpret_cast<int*>(&info.height), nullptr, 4);
   err_if(!data, "not found image {}", path);
 
-  // check whether have free slot
-  if (!_free_slots.empty())
-  {
-    // pop free slot
-    auto idx = _free_slots.front();
-    _slot_indexs.emplace(path, idx);
-    _free_slots.pop();
-
-    // set image info
-    auto& slot = _slots.at(idx);
-    slot.info.width   = w;
-    slot.info.height  = h;
-    slot.info.channel = ch;
-
-     // send message to renderer
-    auto msg = Renderer::Message_Upload_Image{};
-    msg.bitmap.init(w, h, 4, data);
-    msg.index = idx;
-    g_renderer.send_message(std::move(msg));
-    return;
-  }
-
-  // send message to renderer
+   // send message to renderer
   auto msg = Renderer::Message_Upload_Image{};
-  msg.bitmap.init(w, h, 4, data);
-  msg.index = _slots.size();
+  msg.bitmap.init(info.width, info.height, 4, data);
+  msg.index = handle.index();
   g_renderer.send_message(std::move(msg));
-
-  // create slot
-  auto slot = Slot{};
-  slot.info.index   = _slots.size();
-  slot.info.width   = w;
-  slot.info.height  = h;
-  slot.info.channel = ch;
-  _slot_indexs.emplace(path, slot.info.index);
-  _slots.emplace_back(std::move(slot));
 }
 
 void ImageManager::unload(std::string_view path) noexcept
 {
-  assert(_slot_indexs.contains(path.data()));
-  auto idx = _slot_indexs.at(path.data());
-  _free_slots.push(idx);
-  _slot_indexs.erase(path.data());
+  assert(_loaded_images.contains(path.data()));
 
-  g_renderer.send_message(Renderer::Message_Remove_Image{ idx });
+  // get image handle
+  auto handle = _loaded_images.at(path.data());
+
+  // remove image resource by index
+  g_renderer.send_message(Renderer::Message_Destroy_Image{ handle.index() });
+
+  // remove image record
+  _loaded_images.erase(path.data());
+
+  // release image handle
+  _pool.free(handle);
 }
 
 }}

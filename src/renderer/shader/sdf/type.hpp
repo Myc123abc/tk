@@ -33,7 +33,8 @@ struct ShapeProperty
     path_line,
     path_bezier,
 
-    image
+    image,
+    glyph,
   };
 
   enum class Operator : uint32_t

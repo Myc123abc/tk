@@ -96,6 +96,36 @@ auto image_extent(std::string_view path) noexcept -> glm::vec2;
  */
 void image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha = 0xff) noexcept;
 
+enum class FontStyle
+{
+  regular,
+  italic,
+  bold,
+  italic_bold,
+};
+
+/**
+ * draw text
+ * @param text
+ * @param pos left top of text
+ * @param size
+ * @param color
+ * @param style regular(default), italic, bold, italic_bold
+ * @return extent of text
+ */
+auto text(std::string_view text, glm::vec2 pos, float size, Color color, FontStyle style = {}) noexcept -> glm::vec2;
+
+/**
+ * draw text
+ * @param text
+ * @param pos left top of text
+ * @param size
+ * @param inner_color
+ * @param outer_color alpha not 0 then draw outline
+ * @return extent of text
+ */
+auto text(std::string_view text, glm::vec2 pos, float size, Color inner_color, Color outer_color) noexcept -> glm::vec2;
+
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Window
 ////////////////////////////////////////////////////////////////////////////////

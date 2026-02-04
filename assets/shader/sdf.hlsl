@@ -11,10 +11,10 @@ struct Vertex
 
 struct PSParameter
 {
-  float4   pos           : SV_POSITION;
-  float2   uv            : TEXCOORD;
-  float4   color         : COLOR;
-  uint32_t buffer_offset : BUFFER_OFFSET;
+  float4 pos : SV_POSITION;
+  float2 uv  : TEXCOORD;
+  nointerpolation float4   color         : COLOR;
+  nointerpolation uint32_t buffer_offset : BUFFER_OFFSET;
 };
 
 struct Constants
@@ -35,7 +35,8 @@ enum : uint32_t
   type_path_line,
   type_path_bezier,
 
-  type_image
+  type_image,
+  type_glyph
 };
 
 enum : uint32_t
@@ -68,11 +69,11 @@ struct ShapeProperty
 ///                              Binding
 ////////////////////////////////////////////////////////////////////////////////
 
-ConstantBuffer<Constants> constants    : register(b0);
-SamplerState              g_sampler    : register(s0);
-Texture2D                 images[]     : register(t0);
-ByteAddressBuffer         buffer       : register(t0, space1);
-StructuredBuffer<uint>    image_indexs : register(t0, space2);
+ConstantBuffer<Constants> constants       : register(b0);
+SamplerState              g_sampler       : register(s0);
+ByteAddressBuffer         buffer          : register(t0);
+Texture2D                 images[]        : register(t0, space1);
+StructuredBuffer<uint>    image_indexs    : register(t0, space2);
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                              Functions
@@ -103,6 +104,13 @@ uint32_t get_uint(inout uint32_t offset)
 {
   uint32_t res = buffer.Load<uint32_t>(offset);
   offset += sizeof(uint32_t);
+  return res;
+}
+
+float4 get_float4(inout uint32_t offset)
+{
+  float4 res = buffer.Load<float4>(offset);
+  offset += sizeof(float4);
   return res;
 }
 
@@ -262,6 +270,35 @@ float4 ps(PSParameter args) : SV_TARGET
   {
     color = images[NonUniformResourceIndex(image_indexs[get_uint(offset)])].Sample(g_sampler, args.uv);
     color.a *= get_float(offset);
+    return color;
+  }
+
+  if (shape_property.type == type_glyph)
+  {
+    // reference: https://computergraphics.stackexchange.com/questions/306/sharp-corners-with-signed-distance-fields-fonts
+    // author: Detheroc
+    float d = images[NonUniformResourceIndex(image_indexs[get_uint(offset)])].Sample(g_sampler, args.uv).r - 0.5;
+    float w = fwidth(d);
+    float inner_alpha = clamp(d / w + 0.5, 0.0, 1.0);
+
+    float4 inner_color = get_float4(offset);
+    float4 outer_color = get_float4(offset);
+
+    if (outer_color.a == 0.0)
+      color = float4(inner_color.rgb, inner_color.a * inner_alpha);
+    else
+    {
+      // reference: https://www.redblobgames.com/x/2404-distance-field-effects/
+      float outline_width = get_float(offset);
+      float outer_alpha   = clamp((d + outline_width) / w + 0.5, 0.0, 1.0);
+
+      if (inner_color.a == 0)
+        inner_color = float4(0.0, 0.0, 0.0, 0.0);
+      else
+        inner_color *= inner_alpha;
+
+      color = inner_color + (outer_color * (outer_alpha - inner_alpha));
+    }
     return color;
   }
 

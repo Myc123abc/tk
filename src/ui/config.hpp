@@ -11,4 +11,6 @@ constexpr auto Title_Bar_Button_Icon_Height = 10;
 
 constexpr auto Key_Repeate_Start_Duration = 400'000;
 
+constexpr auto Image_Pool_Init_Capacity = 32;
+
 }}

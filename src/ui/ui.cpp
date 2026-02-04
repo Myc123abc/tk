@@ -51,6 +51,16 @@ void image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, ui
   g_ui_ctx.image(path, left_top, right_bottom, alpha);
 }
 
+auto text(std::string_view text, glm::vec2 pos, float size, Color color, FontStyle style) noexcept -> glm::vec2
+{
+  return g_ui_ctx.text(text, pos, size, color, style, {});
+}
+
+auto text(std::string_view text, glm::vec2 pos, float size, Color inner_color, Color outer_color) noexcept -> glm::vec2
+{
+  return g_ui_ctx.text(text, pos, size, inner_color, {}, outer_color);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Window
 ////////////////////////////////////////////////////////////////////////////////

@@ -136,6 +136,7 @@ public:
   auto access_move_invalid_areas(HWND handle) noexcept -> std::vector<RECT>&;
 
   void image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha) noexcept;
+  auto text(std::string_view text, glm::vec2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> glm::vec2;
 
 private:
   void preprocess_render() noexcept;

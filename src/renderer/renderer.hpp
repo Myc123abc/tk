@@ -124,14 +124,23 @@ public:
     uint32_t index{};
   };
 
-  struct Message_Remove_Image
+  struct Message_Create_Image
+  {
+    uint32_t    width{};
+    uint32_t    height{};
+    ImageFormat format{};
+    uint32_t    index{};
+  };
+
+  struct Message_Destroy_Image
   {
     uint32_t index{};
   };
 
   using UIContextMessage = std::variant<
     Message_Upload_Image,
-    Message_Remove_Image
+    Message_Create_Image,
+    Message_Destroy_Image
   >;
 
   void send_message(UIContextMessage&& msg) noexcept
@@ -144,14 +153,15 @@ private:
   {
     Renderer& renderer;
     void operator()(Message_Window_Create const& msg) const noexcept;
-    void operator()(Message_Window_Destroy const& msg) const noexcept;
     void operator()(Message_Window_Update const& msg) const noexcept;
+    void operator()(Message_Window_Destroy const& msg) const noexcept;
   };
   struct UIContextMessageHandler
   {
     Renderer& renderer;
     void operator()(Message_Upload_Image const& msg) const noexcept;
-    void operator()(Message_Remove_Image const& msg) const noexcept;
+    void operator()(Message_Destroy_Image const& msg) const noexcept;
+    void operator()(Message_Create_Image const& msg) const noexcept;
   };
   MessageQueue<Message, Renderer_Msg_Queue_Capacity>          _msg_queue;
   MessageQueue<UIContextMessage, Renderer_Msg_Queue_Capacity> _ui_ctx_msg_queue;

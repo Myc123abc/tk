@@ -1,7 +1,5 @@
 #include "tk/tk.hpp"
 
-#include <windows.h>
-
 using namespace tk;
 
 using Vec2 = glm::vec2;
@@ -114,6 +112,12 @@ int main()
   auto progress_lerpolator = ui::Lerpolator{};
   progress_lerpolator.init(1'000'000);
 
+  auto loop_trigger = ui::LoopTrigger{};
+  loop_trigger.init(1'000'000, true);
+
+  auto circle_lerplocator = ui::Lerpolator{};
+  circle_lerplocator.init(250'000, ui::Lerpolator::Mode::loop);
+
   auto wnd1_is_closed = false;
   auto wnd2_is_closed = false;
   while (!wnd1_is_closed || !wnd2_is_closed)
@@ -128,7 +132,7 @@ int main()
       auto size = ui::window_drawable_extent();
       ui::triangle({ size.x / 2, 0 }, size, { 0, size.y }, 0x00ff004f, 10);
       if (ui::button("btn1", 0, 0, 100, 100, 0x00ff00ff, 0x0000ffff))
-        info("click 11");
+        circle_lerplocator.reverse();
       if (ui::button("btn2", 50, 50, 100, 100, 0x00ff00ff, 0x0000ffff))
         wnd2_is_closed = false;
       ui::add_move_invalid_area({}, { 150, 150 });
@@ -151,7 +155,7 @@ int main()
       if (playback_btn(p0, p1, p2, 0xffffffff, 0xdcdcdcff, 1))
         if (progress_lerpolator.is_not_started()) progress_lerpolator.start();
 
-      if (!playback_btn.is_paused()) progress_lerpolator.update(ui::delta_time());
+      if (!playback_btn.is_paused()) progress_lerpolator.update();
       if (progress_lerpolator.is_finished())
       {
         progress_lerpolator.reset();
@@ -176,20 +180,22 @@ int main()
       ui::rectangle(p, p + Vec2{ progress, 3 }, 0x0000ffff);
 
       // image
-      auto img_ext = ui::image_extent("assets/image/test.png");
-      ui::image("assets/image/test.png", p2, p2 + Vec2{ img_ext.x / 4, img_ext.y / 4 });
+      if (loop_trigger)
+      {
+        auto img_ext = ui::image_extent("assets/image/test.png");
+        ui::image("assets/image/test.png", p2, p2 + Vec2{ img_ext.x / 4, img_ext.y / 4 });
+      }
+      loop_trigger.update();
       ui::image("assets/image/test.jpg", {}, wnd_ext, 0x44);
 
       // circle point
-      static auto dur  = 0;
-      static auto time = 250;
-      static auto target_value = 360;
-      
-      dur = (dur + static_cast<int>(ui::delta_time() / 1000)) % time; // to ms
-      auto theta = static_cast<double>(dur) / time * target_value;
-
       auto size = ui::window_drawable_extent();
-      ui::circle(point_on_circle({ size.x - 30, size.y - 30}, 20, theta), 3, 0xffffffff);
+      ui::circle(point_on_circle({ size.x - 30, size.y - 30}, 20, circle_lerplocator.get() * 360), 3, 0xffffffff);
+      circle_lerplocator.update();
+
+      auto text_pos = p2 + Vec2{ 0, 10 };
+      auto text_ext = ui::text("Hello, World!", text_pos, 32, 0xffff00ff);
+      ui::rectangle(text_pos, text_ext, 0x00ff00ff, 1);
 
       ui::end();
     }
