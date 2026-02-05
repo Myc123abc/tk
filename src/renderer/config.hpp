@@ -18,9 +18,8 @@ constexpr auto Window_Y_Pos_Moving_From_Maximize = 10;
 
 constexpr auto Enable_Depth_Test = false;
 
-constexpr auto Image_Pool_Init_Capacity            = 32;
-constexpr auto RenderData_Pool_Init_Capacity       = 32;
-constexpr auto Copy_Engine_Slot_Pool_Init_Capacity = 32;
+constexpr auto Image_Pool_Init_Capacity      = 32;
+constexpr auto RenderData_Pool_Init_Capacity = 32;
 
 constexpr auto Renderer_Msg_Queue_Capacity = 16;
 constexpr auto Render_Data_Queue_Capacity  = 32;

@@ -61,8 +61,6 @@ void CopyEngine::init() noexcept
 void CopyEngine::destroy() noexcept
 {
   Engine::destroy();
-  for (auto slot : _slots)
-    _slot_pool.free(slot);
 }
 
 auto CopyEngine::Slot::is_idle() const noexcept -> bool
@@ -70,42 +68,38 @@ auto CopyEngine::Slot::is_idle() const noexcept -> bool
   return g_copy_engine.fence_completed_value() >= fence_value;
 }
 
-auto CopyEngine::create_slot() noexcept -> SlotHandle
+CopyEngine::Slot::Slot() noexcept
 {
-  auto handle = _slot_pool.alloc();
-  _slot_pool[handle].cmd_alloc = g_core.create_cmd_alloc(D3D12_COMMAND_LIST_TYPE_COPY);
-  return handle;
+  cmd_alloc = g_core.create_cmd_alloc(D3D12_COMMAND_LIST_TYPE_COPY);
 }
 
 void CopyEngine::acquire_slot() noexcept
 {
-  if (auto it = std::ranges::find_if(_slots, [this](auto slot) { return _slot_pool[slot].is_idle(); });
+  if (auto it = std::ranges::find_if(_slots, [this](auto slot) { return slot.is_idle(); });
       it != _slots.end())
   {
-    _slot = *it;
+    _slot = &*it;
   }
   else
   {
-    _slots.emplace_back(create_slot());
-    _slot = _slots.back();
+    _slots.emplace_back(Slot{});
+    _slot = &_slots.back();
   }
 }
 
 void CopyEngine::copy(std::vector<Bitmap> const& bitmaps, std::vector<Image*> const& images) noexcept
 {
-  auto& slot = _slot_pool[_slot];
-  assert(slot.is_idle());
-  slot.upload_buffer.add_images(images, bitmaps);
+  assert(_slot && _slot->is_idle());
+  _slot->upload_buffer.add_images(images, bitmaps);
 }
 
 auto CopyEngine::submit_slot() noexcept -> uint64_t
 {
-  auto& slot = _slot_pool[_slot];
-  assert(slot.is_idle());
-  reset_cmd(slot.cmd_alloc.Get());
-  slot.upload_buffer.upload(cmd());
-  slot.fence_value = submit(); 
-  return slot.fence_value;
+  assert(_slot && _slot->is_idle());
+  reset_cmd(_slot->cmd_alloc.Get());
+  _slot->upload_buffer.upload(cmd());
+  _slot->fence_value = submit(); 
+  return _slot->fence_value;
 }
 
 }}

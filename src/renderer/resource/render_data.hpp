@@ -28,12 +28,9 @@ struct RenderData
     scissor_rect        = {};
   }
 
-  auto empty() const noexcept { return vertices.empty(); }
   void wait() noexcept { sem.acquire(); }
 };
 
-using RenderDataPoolType = ObjectPool<RenderData, RenderData_Pool_Init_Capacity>;
-using RenderDataHandle   = RenderDataPoolType::Handle;
 class RenderDataPool
 {
 private:
@@ -53,13 +50,20 @@ public:
 
   auto alloc() noexcept { return _pool.alloc(); }
 
+private:
+  using PoolType = ObjectPool<RenderData, RenderData_Pool_Init_Capacity>;
+public:
+  using RenderDataHandle = PoolType::Handle;
+
   auto& operator[](RenderDataHandle handle) noexcept { return *_pool.get(handle); }
 
   void free(RenderDataHandle& handle) noexcept { _pool.free(handle); }
 
 private:
-  RenderDataPoolType _pool;
+  PoolType _pool;
 };
+
+using RenderDataHandle = RenderDataPool::RenderDataHandle;
 
 inline static auto& g_render_data_pool{ *RenderDataPool::instance() };
 

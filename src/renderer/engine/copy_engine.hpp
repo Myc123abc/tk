@@ -1,8 +1,6 @@
 #pragma once
 
 #include "engine.hpp"
-#include "../config.hpp"
-#include "../../util/object_pool.hpp"
 #include "../resource/image.hpp"
 #include "../resource/buffer.hpp"
 
@@ -53,17 +51,11 @@ private:
 
     auto is_idle() const noexcept -> bool;
 
-    Slot() noexcept = default;
+    Slot() noexcept;
   };
 
-  using SlotPoolType = ObjectPool<Slot, Copy_Engine_Slot_Pool_Init_Capacity>;
-  using SlotHandle   = SlotPoolType::Handle;
-
-  auto create_slot() noexcept -> SlotHandle;
-
-  SlotPoolType            _slot_pool;
-  std::vector<SlotHandle> _slots;
-  SlotHandle              _slot{};
+  std::vector<Slot> _slots;
+  Slot*             _slot{};
 };
 
 inline static auto& g_copy_engine{ CopyEngine::instance() };
