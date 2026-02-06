@@ -15,50 +15,54 @@ requires (BlockCapacity > 0)                                     &&
          (BlockCapacity <= std::numeric_limits<uint16_t>::max()) &&
          std::is_nothrow_constructible_v<T>                      &&
          std::is_nothrow_destructible_v<T>
+class ObjectPool;
+
+template <typename T, uint16_t BlockCapacity>
+class [[nodiscard]] ObjectPoolHandle
+{
+  friend class ObjectPool<T, BlockCapacity>;
+  friend struct std::hash<ObjectPoolHandle>;
+
+public:
+  constexpr ObjectPoolHandle() noexcept = default;
+
+  constexpr auto valid() const noexcept { return _generation != 0; }
+
+  constexpr explicit operator bool() const noexcept { return valid(); }
+
+  constexpr bool operator==(ObjectPoolHandle const&) const noexcept = default;
+
+  constexpr auto index() const noexcept -> uint32_t
+  {
+    return _block_idx * BlockCapacity + _slot_idx;
+  }
+
+private:
+  constexpr ObjectPoolHandle(uint16_t block_idx, uint16_t slot_idx, uint32_t generation) noexcept
+    : _block_idx(block_idx), _slot_idx(slot_idx), _generation(generation) {}
+
+  constexpr auto pack() const noexcept
+  {
+    return static_cast<uint64_t>(_generation) << 32 |
+           static_cast<uint64_t>(_slot_idx)   << 16 |
+           static_cast<uint64_t>(_block_idx);
+  }
+
+private:
+  uint16_t _block_idx{};
+  uint16_t _slot_idx{};
+  uint32_t _generation{};
+};
+
+template <typename T, uint16_t BlockCapacity>
+requires (BlockCapacity > 0)                                     &&
+         (BlockCapacity <= std::numeric_limits<uint16_t>::max()) &&
+         std::is_nothrow_constructible_v<T>                      &&
+         std::is_nothrow_destructible_v<T>
 class ObjectPool
 {
 public:
-  class [[nodiscard]] Handle
-  {
-    friend class ObjectPool;
-  public:
-    constexpr Handle() noexcept = default;
-
-    constexpr auto valid() const noexcept { return _generation != 0; }
-
-    constexpr explicit operator bool() const noexcept { return valid(); }
-
-    constexpr bool operator==(Handle const&) const noexcept = default;
-
-    struct Hash
-    {
-      auto operator()(Handle h) const noexcept
-      {
-        return std::hash<uint64_t >{}(h.pack());
-      };
-    };
-
-    constexpr auto index() const noexcept -> uint32_t
-    {
-      return _block_idx * BlockCapacity + _slot_idx;
-    }
-
-  private:
-    constexpr Handle(uint16_t block_idx, uint16_t slot_idx, uint32_t generation) noexcept
-      : _block_idx(block_idx), _slot_idx(slot_idx), _generation(generation) {}
-
-    constexpr auto pack() const noexcept
-    {
-      return static_cast<uint64_t>(_generation) << 32 |
-             static_cast<uint64_t>(_slot_idx)  << 16 |
-             static_cast<uint64_t>(_block_idx);
-    }
-
-  private:
-    uint16_t _block_idx{};
-    uint16_t _slot_idx{};
-    uint32_t _generation{};
-  };
+  using Handle = ObjectPoolHandle<T, BlockCapacity>;
 
   ObjectPool() noexcept
   {
@@ -174,6 +178,19 @@ private:
   std::vector<FreeSlot>               _free_list;
   uint16_t                            _block_idx{};
   uint16_t                            _slot_idx{};
+};
+
+}
+
+namespace std {
+
+template <typename T, uint16_t BlockCapacity>
+struct hash<tk::ObjectPoolHandle<T, BlockCapacity>>
+{
+  auto operator()(tk::ObjectPoolHandle<T, BlockCapacity> const& h) const noexcept -> size_t
+  {
+    return std::hash<uint64_t>{}(h.pack());
+  }
 };
 
 }

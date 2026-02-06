@@ -23,8 +23,13 @@ if (NOT "${CMAKE_GENERATOR}" MATCHES "Visual Studio")
   file(WRITE vendor/freetype/src/base/ftver.rc "")
 endif()
 
-file(GLOB_RECURSE SRC src/*.cpp)
-add_library(tk ${SRC})
+# build libunibreak
+file(GLOB_RECURSE LIBUNIBREAK_SRC vendor/libunibreak/src/*.c)
+add_library(libunibreak STATIC ${LIBUNIBREAK_SRC})
+target_include_directories(libunibreak PUBLIC vendor/libunibreak/src)
+
+file(GLOB_RECURSE TK_SRC src/*.cpp)
+add_library(tk ${TK_SRC})
 target_compile_definitions(tk
   PRIVATE
     WIN32_LEAN_AND_MEAN
@@ -48,6 +53,7 @@ target_link_libraries(tk
     DirectX-Headers
     SPSCQueue
     harfbuzz
+    libunibreak
 )
 
 add_executable(test test/main.cpp)

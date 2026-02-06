@@ -20,14 +20,6 @@ void Renderer::MessageHandler::operator()(Message_Window_Destroy const& msg) con
   });
   renderer._res.erase(msg.handle);
   renderer._destroied_windows.emplace(msg.handle);
-
-  // free render data
-  if (msg.ptr)
-  {
-    for (auto i : std::views::iota(0, Frame_Count))
-      g_render_data_pool.free(*(msg.ptr + i));
-    free(msg.ptr);
-  }
 }
 
 void Renderer::MessageHandler::operator()(Message_Window_Update const& msg) const noexcept
@@ -60,6 +52,9 @@ void Renderer::UIContextMessageHandler::operator()(Message_Create_Image const& m
   // store image indexs
   renderer._image_indexs.resize(msg.index + 1);
   renderer._image_indexs.at(msg.index) = image.index();
+
+  assert(!renderer._images.contains(msg.index));
+  renderer._images.emplace(msg.index, std::move(image));
 }
 
 void Renderer::UIContextMessageHandler::operator()(Message_Destroy_Image const& msg) const noexcept
@@ -74,8 +69,11 @@ void Renderer::UIContextMessageHandler::operator()(Message_Destroy_Image const& 
     renderer._bitmaps.erase(msg.index);
   }
   else
+  {
     // already uploaded, release image resource
     renderer._images.at(msg.index).destroy();
+    renderer._images.erase(msg.index);
+  }
 }
 
 }}

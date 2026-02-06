@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../resource/render_data.hpp"
+#include "../config.hpp"
 
 #include <glm/glm.hpp>
 
@@ -45,7 +45,7 @@ public:
 
   void init(int x, int y, uint32_t width, uint32_t height) noexcept;
   void init_auxiliary(int x, int y, uint32_t width, uint32_t height) noexcept;
-  void destroy(RenderDataHandle* ptr) const noexcept;
+  void destroy() const noexcept;
 
   void monitor_change() noexcept;
 

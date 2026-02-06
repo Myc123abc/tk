@@ -1,5 +1,6 @@
 #include "ui/ui.hpp"
 #include "ui_context.hpp"
+#include "text_engine.hpp"
 
 #include <stb_image.h>
 
@@ -49,6 +50,11 @@ auto image_extent(std::string_view path) noexcept -> glm::vec2
 void image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha) noexcept
 {
   g_ui_ctx.image(path, left_top, right_bottom, alpha);
+}
+
+void load_font(std::string_view path) noexcept
+{
+  g_text_engine.load_font(path);
 }
 
 auto text(std::string_view text, glm::vec2 pos, float size, Color color, FontStyle style) noexcept -> glm::vec2

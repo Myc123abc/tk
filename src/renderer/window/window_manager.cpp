@@ -289,12 +289,9 @@ auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height)
   return snap;
 }
 
-void WindowManager::close_window(HWND handle, std::vector<RenderDataHandle>&& datas) const noexcept
+void WindowManager::close_window(HWND handle) const noexcept
 {
-  auto size = sizeof(RenderDataHandle) * datas.size();
-  auto ptr  = malloc(size);
-  memcpy(ptr, datas.data(), size);
-  PostThreadMessageW(_thread_id, static_cast<UINT>(Message::close_window), std::bit_cast<WPARAM>(handle), std::bit_cast<LPARAM>(ptr));
+  PostThreadMessageW(_thread_id, static_cast<UINT>(Message::close_window), std::bit_cast<WPARAM>(handle), {});
 }
 
 void WindowManager::close_fullscreen_window() const noexcept
@@ -344,7 +341,7 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
   case Message::close_window:
   {
     auto handle = std::bit_cast<HWND>(w_param);
-    _windows.at(handle).destroy(std::bit_cast<RenderDataHandle*>(l_param));
+    _windows.at(handle).destroy();
     _windows.erase(handle);
     _using_mouse_pass_through_windows.erase(handle);
     break;
@@ -352,7 +349,7 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
 
   case Message::close_fullscreen_window:
   {
-    _fullscreen_window.destroy(nullptr);
+    _fullscreen_window.destroy();
     break;
   }
 

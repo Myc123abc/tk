@@ -96,8 +96,7 @@ public:
 
   struct Message_Window_Destroy
   {
-    HWND              handle{};
-    RenderDataHandle* ptr{};
+    HWND handle{};
   };
 
   struct Message_Window_Update

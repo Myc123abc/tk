@@ -67,10 +67,10 @@ void Window::update_rect() noexcept
   _rect = { x, y, static_cast<LONG>(x + width), static_cast<LONG>(y + height) };
 }
 
-void Window::destroy(RenderDataHandle* ptr) const noexcept
+void Window::destroy() const noexcept
 {
   ShowWindow(_handle, SW_HIDE);
-  g_renderer.send_message(Renderer::Message_Window_Destroy{ _handle, ptr });
+  g_renderer.send_message(Renderer::Message_Window_Destroy{ _handle });
 }
 
 auto Window::cursor_pos() const noexcept -> glm::vec<2, int>

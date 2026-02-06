@@ -96,6 +96,12 @@ auto image_extent(std::string_view path) noexcept -> glm::vec2;
  */
 void image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha = 0xff) noexcept;
 
+/**
+ * load font
+ * @param path
+ */
+void load_font(std::string_view path) noexcept;
+
 enum class FontStyle
 {
   regular,

@@ -106,6 +106,9 @@ int main()
 {
   tk::init();
 
+  ui::load_font("assets/font/NotoSansJP-Regular.ttf");
+  ui::load_font("assets/font/NotoSansSC-Regular.ttf");
+
   auto playback_btn = PlaybackButton{};
   playback_btn.init("playback button");
 

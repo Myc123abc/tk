@@ -171,7 +171,12 @@ void UIContext::close_window() noexcept
     }
     else
     {
-      g_wnd_mgr.close_window(window.snap.handle, { window.datas.begin(), window.datas.end() });
+      for (auto h : window.datas)
+      {
+        g_render_data_pool[h].wait();
+        g_render_data_pool.free(h);
+      }
+      g_wnd_mgr.close_window(window.snap.handle);
       _window_names.erase(window.snap.handle);
       return true;
     }

@@ -52,11 +52,13 @@ public:
   auto index(std::string_view path) const noexcept { return _loaded_images.at(path.data()).index(); }
 
 private:
-  PoolType _pool;
-  std::unordered_map<std::string, ImageHandle>       _loaded_images;
-  std::unordered_set<ImageHandle, ImageHandle::Hash> _images;
+  PoolType                                     _pool;
+  std::unordered_map<std::string, ImageHandle> _loaded_images;
+  std::unordered_set<ImageHandle>              _images;
 };
 
 inline static auto& g_img_mgr{ ImageManager::instance() };
+
+using ImageHandle = ImageManager::ImageHandle;
 
 }}

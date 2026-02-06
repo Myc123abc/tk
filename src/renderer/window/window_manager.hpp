@@ -1,7 +1,6 @@
 #pragma once
 
 #include "window.hpp"
-#include "../resource/render_data.hpp"
 
 #include <thread>
 #include <latch>
@@ -140,7 +139,7 @@ public:
 
   auto create_fullscreen_window() noexcept -> WindowSnapshot;
   auto create_window(int x, int y, uint32_t width, uint32_t height) noexcept -> WindowSnapshot;
-  void close_window(HWND handle, std::vector<RenderDataHandle>&& datas) const noexcept;
+  void close_window(HWND handle) const noexcept;
   void close_fullscreen_window() const noexcept;
   void minimize_window(HWND handle) const noexcept;
   void maximize_window(HWND handle) const noexcept;
