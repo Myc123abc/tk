@@ -183,13 +183,16 @@ int main()
       ui::rectangle(p, p + Vec2{ progress, 3 }, 0x0000ffff);
 
       // image
-      if (loop_trigger)
+      // if (loop_trigger)
       {
         auto img_ext = ui::image_extent("assets/image/test.png");
-        ui::image("assets/image/test.png", p2, p2 + Vec2{ img_ext.x / 4, img_ext.y / 4 });
+        auto ext = wnd_ext - p2;
+        auto scale = std::max(img_ext.x / ext.x, img_ext.y / ext.y);
+        img_ext /= scale;
+        ui::image("assets/image/test.png", p2, p2 + img_ext);
       }
       loop_trigger.update();
-      ui::image("assets/image/test.jpg", {}, wnd_ext, 0x44);
+      // ui::image("assets/image/test.jpg", {}, wnd_ext);
 
       // circle point
       auto size = ui::window_drawable_extent();
