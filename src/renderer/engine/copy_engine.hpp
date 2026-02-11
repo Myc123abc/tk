@@ -32,8 +32,7 @@ public:
     return instance;
   }
 
-  void init() noexcept;
-  void destroy() noexcept;
+  void init() noexcept { Engine::init(D3D12_COMMAND_LIST_TYPE_COPY); }
 
   void acquire_slot() noexcept;
 

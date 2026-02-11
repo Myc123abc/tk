@@ -33,6 +33,8 @@ public:
 
   auto index() const noexcept { return _index; }
 
+  void set(std::function<void()> func) noexcept { _recreate_descriptor_func = func; }
+
 private:
   int                   _index{ -1 };
   DescriptorHeapType    _type;
@@ -63,6 +65,8 @@ class DescriptorHeapManager
 
     auto usable_handle_count() const noexcept -> uint32_t;
 
+    auto size() const noexcept { return _handles.size(); }
+
   private:
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>   _heap;
     std::vector<std::pair<bool, DescriptorHandle>> _handles;
@@ -86,11 +90,13 @@ public:
 
   void init() noexcept;
 
-  auto pop_handle(DescriptorHeapType type, std::function<void()> recreate_descriptor_func) noexcept { return _heaps[type].pop_handle(recreate_descriptor_func); }
+  auto pop_handle(DescriptorHeapType type, std::function<void()> recreate_descriptor_func = {}) noexcept { return _heaps[type].pop_handle(recreate_descriptor_func); }
 
   void bind_heaps(ID3D12GraphicsCommandList1* cmd) noexcept;
 
-  void reserve(DescriptorHeapType type, uint32_t capacity) noexcept { _heaps[type].reserve(capacity); }
+  void reserve(DescriptorHeapType type, uint32_t capacity) noexcept { _heaps.at(type).reserve(capacity); }
+
+  auto size(DescriptorHeapType type) const noexcept { return _heaps.at(type).size(); }
 
   auto usable_handle_count(DescriptorHeapType type) const noexcept { return _heaps.at(type).usable_handle_count(); }
 

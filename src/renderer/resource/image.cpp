@@ -3,6 +3,8 @@
 #include "util/error_handling.hpp"
 #include "../../util/align.hpp"
 
+#include <ranges>
+
 using namespace tk;
 using namespace tk::renderer;
 using namespace Microsoft::WRL;
@@ -83,7 +85,7 @@ auto dxgi_format(ImageFormat format) noexcept -> DXGI_FORMAT
   return map.at(format);
 }
 
-void Image::init(ImageType type, DXGI_FORMAT format, uint32_t width , uint32_t height) noexcept
+void Image::init(ImageType type, DXGI_FORMAT format, uint32_t width , uint32_t height, bool use_mipmap) noexcept
 {
   auto device = g_core.device();
 
@@ -103,6 +105,10 @@ void Image::init(ImageType type, DXGI_FORMAT format, uint32_t width , uint32_t h
   texture_desc.Dimension        = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
   texture_desc.Flags            = dx12_resource_flag(type);
   auto heap_properties          = CD3DX12_HEAP_PROPERTIES{ D3D12_HEAP_TYPE_DEFAULT };
+  if (!use_mipmap)
+    texture_desc.MipLevels = 1;
+  else
+    texture_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
   auto clear_value = D3D12_CLEAR_VALUE{};
   if (type == ImageType::dsv)
@@ -122,12 +128,12 @@ void Image::init(ImageType type, DXGI_FORMAT format, uint32_t width , uint32_t h
     err_if(device->CreateCommittedResource(&heap_properties, D3D12_HEAP_FLAG_NONE, &texture_desc, _state, nullptr, IID_PPV_ARGS(_handle.ReleaseAndGetAddressOf())),
             "failed to create image");
 
-  create_descriptor();
+  create_descriptor(use_mipmap);
 }
 
-void Image::init(ImageType type, ImageFormat format, uint32_t width , uint32_t height) noexcept
+void Image::init(ImageType type, ImageFormat format, uint32_t width , uint32_t height, bool use_mipmap) noexcept
 {
-  init(type, dxgi_format(format), width, height);
+  init(type, dxgi_format(format), width, height, use_mipmap);
 }
 
 void Image::init(IDXGISwapChain1* swapchain, uint32_t index) noexcept
@@ -162,7 +168,7 @@ void Image::set_state(ID3D12GraphicsCommandList1* cmd, ImageState state) noexcep
   _state = transition_state;
 }
 
-void Image::create_descriptor() noexcept
+void Image::create_descriptor(bool use_mipmap) noexcept
 {
   static auto device = g_core.device();
   auto        mgr    = DescriptorHeapManager::instance();
@@ -221,6 +227,37 @@ void Image::create_descriptor() noexcept
     create_depth_stencil_view();
   else
     std::unreachable();
+
+  // create mipmap uavs for generate mipmap
+  if (use_mipmap)
+  {
+    // get count of mipmap images
+    auto count = _handle->GetDesc().MipLevels;
+    _mipmap_uavs.reserve(count);
+    for (auto i : std::views::iota(1u, count))
+    {
+      // pop descriptor handle
+      auto handle = mgr->pop_handle(DescriptorHeapType::cbv_srv_uav);
+
+      // create mipmap uav func
+      auto create_mipmap_uav = [this, i, handle = handle.cpu_handle()]
+      {
+        auto desc               = D3D12_UNORDERED_ACCESS_VIEW_DESC{};
+        desc.Format             = _format;
+        desc.ViewDimension      = D3D12_UAV_DIMENSION_TEXTURE2D;
+        desc.Texture2D.MipSlice = i;
+        device->CreateUnorderedAccessView(_handle.Get(), nullptr, &desc, handle);
+      };
+      
+      // create uav
+      create_mipmap_uav();
+
+      // store creatation func to descriptor handle avoid dynamic expand handle invalidation
+      handle.set(std::move(create_mipmap_uav));
+
+      _mipmap_uavs.emplace_back(std::move(handle));
+    }
+  }
 }
 
 void Image::clear(ID3D12GraphicsCommandList1* cmd, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) const noexcept

@@ -1,5 +1,0 @@
-#include "graphics_engine.hpp"
-
-namespace tk { namespace renderer {
-
-}}

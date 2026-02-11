@@ -651,7 +651,12 @@ void UIContext::image(std::string_view path, glm::vec2 left_top, glm::vec2 right
   check_path_not_draw();
   check_union_not_draw();
 
-  if (!g_img_mgr.contains(path)) g_img_mgr.load(path);
+  // when the image size scale down enough, use mipmaps
+  auto extent = right_bottom - left_top;
+  if (g_img_mgr.contains(path))
+    g_img_mgr.need_to_generate_mapmip(extent);
+  else
+    g_img_mgr.load(path, extent);
 
   auto offset = get_render_pos();
   left_top     += offset;

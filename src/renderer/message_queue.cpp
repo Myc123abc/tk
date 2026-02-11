@@ -71,7 +71,7 @@ void Renderer::UIContextMessageHandler::operator()(Message_Destroy_Image const& 
   else
   {
     // already uploaded, release image resource
-    renderer._images.at(msg.index).destroy();
+    renderer.add_frame_render_complete_func([image = renderer._images.at(msg.index)] mutable { image.destroy(); });
     renderer._images.erase(msg.index);
   }
 }

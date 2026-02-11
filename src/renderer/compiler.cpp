@@ -179,8 +179,8 @@ auto Compiler::compile(std::string_view shader, std::string_view vertex_shader_e
   compile_result.get_vertex_input_layout(vs_reflection.Get());
 
   // create root signature
-  compile_result.get_root_parameters(vs_reflection.Get());
-  compile_result.get_root_parameters(ps_reflection.Get());
+  compile_result.get_root_parameters(vs_reflection.Get(), false);
+  compile_result.get_root_parameters(ps_reflection.Get(), false);
 
   auto sampler_desc = D3D12_STATIC_SAMPLER_DESC{};
   sampler_desc.Filter           = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
@@ -221,10 +221,21 @@ auto Compiler::compile(std::string_view shader, std::string_view compute_shader_
   compile_result.cs      = { cso->GetBufferPointer(), cso->GetBufferSize() };
 
   auto reflection = compile_result.get_shader_reflection(res.Get());
-  compile_result.get_root_parameters(reflection.Get());
+  compile_result.get_root_parameters(reflection.Get(), true);
+
+  auto sampler_desc = D3D12_STATIC_SAMPLER_DESC{};
+  sampler_desc.Filter           = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+  sampler_desc.AddressU         = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+  sampler_desc.AddressV         = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+  sampler_desc.AddressW         = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+  sampler_desc.ComparisonFunc   = D3D12_COMPARISON_FUNC_NEVER;
+  sampler_desc.MaxLOD           = D3D12_FLOAT32_MAX;
 
   auto signature_desc = CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC{};
-  signature_desc.Init_1_1(compile_result._root_params.size(), compile_result._root_params.data(), 0, nullptr);
+  if (compile_result._has_sampler)
+    signature_desc.Init_1_1(compile_result._root_params.size(), compile_result._root_params.data(), 1, &sampler_desc);
+  else
+    signature_desc.Init_1_1(compile_result._root_params.size(), compile_result._root_params.data(), 0, nullptr);
 
   auto signature = ComPtr<ID3DBlob>{};
   auto error     = ComPtr<ID3DBlob>{};
@@ -285,7 +296,7 @@ void Compiler::CompileResult::get_vertex_input_layout(ID3D12ShaderReflection* sh
   input_layout_desc = D3D12_INPUT_LAYOUT_DESC{ _input_element_descs.data(), static_cast<uint32_t>(_input_element_descs.size()) };
 }
 
-void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader_reflection) noexcept
+void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader_reflection, bool is_compute_shader) noexcept
 {
   auto desc = D3D12_SHADER_DESC{};
   shader_reflection->GetDesc(&desc);
@@ -341,7 +352,7 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
       range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, num_descriptors, resource_desc.BindPoint, resource_desc.Space, range_flags);
       _ranges.emplace(range);
 
-      root_param.InitAsDescriptorTable(1, &_ranges.back(), D3D12_SHADER_VISIBILITY_PIXEL);
+      root_param.InitAsDescriptorTable(1, &_ranges.back(), is_compute_shader ? D3D12_SHADER_VISIBILITY_ALL : D3D12_SHADER_VISIBILITY_PIXEL);
       _root_params.emplace_back(root_param);
       break;
     }

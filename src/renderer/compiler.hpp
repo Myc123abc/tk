@@ -49,7 +49,7 @@ public:
 
     void get_vertex_input_layout(ID3D12ShaderReflection* shader_reflection) noexcept;
 
-    void get_root_parameters(ID3D12ShaderReflection* shader_reflection) noexcept;
+    void get_root_parameters(ID3D12ShaderReflection* shader_reflection, bool is_compute_shader) noexcept;
  
   private:
     Microsoft::WRL::ComPtr<IDxcBlob>      _vs_cso;

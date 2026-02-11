@@ -62,6 +62,7 @@ private:
 
   std::unordered_map<HWND, RenderResource>         _res;
   Pipeline                                         _sdf_pipeline;
+  Pipeline                                         _mipmap_pipeline;
 
   std::unordered_set<HWND>                         _destroied_windows;
   std::vector<HWND>                                _rendered_windows;

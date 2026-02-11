@@ -82,7 +82,7 @@ public:
   Image& operator=(Image const&) = default;
   Image& operator=(Image&&)      = delete;
 
-  void init(ImageType type, ImageFormat format, uint32_t width , uint32_t height) noexcept;
+  void init(ImageType type, ImageFormat format, uint32_t width , uint32_t height, bool use_mipmap = false) noexcept;
   void init(IDXGISwapChain1* swapchain, uint32_t index)                           noexcept;
   void init(ImageType type, HANDLE handle, uint32_t width, uint32_t height)       noexcept;
 
@@ -90,6 +90,7 @@ public:
   {
     _handle.Reset();
     _descriptor_handle.release();
+    for (auto& handle : _mipmap_uavs) handle.release();
   }
 
   void set_state(ID3D12GraphicsCommandList1* cmd, ImageState state) noexcept;
@@ -115,8 +116,8 @@ public:
   auto index()      const noexcept { return _descriptor_handle.index();      }
 
 private:
-  void init(ImageType type, DXGI_FORMAT format, uint32_t width , uint32_t height) noexcept;
-  void create_descriptor() noexcept;
+  void init(ImageType type, DXGI_FORMAT format, uint32_t width , uint32_t height, bool use_mipmap = false) noexcept;
+  void create_descriptor(bool use_mipmap = false) noexcept;
 
 private:
   ImageType                              _type{};
@@ -126,6 +127,7 @@ private:
   uint32_t                               _width{};
   uint32_t                               _height{};
   DescriptorHandle                       _descriptor_handle;
+  std::vector<DescriptorHandle>          _mipmap_uavs;
 };
 
 ////////////////////////////////////////////////////////////////////////////////

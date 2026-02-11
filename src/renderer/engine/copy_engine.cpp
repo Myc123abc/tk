@@ -53,16 +53,6 @@ void UploadBuffer::upload(ID3D12GraphicsCommandList1* cmd) noexcept
 ///                             Copy Engine
 ////////////////////////////////////////////////////////////////////////////////
 
-void CopyEngine::init() noexcept
-{
-  Engine::init(D3D12_COMMAND_LIST_TYPE_COPY);
-}
-
-void CopyEngine::destroy() noexcept
-{
-  Engine::destroy();
-}
-
 auto CopyEngine::Slot::is_idle() const noexcept -> bool
 {
   return g_copy_engine.fence_completed_value() >= fence_value;

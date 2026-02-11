@@ -1,6 +1,7 @@
 #include "renderer.hpp"
 #include "core.hpp"
 #include "engine/graphics_engine.hpp"
+#include "engine/compute_engine.hpp"
 #include "engine/copy_engine.hpp"
 #include "util/error_handling.hpp"
 #include "resource/descriptor_heap_manager.hpp"
@@ -20,9 +21,11 @@ void Renderer::init() noexcept
     g_compiler.init();
     g_desc_heap_mgr.init();
     g_graphics_engine.init();
+    g_compute_engine.init();
     g_copy_engine.init();
 
     _sdf_pipeline.init_graphics("assets/shader/sdf.hlsl", "vs", "ps", "assets/shader", RenderResource::Render_Target_Format, true);
+    _mipmap_pipeline.init_compute("assets/shader/mipmap.hlsl", "main");
 
     while (!_exit.load(std::memory_order_relaxed))
     {
@@ -54,6 +57,7 @@ void Renderer::destroy() noexcept
 
   // destroy render resources
   g_graphics_engine.destroy();
+  g_compute_engine.destroy();
   g_copy_engine.destroy();
   for (auto& res : _res | std::views::values) res.destroy();
 }
