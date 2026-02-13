@@ -105,10 +105,10 @@ void Image::init(ImageType type, DXGI_FORMAT format, uint32_t width , uint32_t h
   texture_desc.Dimension        = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
   texture_desc.Flags            = dx12_resource_flag(type);
   auto heap_properties          = CD3DX12_HEAP_PROPERTIES{ D3D12_HEAP_TYPE_DEFAULT };
-  if (!use_mipmap)
-    texture_desc.MipLevels = 1;
-  else
+  if (use_mipmap)
     texture_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+  else
+    texture_desc.MipLevels = 1;
 
   auto clear_value = D3D12_CLEAR_VALUE{};
   if (type == ImageType::dsv)

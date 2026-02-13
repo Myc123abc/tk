@@ -651,19 +651,17 @@ void UIContext::image(std::string_view path, glm::vec2 left_top, glm::vec2 right
   check_path_not_draw();
   check_union_not_draw();
 
-  // when the image size scale down enough, use mipmaps
-  auto extent = right_bottom - left_top;
-  if (g_img_mgr.contains(path))
-    g_img_mgr.need_to_generate_mapmip(extent);
+  if (g_img_mgr.try_load(path, right_bottom - left_top))
+  {
+    auto offset = get_render_pos();
+    left_top     += offset;
+    right_bottom += offset;
+    add_shape(ShapeProperty::Type::image, {}, {},
+      { std::bit_cast<float>(g_img_mgr.index(path)), static_cast<float>(alpha) / 0xff },
+      { left_top, right_bottom });
+  }
   else
-    g_img_mgr.load(path, extent);
-
-  auto offset = get_render_pos();
-  left_top     += offset;
-  right_bottom += offset;
-  add_shape(ShapeProperty::Type::image, {}, {},
-    { std::bit_cast<float>(g_img_mgr.index(path)), static_cast<float>(alpha) / 0xff },
-    { left_top, right_bottom });
+    warn("image {} is not exist", path);
 }
 
 auto UIContext::text(std::string_view text, glm::vec2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> glm::vec2

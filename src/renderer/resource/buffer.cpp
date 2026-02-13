@@ -107,7 +107,7 @@ void FrameBuffer::init() noexcept
 {
   _vertices_indices_buffer.init(Vertices_Indices_Buffer_Size, false);
   _shape_properties_buffer.init(Shape_Properties_Buffer_Size, true);
-  _image_indexs.init(Image_Indexs_Buffer_Size, true);
+  _image_indices.init(Image_Indices_Buffer_Size, true);
 }
 
 void FrameBuffer::upload(ID3D12GraphicsCommandList1* cmd, RenderData* data) noexcept
@@ -139,8 +139,8 @@ void FrameBuffer::upload(ID3D12GraphicsCommandList1* cmd, RenderData* data) noex
   for (auto const& shape_property : data->shape_properties)
     _shape_properties_buffer.append(shape_property.data(), shape_property.byte_size());
 
-  // image indexs
-  _image_indexs.append_range(g_renderer.get_image_indexs());
+  // image indices
+  _image_indices.append_range(g_renderer.get_image_indices());
 }
 
 }}

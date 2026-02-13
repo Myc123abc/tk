@@ -128,6 +128,19 @@ public:
     return *get(handle);
   }
 
+  [[nodiscard]]
+  auto get(Handle handle) const noexcept -> T const*
+  {
+    auto slot = get_slot(handle._block_idx, handle._slot_idx);
+    assert(handle.valid() && slot->alive && slot->generation == handle._generation);
+    return slot->get();
+  }
+
+  auto operator[](Handle handle) const noexcept -> T const&
+  {
+    return *get(handle);
+  }
+
   void free(Handle& handle) noexcept
   {
     auto slot = get_slot(handle._block_idx, handle._slot_idx);

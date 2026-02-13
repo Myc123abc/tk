@@ -25,7 +25,7 @@ void Pipeline::init_graphics(
 
   auto compile_result = g_compiler.compile(shader, vs, ps, include);
   _root_signature  = compile_result.root_signature;
-  _resource_indexs = compile_result.resource_indexs;
+  _resource_indices = compile_result.resource_indices;
 
   auto stream = CD3DX12_PIPELINE_STATE_STREAM{};
   
@@ -76,8 +76,8 @@ void Pipeline::init_graphics(
 void Pipeline::init_compute(std::string shader, std::string cs, std::string include) noexcept
 {
   auto compile_result = g_compiler.compile(shader, cs, include);
-  _root_signature  = compile_result.root_signature;
-  _resource_indexs = compile_result.resource_indexs;
+  _root_signature   = compile_result.root_signature;
+  _resource_indices = compile_result.resource_indices;
 
   auto stream = CD3DX12_PIPELINE_STATE_STREAM{};
   stream.pRootSignature = _root_signature.Get();
@@ -103,12 +103,12 @@ void Pipeline::bind(ID3D12GraphicsCommandList1* cmd) const noexcept
 void Pipeline::set_descriptors(ID3D12GraphicsCommandList1* cmd, std::initializer_list<std::pair<std::string_view, D3D12_GPU_DESCRIPTOR_HANDLE>> handles) const noexcept
 {
   for (auto const& [name, handle] : handles)
-    if (_resource_indexs.contains(name.data()) && handle.ptr)
+    if (_resource_indices.contains(name.data()) && handle.ptr)
     {
       if (_is_graphics_pipeline)
-        cmd->SetGraphicsRootDescriptorTable(_resource_indexs.at(name.data()), handle);
+        cmd->SetGraphicsRootDescriptorTable(_resource_indices.at(name.data()), handle);
       else
-        cmd->SetComputeRootDescriptorTable(_resource_indexs.at(name.data()), handle);
+        cmd->SetComputeRootDescriptorTable(_resource_indices.at(name.data()), handle);
     }
 }
 

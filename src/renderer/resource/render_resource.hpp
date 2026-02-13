@@ -44,8 +44,8 @@ private:
     Image                                          image;
     Image                                          swapchain_image;
     FrameBuffer                                    buffer;
-    uint64_t                                       graphics_fence_value{};
-    Microsoft::WRL::ComPtr<ID3D12CommandAllocator> graphics_cmd_alloc;
+    uint64_t                                       fence_value{};
+    Microsoft::WRL::ComPtr<ID3D12CommandAllocator> cmd_alloc;
   };
 
   std::array<Frame, Frame_Count>              _frames;

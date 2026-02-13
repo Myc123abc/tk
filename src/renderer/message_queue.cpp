@@ -32,11 +32,13 @@ void Renderer::UIContextMessageHandler::operator()(Message_Upload_Image const& m
 {
   // create image resource
   auto image = Image{};
-  image.init(ImageType::srv, ImageFormat::rgba8_unorm, msg.bitmap.width, msg.bitmap.height);
+  image.init(ImageType::srv, ImageFormat::rgba8_unorm, msg.bitmap.width, msg.bitmap.height, msg.use_mipmap);
+  if (msg.use_mipmap)
+    renderer._pending_mipmap_indices.emplace_back(msg.index);
 
-  // store image indexs
-  renderer._image_indexs.resize(msg.index + 1);
-  renderer._image_indexs.at(msg.index) = image.index();
+  // store image indices
+  renderer._image_indices.resize(msg.index + 1);
+  renderer._image_indices.at(msg.index) = image.index();
 
   // store image and bitmap for upload
   renderer._upload_images[msg.index] = image;
@@ -49,9 +51,9 @@ void Renderer::UIContextMessageHandler::operator()(Message_Create_Image const& m
   auto image = Image{};
   image.init(ImageType::srv, msg.format, msg.width, msg.height);
 
-  // store image indexs
-  renderer._image_indexs.resize(msg.index + 1);
-  renderer._image_indexs.at(msg.index) = image.index();
+  // store image indices
+  renderer._image_indices.resize(msg.index + 1);
+  renderer._image_indices.at(msg.index) = image.index();
 
   assert(!renderer._images.contains(msg.index));
   renderer._images.emplace(msg.index, std::move(image));
@@ -59,7 +61,7 @@ void Renderer::UIContextMessageHandler::operator()(Message_Create_Image const& m
 
 void Renderer::UIContextMessageHandler::operator()(Message_Destroy_Image const& msg) const noexcept
 {
-  renderer._image_indexs.at(msg.index) = {};
+  renderer._image_indices.at(msg.index) = {};
   if (renderer._upload_images.contains(msg.index))
   {
     assert(renderer._bitmaps.contains(msg.index));

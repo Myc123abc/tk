@@ -61,7 +61,7 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
   // create command allocator and list
   for (auto& frame : _frames)
   {
-		frame.graphics_cmd_alloc = g_core.create_cmd_alloc(D3D12_COMMAND_LIST_TYPE_DIRECT);
+		frame.cmd_alloc = g_core.create_cmd_alloc(D3D12_COMMAND_LIST_TYPE_DIRECT);
 
     // initialize frame buffer
     frame.buffer.init();
@@ -120,7 +120,7 @@ void RenderResource::resize(uint32_t width, uint32_t height) noexcept
 void RenderResource::wait_frame_complete() const noexcept
 {
   auto& frame = _frames[_frame_index];
-  if (g_graphics_engine.fence_completed_value() < frame.graphics_fence_value)
+  if (g_graphics_engine.fence_completed_value() < frame.fence_value)
   {
     auto objs = std::array<HANDLE, 2>
     {
@@ -136,7 +136,7 @@ void RenderResource::wait_frame_complete() const noexcept
 void RenderResource::render_begin() noexcept
 {
   auto& frame = current_frame();
-  auto  cmd   = g_graphics_engine.reset_cmd(frame.graphics_cmd_alloc.Get());
+  auto  cmd   = g_graphics_engine.reset_cmd(frame.cmd_alloc.Get());
 
   // bind heaps
   g_desc_heap_mgr.bind_heaps(cmd);
@@ -145,7 +145,7 @@ void RenderResource::render_begin() noexcept
   clear_image();
 
   // set viewport
-  auto  viewport = CD3DX12_VIEWPORT{ 0.f, 0.f, static_cast<float>(frame.image.width()), static_cast<float>(frame.image.height()) };
+  auto viewport = CD3DX12_VIEWPORT{ 0.f, 0.f, static_cast<float>(frame.image.width()), static_cast<float>(frame.image.height()) };
   cmd->RSSetViewports(1, &viewport);
 }
 
@@ -162,7 +162,7 @@ void RenderResource::render_end() noexcept
   swapchain_image.set_state(cmd, ImageState::present);
 
 	// submit graphics commands to graphics engine
-	frame.graphics_fence_value = g_graphics_engine.submit();
+	frame.fence_value = g_graphics_engine.submit();
 
   // move to next frame
   _frame_index = (_frame_index + 1) % Frame_Count;

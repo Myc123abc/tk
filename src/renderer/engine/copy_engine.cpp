@@ -75,6 +75,7 @@ void CopyEngine::acquire_slot() noexcept
     _slots.emplace_back(Slot{});
     _slot = &_slots.back();
   }
+  reset_cmd(_slot->cmd_alloc.Get());
 }
 
 void CopyEngine::copy(std::vector<Bitmap> const& bitmaps, std::vector<Image*> const& images) noexcept
@@ -86,7 +87,6 @@ void CopyEngine::copy(std::vector<Bitmap> const& bitmaps, std::vector<Image*> co
 auto CopyEngine::submit_slot() noexcept -> uint64_t
 {
   assert(_slot && _slot->is_idle());
-  reset_cmd(_slot->cmd_alloc.Get());
   _slot->upload_buffer.upload(cmd());
   _slot->fence_value = submit(); 
   return _slot->fence_value;

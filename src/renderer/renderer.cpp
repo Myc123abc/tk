@@ -109,8 +109,13 @@ void Renderer::preprocess_render() noexcept
         | std::views::values
         | std::views::transform([](auto& img) { return &img; })
         | std::ranges::to<std::vector<Image*>>());
+    auto fence_value = g_copy_engine.submit_slot();
+
     // wait upload images complete before rendering
-    g_graphics_engine.wait(g_copy_engine, g_copy_engine.submit_slot());
+    g_graphics_engine.wait(g_copy_engine, fence_value);
+    // also wait for compute engine if need to generate mipamp
+    if (!_pending_mipmap_indices.empty())
+      g_compute_engine.wait(g_copy_engine, fence_value);
 
     // move upload images to images
     for (auto& [idx, img] : _upload_images)
@@ -133,6 +138,8 @@ void Renderer::postprocess_render() noexcept
 void Renderer::render() noexcept
 {
   preprocess_render();
+
+  generate_mipmap();
 
   for (auto _ : std::views::iota(0u, _render_datas.size()))
   {
@@ -190,15 +197,47 @@ void Renderer::render_sdf(RenderResource& res, RenderData* data) noexcept
   constants.window_pos    = data->resizing_window_pos;
   _sdf_pipeline.set_descriptors(cmd, "constants", constants,
   {
-    { "images",       _images.empty() ? D3D12_GPU_DESCRIPTOR_HANDLE{}
-                                      : g_desc_heap_mgr.first_gpu_handle(DescriptorHeapType::cbv_srv_uav) },
-    { "buffer",       frame.buffer.shape_properties_gpu_handle()                                          },
-    { "image_indexs", frame.buffer.image_indexs_gpu_handle()                                              },
+    { "images",        _images.empty() ? D3D12_GPU_DESCRIPTOR_HANDLE{}
+                                       : g_desc_heap_mgr.first_gpu_handle(DescriptorHeapType::cbv_srv_uav) },
+    { "buffer",        frame.buffer.shape_properties_gpu_handle()                                          },
+    { "image_indices", frame.buffer.image_indices_gpu_handle()                                             },
   });
 
   // draw
   cmd->RSSetScissorRects(1, &data->scissor_rect);
   cmd->DrawIndexedInstanced(data->indices.size(), 1, 0, 0, 0);
+}
+
+struct MipmapGenerationCostant
+{
+  uint32_t mipmap_count{};
+};
+
+void Renderer::generate_mipmap() noexcept
+{
+  if (_pending_mipmap_indices.empty()) return;
+
+  g_compute_engine.acquire_slot();
+
+  auto cmd = g_compute_engine.cmd();
+  _mipmap_pipeline.bind(cmd);
+
+  auto const& img = _images[_pending_mipmap_indices[0]];
+  auto constants = MipmapGenerationCostant{};
+  constants.mipmap_count = img.mipmap_uavs().size();
+  _mipmap_pipeline.set_descriptors(cmd, "constants", constants,
+  {
+    { "image",  img.gpu_handle()                       },
+    { "output", img.mipmap_uavs().front().gpu_handle() },
+  });
+  cmd->Dispatch((img.width() + 7) / 8, (img.height() + 7) / 8, 1);
+
+  // wait mipmap generation complete
+  g_graphics_engine.wait(g_compute_engine, g_compute_engine.submit_slot());
+
+  _pending_mipmap_indices.clear();
+
+  // TODO: release mipmap uavs after generation complete
 }
 
 }}

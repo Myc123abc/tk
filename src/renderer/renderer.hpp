@@ -53,6 +53,7 @@ private:
   void postprocess_render() noexcept;
   void render() noexcept;
   void render_sdf(RenderResource& res, RenderData* data) noexcept;
+  void generate_mipmap() noexcept;
 
 private:
   std::jthread                                     _thread;
@@ -75,13 +76,14 @@ private:
   // images
   //
 public:
-  auto get_image_indexs() const noexcept { return _image_indexs; }
+  auto get_image_indices() const noexcept { return _image_indices; }
 
 private:
   std::unordered_map<uint32_t, Image>  _images;
   std::unordered_map<uint32_t, Bitmap> _bitmaps;
   std::unordered_map<uint32_t, Image>  _upload_images;
-  std::vector<uint32_t>                _image_indexs;
+  std::vector<uint32_t>                _image_indices;
+  std::vector<uint32_t>                _pending_mipmap_indices; 
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                              Message Process
@@ -122,6 +124,7 @@ public:
   {
     Bitmap   bitmap;
     uint32_t index{};
+    bool     use_mipmap{};
   };
 
   struct Message_Create_Image

@@ -320,7 +320,7 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
       err_if(std::ranges::find_if(_root_params, [](auto const& param) { return param.ParameterType == D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS; }) != _root_params.end(),
               "Please only use single constant buffer");
 
-      resource_indexs[resource_desc.Name] = _root_params.size();
+      resource_indices[resource_desc.Name] = _root_params.size();
 
       auto constant_buffer = shader_reflection->GetConstantBufferByIndex(i);
       auto buffer_desc = D3D12_SHADER_BUFFER_DESC{};
@@ -340,7 +340,7 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
 
     case D3D_SIT_TEXTURE:
     {
-      resource_indexs[resource_desc.Name] = _root_params.size();
+      resource_indices[resource_desc.Name] = _root_params.size();
 
       // For arrays, reflection reports BindCount > 1. For unbounded arrays, BindCount is commonly 0.
       // D3D12 root signature supports unbounded descriptor ranges via NumDescriptors = UINT_MAX.
@@ -360,7 +360,7 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
     case D3D_SIT_BYTEADDRESS:
     case D3D_SIT_STRUCTURED:
     {
-      resource_indexs[resource_desc.Name] = _root_params.size();
+      resource_indices[resource_desc.Name] = _root_params.size();
 
       auto const num_descriptors = resource_desc.BindCount ? resource_desc.BindCount : UINT_MAX;
       auto const range_flags = (num_descriptors == 1)
@@ -377,7 +377,7 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
 
     case D3D_SIT_UAV_RWTYPED:
     {
-      resource_indexs[resource_desc.Name] = _root_params.size();
+      resource_indices[resource_desc.Name] = _root_params.size();
 
       auto const num_descriptors = resource_desc.BindCount ? resource_desc.BindCount : UINT_MAX;
       auto const range_flags = (num_descriptors == 1)

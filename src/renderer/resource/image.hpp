@@ -111,9 +111,10 @@ public:
 
   auto readback(ID3D12GraphicsCommandList1* cmd, RECT rect) noexcept -> std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, Bitmap>;
 
-  auto cpu_handle() const noexcept { return _descriptor_handle.cpu_handle(); }
-  auto gpu_handle() const noexcept { return _descriptor_handle.gpu_handle(); }
-  auto index()      const noexcept { return _descriptor_handle.index();      }
+  auto cpu_handle()  const noexcept { return _descriptor_handle.cpu_handle(); }
+  auto gpu_handle()  const noexcept { return _descriptor_handle.gpu_handle(); }
+  auto index()       const noexcept { return _descriptor_handle.index();      }
+  auto mipmap_uavs() const noexcept { return _mipmap_uavs;                    }
 
 private:
   void init(ImageType type, DXGI_FORMAT format, uint32_t width , uint32_t height, bool use_mipmap = false) noexcept;

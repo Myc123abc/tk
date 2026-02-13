@@ -183,7 +183,7 @@ int main()
       ui::rectangle(p, p + Vec2{ progress, 3 }, 0x0000ffff);
 
       // image
-      // if (loop_trigger)
+      if (loop_trigger)
       {
         auto img_ext = ui::image_extent("assets/image/test.png");
         auto ext = wnd_ext - p2;
@@ -192,7 +192,7 @@ int main()
         ui::image("assets/image/test.png", p2, p2 + img_ext);
       }
       loop_trigger.update();
-      // ui::image("assets/image/test.jpg", {}, wnd_ext);
+      ui::image("assets/image/test.jpg", {}, wnd_ext, 0x44);
 
       // circle point
       auto size = ui::window_drawable_extent();

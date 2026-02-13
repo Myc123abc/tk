@@ -33,6 +33,7 @@ public:
   void destroy() noexcept;
 
   auto reset_cmd(ID3D12CommandAllocator* alloc) const noexcept -> ID3D12GraphicsCommandList1*;
+  auto reset_cmd() const noexcept { return reset_cmd(_cmd_alloc.Get()); }
   auto cmd() const noexcept { return _cmd.Get(); }
 
 protected:

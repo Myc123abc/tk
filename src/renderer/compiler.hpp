@@ -39,7 +39,7 @@ public:
     D3D12_SHADER_BYTECODE                       ps;
     D3D12_SHADER_BYTECODE                       cs;
     D3D12_INPUT_LAYOUT_DESC                     input_layout_desc;
-    std::unordered_map<std::string, uint32_t>   resource_indexs;
+    std::unordered_map<std::string, uint32_t>   resource_indices;
     Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature;
 
   private:

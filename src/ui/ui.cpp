@@ -42,9 +42,7 @@ auto delta_time() noexcept -> double
 
 auto image_extent(std::string_view path) noexcept -> glm::vec2
 {
-  int w, h, ch;
-  if (stbi_info(path.data(), &w, &h, &ch))  return { w, h };
-  return {};
+  return g_img_mgr.extent(path);
 }
 
 void image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha) noexcept

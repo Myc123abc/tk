@@ -69,11 +69,11 @@ struct ShapeProperty
 ///                              Binding
 ////////////////////////////////////////////////////////////////////////////////
 
-ConstantBuffer<Constants> constants       : register(b0);
-SamplerState              g_sampler       : register(s0);
-ByteAddressBuffer         buffer          : register(t0);
-Texture2D                 images[]        : register(t0, space1);
-StructuredBuffer<uint>    image_indexs    : register(t0, space2);
+ConstantBuffer<Constants> constants     : register(b0);
+SamplerState              g_sampler     : register(s0);
+ByteAddressBuffer         buffer        : register(t0);
+Texture2D                 images[]      : register(t0, space1);
+StructuredBuffer<uint>    image_indices : register(t0, space2); // TODO: ui thread only record cmds so not need this again
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                              Functions
@@ -268,7 +268,7 @@ float4 ps(PSParameter args) : SV_TARGET
 
   if (shape_property.type == type_image)
   {
-    color = images[NonUniformResourceIndex(image_indexs[get_uint(offset)])].Sample(g_sampler, args.uv);
+    color = images[NonUniformResourceIndex(image_indices[get_uint(offset)])].Sample(g_sampler, args.uv);
     color.a *= get_float(offset);
     return color;
   }
@@ -277,7 +277,7 @@ float4 ps(PSParameter args) : SV_TARGET
   {
     // reference: https://computergraphics.stackexchange.com/questions/306/sharp-corners-with-signed-distance-fields-fonts
     // author: Detheroc
-    float d = images[NonUniformResourceIndex(image_indexs[get_uint(offset)])].Sample(g_sampler, args.uv).r - 0.5;
+    float d = images[NonUniformResourceIndex(image_indices[get_uint(offset)])].Sample(g_sampler, args.uv).r - 0.5;
     float w = fwidth(d);
     float inner_alpha = clamp(d / w + 0.5, 0.0, 1.0);
 
