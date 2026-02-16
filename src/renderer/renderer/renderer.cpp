@@ -1,11 +1,11 @@
 #include "renderer.hpp"
-#include "core.hpp"
-#include "engine/graphics_engine.hpp"
-#include "engine/compute_engine.hpp"
-#include "engine/copy_engine.hpp"
+#include "../core.hpp"
+#include "../engine/graphics_engine.hpp"
+#include "../engine/compute_engine.hpp"
+#include "../engine/copy_engine.hpp"
 #include "util/error_handling.hpp"
-#include "resource/descriptor_heap_manager.hpp"
-#include "compiler.hpp"
+#include "../resource/descriptor_heap_manager.hpp"
+#include "../compiler.hpp"
 
 #include <stb_image.h>
 
@@ -30,13 +30,13 @@ void Renderer::init() noexcept
     while (!_exit.load(std::memory_order_relaxed))
     {
       message_process();
-      if (!_render_datas.empty())
+      if (!_cmds.empty())
       {
         render();
         _frame_sem.release();
       }
       else
-        _render_data_empty_sem.acquire();
+        _cmds_empty.acquire();
     }
   });
 }
@@ -46,7 +46,7 @@ void Renderer::destroy() noexcept
   // exit render loop
   _exit.store(true, std::memory_order_relaxed);
   _frame_sem.release();
-  _render_data_empty_sem.release();
+  _cmds_empty.release();
   _thread.join();
 
   // pop all message
@@ -94,7 +94,11 @@ void Renderer::message_process() noexcept
 
 void Renderer::preprocess_render() noexcept
 {
-  // upload images
+  upload_images();
+}
+
+void Renderer::upload_images() noexcept
+{
   if (!_upload_images.empty())
   {
     assert(_upload_images.size() == _bitmaps.size());
@@ -114,7 +118,7 @@ void Renderer::preprocess_render() noexcept
     // wait upload images complete before rendering
     g_graphics_engine.wait(g_copy_engine, fence_value);
     // also wait for compute engine if need to generate mipamp
-    if (!_pending_mipmap_indices.empty())
+    if (!_pending_mipmap_image_handles.empty())
       g_compute_engine.wait(g_copy_engine, fence_value);
 
     // move upload images to images
@@ -129,57 +133,52 @@ void Renderer::preprocess_render() noexcept
   }
 }
 
-void Renderer::postprocess_render() noexcept
-{
-  _destroied_windows.clear();
-  _rendered_windows.clear();
-}
-
 void Renderer::render() noexcept
 {
   preprocess_render();
 
   generate_mipmap();
 
-  for (auto _ : std::views::iota(0u, _render_datas.size()))
+  for (auto _ : std::views::iota(0u, _cmds.size()))
   {
-    // pop render data
-    auto [handle, render_data] = *_render_datas.front();
-    _render_datas.pop();
+    // pop command list
+    auto [handle, cmd] = *_cmds.front(); _cmds.pop();
 
     // continue if the window is destoried
     if (_destroied_windows.contains(handle)) continue;
-    _rendered_windows.emplace_back(handle);
+    _render_windows.emplace_back(handle);
 
-    // promise window is valid
-    err_if(!_res.contains(handle), "failed to render. No render resource exist on handle {}", (size_t)handle);
+    // generate render data
+    if (cmd) generate_render_data(handle, cmd);
 
-    // last frame is complete, rendering, otherwise, discard
-    auto& res = _res[handle];
+    // render
+    auto& res = _res.at(handle);
     res.wait_frame_complete();
     res.render_begin();
-    if (render_data)
-    {
-      render_sdf(res, render_data);
-      render_data->clear();
-    }
+    if (cmd) render_sdf(res, _render_datas.at(handle));
     res.render_end();
   }
 
   // present windows
-  if (_rendered_windows.size() == 1)
-    _res[_rendered_windows.back()].present(true);
-  else if (_rendered_windows.size() > 1)
+  if (_render_windows.size() == 1)
+    _res.at(_render_windows.back()).present(true);
+  else if (_render_windows.size() > 1)
   {
-    for (auto handle : _rendered_windows | std::views::take(_rendered_windows.size() - 1))
-      _res[handle].present(false);
-    _res[_rendered_windows.back()].present(true);
+    for (auto handle : _render_windows | std::views::take(_render_windows.size() - 1))
+      _res.at(handle).present(false);
+    _res.at(_render_windows.back()).present(true);
   }
 
   postprocess_render();
 }
 
-void Renderer::render_sdf(RenderResource& res, RenderData* data) noexcept
+void Renderer::postprocess_render() noexcept
+{
+  _destroied_windows.clear();
+  _render_windows.clear();
+}
+
+void Renderer::render_sdf(RenderResource& res, RenderData& data) noexcept
 {
   auto& frame               = res.current_frame();
   auto& render_target_image = frame.image;
@@ -194,18 +193,17 @@ void Renderer::render_sdf(RenderResource& res, RenderData* data) noexcept
   // set descriptors
   auto constants = Constants{};
   constants.window_extent = render_target_image.extent();
-  constants.window_pos    = data->resizing_window_pos;
+  constants.window_pos    = data.resizing_window_pos;
   _sdf_pipeline.set_descriptors(cmd, "constants", constants,
   {
-    { "images",        _images.empty() ? D3D12_GPU_DESCRIPTOR_HANDLE{}
-                                       : g_desc_heap_mgr.first_gpu_handle(DescriptorHeapType::cbv_srv_uav) },
-    { "buffer",        frame.buffer.shape_properties_gpu_handle()                                          },
-    { "image_indices", frame.buffer.image_indices_gpu_handle()                                             },
+    { "images", _images.empty() ? D3D12_GPU_DESCRIPTOR_HANDLE{}
+                                : g_desc_heap_mgr.first_gpu_handle(DescriptorHeapType::cbv_srv_uav) },
+    { "buffer", frame.buffer.shape_properties_gpu_handle()                                          },
   });
 
   // draw
-  cmd->RSSetScissorRects(1, &data->scissor_rect);
-  cmd->DrawIndexedInstanced(data->indices.size(), 1, 0, 0, 0);
+  cmd->RSSetScissorRects(1, &data.scissor_rect);
+  cmd->DrawIndexedInstanced(data.indices.size(), 1, 0, 0, 0);
 }
 
 struct MipmapGenerationCostant
@@ -215,14 +213,14 @@ struct MipmapGenerationCostant
 
 void Renderer::generate_mipmap() noexcept
 {
-  if (_pending_mipmap_indices.empty()) return;
+  if (_pending_mipmap_image_handles.empty()) return;
 
   g_compute_engine.acquire_slot();
 
   auto cmd = g_compute_engine.cmd();
   _mipmap_pipeline.bind(cmd);
 
-  auto const& img = _images[_pending_mipmap_indices[0]];
+  auto const& img = _images[_pending_mipmap_image_handles[0]];
   auto constants = MipmapGenerationCostant{};
   constants.mipmap_count = img.mipmap_uavs().size();
   _mipmap_pipeline.set_descriptors(cmd, "constants", constants,
@@ -235,7 +233,7 @@ void Renderer::generate_mipmap() noexcept
   // wait mipmap generation complete
   g_graphics_engine.wait(g_compute_engine, g_compute_engine.submit_slot());
 
-  _pending_mipmap_indices.clear();
+  _pending_mipmap_image_handles.clear();
 
   // TODO: release mipmap uavs after generation complete
 }

@@ -1,7 +1,7 @@
 #include "ui_context.hpp"
 #include "util/error_handling.hpp"
 #include "../renderer/window/window_manager.hpp"
-#include "../renderer/renderer.hpp"
+#include "../renderer/renderer/renderer.hpp"
 #include "../util/hash.hpp"
 #include "image_manager.hpp"
 #include "text_engine.hpp"
@@ -9,28 +9,6 @@
 using namespace tk::renderer;
 
 namespace tk { namespace ui {
-
-auto get_bounding_rectangle(std::vector<glm::vec2> const& data) noexcept -> std::pair<glm::vec2, glm::vec2>
-{
-  assert(data.size() > 1);
-
-  auto min = data[0];
-  auto max = data[0];
-
-  for (auto i = 1; i < data.size(); ++i)
-  {
-    auto& p = data[i];
-    if (p.x < min.x) min.x = p.x;
-    if (p.y < min.y) min.y = p.y;
-    if (p.x > max.x) max.x = p.x;
-    if (p.y > max.y) max.y = p.y;
-  }
-
-  min -= 1;
-  max += 1;
-
-  return { min, max };
-}
 
 auto is_caps_locked() noexcept -> bool
 {
@@ -94,7 +72,6 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
     _window = &_windows[name.data()];
     _window_names.emplace(_window->snap.handle, name.data());
     _window->can_be_closed = is_closed;
-    for (auto& handle : _window->datas) handle = g_render_data_pool.alloc();
   }
 
   _window = &_windows[name.data()];
@@ -103,16 +80,13 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
   if (is_closed)
     *is_closed = _window->is_closed;
 
-  _shape_properties_offset = 0;
-  _idx_beg                 = 0;
-
   if (_window->cfg.display_title_bar)
     set_render_pos(0, Title_Bar_Height);
   else
     set_render_pos(0, 0);
 
   _window->clear_move_invalid_areas();
-  _window->data()->wait();
+  _window->cmd()->wait().reset();
 }
 
 void UIContext::end() noexcept
@@ -171,11 +145,7 @@ void UIContext::close_window() noexcept
     }
     else
     {
-      for (auto h : window.datas)
-      {
-        g_render_data_pool[h].wait();
-        g_render_data_pool.free(h);
-      }
+      for (auto& cmd : window.cmds) cmd.wait();
       g_wnd_mgr.close_window(window.snap.handle);
       _window_names.erase(window.snap.handle);
       return true;
@@ -195,36 +165,37 @@ void UIContext::render() noexcept
   // acquire frame, for synchronous with present vsync
   g_renderer.acquire_frame();
 
-  // wakeup if renderer is sleeping, which is no render data has
+  // wakeup if renderer is sleeping, which is mean no commands submit
   auto need_wakeup = g_renderer.is_sleeping();
 
   // process window render datas
-  static auto render = [](Window& wnd, RenderData* data)
+  static auto render = [](Window& wnd, CommandList* cmd)
   {
-    g_renderer.render(wnd.snap.handle, data);
-    if (data) wnd.next_frame();
+    g_renderer.submit(wnd.snap.handle, cmd);
+    if (cmd) wnd.next_frame();
   };
   for (auto& wnd : _windows | std::views::values)
   {
-    auto data = wnd.data();
+    auto cmd = wnd.cmd();
+
     if (!wnd.snap.resizing)
     {
-      data->scissor_rect.left   = Window_Shadow_Thickness;
-      data->scissor_rect.top    = Window_Shadow_Thickness;
-      data->scissor_rect.right  = data->scissor_rect.left + wnd.snap.width;
-      data->scissor_rect.bottom = data->scissor_rect.top  + wnd.snap.height;
-      render(wnd, wnd.data());
+      cmd->set_render_area({Window_Shadow_Thickness, Window_Shadow_Thickness,
+        static_cast<LONG>(Window_Shadow_Thickness + wnd.snap.width),
+        static_cast<LONG>(Window_Shadow_Thickness + wnd.snap.height)});
+      cmd->submit();
+      render(wnd, cmd);
     }
     else
-    {
+    { 
       if (wnd.need_clear)
       {
         wnd.need_clear = false;
         render(wnd, {});
       }
-      data->scissor_rect        = wnd.rect();
-      data->resizing_window_pos = wnd.real_pos();
-      render(_fullscreen_window, wnd.data());
+      cmd->set_render_area(wnd.rect(), wnd.real_pos());
+      cmd->submit();
+      render(_fullscreen_window, cmd);
     }
   }
   if (_fullscreen_window.need_clear)
@@ -327,62 +298,6 @@ void UIContext::add_mouse_left_button_state(size_t id, glm::vec2 left_top, glm::
 auto UIContext::is_cursor_move_out(size_t id) noexcept -> bool
 {
   return _btn_state.id != id ? false : _btn_state.move_out;
-}
-
-void UIContext::add_vertices_indices(std::pair<glm::vec2, glm::vec2> bounding_rectangle) noexcept
-{
-  auto render_data = _window->data();
-  auto [min, max]  = bounding_rectangle;
-
-  auto offset = _op_data.op == ShapeProperty::Operator::none ? _shape_properties_offset : _op_data.offset;
-
-  render_data->vertices.append_range(std::vector<Vertex>
-  {
-    { { min.x, min.y, 0.f }, { 0.f, 0.f }, offset },
-    { { max.x, min.y, 0.f }, { 1.f, 0.f }, offset },
-    { { max.x, max.y, 0.f }, { 1.f, 1.f }, offset },
-    { { min.x, max.y, 0.f }, { 0.f, 1.f }, offset },
-  });
-  render_data->indices.append_range(std::vector<uint16_t>
-  {
-    static_cast<uint16_t>(_idx_beg + 0),
-    static_cast<uint16_t>(_idx_beg + 1),
-    static_cast<uint16_t>(_idx_beg + 2),
-    static_cast<uint16_t>(_idx_beg + 0),
-    static_cast<uint16_t>(_idx_beg + 2),
-    static_cast<uint16_t>(_idx_beg + 3),
-  });
-  _idx_beg += 4;
-}
-
-void UIContext::add_shape_property(renderer::ShapeProperty::Type type, glm::vec4 color, float thickness, std::vector<float> const& values) noexcept
-{
-  auto render_data = _window->data();
-  render_data->shape_properties.emplace_back(ShapeProperty
-  {
-    type,
-    _tmp_color.value_or(color),
-    thickness,
-    _op_data.op,
-    values
-  });
-  _shape_properties_offset += render_data->shape_properties.back().byte_size();
-}
-
-void UIContext::add_shape(renderer::ShapeProperty::Type type, glm::vec4 color, float thickness, std::vector<float> const& values, std::pair<glm::vec2, glm::vec2> bounding_rectangle) noexcept
-{
-  auto [min, max] = bounding_rectangle;
-
-  if (_op_data.op == ShapeProperty::Operator::u)
-  {
-    _op_data.points.emplace_back(min);
-    _op_data.points.emplace_back(max);
-    goto add_shape_property;
-  }
-
-  add_vertices_indices(bounding_rectangle);
-add_shape_property:
-  add_shape_property(type, color, thickness, values);
 }
 
 void UIContext::render_on(int x, int y, std::move_only_function<void()>&& func) noexcept
@@ -547,48 +462,33 @@ void UIContext::begin_path() noexcept
   check_draw();
   check_path_not_draw();
   _path_begin = true;
-  path_data.push_back(std::bit_cast<float>(0u)); // record count
+  cmd()->begin_path();
 }
 
 void UIContext::end_path(Color color, float thickness) noexcept
 {
   check_draw();
   check_path_draw();
-  err_if(path_data.empty(), "path drawing not have any data");
-
-  add_shape(ShapeProperty::Type::path, color, thickness, path_data, get_bounding_rectangle(path_points));
-
-  _path_begin = {};
-  path_data.clear();
-  path_points.clear();
+  _path_begin = false;
+  cmd()->end_path(color, thickness);
 }
 
 void UIContext::begin_union() noexcept
 {
   check_draw();
   check_path_not_draw();
-  err_if(_union_begin, "cannot call begin union twice");
-  _union_begin    = true;
-  _op_data.op     = ShapeProperty::Operator::u;
-  _op_data.offset = _shape_properties_offset;
+  check_union_not_draw();
+  _union_begin = true;
+  cmd()->begin_union();
 }
 
 void UIContext::end_union(Color color, float thickness) noexcept
 {
   check_draw();
-  err_if(!_union_begin, "cannot call end union in an uncomplete unino operator");
-  err_if(_path_begin, "cannot call end union in an uncomplete path draw");
+  check_path_not_draw();
+  check_union_draw();
   _union_begin = false;
-  auto render_data = _window->data();
-  render_data->shape_properties.back().set_color(_tmp_color.value_or(color));
-  render_data->shape_properties.back().set_thickness(thickness);
-  render_data->shape_properties.back().set_operator({});
-
-  add_vertices_indices(get_bounding_rectangle(_op_data.points));
-
-  _op_data.op     = {};
-  _op_data.offset = {};
-  _op_data.points.clear();
+  cmd()->end_union(color, thickness);
 }
 
 void UIContext::update_keys() noexcept
@@ -656,9 +556,7 @@ void UIContext::image(std::string_view path, glm::vec2 left_top, glm::vec2 right
     auto offset = get_render_pos();
     left_top     += offset;
     right_bottom += offset;
-    add_shape(ShapeProperty::Type::image, {}, {},
-      { std::bit_cast<float>(g_img_mgr.index(path)), static_cast<float>(alpha) / 0xff },
-      { left_top, right_bottom });
+    cmd()->image(g_img_mgr.handle(path), left_top, right_bottom, alpha);
   }
   else
     warn("image {} is not exist", path);
@@ -686,7 +584,7 @@ auto UIContext::text(std::string_view text, glm::vec2 pos, float size, Color inn
   values.emplace_back(outer_color.b);
   values.emplace_back(outer_color.a);
   values.emplace_back(.05f); // outline width, TODO: can be set by user
-  add_shape_property(ShapeProperty::Type::glyph, {}, {}, values);
+  // add_shape_property(ShapeProperty::Type::glyph, {}, {}, values);
 
   return res.extent;
 }

@@ -1,8 +1,9 @@
 #include "window.hpp"
-#include "../renderer.hpp"
+#include "../renderer/renderer.hpp"
 #include "window_manager.hpp"
 #include "../../ui/ui_context.hpp"
 #include "../config.hpp"
+#include "util/error_handling.hpp"
 
 using namespace tk::ui;
 

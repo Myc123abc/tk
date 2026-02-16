@@ -1,5 +1,5 @@
 #include "image_manager.hpp"
-#include "../renderer/renderer.hpp"
+#include "../renderer/renderer/renderer.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -21,7 +21,7 @@ auto ImageManager::create_image(uint32_t width, uint32_t height, ImageFormat for
   auto& info = _pool[handle];
   info.width  = width;
   info.height = height;
-  g_renderer.send_message(Renderer::Message_Create_Image{ width, height, format, handle.index() });
+  g_renderer.send_message(Renderer::Message_Create_Image{ handle, width, height, format });
   return handle;
 }
 
@@ -30,7 +30,7 @@ void ImageManager::destroy_image(ImageHandle handle) noexcept
   assert(_images.contains(handle));
 
   // remove image resource by index
-  g_renderer.send_message(Renderer::Message_Destroy_Image{ handle.index() });
+  g_renderer.send_message(Renderer::Message_Destroy_Image{ handle });
 
   // remove image
   _images.erase(handle);
@@ -76,10 +76,13 @@ void ImageManager::load(std::string_view path, uint32_t width, uint32_t height, 
   _loaded_images.emplace(path, handle);
   _pool[handle] = { width, height, use_mipmap };
 
+  if (!_image_extents.contains(path.data()))
+    _image_extents[path.data()] = { width, height };
+
   // send message to renderer
   auto msg = Renderer::Message_Upload_Image{};
   msg.bitmap.init(width, height, 4, data);
-  msg.index      = handle.index();
+  msg.handle     = handle;
   msg.use_mipmap = use_mipmap;
   g_renderer.send_message(std::move(msg));
 }
@@ -92,7 +95,7 @@ void ImageManager::unload(std::string_view path) noexcept
   auto handle = _loaded_images.at(path.data());
 
   // remove image resource by index
-  g_renderer.send_message(Renderer::Message_Destroy_Image{ handle.index() });
+  g_renderer.send_message(Renderer::Message_Destroy_Image{ handle });
 
   // remove image record
   _loaded_images.erase(path.data());

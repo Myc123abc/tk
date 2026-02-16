@@ -37,7 +37,7 @@ public:
 
 private:
   int                   _index{ -1 };
-  DescriptorHeapType    _type;
+  DescriptorHeapType    _type{};
   std::function<void()> _recreate_descriptor_func;
 };
 
@@ -70,7 +70,7 @@ class DescriptorHeapManager
   private:
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>   _heap;
     std::vector<std::pair<bool, DescriptorHandle>> _handles;
-    DescriptorHeapType                             _type;
+    DescriptorHeapType                             _type{};
   };
 
 private:

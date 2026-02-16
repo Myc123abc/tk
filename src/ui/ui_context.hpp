@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../renderer/resource/render_data.hpp"
+#include "command_list.hpp"
 #include "../renderer/window/window_manager.hpp"
 #include "../renderer/config.hpp"
 #include "../util/message_queue.hpp"
@@ -18,7 +18,6 @@
 
 namespace tk { namespace ui {
 
-auto get_bounding_rectangle(std::vector<glm::vec2> const& data) noexcept -> std::pair<glm::vec2, glm::vec2>;
 auto is_hover_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool;
 auto is_caps_locked() noexcept -> bool;
 
@@ -53,11 +52,11 @@ struct Window
   glm::vec2    render_pos{};
   bool         need_clear{};
 
-  uint32_t                                                      frame_index{};
-  std::array<renderer::RenderDataHandle, renderer::Frame_Count> datas;
+  uint32_t                                       frame_index{};
+  std::array<CommandList, renderer::Frame_Count> cmds;
 
-  auto data()       noexcept { return &renderer::g_render_data_pool[datas[frame_index]]; }
-  void next_frame() noexcept { frame_index = (frame_index + 1) % datas.size();           }
+  auto cmd()        noexcept { return &cmds[frame_index];                     }
+  void next_frame() noexcept { frame_index = (frame_index + 1) % cmds.size(); }
 
   std::array<std::vector<RECT>, 2> move_invalid_areas{};
   std::atomic_uint32_t             move_invalid_areas_idx{};
@@ -71,8 +70,8 @@ struct Window
 class UIContext
 {
 private:
-  UIContext()                           = default;
-  ~UIContext()                          = default;
+  UIContext()                            = default;
+  ~UIContext()                           = default;
 public:
   UIContext(UIContext const&)            = delete;
   UIContext(UIContext&&)                 = delete;
@@ -99,25 +98,17 @@ public:
   void check_union_draw() const noexcept;
   void check_union_not_draw() const noexcept;
 
+  auto cmd() noexcept { return _window->cmd(); }
+
+  void render() noexcept;
+
   void begin_path() noexcept;
   void end_path(Color color, float thickness) noexcept;
   void begin_union() noexcept;
   void end_union(Color color, float thickness) noexcept;
 
-  void render() noexcept;
-
-  void add_vertices_indices(std::pair<glm::vec2, glm::vec2> bounding_rectangle) noexcept;
-  void add_shape_property(renderer::ShapeProperty::Type type, glm::vec4 color, float thickness, std::vector<float> const& values) noexcept;
-  void add_shape(renderer::ShapeProperty::Type type, glm::vec4 color, float thickness, std::vector<float> const& values, std::pair<glm::vec2, glm::vec2> bounding_rectangle) noexcept;
-
-  auto is_path_draw()  const noexcept { return _path_begin;  }
-  auto is_union_draw() const noexcept { return _union_begin; }
-
   auto is_hover_on(size_t id, glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool;
 
-  void enable_tmp_color(glm::vec4 color) noexcept { _tmp_color = color; }
-  void disable_tmp_color() noexcept { _tmp_color = {}; }
-  auto get_render_data() noexcept { return _window->data(); }
   void set_render_pos(int x, int y) noexcept { _window->render_pos = { x + renderer::Window_Shadow_Thickness, y + renderer::Window_Shadow_Thickness }; }
   auto get_render_pos() const noexcept { return _window->render_pos; }
 
@@ -152,28 +143,12 @@ private:
   Window                                  _fullscreen_window{};
   std::unordered_map<std::string, Window> _windows;
   std::unordered_map<HWND, std::string>   _window_names;
-  uint32_t                                _shape_properties_offset{};
-  uint16_t                                _idx_beg{};
-
   bool                                    _call_begin{};
   bool                                    _path_begin{};
   bool                                    _union_begin{};
+  double                                  _delta_time{};
 
 public:
-  std::vector<float>                      path_data;
-  std::vector<glm::vec2>                  path_points;
-private:
-
-  struct OperatorShapeRenderData
-  {
-    renderer::ShapeProperty::Operator op;
-    std::vector<glm::vec2>            points;
-    uint32_t                          offset{};
-  };
-  OperatorShapeRenderData  _op_data;
-  std::optional<glm::vec4> _tmp_color;
-  double                   _delta_time{};
-
   //
   // widget ids
   //

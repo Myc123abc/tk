@@ -1,4 +1,5 @@
 #include "renderer.hpp"
+#include "util/error_handling.hpp"
 
 namespace tk { namespace renderer {
 
@@ -8,6 +9,7 @@ void Renderer::MessageHandler::operator()(Message_Window_Create const& msg) cons
   auto res = RenderResource{};
   res.init(msg.handle, msg.width, msg.height);
   renderer._res.emplace(msg.handle, std::move(res));
+  renderer._render_datas.emplace(msg.handle, RenderData{});
 }
 
 void Renderer::MessageHandler::operator()(Message_Window_Destroy const& msg) const noexcept
@@ -19,6 +21,7 @@ void Renderer::MessageHandler::operator()(Message_Window_Destroy const& msg) con
     DestroyWindow(handle);
   });
   renderer._res.erase(msg.handle);
+  renderer._render_datas.erase(msg.handle);
   renderer._destroied_windows.emplace(msg.handle);
 }
 
@@ -33,16 +36,13 @@ void Renderer::UIContextMessageHandler::operator()(Message_Upload_Image const& m
   // create image resource
   auto image = Image{};
   image.init(ImageType::srv, ImageFormat::rgba8_unorm, msg.bitmap.width, msg.bitmap.height, msg.use_mipmap);
-  if (msg.use_mipmap)
-    renderer._pending_mipmap_indices.emplace_back(msg.index);
-
-  // store image indices
-  renderer._image_indices.resize(msg.index + 1);
-  renderer._image_indices.at(msg.index) = image.index();
 
   // store image and bitmap for upload
-  renderer._upload_images[msg.index] = image;
-  renderer._bitmaps[msg.index]       = msg.bitmap;
+  renderer._upload_images[msg.handle] = image;
+  renderer._bitmaps[msg.handle]       = msg.bitmap;
+
+  if (msg.use_mipmap)
+    renderer._pending_mipmap_image_handles.emplace_back(msg.handle);
 }
 
 void Renderer::UIContextMessageHandler::operator()(Message_Create_Image const& msg) const noexcept
@@ -51,30 +51,25 @@ void Renderer::UIContextMessageHandler::operator()(Message_Create_Image const& m
   auto image = Image{};
   image.init(ImageType::srv, msg.format, msg.width, msg.height);
 
-  // store image indices
-  renderer._image_indices.resize(msg.index + 1);
-  renderer._image_indices.at(msg.index) = image.index();
-
-  assert(!renderer._images.contains(msg.index));
-  renderer._images.emplace(msg.index, std::move(image));
+  assert(!renderer._images.contains(msg.handle));
+  renderer._images.emplace(msg.handle, std::move(image));
 }
 
 void Renderer::UIContextMessageHandler::operator()(Message_Destroy_Image const& msg) const noexcept
 {
-  renderer._image_indices.at(msg.index) = {};
-  if (renderer._upload_images.contains(msg.index))
+  if (renderer._upload_images.contains(msg.handle))
   {
-    assert(renderer._bitmaps.contains(msg.index));
+    assert(renderer._bitmaps.contains(msg.handle));
 
     // not upload yet, remove upload image
-    renderer._upload_images.erase(msg.index);
-    renderer._bitmaps.erase(msg.index);
+    renderer._upload_images.erase(msg.handle);
+    renderer._bitmaps.erase(msg.handle);
   }
   else
   {
     // already uploaded, release image resource
-    renderer.add_frame_render_complete_func([image = renderer._images.at(msg.index)] mutable { image.destroy(); });
-    renderer._images.erase(msg.index);
+    renderer.add_frame_render_complete_func([image = renderer._images.at(msg.handle)] mutable { image.destroy(); });
+    renderer._images.erase(msg.handle);
   }
 }
 

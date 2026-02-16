@@ -32,7 +32,7 @@ auto lerp(glm::vec2 x, glm::vec2 y, float v) noexcept -> glm::vec2
 {
   return { std::lerp(x.x, y.x, v), std::lerp(x.y, y.y, v) };
   // use round for small pixel level lerp for smooth
-  //return { std::round(std::lerp(a.x, b.x, t)), std::round(std::lerp(a.y, b.y, t)) };
+  // return { std::round(std::lerp(a.x, b.x, t)), std::round(std::lerp(a.y, b.y, t)) };
 }
 
 auto delta_time() noexcept -> double
@@ -116,21 +116,15 @@ auto window_drawable_extent() noexcept -> glm::vec2
 
 void discard_rectangle(glm::vec2 left_top, glm::vec2 right_bottom) noexcept
 {
-  g_ui_ctx.check_draw();
-  
-  auto render_data = g_ui_ctx.get_render_data();
-  err_if(render_data->shape_properties.empty(), "failed must draw a shape then use discard rectangle");
-  err_if(g_ui_ctx.is_union_draw(), "don't use discard rectangle in union operator, I'm not test for this");
-  err_if(g_ui_ctx.is_path_draw(), "don't use discard rectangle in part draw, I'm not test for this");
-
-  auto& shape_property = render_data->shape_properties.back();
-  shape_property.set_operator(ShapeProperty::Operator::discard);
+  g_ui_ctx.check_draw();  
+  g_ui_ctx.check_path_not_draw();
+  g_ui_ctx.check_union_not_draw();
 
   auto offset = g_ui_ctx.get_render_pos();
   left_top     += offset;
   right_bottom += offset;
 
-  g_ui_ctx.add_shape_property(ShapeProperty::Type::rectangle, {}, {}, { left_top.x, left_top.y, right_bottom.x, right_bottom.y });
+  g_ui_ctx.cmd()->add_discard_rectangle(left_top, right_bottom);
 }
 
 void begin_path() noexcept
@@ -166,7 +160,7 @@ void rectangle(glm::vec2 left_top, glm::vec2 right_bottom, Color color, float th
 	left_top     += offset;
 	right_bottom += offset;
 
-	g_ui_ctx.add_shape(ShapeProperty::Type::rectangle, color, thickness, { left_top.x, left_top.y, right_bottom.x, right_bottom.y }, { left_top, right_bottom });
+  g_ui_ctx.cmd()->draw_rectangle(left_top, right_bottom, color, thickness);
 }
 
 void triangle(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color, float thickness) noexcept
@@ -179,7 +173,7 @@ void triangle(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color, float thick
 	p1 += offset;
 	p2 += offset;
 
-	g_ui_ctx.add_shape(ShapeProperty::Type::triangle, color, thickness, { p0.x, p0.y, p1.x, p1.y, p2.x, p2.y }, get_bounding_rectangle({ p0, p1, p2 }));
+	g_ui_ctx.cmd()->draw_triangle(p0, p1, p2, color, thickness);
 }
 
 void circle(glm::vec2 center, float radius, Color color, float thickness) noexcept
@@ -189,10 +183,7 @@ void circle(glm::vec2 center, float radius, Color color, float thickness) noexce
 
 	auto offset = g_ui_ctx.get_render_pos();
   center += offset;
-
-  auto r = radius - 1;
-  if (r < 0) r = 1;
-  g_ui_ctx.add_shape(ShapeProperty::Type::circle, color, thickness, { center.x, center.y, r }, { center - radius, center + radius });
+  g_ui_ctx.cmd()->draw_circle(center, radius, color, thickness);
 }
 
 void line(glm::vec2 p0, glm::vec2 p1, Color color) noexcept
@@ -205,18 +196,7 @@ void line(glm::vec2 p0, glm::vec2 p1, Color color) noexcept
   p0 += offset;
   p1 += offset;
 
-  if (g_ui_ctx.is_path_draw())
-  {
-    g_ui_ctx.path_data[0] = std::bit_cast<float>(std::bit_cast<uint32_t>(g_ui_ctx.path_data[0]) + 1);
-    auto points = { p0, p1 };
-    g_ui_ctx.path_points.append_range(points);
-    g_ui_ctx.path_data.emplace_back(std::bit_cast<float>(ShapeProperty::Type::path_line));
-    g_ui_ctx.path_data.append_range(std::ranges::to<std::vector<float>>(points
-      | std::views::transform([](auto const& p) { return std::array<float, 2>{ p.x, p.y }; })
-      | std::views::join));
-  }
-  else
-    g_ui_ctx.add_shape(ShapeProperty::Type::line, color, {}, { p0.x, p0.y, p1.x, p1.y }, get_bounding_rectangle({ p0, p1 }));
+  g_ui_ctx.cmd()->draw_line(p0, p1, color);
 }
 
 void bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color) noexcept
@@ -228,18 +208,7 @@ void bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color) noexcept
   p1 += offset;
   p2 += offset;
 
-  if (g_ui_ctx.is_path_draw())
-  {
-    g_ui_ctx.path_data[0] = std::bit_cast<float>(std::bit_cast<uint32_t>(g_ui_ctx.path_data[0]) + 1);
-    auto points = { p0, p1, p2 };
-    g_ui_ctx.path_points.append_range(points);
-    g_ui_ctx.path_data.emplace_back(std::bit_cast<float>(ShapeProperty::Type::path_bezier));
-    g_ui_ctx.path_data.append_range(std::ranges::to<std::vector<float>>(points
-      | std::views::transform([](auto const& p) { return std::array<float, 2>{ p.x, p.y }; })
-      | std::views::join));
-  }
-  else
-    g_ui_ctx.add_shape(ShapeProperty::Type::bezier, color, {}, { p0.x, p0.y, p1.x, p1.y, p2.x, p2.y }, get_bounding_rectangle({ p0, p1, p2 }));
+  g_ui_ctx.cmd()->draw_bezier(p0, p1, p2, color);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -264,7 +233,7 @@ auto is_click_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
       !g_ui_ctx.mouse_down_pos         ||
       !g_ui_ctx.mouse_up_pos           ||
        g_ui_ctx.mouse_down_window != g_ui_ctx.mouse_up_window) return false;
-  return !g_ui_ctx.is_move_from_maximize                                 &&
+  return !g_ui_ctx.is_move_from_maximize                                   &&
          point_on(g_ui_ctx.mouse_down_pos.value(), left_top, right_bottom) &&
          point_on(g_ui_ctx.mouse_up_pos.value(),   left_top, right_bottom);
 }
@@ -370,9 +339,9 @@ auto button(
     
     g_ui_ctx.render_on(x + x_offset, y + y_offset, [&]
     {
-      g_ui_ctx.enable_tmp_color(icon_color);
+      g_ui_ctx.cmd()->enable_tmp_color(icon_color);
       icon_update_func(icon_width, icon_height);
-      g_ui_ctx.disable_tmp_color();
+      g_ui_ctx.cmd()->disable_tmp_color();
     });
   }
 

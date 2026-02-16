@@ -2,6 +2,8 @@
 #include "../../util/align.hpp"
 #include "../core.hpp"
 
+#include <algorithm>
+
 namespace tk { namespace renderer {
 
 ////////////////////////////////////////////////////////////////////////////////

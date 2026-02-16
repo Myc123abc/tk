@@ -49,26 +49,22 @@ public:
   {
     _vertices_indices_buffer.destroy();
     _shape_properties_buffer.destroy();
-    _image_indices.destroy();
   }
 
   auto clear() noexcept -> FrameBuffer&
   {
     _vertices_indices_buffer.clear();
     _shape_properties_buffer.clear();
-    _image_indices.clear();
     return *this;
   }
 
-  void upload(ID3D12GraphicsCommandList1* cmd, RenderData* data) noexcept;
+  void upload(ID3D12GraphicsCommandList1* cmd, RenderData& data) noexcept;
 
   auto shape_properties_gpu_handle() const noexcept { return _shape_properties_buffer.gpu_handle(); }
-  auto image_indices_gpu_handle()     const noexcept { return _image_indices.gpu_handle();            }
 
 private:
   Buffer _vertices_indices_buffer;
   Buffer _shape_properties_buffer;
-  Buffer _image_indices;
 };
 
 }}

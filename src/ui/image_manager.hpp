@@ -10,15 +10,6 @@
 
 namespace tk { namespace ui {
 
-struct ImageInfo
-{
-  uint32_t width{};
-  uint32_t height{};
-  bool     has_mipmap{};
-
-  auto extent() const noexcept -> glm::vec2 { return { width, height }; }
-};
-
 class ImageManager
 {
 private:
@@ -39,6 +30,19 @@ public:
   void destroy() noexcept;
 
 private:
+  struct ImageInfo
+  {
+    uint32_t width{};
+    uint32_t height{};
+    bool     has_mipmap{};
+
+    auto extent() const noexcept -> glm::vec2 { return { width, height }; }
+
+    ImageInfo() noexcept = default;
+    ImageInfo(uint32_t width, uint32_t height, bool has_mipmap) noexcept
+      : width(width), height(height), has_mipmap(has_mipmap) {}
+  };
+
   using PoolType    = ObjectPool<ImageInfo, Image_Pool_Init_Capacity>;
 public:
   using ImageHandle = PoolType::Handle;
@@ -54,7 +58,7 @@ public:
 
   auto contains(std::string_view path) const noexcept { return _loaded_images.contains(path.data());   }
   auto extent(std::string_view path) noexcept -> glm::vec2;
-  auto index(std::string_view path) const noexcept { return _loaded_images.at(path.data()).index(); }
+  auto handle(std::string_view path) const noexcept { return _loaded_images.at(path.data()); }
 
 private:
   void load(std::string_view path, uint32_t width, uint32_t height, void* data, bool use_mipmap) noexcept;

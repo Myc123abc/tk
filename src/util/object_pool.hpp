@@ -32,11 +32,6 @@ public:
 
   constexpr bool operator==(ObjectPoolHandle const&) const noexcept = default;
 
-  constexpr auto index() const noexcept -> uint32_t
-  {
-    return _block_idx * BlockCapacity + _slot_idx;
-  }
-
 private:
   constexpr ObjectPoolHandle(uint16_t block_idx, uint16_t slot_idx, uint32_t generation) noexcept
     : _block_idx(block_idx), _slot_idx(slot_idx), _generation(generation) {}
