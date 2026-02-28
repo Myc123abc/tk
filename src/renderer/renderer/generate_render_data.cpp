@@ -22,8 +22,17 @@ auto get_bounding_rectangle(std::vector<glm::vec2> const& data) noexcept -> std:
     if (p.y > max.y) max.y = p.y;
   }
 
-  min -= 1;
-  max += 1;
+  if (min.x == max.x || min.y == max.y)
+  {
+    // promise horizontal or vertical line only 1px
+    min -= 0.5;
+    max += 0.5;
+  }
+  else
+  {
+    min -= 1.0;
+    max += 1.0;
+  }
 
   return { min, max };
 }
