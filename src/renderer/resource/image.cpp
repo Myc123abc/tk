@@ -184,13 +184,13 @@ void Image::create_descriptor(bool use_mipmap) noexcept
   {
     device->CreateRenderTargetView(_handle.Get(), nullptr, _descriptor_handle.cpu_handle());
   };
-  auto create_shader_resource_view = [&]
+  auto create_shader_resource_view = [&, use_mipmap = use_mipmap]
   {
     auto srv_desc = D3D12_SHADER_RESOURCE_VIEW_DESC{};
     srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     srv_desc.Format                  = _format;
     srv_desc.ViewDimension           = D3D12_SRV_DIMENSION_TEXTURE2D;
-    srv_desc.Texture2D.MipLevels     = 1;
+    srv_desc.Texture2D.MipLevels     = use_mipmap ? -1 : 1;
     device->CreateShaderResourceView(_handle.Get(), &srv_desc, _descriptor_handle.cpu_handle());
   };
   auto create_depth_stencil_view = [&]
@@ -372,6 +372,13 @@ void copy(Bitmap const& src, Bitmap const& dst) noexcept
     src_data += src.row_pitch;
     dst_data += dst.row_pitch;
   }
+}
+
+void Image::release_mipmap_uavs() noexcept
+{
+  assert(!_mipmap_uavs.empty());
+  for (auto& uav : _mipmap_uavs) uav.release(); 
+  _mipmap_uavs.clear();
 }
 
 }}

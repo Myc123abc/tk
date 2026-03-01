@@ -52,18 +52,20 @@ auto ImageManager::extent(std::string_view path) noexcept -> glm::vec2
 
 auto ImageManager::try_load(std::string_view path, glm::vec2 extent) noexcept -> bool
 {
-  if (_loaded_images.contains(path.data()))
-  {
-    auto const& info = _pool[_loaded_images.at(path.data())];
-    if (!info.has_mipmap && (extent.x < info.width || extent.y < info.height))
-      generate_mipmap(path);
-  }
-  else
+  // if (_loaded_images.contains(path.data()))
+  // {
+  //   auto const& info = _pool[_loaded_images.at(path.data())];
+  //   if (!info.has_mipmap && (extent.x < info.width || extent.y < info.height))
+  //     generate_mipmap(path);
+  // }
+  // else
+  if (!_loaded_images.contains(path.data()))
   {
     int w, h; 
     auto data = stbi_load(path.data(), reinterpret_cast<int*>(&w), reinterpret_cast<int*>(&h), nullptr, 4);
     if (!data) return false;
-    load(path, w, h, data, extent.x < w || extent.y < h);
+    // load(path, w, h, data, extent.x < w || extent.y < h);
+    load(path, w, h, data, false); // the quality of mipmap scale down not better than directly use sampler
   }
   return true;
 }

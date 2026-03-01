@@ -1,43 +1,40 @@
 struct Constants
 {
-  uint32_t mipmap_count;
+  float2 texel_size;
+  uint   mip_level;
 };
 
 ConstantBuffer<Constants> constants : register(b0);
 SamplerState              g_sampler : register(s0);
-Texture2D                 image     : register(t0);
-RWTexture2D<float4>       output    : register(u0);
-
-groupshared float r[64];
-groupshared float g[64];
-groupshared float b[64];
-groupshared float a[64];
-
-float4 sample_color(bool is_width_even, bool is_height_even, float2 pos, uint32_t width, uint32_t height, uint32_t mip_level)
-{
-  float2 uv;
-  float4 color;
-  if (is_width_even && is_height_even)
-  {
-    uv    = (pos + 0.5) / float2(width, height);
-    color = image.SampleLevel(g_sampler, uv, mip_level);
-  }
-  return color;
-}
+Texture2D                 src       : register(t0);
+RWTexture2D<float4>       dst       : register(u0);
 
 [numthreads(8, 8, 1)]
 void main(uint3 id : SV_DispatchThreadID)
 {
-  uint mip_level = 0;
+  uint width, height, mip_level_count;
+  src.GetDimensions(constants.mip_level, width, height, mip_level_count);
 
-  // get image extent and mipmap counts
-  uint width, height, mipmap_count;
-  image.GetDimensions(mip_level, width, height, mipmap_count);
-  ++mip_level;
+  uint2 pos = id.xy * 2.0;
 
-  // width even height even
-  bool is_width_even  = width  % 2 == 0;
-  bool is_height_even = height % 2 == 0;
+  float4 color = 0;
+  uint   count = 0;
 
-  output[id.xy] = sample_color(is_width_even, is_height_even, id.xy, width, height, mip_level);
+  [unroll]
+  for (uint dy = 0; dy < 2; ++dy)
+  {
+    [unroll]
+    for (uint dx = 0; dx < 2; ++dx)
+    {
+      uint2 p = pos + uint2(dx, dy);
+      if (p.x < width && p.y < height)
+      {
+        float2 uv = (float2(p) + 0.5) * constants.texel_size;
+        color += src.SampleLevel(g_sampler, uv, constants.mip_level);
+        ++count;
+      }
+    }
+  }
+
+  dst[id.xy] = color / count;
 }

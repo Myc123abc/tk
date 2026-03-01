@@ -116,6 +116,8 @@ public:
   auto index()       const noexcept { return _descriptor_handle.index();      }
   auto mipmap_uavs() const noexcept { return _mipmap_uavs;                    }
 
+  void release_mipmap_uavs() noexcept;
+
 private:
   void init(ImageType type, DXGI_FORMAT format, uint32_t width , uint32_t height, bool use_mipmap = false) noexcept;
   void create_descriptor(bool use_mipmap = false) noexcept;
