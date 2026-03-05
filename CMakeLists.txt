@@ -49,7 +49,7 @@ target_link_libraries(tk
   PUBLIC
     glm::glm
   PRIVATE
-    d3d12 dxgi dcomp dxguid dxcompiler
+    d3d12 dxgi dcomp dxguid dxcompiler shcore
     DirectX-Headers
     SPSCQueue
     harfbuzz

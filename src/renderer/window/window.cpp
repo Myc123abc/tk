@@ -19,12 +19,13 @@ auto in_range(float v, float min, float max) noexcept
 
 namespace tk { namespace renderer {
 
-void Window::init(int x, int y, uint32_t width, uint32_t height) noexcept
+void Window::init(int x, int y, uint32_t width, uint32_t height, float scale) noexcept
 {
   this->x      = x;
   this->y      = y;
-  this->width  = width;
-  this->height = height;
+  this->width  = width  * scale;
+  this->height = height * scale;
+  this->scale  = scale;
   update_rect();
 
   _handle = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP, WindowManager::Window_Class, nullptr, WS_POPUP | WS_MINIMIZEBOX,

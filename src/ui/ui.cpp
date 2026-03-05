@@ -65,6 +65,11 @@ auto text(std::string_view text, glm::vec2 pos, float size, Color inner_color, C
   return g_ui_ctx.text(text, pos, size, inner_color, {}, outer_color);
 }
 
+auto get_cursor_pos() noexcept -> glm::vec2
+{
+  return renderer::get_cursor_pos();
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Window
 ////////////////////////////////////////////////////////////////////////////////

@@ -75,6 +75,12 @@ auto delta_time() noexcept -> double;
 auto lerp_ping_pong(std::string_view name, bool b, double duration) noexcept -> double;
 
 /**
+ * get cursor position
+ * @return cursor position
+ */
+auto get_cursor_pos() noexcept -> glm::vec2;
+
+/**
  * reset lerpolator
  * @param name name of lerpolator, TODO: now name only unique in single window, not global unique
  */

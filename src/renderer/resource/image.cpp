@@ -348,7 +348,7 @@ void copy(
   ID3D12Resource*             readback_buffer) noexcept
 {
   src.set_state(cmd, ImageState::copy_src);
-  auto src_loc = CD3DX12_TEXTURE_COPY_LOCATION{ src.handle()    };
+  auto src_loc    = CD3DX12_TEXTURE_COPY_LOCATION{ src.handle() };
   auto region_box = CD3DX12_BOX{ left, top, right, bottom };
 
   auto footprint = D3D12_PLACED_SUBRESOURCE_FOOTPRINT{};

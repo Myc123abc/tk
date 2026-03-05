@@ -2,6 +2,8 @@
 #include "util/error_handling.hpp"
 #include "../../ui/ui_context.hpp"
 
+#include <shellscalingapi.h>
+
 using namespace tk::ui;
 using namespace tk::renderer;
 
@@ -53,6 +55,14 @@ void set_cursor(HWND handle, ResizeType type) noexcept
   SetClassLongPtrA(handle, GCLP_HCURSOR, reinterpret_cast<LONG_PTR>(LoadCursorA(nullptr, cursor)));
 }
 
+inline auto get_monitor_scale(HMONITOR monitor) noexcept
+{
+  uint32_t dpi_x, dpi_y;
+  GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &dpi_x, &dpi_y);
+  assert(dpi_x == dpi_y);
+  return dpi_x / 96.f;
+}
+
 }
 
 namespace tk { namespace renderer {
@@ -64,7 +74,8 @@ void WindowManager::init() noexcept
     _thread_id = GetCurrentThreadId();
 
     // enable DPI awareness
-    SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    update_monitors();
 
     // register window class
     auto wnd_class = WNDCLASSEXW{};
@@ -92,6 +103,7 @@ void WindowManager::init() noexcept
       TranslateMessage(&msg);
       DispatchMessageW(&msg);
       message_process(msg.hwnd, static_cast<Message>(msg.message), msg.wParam, msg.lParam);
+      update();
     }
   });
 }
@@ -142,9 +154,17 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     return 0;
   }
 
+  case WM_SETTINGCHANGE:
+  {
+    if (w_param == SPI_SETWORKAREA)
+      wnd_mgr._update_monitors = true;
+    return 0;
+  }
+
   // when another monitor remove or add, update window position
   case WM_DISPLAYCHANGE:
   {
+    wnd_mgr._update_monitors = true;
     if (windows.contains(handle))
     {
       auto& window = windows.at(handle);
@@ -246,6 +266,35 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   }
 
   return DefWindowProcW(handle, msg, w_param, l_param);
+}
+
+void WindowManager::update() noexcept
+{
+  if (_update_monitors)
+  {
+    _update_monitors = false;
+    update_monitors();
+  }
+}
+
+auto CALLBACK WindowManager::enum_display_monitors(HMONITOR monitor, HDC, LPRECT, LPARAM) -> BOOL
+{
+  auto& info = g_wnd_mgr._monitor_infos[monitor];
+
+  auto monitor_info = MONITORINFO{};
+  monitor_info.cbSize = sizeof(monitor_info);
+  GetMonitorInfo(monitor, &monitor_info);
+
+  info.rect  = monitor_info.rcMonitor;
+  info.scale = get_monitor_scale(monitor);
+
+  return TRUE;
+}
+
+void WindowManager::update_monitors() noexcept
+{
+  _monitor_infos.clear();
+  EnumDisplayMonitors(nullptr, nullptr, enum_display_monitors, 0);
 }
 
 auto WindowManager::create_fullscreen_window() noexcept -> WindowSnapshot
@@ -405,9 +454,16 @@ void WindowManager::msg_create_window(WPARAM w_param) noexcept
   // get create info
   auto info = reinterpret_cast<WindowCreateInfo*>(w_param);
 
+  // get scale of monitor
+  auto scale = 1.f;
+  auto infos = _monitor_infos | std::views::values;
+  if (auto it = std::ranges::find_if(infos, [x = info->x, y = info->y](auto const& info) { return PtInRect(&info.rect, { x, y }); });
+     it != infos.end())
+    scale = it.base()->second.scale;
+
   // init window and set handle
   auto window = Window{};
-  window.init(info->x, info->y, info->width, info->height);
+  window.init(info->x, info->y, info->width, info->height, scale);
   info->handle = window._handle;
 
   // store window

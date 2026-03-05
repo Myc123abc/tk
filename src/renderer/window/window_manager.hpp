@@ -16,6 +16,11 @@ inline auto get_cursor_pos() noexcept
   return glm::vec<2, int>{ p.x, p.y };
 }
 
+inline auto get_monitor(HWND handle) noexcept
+{
+  return MonitorFromWindow(handle, MONITOR_DEFAULTTONEAREST);
+}
+
 inline auto get_virtual_screen_rect() noexcept
 {
   auto rect = RECT{};
@@ -89,6 +94,7 @@ struct WindowSnapshot
   bool     resizing{};
   bool     maximized{};
   bool     move_from_maximize{};
+  float    scale{};
   
   void init(Window const& window) noexcept
   {
@@ -98,6 +104,7 @@ struct WindowSnapshot
     width     = window.width;
     height    = window.height;
     maximized = window.maximized;
+    scale     = window.scale;
   }
 };
 
@@ -150,8 +157,11 @@ public:
 
 private:
   void message_process(HWND handle, Message msg, WPARAM w_param, LPARAM l_param) noexcept;
-
   void msg_create_window(WPARAM w_param) noexcept;
+
+  void update() noexcept;
+  void update_monitors() noexcept;
+  static auto CALLBACK enum_display_monitors(HMONITOR monitor, HDC, LPRECT, LPARAM) -> BOOL;
 
 private:
   static constexpr wchar_t Auxiliary_Class[] = L"vn::window::WindowManager::AuxiliaryWindow";
@@ -166,6 +176,14 @@ private:
   HANDLE                           _signal_event{};
   std::unordered_set<HWND>         _using_mouse_pass_through_windows;
   UINT_PTR                         _timer_mouse_pass_through{};
+  
+  struct MonitorInfo
+  {
+    float scale{};
+    RECT  rect{};
+  };
+  bool                                      _update_monitors{};
+  std::unordered_map<HMONITOR, MonitorInfo> _monitor_infos{};
 };
 
 inline static auto& g_wnd_mgr{ WindowManager::instance() };

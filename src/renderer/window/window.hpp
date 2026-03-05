@@ -43,7 +43,7 @@ public:
   Window& operator=(Window const&) = default;
   Window& operator=(Window&&)      = default;
 
-  void init(int x, int y, uint32_t width, uint32_t height) noexcept;
+  void init(int x, int y, uint32_t width, uint32_t height, float scale) noexcept;
   void init_auxiliary(int x, int y, uint32_t width, uint32_t height) noexcept;
   void destroy() const noexcept;
 
@@ -98,6 +98,7 @@ public:
   uint32_t width{};
   uint32_t height{};
   bool     maximized{};
+  float    scale{};
 
 private:
   HWND     _handle{};
