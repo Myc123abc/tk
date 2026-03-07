@@ -144,7 +144,7 @@ int main()
 
     if (!wnd2_is_closed)
     {
-      ui::begin("wnd2", 100, 100, 200, 200, &wnd2_is_closed, cfg);
+      ui::begin("wnd2", 0, 1080, 200, 200, &wnd2_is_closed, cfg);
 
       auto wnd_ext = ui::window_drawable_extent();
       ui::rectangle({}, wnd_ext, 0x282c34ff);

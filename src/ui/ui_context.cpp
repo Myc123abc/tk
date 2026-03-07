@@ -180,9 +180,10 @@ void UIContext::render() noexcept
 
     if (!wnd.snap.resizing)
     {
-      cmd->set_render_area({Window_Shadow_Thickness, Window_Shadow_Thickness,
-        static_cast<LONG>(Window_Shadow_Thickness + wnd.snap.width),
-        static_cast<LONG>(Window_Shadow_Thickness + wnd.snap.height)});
+      auto thickness = wnd.shadow_thickness();
+      cmd->set_render_area({ thickness, thickness,
+        static_cast<LONG>(thickness + wnd.snap.width),
+        static_cast<LONG>(thickness + wnd.snap.height)});
       cmd->submit();
       render(wnd, cmd);
     }
@@ -336,8 +337,9 @@ void UIContext::add_title_bar() noexcept
   auto close_btn_mouse_down_color = 0xea6a75ff;
   auto close_btn_hovered_color    = is_active ? 0xe81123ff : 0xe81123ff;
 
-  auto w = _window->snap.width;
-  auto h = _window->snap.height;
+  auto scale = get_scale();
+  auto w     = _window->snap.width  / scale;
+  auto h     = _window->snap.height / scale;
 
   set_render_pos(0, 0);
 
@@ -556,6 +558,11 @@ void UIContext::image(std::string_view path, glm::vec2 left_top, glm::vec2 right
     auto offset = get_render_pos();
     left_top     += offset;
     right_bottom += offset;
+    
+    auto scale = get_scale();
+    left_top     *= scale;
+    right_bottom *= scale;
+
     cmd()->image(g_img_mgr.handle(path), left_top, right_bottom, alpha);
   }
   else

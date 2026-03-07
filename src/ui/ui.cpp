@@ -92,6 +92,11 @@ void add_move_invalid_area(glm::vec2 left_top, glm::vec2 right_bottom) noexcept
     left_top.y     += Title_Bar_Height;
     right_bottom.y += Title_Bar_Height;
   }
+
+  auto scale = g_ui_ctx.get_scale();
+  left_top     *= scale;
+  right_bottom *= scale;
+
   g_ui_ctx._window->add_move_invald_areas(
   {
     static_cast<LONG>(left_top.x),
@@ -104,7 +109,7 @@ void add_move_invalid_area(glm::vec2 left_top, glm::vec2 right_bottom) noexcept
 auto window_extent() noexcept -> glm::vec2
 {
   g_ui_ctx.check_draw();
-  return { g_ui_ctx._window->snap.width, g_ui_ctx._window->snap.height };
+  return glm::vec2{ g_ui_ctx._window->snap.width, g_ui_ctx._window->snap.height } / g_ui_ctx.get_scale();
 }
 
 auto window_drawable_extent() noexcept -> glm::vec2
@@ -128,6 +133,10 @@ void discard_rectangle(glm::vec2 left_top, glm::vec2 right_bottom) noexcept
   auto offset = g_ui_ctx.get_render_pos();
   left_top     += offset;
   right_bottom += offset;
+
+  auto scale = g_ui_ctx.get_scale();
+  left_top     *= scale;
+  right_bottom *= scale;
 
   g_ui_ctx.cmd()->add_discard_rectangle(left_top, right_bottom);
 }
@@ -165,6 +174,10 @@ void rectangle(glm::vec2 left_top, glm::vec2 right_bottom, Color color, float th
 	left_top     += offset;
 	right_bottom += offset;
 
+  auto scale = g_ui_ctx.get_scale();
+  left_top     *= scale;
+  right_bottom *= scale;
+
   g_ui_ctx.cmd()->draw_rectangle(left_top, right_bottom, color, thickness);
 }
 
@@ -178,6 +191,11 @@ void triangle(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color, float thick
 	p1 += offset;
 	p2 += offset;
 
+  auto scale = g_ui_ctx.get_scale();
+  p0 *= scale;
+  p1 *= scale;
+  p2 *= scale;
+
 	g_ui_ctx.cmd()->draw_triangle(p0, p1, p2, color, thickness);
 }
 
@@ -188,6 +206,11 @@ void circle(glm::vec2 center, float radius, Color color, float thickness) noexce
 
 	auto offset = g_ui_ctx.get_render_pos();
   center += offset;
+
+  auto scale = g_ui_ctx.get_scale();
+  radius *= scale;
+  center *= scale;
+
   g_ui_ctx.cmd()->draw_circle(center, radius, color, thickness);
 }
 
@@ -201,6 +224,10 @@ void line(glm::vec2 p0, glm::vec2 p1, Color color) noexcept
   p0 += offset;
   p1 += offset;
 
+  auto scale = g_ui_ctx.get_scale();
+  p0 *= scale;
+  p1 *= scale;
+
   g_ui_ctx.cmd()->draw_line(p0, p1, color);
 }
 
@@ -212,6 +239,11 @@ void bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color) noexcept
   p0 += offset;
   p1 += offset;
   p2 += offset;
+
+  auto scale = g_ui_ctx.get_scale();
+  p0 *= scale;
+  p1 *= scale;
+  p2 *= scale;
 
   g_ui_ctx.cmd()->draw_bezier(p0, p1, p2, color);
 }
@@ -261,13 +293,17 @@ auto button(size_t id, int x, int y, uint32_t width, uint32_t height) noexcept->
 
   // what is a button
   // button is a rectangle with width and height in specific position
-  auto left_top     = glm::vec<2, int>{ x, y };
-  auto right_bottom = glm::vec<2, int>{ x + width, y + height };
+  auto left_top     = glm::vec2{ x, y };
+  auto right_bottom = glm::vec2{ x + width, y + height };
   if (g_ui_ctx._window->cfg.display_title_bar && !g_ui_ctx.draw_title_bar)
   {
     left_top.y     += Title_Bar_Height;
     right_bottom.y += Title_Bar_Height;
   }
+
+  auto scale = g_ui_ctx.get_scale();
+  left_top     *= scale;
+  right_bottom *= scale;
 
   // when cursor hover on it, it will change color to hovered color
   auto is_hovered  = g_ui_ctx.is_hover_on(id, left_top, right_bottom);

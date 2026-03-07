@@ -48,25 +48,33 @@ public:
   void destroy() const noexcept;
 
   void monitor_change() noexcept;
-
-  auto real_x()      const noexcept { return x      - Window_Shadow_Thickness;     }
-  auto real_y()      const noexcept { return y      - Window_Shadow_Thickness;     }
-  auto real_width()  const noexcept { return width  + Window_Shadow_Thickness * 2; }
-  auto real_height() const noexcept { return height + Window_Shadow_Thickness * 2; }
-  auto real_rect()   const noexcept { return RECT{ _rect.left   - static_cast<LONG>(Window_Shadow_Thickness),
-                                                   _rect.top    - static_cast<LONG>(Window_Shadow_Thickness),
-                                                   _rect.right  + static_cast<LONG>(Window_Shadow_Thickness),
-                                                   _rect.bottom + static_cast<LONG>(Window_Shadow_Thickness) }; }
+  
+  auto shadow_thickness() const noexcept -> LONG { return Window_Shadow_Thickness * _scale; }
+  auto real_x()      const noexcept -> int      { return _x      - shadow_thickness();     }
+  auto real_y()      const noexcept -> int      { return _y      - shadow_thickness();     }
+  auto real_width()  const noexcept -> uint32_t { return _width  + shadow_thickness() * 2; }
+  auto real_height() const noexcept -> uint32_t { return _height + shadow_thickness() * 2; }
+  auto real_rect()   const noexcept { return RECT{ _rect.left   - shadow_thickness(),
+                                                   _rect.top    - shadow_thickness(),
+                                                   _rect.right  + shadow_thickness(),
+                                                   _rect.bottom + shadow_thickness() }; }
 
   auto contains_point(glm::vec<2, int> p) const noexcept -> bool;
 
   auto handle() const noexcept { return _handle; }
-  auto pos() const noexcept { return glm::vec<2, int>{ x, y }; }
+  auto pos() const noexcept { return glm::vec<2, int>{ _x, _y }; }
   auto cursor_pos() const noexcept -> glm::vec<2, int>;
 
   auto is_active() const noexcept { return GetForegroundWindow() == _handle; }
   auto is_mouse_pass_through_area() const noexcept -> bool;
 
+  auto x() const noexcept { return _x; }
+  auto y() const noexcept { return _y; }
+  auto width() const noexcept { return _width; }
+  auto height() const noexcept { return _height; }
+  auto scale() const noexcept { return _scale; }
+
+  auto is_maximized() const noexcept { return _maximized; }
   auto is_moving() const noexcept { return _moving; }
   auto is_resizing() const noexcept { return _resizing; }
   auto is_moving_or_resizing() const noexcept { return _moving || _resizing; }
@@ -76,6 +84,7 @@ public:
   void adjust_offset(ResizeType type, glm::vec<2, int> const& point, int& dx, int& dy) const noexcept;
   void resize(ResizeType type, int dx, int dy) noexcept;
   void resize_end() noexcept;
+  void resize_by_scale(float scale) noexcept;
 
   void maximize() noexcept;
   void restore() noexcept;
@@ -91,24 +100,26 @@ private:
   void top_offset(int dy)    noexcept;
   void right_offset(int dx)  noexcept;
   void bottom_offset(int dy) noexcept;
-
-public:
-  int      x{};
-  int      y{};
-  uint32_t width{};
-  uint32_t height{};
-  bool     maximized{};
-  float    scale{};
+  
+  auto min_width() const noexcept { return Window_Min_Width * _scale; }
+  auto min_height() const noexcept { return Window_Min_Height * _scale; }
 
 private:
+  int      _x{};
+  int      _y{};
+  uint32_t _width{};
+  uint32_t _height{};
+
   HWND     _handle{};
+  float    _scale{ 1.f };
+
+  bool     _maximized{};
   bool     _moving{};
   bool     _move_from_maximize{};
   bool     _resizing{};
+
   RECT     _rect{};
   RECT     _backup_rect{};
-  uint32_t _min_width{ 50 };
-  uint32_t _min_height{ 50 };
 };
 
 }}

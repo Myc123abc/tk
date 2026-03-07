@@ -18,7 +18,7 @@ inline auto get_cursor_pos() noexcept
 
 inline auto get_monitor(HWND handle) noexcept
 {
-  return MonitorFromWindow(handle, MONITOR_DEFAULTTONEAREST);
+  return MonitorFromWindow(handle, MONITOR_DEFAULTTONULL);
 }
 
 inline auto get_virtual_screen_rect() noexcept
@@ -99,12 +99,12 @@ struct WindowSnapshot
   void init(Window const& window) noexcept
   {
     handle    = window.handle();
-    x         = window.x;
-    y         = window.y;
-    width     = window.width;
-    height    = window.height;
-    maximized = window.maximized;
-    scale     = window.scale;
+    x         = window.x();
+    y         = window.y();
+    width     = window.width();
+    height    = window.height();
+    maximized = window.is_maximized();
+    scale     = window.scale();
   }
 };
 

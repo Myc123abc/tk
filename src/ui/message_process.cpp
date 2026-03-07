@@ -103,4 +103,14 @@ void UIContext::MessageHandler::operator()(Message_Update_Fullscreen_Window cons
   ctx._fullscreen_window.snap.height = msg.height;
 }
 
+void UIContext::MessageHandler::operator()(Message_Scale_Change const& msg) const noexcept
+{
+  auto& wnd = ctx.get_window(msg.handle).snap;
+  wnd.scale  = msg.scale;
+  wnd.x      = msg.x;
+  wnd.y      = msg.y;
+  wnd.width  = msg.width;
+  wnd.height = msg.height;
+}
+
 }}

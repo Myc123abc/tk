@@ -21,11 +21,11 @@ namespace tk { namespace renderer {
 
 void Window::init(int x, int y, uint32_t width, uint32_t height, float scale) noexcept
 {
-  this->x      = x;
-  this->y      = y;
-  this->width  = width  * scale;
-  this->height = height * scale;
-  this->scale  = scale;
+  _x      = x;
+  _y      = y;
+  _width  = width  * scale;
+  _height = height * scale;
+  _scale  = scale;
   update_rect();
 
   _handle = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP, WindowManager::Window_Class, nullptr, WS_POPUP | WS_MINIMIZEBOX,
@@ -40,10 +40,10 @@ void Window::init(int x, int y, uint32_t width, uint32_t height, float scale) no
 
 void Window::init_auxiliary(int x, int y, uint32_t width, uint32_t height) noexcept
 {
-  this->x      = x;
-  this->y      = y;
-  this->width  = width;
-  this->height = height;
+  _x      = x;
+  _y      = y;
+  _width  = width;
+  _height = height;
   update_rect();
 
   _handle = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
@@ -58,15 +58,15 @@ void Window::init_auxiliary(int x, int y, uint32_t width, uint32_t height) noexc
 
 void Window::update_by_rect() noexcept
 {
-  x      = _rect.left;
-  y      = _rect.top;
-  width  = _rect.right  - _rect.left;
-  height = _rect.bottom - _rect.top;
+  _x      = _rect.left;
+  _y      = _rect.top;
+  _width  = _rect.right  - _rect.left;
+  _height = _rect.bottom - _rect.top;
 }
 
 void Window::update_rect() noexcept
 {
-  _rect = { x, y, static_cast<LONG>(x + width), static_cast<LONG>(y + height) };
+  _rect = { _x, _y, static_cast<LONG>(_x + _width), static_cast<LONG>(_y + _height) };
 }
 
 void Window::destroy() const noexcept
@@ -78,7 +78,7 @@ void Window::destroy() const noexcept
 auto Window::cursor_pos() const noexcept -> glm::vec<2, int>
 {
   auto pos = get_cursor_pos();
-  return { pos.x - x, pos.y - y };
+  return { pos.x - _x, pos.y - _y };
 }
 
 auto Window::cursor_valid_area() const noexcept -> RECT
@@ -106,19 +106,22 @@ auto Window::contains_point(glm::vec<2, int> p) const noexcept -> bool
 void Window::move_from_maximize() noexcept
 {
   auto pos     = cursor_pos();
-  auto ratio_x = static_cast<float>(pos.x) / width;
+  auto ratio_x = static_cast<float>(pos.x) / _width;
 
-  _move_from_maximize =  true;
-  _moving             =  true;
-  maximized           =  false;
-  width               =  _backup_rect.right  - _backup_rect.left;
-  height              =  _backup_rect.bottom - _backup_rect.top;
-  x                   = get_cursor_pos().x - width * ratio_x;
-  if (pos.y < Window_Y_Pos_Moving_From_Maximize)
-    y -= Window_Y_Pos_Moving_From_Maximize;
+  _move_from_maximize = true;
+  _moving             = true;
+  _maximized          = false;
+  _width              = _backup_rect.right  - _backup_rect.left;
+  _height             = _backup_rect.bottom - _backup_rect.top;
+  _x                  = get_cursor_pos().x - _width * ratio_x;
+  
+  auto limit = Window_Y_Pos_Moving_From_Maximize * _scale;
+  if (pos.y < limit)
+    _y -= limit;
+
   update_rect();
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
-  g_ui_ctx.send_message(UIContext::Message_Window_Moving_From_Maximize{ _handle, x, y, width, height });
+  g_ui_ctx.send_message(UIContext::Message_Window_Moving_From_Maximize{ _handle, _x, _y, _width, _height });
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
@@ -139,32 +142,32 @@ void Window::monitor_change() noexcept
   else
     GetWindowRect(_handle, &rect);
 
-  rect.left   += Window_Shadow_Thickness;
-  rect.top    += Window_Shadow_Thickness;
-  rect.right  -= Window_Shadow_Thickness;
-  rect.bottom -= Window_Shadow_Thickness;
-  _rect     = rect;
-  maximized = false;
+  rect.left   += shadow_thickness();
+  rect.top    += shadow_thickness();
+  rect.right  -= shadow_thickness();
+  rect.bottom -= shadow_thickness();
+  _rect      = rect;
+  _maximized = false;
   update_by_rect();
-  g_ui_ctx.send_message(UIContext::Message_Window_Restore{ _handle, x, y, width, height });
+  g_ui_ctx.send_message(UIContext::Message_Window_Restore{ _handle, _x, _y, _width, _height });
 
   // update fullscreen window
   g_wnd_mgr._fullscreen_window._rect = get_virtual_screen_rect();
   g_wnd_mgr._fullscreen_window.update_by_rect();
   g_renderer.send_message(Renderer::Message_Window_Update{
-    g_wnd_mgr._fullscreen_window.handle(), g_wnd_mgr._fullscreen_window.width, g_wnd_mgr._fullscreen_window.height });
-  g_ui_ctx.send_message(UIContext::Message_Update_Fullscreen_Window{ g_wnd_mgr._fullscreen_window.width, g_wnd_mgr._fullscreen_window.height });
+    g_wnd_mgr._fullscreen_window.handle(), g_wnd_mgr._fullscreen_window._width, g_wnd_mgr._fullscreen_window._height });
+  g_ui_ctx.send_message(UIContext::Message_Update_Fullscreen_Window{ g_wnd_mgr._fullscreen_window._width, g_wnd_mgr._fullscreen_window._height });
   SetWindowPos(
     g_wnd_mgr._fullscreen_window.handle(), 0,
-    g_wnd_mgr._fullscreen_window.x, g_wnd_mgr._fullscreen_window.y,
-    g_wnd_mgr._fullscreen_window.width, g_wnd_mgr._fullscreen_window.height,
+    g_wnd_mgr._fullscreen_window._x, g_wnd_mgr._fullscreen_window._y,
+    g_wnd_mgr._fullscreen_window._width, g_wnd_mgr._fullscreen_window._height,
     SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 void Window::move_with_pos(int x, int y) noexcept
 {
-  this->x = x;
-  this->y = y;
+  _x = x;
+  _y = y;
   _moving = true;
   update_rect();
   g_ui_ctx.send_message(UIContext::Message_Update_Moving{ _handle, _moving, x, y });
@@ -177,10 +180,10 @@ void Window::move_end() noexcept
   if (_move_from_maximize)
   {
     _move_from_maximize = false;
-    g_ui_ctx.send_message(UIContext::Message_Window_Moving_From_Maximize_End{ _handle, x, y });
+    g_ui_ctx.send_message(UIContext::Message_Window_Moving_From_Maximize_End{ _handle, _x, _y });
   }
   else
-    g_ui_ctx.send_message(UIContext::Message_Update_Moving{ _handle, _moving, x, y });
+    g_ui_ctx.send_message(UIContext::Message_Update_Moving{ _handle, _moving, _x, _y });
 }
 
 void Window::adjust_offset(ResizeType type, glm::vec<2, int> const& point, int& dx, int& dy) const noexcept
@@ -192,39 +195,39 @@ void Window::adjust_offset(ResizeType type, glm::vec<2, int> const& point, int& 
     break;
 
   case left_top:
-    if (width  == _min_width  && point.x > _rect.left) dx = 0;
-    if (height == _min_height && point.y > _rect.top)  dy = 0;
+    if (_width  == min_width()  && point.x > _rect.left) dx = 0;
+    if (_height == min_height() && point.y > _rect.top)  dy = 0;
     break;
 
   case right_top:
-    if (width  == _min_width  && point.x < _rect.right) dx = 0;
-    if (height == _min_height && point.y > _rect.top)   dy = 0;
+    if (_width  == min_width()  && point.x < _rect.right) dx = 0;
+    if (_height == min_height() && point.y > _rect.top)   dy = 0;
     break;
 
   case left_bottom:
-    if (width  == _min_width  && point.x > _rect.left)   dx = 0;
-    if (height == _min_height && point.y < _rect.bottom) dy = 0;
+    if (_width  == min_width()  && point.x > _rect.left)   dx = 0;
+    if (_height == min_height() && point.y < _rect.bottom) dy = 0;
     break;
 
   case right_bottom:
-    if (width  == _min_width  && point.x < _rect.right)  dx = 0;
-    if (height == _min_height && point.y < _rect.bottom) dy = 0;
+    if (_width  == min_width()  && point.x < _rect.right)  dx = 0;
+    if (_height == min_height() && point.y < _rect.bottom) dy = 0;
     break;
 
   case left:
-    if (width == _min_width && point.x > _rect.left) dx = 0;
+    if (_width == min_width() && point.x > _rect.left) dx = 0;
     break;
 
   case right:
-    if (width == _min_width && point.x < _rect.right) dx = 0;
+    if (_width == min_width() && point.x < _rect.right) dx = 0;
     break;
 
   case top:
-    if (height == _min_height && point.y > _rect.top) dy = 0;
+    if (_height == min_height() && point.y > _rect.top) dy = 0;
     break;
 
   case bottom:
-    if (height == _min_height && point.y < _rect.bottom) dy = 0;
+    if (_height == min_height() && point.y < _rect.bottom) dy = 0;
     break;
   }
 }
@@ -277,7 +280,7 @@ void Window::resize(ResizeType type, int dx, int dy) noexcept
   }
   update_by_rect();
 
-  g_ui_ctx.send_message(UIContext::Message_Update_Resizing{ _handle, x, y, width, height });
+  g_ui_ctx.send_message(UIContext::Message_Update_Resizing{ _handle, _x, _y, _width, _height });
 }
 
 void Window::resize_end() noexcept
@@ -288,17 +291,33 @@ void Window::resize_end() noexcept
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
+void Window::resize_by_scale(float scale) noexcept
+{
+  auto width  = _width  / _scale;
+  auto height = _height / _scale;
+  _scale  = scale;
+  _width  = width  * scale;
+  _height = height * scale;
+  update_rect();
+
+  // when the monitor scale is changed, if part of the window is outside the monitor,
+  // the OS will move the window completely inside the monitor
+  g_ui_ctx.send_message(UIContext::Message_Scale_Change{ _handle, scale, _x, _y, _width, _height });
+  g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
+  SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
 void Window::left_offset(int dx) noexcept
 {
   auto rc = get_virtual_screen_rect();
   _rect.left = std::clamp(
     _rect.left + dx,
     rc.left,
-    static_cast<LONG>(std::min(_rect.right, rc.right) - _min_width)
+    static_cast<LONG>(std::min(_rect.right, rc.right) - min_width())
   );
   auto p = get_cursor_pos();
-  if (dx < 0 && _rect.left < p.x && rc.right - _rect.left > _min_width) _rect.left = p.x;
-  if (_rect.right > rc.right && rc.right - _rect.left < _min_width) _rect.left = rc.right - _min_width;
+  if (dx < 0 && _rect.left < p.x && rc.right - _rect.left > min_width()) _rect.left = p.x;
+  if (_rect.right > rc.right && rc.right - _rect.left < min_width()) _rect.left = rc.right - min_width();
 }
 
 void Window::top_offset(int dy) noexcept
@@ -307,11 +326,11 @@ void Window::top_offset(int dy) noexcept
   _rect.top = std::clamp(
     _rect.top + dy,
     rc.top,
-    static_cast<LONG>(std::min(_rect.bottom, rc.bottom) - _min_height)
+    static_cast<LONG>(std::min(_rect.bottom, rc.bottom) - min_height())
   );
   auto p = get_cursor_pos();
-  if (dy < 0 && _rect.top < p.y && rc.bottom - _rect.top > _min_height) _rect.top = p.y;
-  if (_rect.bottom > rc.bottom && rc.bottom - _rect.top < _min_height) _rect.top = rc.bottom - _min_width;
+  if (dy < 0 && _rect.top < p.y && rc.bottom - _rect.top > min_height()) _rect.top = p.y;
+  if (_rect.bottom > rc.bottom && rc.bottom - _rect.top < min_height()) _rect.top = rc.bottom - min_width();
 }
 
 void Window::right_offset(int dx) noexcept
@@ -319,12 +338,12 @@ void Window::right_offset(int dx) noexcept
   auto rc = get_virtual_screen_rect();
   _rect.right = std::clamp(
     _rect.right + dx,
-    static_cast<LONG>(std::max(_rect.left, rc.left) + _min_width),
+    static_cast<LONG>(std::max(_rect.left, rc.left) + min_width()),
     rc.right
   );
   auto p = get_cursor_pos();
-  if (dx > 0 && _rect.right > p.x && _rect.right - rc.left > _min_width) _rect.right = p.x;
-  if (_rect.left < rc.left && _rect.right - rc.left < _min_width) _rect.right = rc.left + _min_width;
+  if (dx > 0 && _rect.right > p.x && _rect.right - rc.left > min_width()) _rect.right = p.x;
+  if (_rect.left < rc.left && _rect.right - rc.left < min_width()) _rect.right = rc.left + min_width();
   if (_rect.right == rc.right - 1) _rect.right = rc.right; // I don't know why in this case the dx is always 0
 }
 
@@ -333,33 +352,33 @@ void Window::bottom_offset(int dy) noexcept
   auto rc = get_virtual_screen_rect();
   _rect.bottom = std::clamp(
     _rect.bottom + dy,
-    static_cast<LONG>(std::max(_rect.top, rc.top) + _min_height),
+    static_cast<LONG>(std::max(_rect.top, rc.top) + min_height()),
     rc.bottom
   );
   auto p = get_cursor_pos();
-  if (dy > 0 && _rect.bottom > p.y && _rect.bottom - rc.top > _min_height) _rect.bottom = p.y;
-  if (_rect.top < rc.top && _rect.bottom - rc.top < _min_height) _rect.bottom = rc.top + _min_height;
+  if (dy > 0 && _rect.bottom > p.y && _rect.bottom - rc.top > min_height()) _rect.bottom = p.y;
+  if (_rect.top < rc.top && _rect.bottom - rc.top < min_height()) _rect.bottom = rc.top + min_height();
   if (_rect.bottom == rc.bottom - 1) _rect.bottom = rc.bottom; // I don't know why in this case the dy is always 0
 }
 
 void Window::maximize() noexcept
 {
-  maximized    = true;
+  _maximized   = true;
   _backup_rect =_rect;
   _rect        = get_window_monitor_work_rect(_handle);
   update_by_rect();
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
-  g_ui_ctx.send_message(UIContext::Message_Window_Maximize{ _handle, x, y, width, height });
+  g_ui_ctx.send_message(UIContext::Message_Window_Maximize{ _handle, _x, _y, _width, _height });
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 void Window::restore() noexcept
 {
-  maximized = false;
-  _rect     = _backup_rect;
+  _maximized = false;
+  _rect      = _backup_rect;
   update_by_rect();
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
-  g_ui_ctx.send_message(UIContext::Message_Window_Restore{ _handle, x, y, width, height });
+  g_ui_ctx.send_message(UIContext::Message_Window_Restore{ _handle, _x, _y, _width, _height });
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
@@ -367,12 +386,12 @@ auto Window::get_resize_type(glm::vec<2, int> const& p) const noexcept -> Resize
 {
   using enum ResizeType;
 
-  if (maximized) return none;
+  if (_maximized) return none;
 
   auto left_side   = in_range(p.x, -Window_Resize_Thickness, 0);
-  auto right_side  = in_range(p.x, width, width + Window_Resize_Thickness);
+  auto right_side  = in_range(p.x, _width, _width + Window_Resize_Thickness);
   auto top_side    = in_range(p.y, -Window_Resize_Thickness, 0);
-  auto bottom_side = in_range(p.y, height, height + Window_Resize_Thickness);
+  auto bottom_side = in_range(p.y, _height, _height + Window_Resize_Thickness);
 
   if (top_side)
   {

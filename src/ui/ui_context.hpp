@@ -38,7 +38,8 @@ struct Window
     return cursor_pos() + glm::vec<2, int>{ renderer::Window_Shadow_Thickness };
   }
 
-  auto real_pos() const noexcept -> glm::vec2 { return { snap.x - renderer::Window_Shadow_Thickness, snap.y - renderer::Window_Shadow_Thickness }; }
+  auto shadow_thickness() const noexcept -> LONG { return renderer::Window_Shadow_Thickness * snap.scale; }
+  auto real_pos() const noexcept -> glm::vec2 { return { snap.x - shadow_thickness(), snap.y - shadow_thickness() }; }
   auto pos()      const noexcept -> glm::vec2 { return { snap.x, snap.y }; }
 
   auto is_moving_or_resizing() const noexcept { return snap.moving || snap.resizing; }
@@ -111,6 +112,7 @@ public:
 
   void set_render_pos(int x, int y) noexcept { _window->render_pos = { x + renderer::Window_Shadow_Thickness, y + renderer::Window_Shadow_Thickness }; }
   auto get_render_pos() const noexcept { return _window->render_pos; }
+  auto get_scale() const noexcept { return _window->snap.scale; }
 
   void render_on(int x, int y, std::move_only_function<void()>&& func) noexcept;
 
@@ -286,6 +288,16 @@ public:
     uint32_t height{};
   };
 
+  struct Message_Scale_Change
+  {
+    HWND     handle{};
+    float    scale{};
+    int      x{};
+    int      y{};
+    uint32_t width{};
+    uint32_t height{};
+  };
+
   using Message = std::variant<
     Message_Window_Close,
     Message_Cursor_On_Window,
@@ -297,7 +309,8 @@ public:
     Message_Window_Moving_From_Maximize,
     Message_Window_Moving_From_Maximize_End,
     Message_Interruption,
-    Message_Update_Fullscreen_Window
+    Message_Update_Fullscreen_Window,
+    Message_Scale_Change
   >;
 
   void send_message(Message&& msg) noexcept
@@ -320,6 +333,7 @@ private:
     void operator()(Message_Window_Moving_From_Maximize_End const& msg) const noexcept;
     void operator()(Message_Interruption const& msg) const noexcept;
     void operator()(Message_Update_Fullscreen_Window const& msg) const noexcept;
+    void operator()(Message_Scale_Change const& msg) const noexcept;
   };
   MessageQueue<Message, UI_Message_Queue_Capacity> _msg_queue;
 };

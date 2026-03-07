@@ -224,7 +224,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
             std::ranges::any_of(g_ui_ctx.access_move_invalid_areas(handle), [pt](auto rect) { return PtInRect(&rect, pt); }))
           break;
 
-        if (window.maximized)
+        if (window.is_maximized())
         {
           window.move_from_maximize();
           left_button_down_window_pos = window.cursor_pos();
@@ -295,6 +295,17 @@ void WindowManager::update_monitors() noexcept
 {
   _monitor_infos.clear();
   EnumDisplayMonitors(nullptr, nullptr, enum_display_monitors, 0);
+
+  // resize window and update scale of window to ui context if monitor scale is changed
+  for (auto& [handle, window] : _windows)
+  {
+    if (auto monitor = get_monitor(handle))
+    {
+      auto scale = _monitor_infos.at(monitor).scale;
+      if (scale != window.scale())
+        window.resize_by_scale(scale);
+    }
+  }
 }
 
 auto WindowManager::create_fullscreen_window() noexcept -> WindowSnapshot
