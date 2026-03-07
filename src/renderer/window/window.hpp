@@ -85,6 +85,7 @@ public:
   void resize(ResizeType type, int dx, int dy) noexcept;
   void resize_end() noexcept;
   void resize_by_scale(float scale) noexcept;
+  void resize_by_scale(float scale, float x, float y) noexcept;
 
   void maximize() noexcept;
   void restore() noexcept;

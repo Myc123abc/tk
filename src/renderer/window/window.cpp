@@ -293,15 +293,35 @@ void Window::resize_end() noexcept
 
 void Window::resize_by_scale(float scale) noexcept
 {
-  auto width  = _width  / _scale;
-  auto height = _height / _scale;
-  _scale  = scale;
-  _width  = width  * scale;
-  _height = height * scale;
+  _width  *= scale / _scale;
+  _height *= scale / _scale;
+  _scale   = scale;
   update_rect();
 
   // when the monitor scale is changed, if part of the window is outside the monitor,
   // the OS will move the window completely inside the monitor
+  g_ui_ctx.send_message(UIContext::Message_Scale_Change{ _handle, scale, _x, _y, _width, _height });
+  g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
+  SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+void Window::resize_by_scale(float scale, float x, float y) noexcept
+{
+  // get ratio
+  auto ratio = glm::vec2{ x / _width, y / _height };
+
+  // scale
+  _width  *= scale / _scale;
+  _height *= scale / _scale;
+  _scale   = scale;
+
+  // calculate new position
+  auto cursor_pos = get_cursor_pos();
+  _x = cursor_pos.x - ratio.x * _width;
+  _y = cursor_pos.y - ratio.y * _height;
+
+  update_rect();
+
   g_ui_ctx.send_message(UIContext::Message_Scale_Change{ _handle, scale, _x, _y, _width, _height });
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);

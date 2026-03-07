@@ -161,6 +161,7 @@ private:
 
   void update() noexcept;
   void update_monitors() noexcept;
+  auto update_monitor(HWND handle, int x, int y) noexcept -> bool;
   static auto CALLBACK enum_display_monitors(HMONITOR monitor, HDC, LPRECT, LPARAM) -> BOOL;
 
 private:
@@ -184,6 +185,7 @@ private:
   };
   bool                                      _update_monitors{};
   std::unordered_map<HMONITOR, MonitorInfo> _monitor_infos{};
+  std::unordered_map<HWND, HMONITOR>        _window_monitors{};
 };
 
 inline static auto& g_wnd_mgr{ WindowManager::instance() };

@@ -169,6 +169,9 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     {
       auto& window = windows.at(handle);
       window.monitor_change();
+      auto monitor = get_monitor(handle);
+      if (monitor != wnd_mgr._window_monitors.at(handle))
+        wnd_mgr._window_monitors.at(handle) = monitor;
     }
     return 0;
   }
@@ -214,6 +217,13 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
       // limit cursor move area
       auto rect = get_virtual_workarea_rect();
       ClipCursor(&rect);
+
+      if (wnd_mgr.update_monitor(handle, cursor_pos.x, cursor_pos.y))
+        left_button_down_window_pos = window.cursor_pos();
+
+      // HACK: why left_button_down_window_pos have y < 0 case,
+      // this make the cursor is outside the window when moving
+      // should i need use own rendering cursor back?
 
       // moving
       if (left_button_down_resize_type == ResizeType::none)
@@ -306,6 +316,26 @@ void WindowManager::update_monitors() noexcept
         window.resize_by_scale(scale);
     }
   }
+}
+
+auto WindowManager::update_monitor(HWND handle, int x, int y) noexcept -> bool
+{
+  auto monitor = get_monitor(handle);
+  if (monitor != _window_monitors.at(handle))
+  {
+    _window_monitors.at(handle) = monitor;
+    if (monitor)
+    {
+      auto  scale  = _monitor_infos.at(monitor).scale;
+      auto& window = _windows.at(handle);
+      if (scale != window.scale())
+      {
+        window.resize_by_scale(scale, x, y);
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 auto WindowManager::create_fullscreen_window() noexcept -> WindowSnapshot
@@ -403,6 +433,7 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
     auto handle = std::bit_cast<HWND>(w_param);
     _windows.at(handle).destroy();
     _windows.erase(handle);
+    _window_monitors.erase(handle);
     _using_mouse_pass_through_windows.erase(handle);
     break;
   }
@@ -466,11 +497,15 @@ void WindowManager::msg_create_window(WPARAM w_param) noexcept
   auto info = reinterpret_cast<WindowCreateInfo*>(w_param);
 
   // get scale of monitor
-  auto scale = 1.f;
+  auto scale   = 1.f;
+  auto monitor = HMONITOR{};
   auto infos = _monitor_infos | std::views::values;
   if (auto it = std::ranges::find_if(infos, [x = info->x, y = info->y](auto const& info) { return PtInRect(&info.rect, { x, y }); });
      it != infos.end())
-    scale = it.base()->second.scale;
+  {
+    scale   = it.base()->second.scale;
+    monitor = it.base()->first;
+  }
 
   // init window and set handle
   auto window = Window{};
@@ -479,6 +514,7 @@ void WindowManager::msg_create_window(WPARAM w_param) noexcept
 
   // store window
   _windows.emplace(window._handle, std::move(window));
+  _window_monitors.emplace(window._handle, monitor);
 
   // notice window create complete
   SetEvent(info->event);
