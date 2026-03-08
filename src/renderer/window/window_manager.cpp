@@ -221,10 +221,6 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
       if (wnd_mgr.update_monitor(handle, cursor_pos.x, cursor_pos.y))
         left_button_down_window_pos = window.cursor_pos();
 
-      // HACK: why left_button_down_window_pos have y < 0 case,
-      // this make the cursor is outside the window when moving
-      // should i need use own rendering cursor back?
-
       // moving
       if (left_button_down_resize_type == ResizeType::none)
       {

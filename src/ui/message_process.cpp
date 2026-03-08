@@ -74,21 +74,21 @@ void UIContext::MessageHandler::operator()(Message_Window_Restore const& msg) co
 void UIContext::MessageHandler::operator()(Message_Window_Moving_From_Maximize const& msg) const noexcept
 {
   auto& wnd = ctx.get_window(msg.handle);
-  wnd.snap.maximized            = false;
-  wnd.snap.moving               = true;
-  wnd.snap.x                    = msg.x;
-  wnd.snap.y                    = msg.y;
-  wnd.snap.width                = msg.width;
-  wnd.snap.height               = msg.height;
+  wnd.snap.maximized          = false;
+  wnd.snap.moving             = true;
+  wnd.snap.x                  = msg.x;
+  wnd.snap.y                  = msg.y;
+  wnd.snap.width              = msg.width;
+  wnd.snap.height             = msg.height;
   wnd.snap.move_from_maximize = true;
 }
 
 void UIContext::MessageHandler::operator()(Message_Window_Moving_From_Maximize_End const& msg) const noexcept
 {
   auto& wnd = ctx.get_window(msg.handle);
-  wnd.snap.moving               = false;
-  wnd.snap.x                    = msg.x;
-  wnd.snap.y                    = msg.y;
+  wnd.snap.moving             = false;
+  wnd.snap.x                  = msg.x;
+  wnd.snap.y                  = msg.y;
   wnd.snap.move_from_maximize = false;
 }
 

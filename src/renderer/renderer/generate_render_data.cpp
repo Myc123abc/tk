@@ -37,6 +37,11 @@ auto get_bounding_rectangle(std::vector<glm::vec2> const& data) noexcept -> std:
   return { min, max };
 }
 
+auto is_integer_scale(float s)
+{
+  return std::fabs(s - std::round(s)) < 0.0001f;
+}
+
 }
 
 namespace tk { namespace renderer {
@@ -60,9 +65,17 @@ void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
     case draw_rectangle:
     {
       auto info = reinterpret_cast<RectangleInfo*>(info_ptr);
-	    add_shape(render_data, ShapeProperty::Type::rectangle, info->color, info->thickness,
-        { info->left_top.x, info->left_top.y, info->right_bottom.x, info->right_bottom.y },
-        { info->left_top, info->right_bottom });
+      if (is_integer_scale(info->left_top.x)     &&
+          is_integer_scale(info->left_top.y)     &&
+          is_integer_scale(info->right_bottom.x) &&
+          is_integer_scale(info->right_bottom.y))
+	      add_shape(render_data, ShapeProperty::Type::rectangle, info->color, info->thickness,
+          { info->left_top.x, info->left_top.y, info->right_bottom.x, info->right_bottom.y },
+          { info->left_top, info->right_bottom });
+      else
+	      add_shape(render_data, ShapeProperty::Type::rectangle, info->color, info->thickness,
+          { info->left_top.x, info->left_top.y, info->right_bottom.x, info->right_bottom.y },
+          { info->left_top - glm::vec2(1), info->right_bottom + glm::vec2(1) });
     }
     break;
 

@@ -244,9 +244,10 @@ void UIContext::postprocess_render() noexcept
     auto& window = it->second;
     if (mouse_left_button_state == KeyState::down)
     {
-      mouse_down_window       = window.snap.handle;
-      mouse_down_pos          = window.cursor_pos();
-      is_move_from_maximize = window.snap.move_from_maximize;
+      mouse_down_window = window.snap.handle;
+      mouse_down_pos    = window.cursor_pos();
+      if (!is_move_from_maximize)
+        is_move_from_maximize = window.snap.move_from_maximize;
     }
     else if (mouse_left_button_state == KeyState::up)
     {

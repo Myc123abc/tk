@@ -330,55 +330,76 @@ void Window::resize_by_scale(float scale, float x, float y) noexcept
 void Window::left_offset(int dx) noexcept
 {
   auto rc = get_virtual_screen_rect();
-  _rect.left = std::clamp(
-    _rect.left + dx,
-    rc.left,
-    static_cast<LONG>(std::min(_rect.right, rc.right) - min_width())
-  );
+
+  LONG new_left = _rect.left + dx;
+
+  // enforce min width
+  LONG max_left = _rect.right - min_width();
+
+  // prevent moving past desktop
+  LONG min_left = rc.left;
+
+  new_left = std::clamp(new_left, min_left, max_left);
+
   auto p = get_cursor_pos();
-  if (dx < 0 && _rect.left < p.x && rc.right - _rect.left > min_width()) _rect.left = p.x;
-  if (_rect.right > rc.right && rc.right - _rect.left < min_width()) _rect.left = rc.right - min_width();
+  if (dx < 0 && new_left < p.x)
+    new_left = std::min((LONG)p.x, max_left);
+
+  _rect.left = new_left;
 }
 
 void Window::top_offset(int dy) noexcept
 {
   auto rc = get_virtual_screen_rect();
-  _rect.top = std::clamp(
-    _rect.top + dy,
-    rc.top,
-    static_cast<LONG>(std::min(_rect.bottom, rc.bottom) - min_height())
-  );
+
+  LONG new_top = _rect.top + dy;
+
+  LONG max_top = _rect.bottom - min_height();
+  LONG min_top = rc.top;
+
+  new_top = std::clamp(new_top, min_top, max_top);
+
   auto p = get_cursor_pos();
-  if (dy < 0 && _rect.top < p.y && rc.bottom - _rect.top > min_height()) _rect.top = p.y;
-  if (_rect.bottom > rc.bottom && rc.bottom - _rect.top < min_height()) _rect.top = rc.bottom - min_width();
+  if (dy < 0 && new_top < p.y)
+    new_top = std::min((LONG)p.y, max_top);
+
+  _rect.top = new_top;
 }
 
 void Window::right_offset(int dx) noexcept
 {
   auto rc = get_virtual_screen_rect();
-  _rect.right = std::clamp(
-    _rect.right + dx,
-    static_cast<LONG>(std::max(_rect.left, rc.left) + min_width()),
-    rc.right
-  );
+
+  LONG new_right = _rect.right + dx;
+
+  LONG min_right = _rect.left + min_width();
+  LONG max_right = rc.right;
+
+  new_right = std::clamp(new_right, min_right, max_right);
+
   auto p = get_cursor_pos();
-  if (dx > 0 && _rect.right > p.x && _rect.right - rc.left > min_width()) _rect.right = p.x;
-  if (_rect.left < rc.left && _rect.right - rc.left < min_width()) _rect.right = rc.left + min_width();
-  if (_rect.right == rc.right - 1) _rect.right = rc.right; // I don't know why in this case the dx is always 0
+  if (dx > 0 && new_right > p.x)
+    new_right = std::max((LONG)p.x, min_right);
+
+  _rect.right = new_right;
 }
 
 void Window::bottom_offset(int dy) noexcept
 {
   auto rc = get_virtual_screen_rect();
-  _rect.bottom = std::clamp(
-    _rect.bottom + dy,
-    static_cast<LONG>(std::max(_rect.top, rc.top) + min_height()),
-    rc.bottom
-  );
+
+  LONG new_bottom = _rect.bottom + dy;
+
+  LONG min_bottom = _rect.top + min_height();
+  LONG max_bottom = rc.bottom;
+
+  new_bottom = std::clamp(new_bottom, min_bottom, max_bottom);
+
   auto p = get_cursor_pos();
-  if (dy > 0 && _rect.bottom > p.y && _rect.bottom - rc.top > min_height()) _rect.bottom = p.y;
-  if (_rect.top < rc.top && _rect.bottom - rc.top < min_height()) _rect.bottom = rc.top + min_height();
-  if (_rect.bottom == rc.bottom - 1) _rect.bottom = rc.bottom; // I don't know why in this case the dy is always 0
+  if (dy > 0 && new_bottom > p.y)
+    new_bottom = std::max((LONG)p.y, min_bottom);
+
+  _rect.bottom = new_bottom;
 }
 
 void Window::maximize() noexcept
