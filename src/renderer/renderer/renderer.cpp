@@ -194,16 +194,39 @@ void Renderer::render_sdf(RenderResource& res, RenderData& data) noexcept
   auto constants = Constants{};
   constants.window_extent = render_target_image.extent();
   constants.window_pos    = data.resizing_window_pos;
-  _sdf_pipeline.set_descriptors(cmd, "constants", constants,
+  _sdf_pipeline.set_descriptors(cmd,
   {
     { "images", _images.empty() ? D3D12_GPU_DESCRIPTOR_HANDLE{}
                                 : g_desc_heap_mgr.first_gpu_handle(DescriptorHeapType::cbv_srv_uav) },
     { "buffer", frame.buffer.shape_properties_gpu_handle()                                          },
   });
 
-  // draw
   cmd->RSSetScissorRects(1, &data.scissor_rect);
-  cmd->DrawIndexedInstanced(data.indices.size(), 1, 0, 0, 0);
+
+  auto last_constants = Constants{};
+  auto first          = true;
+  for (auto draw_data : data.draw_datas)
+  {
+    constants.is_image = draw_data.is_image;
+
+    if (draw_data.is_image)
+      constants.image_alpha = draw_data.image_alpha;
+
+    if (first || memcpy(&last_constants, &constants, sizeof(Constants)))
+    {
+      _sdf_pipeline.set_constants(cmd, "constants", constants);
+      last_constants = constants;
+      first = false;
+    }
+
+    if (draw_data.is_image)
+    {
+      _sdf_pipeline.set_descriptor(cmd, "image", draw_data.image_descriptor_gpu_handle);
+      cmd->DrawIndexedInstanced(draw_data.indices_size, 1, draw_data.indices_start, 0, 0);
+    }
+    else
+      cmd->DrawIndexedInstanced(draw_data.indices_size, 1, draw_data.indices_start, 0, 0);
+  }
 }
 
 void Renderer::generate_mipmap() noexcept
@@ -234,7 +257,8 @@ void Renderer::generate_mipmap() noexcept
       constants.texel_size = glm::vec2{ 1.0 / src_width, 1.0 / src_height };
       constants.mip_level  = i;
 
-      _mipmap_pipeline.set_descriptors(cmd, "constants", constants,
+      _mipmap_pipeline.set_constants(cmd, "constants", constants);
+      _mipmap_pipeline.set_descriptors(cmd,
       {
         { "src", img.gpu_handle()                     },
         { "dst", img.mipmap_uavs().at(i).gpu_handle() },

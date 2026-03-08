@@ -60,6 +60,8 @@ void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
     using namespace tk::ui;
     using enum CommandType;
 
+    render_data.try_push_draw_data(type);
+
     switch (type)
     {
     case draw_rectangle:
@@ -208,9 +210,8 @@ void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
     case image:
     {
       auto info = reinterpret_cast<ImageInfo*>(info_ptr);
-      add_shape(render_data, ShapeProperty::Type::image, {}, {},
-        { std::bit_cast<float>(_images.at(info->handle).index()), static_cast<float>(info->alpha) / 0xff },
-        { info->left_top, info->right_bottom });
+      add_vertices_indices(render_data, { info->left_top, info->right_bottom });
+      render_data.set_image_info(_images.at(info->handle).gpu_handle(), static_cast<float>(info->alpha) / 0xff);
     }
     break;
 
@@ -224,6 +225,8 @@ void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
 
     }
   }
+
+  render_data.generate_finish();
 
   cmd->notify();
 }

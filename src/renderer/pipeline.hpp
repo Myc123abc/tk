@@ -33,18 +33,14 @@ public:
   void bind(ID3D12GraphicsCommandList1* cmd) const noexcept;
 
   void set_descriptors(ID3D12GraphicsCommandList1* cmd, std::initializer_list<std::pair<std::string_view, D3D12_GPU_DESCRIPTOR_HANDLE>> handles) const noexcept;
+  void set_descriptor(ID3D12GraphicsCommandList1* cmd, std::string_view name, D3D12_GPU_DESCRIPTOR_HANDLE handle) const noexcept;
 
   template <typename ConstantsType>
-  void set_descriptors(ID3D12GraphicsCommandList1* cmd, std::string_view constants_name, ConstantsType const& constants, std::initializer_list<std::pair<std::string_view, D3D12_GPU_DESCRIPTOR_HANDLE>> handles) const noexcept
+  void set_constants(ID3D12GraphicsCommandList1* cmd, std::string_view constants_name, ConstantsType const& constants) const noexcept
   {
-    if (_resource_indices.contains(constants_name.data()))
-    {
-      if (_is_graphics_pipeline)
-        cmd->SetGraphicsRoot32BitConstants(_resource_indices.at(constants_name.data()), sizeof(constants) / 4, &constants, 0);
-      else
-        cmd->SetComputeRoot32BitConstants(_resource_indices.at(constants_name.data()), sizeof(constants) / 4, &constants, 0);
-    }
-    set_descriptors(cmd, handles);
+    _is_graphics_pipeline
+      ? cmd->SetGraphicsRoot32BitConstants(_resource_indices.at(constants_name.data()), sizeof(constants) / 4, &constants, 0)
+      : cmd->SetComputeRoot32BitConstants(_resource_indices.at(constants_name.data()), sizeof(constants) / 4, &constants, 0);
   }
 
 private:

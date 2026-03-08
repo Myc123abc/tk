@@ -17,6 +17,8 @@ struct Constants
 {
   glm::vec<2, uint32_t> window_extent{};
   glm::vec2             window_pos{};
+  float                 image_alpha{};
+  bool                  is_image{};
 };
 
 struct ShapeProperty

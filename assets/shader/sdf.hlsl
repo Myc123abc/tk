@@ -21,6 +21,8 @@ struct Constants
 {
   uint2  window_extent;
   float2 window_pos;
+  float  image_alpha;
+  bool   is_image;
 };
 
 enum : uint32_t
@@ -69,10 +71,11 @@ struct ShapeProperty
 ///                              Binding
 ////////////////////////////////////////////////////////////////////////////////
 
-ConstantBuffer<Constants> constants     : register(b0);
-SamplerState              g_sampler     : register(s0);
-ByteAddressBuffer         buffer        : register(t0);
-Texture2D                 images[]      : register(t0, space1);
+ConstantBuffer<Constants> constants : register(b0);
+SamplerState              g_sampler : register(s0);
+ByteAddressBuffer         buffer    : register(t0);
+Texture2D                 image     : register(t0, space1);
+Texture2D                 images[]  : register(t0, space2);
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                              Functions
@@ -259,18 +262,25 @@ PSParameter vs(Vertex vertex)
 
 float4 ps(PSParameter args) : SV_TARGET
 {
+  if (constants.is_image)
+  {  
+    float4 color = image.Sample(g_sampler, args.uv);
+    return float4(color.rgb, color.a * constants.image_alpha);
+  }
+
   uint32_t offset = args.buffer_offset;
 
   ShapeProperty shape_property = get_shape_property(offset);
 
   float4 color = args.color;
 
-  if (shape_property.type == type_image)
-  {
-    color = images[NonUniformResourceIndex(get_uint(offset))].Sample(g_sampler, args.uv);
-    color.a *= get_float(offset);
-    return color;
-  }
+  // TODO: remove type_image
+  // if (shape_property.type == type_image)
+  // {
+  //   color = images[NonUniformResourceIndex(get_uint(offset))].Sample(g_sampler, args.uv);
+  //   color.a *= get_float(offset);
+  //   return color;
+  // }
 
   if (shape_property.type == type_glyph)
   {

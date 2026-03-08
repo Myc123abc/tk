@@ -103,13 +103,17 @@ void Pipeline::bind(ID3D12GraphicsCommandList1* cmd) const noexcept
 void Pipeline::set_descriptors(ID3D12GraphicsCommandList1* cmd, std::initializer_list<std::pair<std::string_view, D3D12_GPU_DESCRIPTOR_HANDLE>> handles) const noexcept
 {
   for (auto const& [name, handle] : handles)
-    if (_resource_indices.contains(name.data()) && handle.ptr)
-    {
-      if (_is_graphics_pipeline)
-        cmd->SetGraphicsRootDescriptorTable(_resource_indices.at(name.data()), handle);
-      else
-        cmd->SetComputeRootDescriptorTable(_resource_indices.at(name.data()), handle);
-    }
+    set_descriptor(cmd, name, handle);
+}
+
+void Pipeline::set_descriptor(ID3D12GraphicsCommandList1* cmd, std::string_view name, D3D12_GPU_DESCRIPTOR_HANDLE handle) const noexcept
+{
+  if (_resource_indices.contains(name.data()) && handle.ptr)
+  {
+    _is_graphics_pipeline
+      ? cmd->SetGraphicsRootDescriptorTable(_resource_indices.at(name.data()), handle)
+      : cmd->SetComputeRootDescriptorTable(_resource_indices.at(name.data()), handle);
+  }
 }
 
 }}
