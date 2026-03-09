@@ -126,11 +126,11 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   static auto& wnd_mgr = WindowManager::instance();
   static auto& windows = wnd_mgr._windows;
 
-  static auto last_cursor_pos              = glm::vec<2, int>{};
-  static auto left_button_down_window_pos  = glm::vec<2, int>{};
-  static auto last_resize_type             = ResizeType{};
-  static auto left_button_down_resize_type = ResizeType{};
-  static auto left_button_down             = false;
+  static auto last_cursor_pos                    = glm::vec<2, int>{};
+  static auto left_button_down_window_cursor_pos = glm::vec<2, int>{};
+  static auto last_resize_type                   = ResizeType{};
+  static auto left_button_down_resize_type       = ResizeType{};
+  static auto left_button_down                   = false;
 
   static auto finish_moving_or_resizing = [&](HWND handle)
   {
@@ -180,9 +180,16 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   {
     SetCapture(handle);
     auto& window = windows.at(handle);
-    last_cursor_pos              = get_cursor_pos();
-    left_button_down_window_pos  = window.cursor_pos();
-    left_button_down_resize_type = window.get_resize_type(left_button_down_window_pos);
+    last_cursor_pos                    = get_cursor_pos();
+    left_button_down_window_cursor_pos = window.cursor_pos();
+
+    // only moving in cursor valid areas
+    auto pt = POINT{ left_button_down_window_cursor_pos.x, left_button_down_window_cursor_pos.y };
+    if (!window._move_from_maximize &&
+      std::ranges::any_of(g_ui_ctx.access_move_invalid_areas(handle), [pt](auto rect) { return PtInRect(&rect, pt); }))
+      break;
+
+    left_button_down_resize_type = window.get_resize_type(left_button_down_window_cursor_pos);
     left_button_down             = true;
     break;
   }
@@ -218,27 +225,20 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
       auto rect = get_virtual_workarea_rect();
       ClipCursor(&rect);
 
-      if (wnd_mgr.update_monitor(handle, cursor_pos.x, cursor_pos.y))
-        left_button_down_window_pos = window.cursor_pos();
-
       // moving
       if (left_button_down_resize_type == ResizeType::none)
       {
-        // only moving in cursor valid areas
-        auto pt = POINT{ left_button_down_window_pos.x, left_button_down_window_pos.y };
-        if (!window._move_from_maximize &&
-            std::ranges::any_of(g_ui_ctx.access_move_invalid_areas(handle), [pt](auto rect) { return PtInRect(&rect, pt); }))
-          break;
-
         if (window.is_maximized())
         {
           window.move_from_maximize();
-          left_button_down_window_pos = window.cursor_pos();
+          left_button_down_window_cursor_pos = window.cursor_pos();
         }
         else
         {
-          pos -= left_button_down_window_pos;
+          pos -= left_button_down_window_cursor_pos;
           window.move_with_pos(pos.x, pos.y);
+          // resize window when moving window between different scale of monitors
+          wnd_mgr.update_monitor(handle, cursor_pos.x, cursor_pos.y);
         }
       }
       // resizing
@@ -314,7 +314,7 @@ void WindowManager::update_monitors() noexcept
   }
 }
 
-auto WindowManager::update_monitor(HWND handle, int x, int y) noexcept -> bool
+void WindowManager::update_monitor(HWND handle, int x, int y) noexcept
 {
   auto monitor = get_monitor(handle);
   if (monitor != _window_monitors.at(handle))
@@ -325,13 +325,9 @@ auto WindowManager::update_monitor(HWND handle, int x, int y) noexcept -> bool
       auto  scale  = _monitor_infos.at(monitor).scale;
       auto& window = _windows.at(handle);
       if (scale != window.scale())
-      {
         window.resize_by_scale(scale, x, y);
-        return true;
-      }
     }
   }
-  return false;
 }
 
 auto WindowManager::create_fullscreen_window() noexcept -> WindowSnapshot

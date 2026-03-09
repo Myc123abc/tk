@@ -161,7 +161,7 @@ private:
 
   void update() noexcept;
   void update_monitors() noexcept;
-  auto update_monitor(HWND handle, int x, int y) noexcept -> bool;
+  void update_monitor(HWND handle, int x, int y) noexcept;
   static auto CALLBACK enum_display_monitors(HMONITOR monitor, HDC, LPRECT, LPARAM) -> BOOL;
 
 private:

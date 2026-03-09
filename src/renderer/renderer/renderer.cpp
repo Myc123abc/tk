@@ -205,14 +205,14 @@ void Renderer::render_sdf(RenderResource& res, RenderData& data) noexcept
 
   auto last_constants = Constants{};
   auto first          = true;
-  for (auto draw_data : data.draw_datas)
+  for (auto const& draw_data : data.draw_datas)
   {
     constants.is_image = draw_data.is_image;
 
     if (draw_data.is_image)
       constants.image_alpha = draw_data.image_alpha;
 
-    if (first || memcpy(&last_constants, &constants, sizeof(Constants)))
+    if (first || memcmp(&last_constants, &constants, sizeof(Constants)))
     {
       _sdf_pipeline.set_constants(cmd, "constants", constants);
       last_constants = constants;

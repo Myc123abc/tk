@@ -18,7 +18,7 @@ struct Constants
   glm::vec<2, uint32_t> window_extent{};
   glm::vec2             window_pos{};
   float                 image_alpha{};
-  bool                  is_image{};
+  uint32_t              is_image{}; // use uint32_t replace bool to avoid msvc build result not consistent with hlsl bool, which clang not have this problem
 };
 
 struct ShapeProperty
