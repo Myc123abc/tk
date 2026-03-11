@@ -6,6 +6,7 @@
 #include <latch>
 #include <unordered_map>
 #include <unordered_set>
+#include <string>
 
 namespace tk { namespace renderer {
 
@@ -19,6 +20,14 @@ inline auto get_cursor_pos() noexcept
 inline auto get_monitor(HWND handle) noexcept
 {
   return MonitorFromWindow(handle, MONITOR_DEFAULTTONULL);
+}
+
+inline auto get_monitor_name(HWND handle) noexcept
+{
+  auto monitor = get_monitor(handle);
+  auto info = MONITORINFOEXA{ sizeof(MONITORINFOEXA) };
+  GetMonitorInfoA(monitor, &info);
+  return std::string(info.szDevice);
 }
 
 inline auto get_virtual_screen_rect() noexcept
@@ -160,8 +169,8 @@ private:
   void msg_create_window(WPARAM w_param) noexcept;
 
   void update() noexcept;
-  void update_monitors() noexcept;
-  void update_monitor(HWND handle, int x, int y) noexcept;
+  void update_monitor(HWND handle, glm::vec2 cursor_pos, glm::vec<2, int>& left_button_down_window_cursor_pos) noexcept;
+  void update_fullscreen_window() noexcept;
   static auto CALLBACK enum_display_monitors(HMONITOR monitor, HDC, LPRECT, LPARAM) -> BOOL;
 
 private:
@@ -183,9 +192,10 @@ private:
     float scale{};
     RECT  rect{};
   };
-  bool                                      _update_monitors{};
-  std::unordered_map<HMONITOR, MonitorInfo> _monitor_infos{};
-  std::unordered_map<HWND, HMONITOR>        _window_monitors{};
+  bool                                         _update_monitors{};
+  std::unordered_map<std::string, MonitorInfo> _monitor_infos{};
+  std::unordered_map<HWND, std::string>        _window_monitors{};
+  std::unordered_map<HWND, RECT>               _window_change_size{};
 };
 
 inline static auto& g_wnd_mgr{ WindowManager::instance() };

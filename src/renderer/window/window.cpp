@@ -125,45 +125,6 @@ void Window::move_from_maximize() noexcept
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
-void Window::monitor_change() noexcept
-{
-  auto rect = RECT{};
-
-  // If the window is minimized (e.g., due to monitor removal), GetWindowRect
-  // returns off-screen sentinel around (-32000, -32000). Use the normal position.
-  if (IsIconic(_handle))
-  {
-    WINDOWPLACEMENT wp{ sizeof(wp) };
-    if (GetWindowPlacement(_handle, &wp))
-      rect = wp.rcNormalPosition;
-    else
-      GetWindowRect(_handle, &rect);
-  }
-  else
-    GetWindowRect(_handle, &rect);
-
-  rect.left   += shadow_thickness();
-  rect.top    += shadow_thickness();
-  rect.right  -= shadow_thickness();
-  rect.bottom -= shadow_thickness();
-  _rect      = rect;
-  _maximized = false;
-  update_by_rect();
-  g_ui_ctx.send_message(UIContext::Message_Window_Restore{ _handle, _x, _y, _width, _height });
-
-  // update fullscreen window
-  g_wnd_mgr._fullscreen_window._rect = get_virtual_screen_rect();
-  g_wnd_mgr._fullscreen_window.update_by_rect();
-  g_renderer.send_message(Renderer::Message_Window_Update{
-    g_wnd_mgr._fullscreen_window.handle(), g_wnd_mgr._fullscreen_window._width, g_wnd_mgr._fullscreen_window._height });
-  g_ui_ctx.send_message(UIContext::Message_Update_Fullscreen_Window{ g_wnd_mgr._fullscreen_window._width, g_wnd_mgr._fullscreen_window._height });
-  SetWindowPos(
-    g_wnd_mgr._fullscreen_window.handle(), 0,
-    g_wnd_mgr._fullscreen_window._x, g_wnd_mgr._fullscreen_window._y,
-    g_wnd_mgr._fullscreen_window._width, g_wnd_mgr._fullscreen_window._height,
-    SWP_NOZORDER | SWP_NOACTIVATE);
-}
-
 void Window::move_with_pos(int x, int y) noexcept
 {
   _x = x;
@@ -184,6 +145,44 @@ void Window::move_end() noexcept
   }
   else
     g_ui_ctx.send_message(UIContext::Message_Update_Moving{ _handle, _moving, _x, _y });
+}
+
+void Window::reset_pos_size() noexcept
+{
+  g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
+  g_ui_ctx.send_message(UIContext::Message_Window_Update{ _handle, _x, _y, _width, _height });
+  SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+void Window::update_by_scale(float scale) noexcept
+{
+  _scale = scale;
+  g_ui_ctx.send_message(UIContext::Message_Scale_Change{ _handle, scale, _x, _y, _width, _height });
+  SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+void Window::update_by_rect(RECT rect, float scale) noexcept
+{
+  _rect  = rect;
+  _scale = scale;
+  update_by_rect();
+  g_ui_ctx.send_message(UIContext::Message_Scale_Change{ _handle, scale, _x, _y, _width, _height });
+  g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
+  SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
+
+}
+
+void Window::update_by_real_rect(RECT rect, float scale) noexcept
+{
+  _x      = rect.left + shadow_thickness();
+  _y      = rect.top  + shadow_thickness();
+  _width  = (rect.right  - rect.left) * scale / _scale - shadow_thickness() * 2;
+  _height = (rect.bottom - rect.top)  * scale / _scale - shadow_thickness() * 2;
+  _scale  = scale;
+  update_rect();
+  g_ui_ctx.send_message(UIContext::Message_Scale_Change{ _handle, scale, _x, _y, _width, _height });
+  g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
+  SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 void Window::adjust_offset(ResizeType type, glm::vec<2, int> const& point, int& dx, int& dy) const noexcept
@@ -291,34 +290,13 @@ void Window::resize_end() noexcept
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
-void Window::resize_by_scale(float scale) noexcept
+void Window::resize_by_scale(float scale, float ratio, glm::vec2 cursor_pos, glm::vec2 left_button_down_window_cusor_pos) noexcept
 {
-  _width  *= scale / _scale;
-  _height *= scale / _scale;
+  _x       = cursor_pos.x - left_button_down_window_cusor_pos.x;
+  _y       = cursor_pos.y - left_button_down_window_cusor_pos.y;
+  _width  *= ratio;
+  _height *= ratio;
   _scale   = scale;
-  update_rect();
-
-  // when the monitor scale is changed, if part of the window is outside the monitor,
-  // the OS will move the window completely inside the monitor
-  g_ui_ctx.send_message(UIContext::Message_Scale_Change{ _handle, scale, _x, _y, _width, _height });
-  g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
-  SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
-}
-
-void Window::resize_by_scale(float scale, float x, float y) noexcept
-{
-  // get ratio
-  auto ratio = glm::vec2{ x / _width, y / _height };
-
-  // scale
-  _width  *= scale / _scale;
-  _height *= scale / _scale;
-  _scale   = scale;
-
-  // calculate new position
-  auto cursor_pos = get_cursor_pos();
-  _x = cursor_pos.x - ratio.x * _width;
-  _y = cursor_pos.y - ratio.y * _height;
 
   update_rect();
 
@@ -413,14 +391,16 @@ void Window::maximize() noexcept
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
-void Window::restore() noexcept
+void Window::cancel_maximize(RECT rect, float scale) noexcept
 {
   _maximized = false;
-  _rect      = _backup_rect;
-  update_by_rect();
-  g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
   g_ui_ctx.send_message(UIContext::Message_Window_Restore{ _handle, _x, _y, _width, _height });
-  SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
+  update_by_real_rect(rect, scale);
+}
+
+void Window::restore() noexcept
+{
+  cancel_maximize(_backup_rect, _scale);
 }
 
 auto Window::get_resize_type(glm::vec<2, int> const& p) const noexcept -> ResizeType

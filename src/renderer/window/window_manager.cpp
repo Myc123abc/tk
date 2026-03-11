@@ -1,6 +1,7 @@
 #include "window_manager.hpp"
 #include "util/error_handling.hpp"
 #include "../../ui/ui_context.hpp"
+#include "../renderer/renderer.hpp"
 
 #include <shellscalingapi.h>
 
@@ -75,7 +76,7 @@ void WindowManager::init() noexcept
 
     // enable DPI awareness
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-    update_monitors();
+    EnumDisplayMonitors(nullptr, nullptr, enum_display_monitors, 0);
 
     // register window class
     auto wnd_class = WNDCLASSEXW{};
@@ -139,11 +140,14 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
 
     left_button_down = false;
 
-    auto& window = windows.at(handle);
-    if (window.is_moving())
-      window.move_end();
-    else if (window.is_resizing())
-      window.resize_end();
+    if (windows.contains(handle))
+    {
+      auto& window = windows.at(handle);
+      if (window.is_moving())
+        window.move_end();
+      else if (window.is_resizing())
+        window.resize_end();
+    }
   };
 
   switch (msg)
@@ -154,25 +158,17 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     return 0;
   }
 
-  case WM_SETTINGCHANGE:
-  {
-    if (w_param == SPI_SETWORKAREA)
-      wnd_mgr._update_monitors = true;
-    return 0;
-  }
-
-  // when another monitor remove or add, update window position
   case WM_DISPLAYCHANGE:
   {
     wnd_mgr._update_monitors = true;
-    if (windows.contains(handle))
-    {
-      auto& window = windows.at(handle);
-      window.monitor_change();
-      auto monitor = get_monitor(handle);
-      if (monitor != wnd_mgr._window_monitors.at(handle))
-        wnd_mgr._window_monitors.at(handle) = monitor;
-    }
+    return 0;
+  }
+
+  case WM_WINDOWPOSCHANGED:
+  {
+    if (IsIconic(handle)) return 0;
+    auto info = reinterpret_cast<WINDOWPOS*>(l_param);
+    wnd_mgr._window_change_size[handle] = { info->x, info->y, info->cx + info->x, info->cy + info->y };
     return 0;
   }
 
@@ -235,10 +231,10 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
         }
         else
         {
-          pos -= left_button_down_window_cursor_pos;
-          window.move_with_pos(pos.x, pos.y);
+          auto move_pos = pos - left_button_down_window_cursor_pos;
+          window.move_with_pos(move_pos.x, move_pos.y);
           // resize window when moving window between different scale of monitors
-          wnd_mgr.update_monitor(handle, cursor_pos.x, cursor_pos.y);
+          wnd_mgr.update_monitor(handle, pos, left_button_down_window_cursor_pos);
         }
       }
       // resizing
@@ -279,55 +275,127 @@ void WindowManager::update() noexcept
   if (_update_monitors)
   {
     _update_monitors = false;
-    update_monitors();
+
+    // update monitor infos
+    _monitor_infos.clear();
+    EnumDisplayMonitors(nullptr, nullptr, enum_display_monitors, 0);
+
+    // update windows
+    for (auto& [handle, window] : _windows)
+    {
+      auto rect = RECT{};
+
+      auto monitor = get_monitor_name(handle);
+
+      // minimize window process
+      if (IsIconic(handle))
+      {
+        ShowWindow(handle, SW_SHOWNOACTIVATE);
+        GetWindowRect(handle, &rect);
+        window.update_by_real_rect(rect, _monitor_infos.at(monitor).scale);
+        ShowWindow(handle, SW_MINIMIZE);
+        _window_monitors.at(handle) = monitor;
+        continue;
+      }
+
+      GetWindowRect(handle, &rect);
+      auto is_same_monitor = _window_monitors.at(handle) == monitor;
+      auto scale           = _monitor_infos.at(monitor).scale;
+
+      // maximize window process
+      if (window.is_maximized())
+      {
+        if (is_same_monitor)
+        {
+          auto intersect_rect = RECT{};
+          if (!IntersectRect(&intersect_rect, &window._rect, &rect))
+            window.update_by_rect(rect, _monitor_infos.at(monitor).scale);
+          else
+            window.update_by_scale(scale);
+          continue;
+        }
+      }
+      
+      // check whether the monitor of the window is removed
+      if (!is_same_monitor)
+      {
+        // if window is maximized, cancel maximize
+        if (window.is_maximized())
+          window.cancel_maximize(rect, scale);
+        // normal window, then move to os suggest position
+        else
+          window.update_by_real_rect(rect, scale);
+
+        // update monitor
+        _window_monitors.at(handle) = monitor;
+        continue;
+      }
+
+      // resize window if scale or rect changed
+      auto real_rect = window.real_rect();
+      if (scale != window.scale() || !EqualRect(&real_rect, &rect))
+        window.update_by_real_rect(rect, _monitor_infos.at(monitor).scale);
+    }
+    update_fullscreen_window();
+  }
+
+  // reset window position avoid OS move window
+  if (!_window_change_size.empty())
+  {
+    for (auto [handle, rect] : _window_change_size)
+    {
+      if (!_windows.contains(handle)) continue;
+      auto& window      = _windows.at(handle);
+      auto  window_rect = window.real_rect();
+      if (!EqualRect(&window_rect, &rect))
+        window.reset_pos_size();
+    }
+    _window_change_size.clear();
   }
 }
 
 auto CALLBACK WindowManager::enum_display_monitors(HMONITOR monitor, HDC, LPRECT, LPARAM) -> BOOL
 {
-  auto& info = g_wnd_mgr._monitor_infos[monitor];
+  auto monitor_info = MONITORINFOEXA{ sizeof(MONITORINFOEXA )};
+  GetMonitorInfoA(monitor, &monitor_info);
 
-  auto monitor_info = MONITORINFO{};
-  monitor_info.cbSize = sizeof(monitor_info);
-  GetMonitorInfo(monitor, &monitor_info);
-
+  auto& info = g_wnd_mgr._monitor_infos[monitor_info.szDevice];
   info.rect  = monitor_info.rcMonitor;
   info.scale = get_monitor_scale(monitor);
 
   return TRUE;
 }
 
-void WindowManager::update_monitors() noexcept
+void WindowManager::update_monitor(HWND handle, glm::vec2 cursor_pos, glm::vec<2, int>& left_button_down_window_cusor_pos) noexcept
 {
-  _monitor_infos.clear();
-  EnumDisplayMonitors(nullptr, nullptr, enum_display_monitors, 0);
-
-  // resize window and update scale of window to ui context if monitor scale is changed
-  for (auto& [handle, window] : _windows)
+  auto monitor = get_monitor_name(handle);
+  if (monitor != _window_monitors.at(handle))
   {
-    if (auto monitor = get_monitor(handle))
+    _window_monitors.at(handle) = monitor;
+    auto  scale  = _monitor_infos.at(monitor).scale;
+    auto& window = _windows.at(handle);
+    auto  ratio  = scale / window.scale();
+    if (ratio != 1.f)
     {
-      auto scale = _monitor_infos.at(monitor).scale;
-      if (scale != window.scale())
-        window.resize_by_scale(scale);
+      // update left_button_down_window_cursor_pos for next move window is right
+      left_button_down_window_cusor_pos = { left_button_down_window_cusor_pos.x * ratio, left_button_down_window_cusor_pos.y * ratio };
+      window.resize_by_scale(scale, ratio, cursor_pos, left_button_down_window_cusor_pos);
     }
   }
 }
 
-void WindowManager::update_monitor(HWND handle, int x, int y) noexcept
+void WindowManager::update_fullscreen_window() noexcept
 {
-  auto monitor = get_monitor(handle);
-  if (monitor != _window_monitors.at(handle))
-  {
-    _window_monitors.at(handle) = monitor;
-    if (monitor)
-    {
-      auto  scale  = _monitor_infos.at(monitor).scale;
-      auto& window = _windows.at(handle);
-      if (scale != window.scale())
-        window.resize_by_scale(scale, x, y);
-    }
-  }
+  auto rect = get_virtual_screen_rect();
+  if (EqualRect(&rect, &g_wnd_mgr._fullscreen_window._rect))
+    return;
+
+  _fullscreen_window._rect = rect;
+  _fullscreen_window.update_by_rect();
+  g_renderer.send_message(Renderer::Message_Window_Update{_fullscreen_window.handle(), _fullscreen_window._width, _fullscreen_window._height });
+  g_ui_ctx.send_message(UIContext::Message_Update_Fullscreen_Window{ _fullscreen_window._width, _fullscreen_window._height });
+  SetWindowPos(_fullscreen_window.handle(), 0, _fullscreen_window._x, g_wnd_mgr._fullscreen_window._y,
+    _fullscreen_window._width, _fullscreen_window._height, SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 auto WindowManager::create_fullscreen_window() noexcept -> WindowSnapshot
@@ -427,6 +495,7 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
     _windows.erase(handle);
     _window_monitors.erase(handle);
     _using_mouse_pass_through_windows.erase(handle);
+    _window_change_size.erase(handle);
     break;
   }
 
@@ -490,8 +559,8 @@ void WindowManager::msg_create_window(WPARAM w_param) noexcept
 
   // get scale of monitor
   auto scale   = 1.f;
-  auto monitor = HMONITOR{};
-  auto infos = _monitor_infos | std::views::values;
+  auto monitor = std::string{};
+  auto infos   = _monitor_infos | std::views::values;
   if (auto it = std::ranges::find_if(infos, [x = info->x, y = info->y](auto const& info) { return PtInRect(&info.rect, { x, y }); });
      it != infos.end())
   {

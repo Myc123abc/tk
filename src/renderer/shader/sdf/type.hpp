@@ -35,7 +35,6 @@ struct ShapeProperty
     path_line,
     path_bezier,
 
-    image,
     glyph,
   };
 

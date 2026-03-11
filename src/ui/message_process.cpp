@@ -19,6 +19,15 @@ void UIContext::MessageHandler::operator()(Message_Cursor_On_Window const& msg) 
   ctx.cursor_on_window = msg.handle;
 }
 
+void UIContext::MessageHandler::operator()(Message_Window_Update const& msg) const noexcept
+{
+  auto& wnd = ctx.get_window(msg.handle);
+  wnd.snap.x      = msg.x;
+  wnd.snap.y      = msg.y;
+  wnd.snap.width  = msg.width;
+  wnd.snap.height = msg.height;
+}
+
 void UIContext::MessageHandler::operator()(Message_Update_Moving const& msg) const noexcept
 {
   auto& wnd = ctx.get_window(msg.handle);

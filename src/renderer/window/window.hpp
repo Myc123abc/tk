@@ -46,8 +46,6 @@ public:
   void init(int x, int y, uint32_t width, uint32_t height, float scale) noexcept;
   void init_auxiliary(int x, int y, uint32_t width, uint32_t height) noexcept;
   void destroy() const noexcept;
-
-  void monitor_change() noexcept;
   
   auto shadow_thickness() const noexcept -> LONG { return Window_Shadow_Thickness * _scale; }
   auto real_x()      const noexcept -> int      { return _x      - shadow_thickness();     }
@@ -84,10 +82,14 @@ public:
   void adjust_offset(ResizeType type, glm::vec<2, int> const& point, int& dx, int& dy) const noexcept;
   void resize(ResizeType type, int dx, int dy) noexcept;
   void resize_end() noexcept;
-  void resize_by_scale(float scale) noexcept;
-  void resize_by_scale(float scale, float x, float y) noexcept;
+  void resize_by_scale(float scale, float ratio, glm::vec2 cursor_pos, glm::vec2 left_button_down_window_cusor_pos) noexcept;
+  void reset_pos_size() noexcept;
+  void update_by_real_rect(RECT rect, float scale) noexcept;
+  void update_by_rect(RECT rect, float scale) noexcept;
+  void update_by_scale(float scale) noexcept;
 
   void maximize() noexcept;
+  void cancel_maximize(RECT rect, float scale) noexcept;
   void restore() noexcept;
 
   auto get_resize_type(glm::vec<2, int> const& p) const noexcept -> ResizeType;

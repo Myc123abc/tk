@@ -65,7 +65,7 @@ void Renderer::UIContextMessageHandler::operator()(Message_Destroy_Image const& 
     renderer._upload_images.erase(msg.handle);
     renderer._bitmaps.erase(msg.handle);
   }
-  else
+  else if (renderer._images.contains(msg.handle))
   {
     // already uploaded, release image resource
     renderer.add_frame_render_complete_func([image = renderer._images.at(msg.handle)] mutable { image.destroy(); });

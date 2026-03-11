@@ -1,3 +1,5 @@
+#include "root_signature.h"
+
 ////////////////////////////////////////////////////////////////////////////////
 ///                                 Structure
 ////////////////////////////////////////////////////////////////////////////////
@@ -17,14 +19,6 @@ struct PSParameter
   nointerpolation uint32_t buffer_offset : BUFFER_OFFSET;
 };
 
-struct Constants
-{
-  uint2  window_extent;
-  float2 window_pos;
-  float  image_alpha;
-  bool   is_image;
-};
-
 enum : uint32_t
 {
   type_triangle = 1,
@@ -37,7 +31,6 @@ enum : uint32_t
   type_path_line,
   type_path_bezier,
 
-  type_image,
   type_glyph
 };
 
@@ -66,16 +59,6 @@ struct ShapeProperty
   //   return bool(flags & flag_window_shadow);
   // }
 };
-
-////////////////////////////////////////////////////////////////////////////////
-///                              Binding
-////////////////////////////////////////////////////////////////////////////////
-
-ConstantBuffer<Constants> constants : register(b0);
-SamplerState              g_sampler : register(s0);
-ByteAddressBuffer         buffer    : register(t0);
-Texture2D                 image     : register(t0, space1);
-Texture2D                 images[]  : register(t0, space2);
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                              Functions
@@ -273,14 +256,6 @@ float4 ps(PSParameter args) : SV_TARGET
   ShapeProperty shape_property = get_shape_property(offset);
 
   float4 color = args.color;
-
-  // TODO: remove type_image
-  // if (shape_property.type == type_image)
-  // {
-  //   color = images[NonUniformResourceIndex(get_uint(offset))].Sample(g_sampler, args.uv);
-  //   color.a *= get_float(offset);
-  //   return color;
-  // }
 
   if (shape_property.type == type_glyph)
   {

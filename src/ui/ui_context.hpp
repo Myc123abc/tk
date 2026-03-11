@@ -225,6 +225,15 @@ public:
     HWND handle{};
   };
 
+  struct Message_Window_Update
+  {
+    HWND     handle{};
+    int      x{};
+    int      y{};
+    uint32_t width{};
+    uint32_t height{};
+  };
+
   struct Message_Update_Moving
   {
     HWND handle{};
@@ -301,6 +310,7 @@ public:
   using Message = std::variant<
     Message_Window_Close,
     Message_Cursor_On_Window,
+    Message_Window_Update,
     Message_Update_Moving,
     Message_Update_Resizing,
     Message_Resize_End,
@@ -324,6 +334,7 @@ private:
     UIContext& ctx;
     void operator()(Message_Window_Close const& msg) const noexcept;
     void operator()(Message_Cursor_On_Window const& msg) const noexcept;
+    void operator()(Message_Window_Update const& msg) const noexcept;
     void operator()(Message_Update_Moving const& msg) const noexcept;
     void operator()(Message_Update_Resizing const& msg) const noexcept;
     void operator()(Message_Resize_End const& msg) const noexcept;
