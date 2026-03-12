@@ -7,6 +7,7 @@
 #include <windows.h>
 
 #include <stdint.h>
+#include <string>
 
 namespace tk { namespace renderer {
 
@@ -43,7 +44,7 @@ public:
   Window& operator=(Window const&) = default;
   Window& operator=(Window&&)      = default;
 
-  void init(int x, int y, uint32_t width, uint32_t height, float scale) noexcept;
+  void init(int x, int y, uint32_t width, uint32_t height) noexcept;
   void init_auxiliary(int x, int y, uint32_t width, uint32_t height) noexcept;
   void destroy() const noexcept;
   
@@ -94,6 +95,9 @@ public:
 
   auto get_resize_type(glm::vec<2, int> const& p) const noexcept -> ResizeType;
 
+  auto monitor() const noexcept { return _monitor; }
+  auto set_monitor(std::string monitor) noexcept { _monitor = monitor; }
+
 private:
   void update_by_rect() noexcept;
   void update_rect() noexcept;
@@ -108,21 +112,23 @@ private:
   auto min_height() const noexcept { return Window_Min_Height * _scale; }
 
 private:
-  int      _x{};
-  int      _y{};
-  uint32_t _width{};
-  uint32_t _height{};
+  int         _x{};
+  int         _y{};
+  uint32_t    _width{};
+  uint32_t    _height{};
 
-  HWND     _handle{};
-  float    _scale{ 1.f };
+  HWND        _handle{};
+  float       _scale{ 1.f };
 
-  bool     _maximized{};
-  bool     _moving{};
-  bool     _move_from_maximize{};
-  bool     _resizing{};
+  bool        _maximized{};
+  bool        _moving{};
+  bool        _move_from_maximize{};
+  bool        _resizing{};
 
-  RECT     _rect{};
-  RECT     _backup_rect{};
+  RECT        _rect{};
+  RECT        _backup_rect{};
+
+  std::string _monitor{};
 };
 
 }}

@@ -4,6 +4,7 @@
 #include "../../ui/ui_context.hpp"
 #include "../config.hpp"
 #include "util/error_handling.hpp"
+#include "monitor.hpp"
 
 using namespace tk::ui;
 
@@ -19,18 +20,31 @@ auto in_range(float v, float min, float max) noexcept
 
 namespace tk { namespace renderer {
 
-void Window::init(int x, int y, uint32_t width, uint32_t height, float scale) noexcept
+void Window::init(int x, int y, uint32_t width, uint32_t height) noexcept
 {
-  _x      = x;
-  _y      = y;
-  _width  = width  * scale;
-  _height = height * scale;
-  _scale  = scale;
+  auto monitor = Monitor{ { x, y, static_cast<LONG>(x + width), static_cast<LONG>(y + height) } };
+
+  _monitor = monitor.name();
+  _scale   = monitor.scale();
+  _x       = x;
+  _y       = y;
+  _width   = width  * _scale;
+  _height  = height * _scale;
   update_rect();
 
   _handle = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP, WindowManager::Window_Class, nullptr, WS_POPUP | WS_MINIMIZEBOX,
     real_x(), real_y(), real_width(), real_height(), 0, 0, GetModuleHandleW(nullptr), 0);
   err_if(!_handle, "failed to create window");
+
+  // move window to primary monitor if it's not on any display monitors
+  auto work_area = monitor.work_rect();
+  if (!point_on({ x, y }, work_area))
+  {
+    _x = work_area.left;
+    _y = work_area.top;
+    update_rect();
+    SetWindowPos(_handle, 0, real_x(), real_y(), 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+  }
 
   // create window render resource
   g_renderer.send_message(Renderer::Message_Window_Create{ _handle, real_width(), real_height() });
@@ -169,7 +183,6 @@ void Window::update_by_rect(RECT rect, float scale) noexcept
   g_ui_ctx.send_message(UIContext::Message_Scale_Change{ _handle, scale, _x, _y, _width, _height });
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
-
 }
 
 void Window::update_by_real_rect(RECT rect, float scale) noexcept
@@ -384,7 +397,7 @@ void Window::maximize() noexcept
 {
   _maximized   = true;
   _backup_rect =_rect;
-  _rect        = get_window_monitor_work_rect(_handle);
+  _rect        = Monitor{_handle }.work_rect();
   update_by_rect();
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
   g_ui_ctx.send_message(UIContext::Message_Window_Maximize{ _handle, _x, _y, _width, _height });

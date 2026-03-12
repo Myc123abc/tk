@@ -2,6 +2,7 @@
 #include "util/error_handling.hpp"
 #include "../../ui/ui_context.hpp"
 #include "../renderer/renderer.hpp"
+#include "monitor.hpp"
 
 #include <shellscalingapi.h>
 
@@ -56,14 +57,6 @@ void set_cursor(HWND handle, ResizeType type) noexcept
   SetClassLongPtrA(handle, GCLP_HCURSOR, reinterpret_cast<LONG_PTR>(LoadCursorA(nullptr, cursor)));
 }
 
-inline auto get_monitor_scale(HMONITOR monitor) noexcept
-{
-  uint32_t dpi_x, dpi_y;
-  GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &dpi_x, &dpi_y);
-  assert(dpi_x == dpi_y);
-  return dpi_x / 96.f;
-}
-
 }
 
 namespace tk { namespace renderer {
@@ -76,7 +69,6 @@ void WindowManager::init() noexcept
 
     // enable DPI awareness
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-    EnumDisplayMonitors(nullptr, nullptr, enum_display_monitors, 0);
 
     // register window class
     auto wnd_class = WNDCLASSEXW{};
@@ -276,31 +268,26 @@ void WindowManager::update() noexcept
   {
     _update_monitors = false;
 
-    // update monitor infos
-    _monitor_infos.clear();
-    EnumDisplayMonitors(nullptr, nullptr, enum_display_monitors, 0);
-
     // update windows
     for (auto& [handle, window] : _windows)
     {
       auto rect = RECT{};
 
-      auto monitor = get_monitor_name(handle);
+      auto monitor = Monitor{ handle };
 
       // minimize window process
       if (IsIconic(handle))
       {
         ShowWindow(handle, SW_SHOWNOACTIVATE);
         GetWindowRect(handle, &rect);
-        window.update_by_real_rect(rect, _monitor_infos.at(monitor).scale);
+        window.update_by_real_rect(rect, monitor.scale());
         ShowWindow(handle, SW_MINIMIZE);
-        _window_monitors.at(handle) = monitor;
+        window.set_monitor(monitor.name());
         continue;
       }
 
       GetWindowRect(handle, &rect);
-      auto is_same_monitor = _window_monitors.at(handle) == monitor;
-      auto scale           = _monitor_infos.at(monitor).scale;
+      auto is_same_monitor = window.monitor() == monitor.name();
 
       // maximize window process
       if (window.is_maximized())
@@ -308,10 +295,19 @@ void WindowManager::update() noexcept
         if (is_same_monitor)
         {
           auto intersect_rect = RECT{};
-          if (!IntersectRect(&intersect_rect, &window._rect, &rect))
-            window.update_by_rect(rect, _monitor_infos.at(monitor).scale);
+          // because some device OS get rect not really the monitor's rcWork,
+          // so I need to get it manually
+label_again:
+          auto target_monitor = Monitor{ rect };
+          auto work_rect      = target_monitor.work_rect();
+          auto monitor_rect   = target_monitor.rect();
+          // some device update monitor info the rcWork and rcMonitor is same, so repeate some times
+          if (EqualRect(&work_rect, &monitor_rect))
+            goto label_again;
+          if (!IntersectRect(&intersect_rect, &window._rect, &work_rect))
+            window.update_by_rect(work_rect, monitor.scale());
           else
-            window.update_by_scale(scale);
+            window.update_by_scale(monitor.scale());
           continue;
         }
       }
@@ -321,20 +317,20 @@ void WindowManager::update() noexcept
       {
         // if window is maximized, cancel maximize
         if (window.is_maximized())
-          window.cancel_maximize(rect, scale);
+          window.cancel_maximize(rect, monitor.scale());
         // normal window, then move to os suggest position
         else
-          window.update_by_real_rect(rect, scale);
+          window.update_by_real_rect(rect, monitor.scale());
 
         // update monitor
-        _window_monitors.at(handle) = monitor;
+        window.set_monitor(monitor.name());
         continue;
       }
 
       // resize window if scale or rect changed
       auto real_rect = window.real_rect();
-      if (scale != window.scale() || !EqualRect(&real_rect, &rect))
-        window.update_by_real_rect(rect, _monitor_infos.at(monitor).scale);
+      if (monitor.scale() != window.scale() || !EqualRect(&real_rect, &rect))
+        window.update_by_real_rect(rect, monitor.scale());
     }
     update_fullscreen_window();
   }
@@ -354,26 +350,14 @@ void WindowManager::update() noexcept
   }
 }
 
-auto CALLBACK WindowManager::enum_display_monitors(HMONITOR monitor, HDC, LPRECT, LPARAM) -> BOOL
-{
-  auto monitor_info = MONITORINFOEXA{ sizeof(MONITORINFOEXA )};
-  GetMonitorInfoA(monitor, &monitor_info);
-
-  auto& info = g_wnd_mgr._monitor_infos[monitor_info.szDevice];
-  info.rect  = monitor_info.rcMonitor;
-  info.scale = get_monitor_scale(monitor);
-
-  return TRUE;
-}
-
 void WindowManager::update_monitor(HWND handle, glm::vec2 cursor_pos, glm::vec<2, int>& left_button_down_window_cusor_pos) noexcept
 {
-  auto monitor = get_monitor_name(handle);
-  if (monitor != _window_monitors.at(handle))
+  auto& window  = _windows.at(handle);
+  auto  monitor = Monitor{ handle };
+  if (monitor.name() != window.monitor())
   {
-    _window_monitors.at(handle) = monitor;
-    auto  scale  = _monitor_infos.at(monitor).scale;
-    auto& window = _windows.at(handle);
+    window.set_monitor(monitor.name());
+    auto  scale  = monitor.scale();
     auto  ratio  = scale / window.scale();
     if (ratio != 1.f)
     {
@@ -493,7 +477,6 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
     auto handle = std::bit_cast<HWND>(w_param);
     _windows.at(handle).destroy();
     _windows.erase(handle);
-    _window_monitors.erase(handle);
     _using_mouse_pass_through_windows.erase(handle);
     _window_change_size.erase(handle);
     break;
@@ -557,25 +540,13 @@ void WindowManager::msg_create_window(WPARAM w_param) noexcept
   // get create info
   auto info = reinterpret_cast<WindowCreateInfo*>(w_param);
 
-  // get scale of monitor
-  auto scale   = 1.f;
-  auto monitor = std::string{};
-  auto infos   = _monitor_infos | std::views::values;
-  if (auto it = std::ranges::find_if(infos, [x = info->x, y = info->y](auto const& info) { return PtInRect(&info.rect, { x, y }); });
-     it != infos.end())
-  {
-    scale   = it.base()->second.scale;
-    monitor = it.base()->first;
-  }
-
   // init window and set handle
   auto window = Window{};
-  window.init(info->x, info->y, info->width, info->height, scale);
+  window.init(info->x, info->y, info->width, info->height);
   info->handle = window._handle;
 
   // store window
   _windows.emplace(window._handle, std::move(window));
-  _window_monitors.emplace(window._handle, monitor);
 
   // notice window create complete
   SetEvent(info->event);
