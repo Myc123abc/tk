@@ -6,7 +6,6 @@
 #include <latch>
 #include <unordered_map>
 #include <unordered_set>
-#include <string>
 
 namespace tk { namespace renderer {
 
@@ -27,6 +26,11 @@ inline auto point_on(glm::vec<2, int> const& p, RECT rect) noexcept
   return p.x >= rect.left && p.x <= rect.right && p.y >= rect.top && p.y <= rect.bottom;
 }
 
+inline auto operator==(RECT lhs, RECT rhs) -> bool
+{
+  return EqualRect(&lhs, &rhs);
+}
+
 struct WindowSnapshot
 {
   HWND     handle{};
@@ -39,6 +43,7 @@ struct WindowSnapshot
   bool     maximized{};
   bool     move_from_maximize{};
   float    scale{};
+  bool     fullscreen_window{};
   
   void init(Window const& window) noexcept
   {
@@ -79,6 +84,8 @@ public:
     minimize_window,
     maximize_window,
     restore_window,
+    fullscreen_window,
+    restore_fullscreen_window,
     signal,
   };
 
@@ -95,6 +102,8 @@ public:
   void minimize_window(HWND handle) const noexcept;
   void maximize_window(HWND handle) const noexcept;
   void restore_window(HWND handle) const noexcept;
+  void fullscreen_window(HWND handle) const noexcept;
+  void restore_fullscreen_window(HWND handle) const noexcept;
 
   auto get_window_z_orders() const noexcept -> std::vector<HWND>;
   auto get_cursor_on_window() const noexcept -> HWND;

@@ -131,7 +131,17 @@ int main()
     if (!wnd1_is_closed)
     {
       ui::begin("wnd1", 50, 50, 200, 200, &wnd1_is_closed, cfg);
-      // ui::rectangle({}, ui::window_extent(), 0xffffffff);
+      ui::rectangle({}, ui::window_drawable_extent(), 0x282c3444);
+      if (ui::get_key(ui::Key::F11))
+      {
+        if (ui::is_fullscreen_window())
+          ui::restore_fullscreen_window();
+        else
+          ui::fullscreen_window();
+      }
+      auto extent = ui::window_drawable_extent();
+      auto pos = glm::vec2{ extent.x / 2 - 50, extent.y - 50 };
+      ui::rectangle(pos, pos + glm::vec2(100), 0x000000ff);
       auto size = ui::window_drawable_extent();
       ui::triangle({ size.x / 2, 0 }, size, { 0, size.y }, 0x00ff004f, 10);
       if (ui::button("btn1", 0, 0, 100, 100, 0x00ff00ff, 0x0000ffff))
@@ -139,6 +149,7 @@ int main()
       if (ui::button("btn2", 50, 50, 100, 100, 0x00ff00ff, 0x0000ffff))
         wnd2_is_closed = false;
       ui::add_move_invalid_area({}, { 150, 150 });
+
       ui::end();
     }
 

@@ -29,7 +29,8 @@ enum class CommandType : uint16_t
 
   image,
 
-  set_render_area,
+  set_scissor_rect,
+  set_window_pos
 };
 
 struct CommandHeader
@@ -110,10 +111,14 @@ struct ImageInfo
   uint8_t     alpha{}; 
 };
 
-struct RenderAreaInfo
+struct ScissorRectInfo
 {
-  RECT      scissor_rect{};
-  glm::vec2 resizing_window_pos{};
+  RECT rect{};
+};
+
+struct WindowPosInfo
+{
+  glm::vec2 pos{};
 };
 
 class CommandList
@@ -245,9 +250,14 @@ public:
     push(CommandType::image, ImageInfo{ handle, left_top, right_bottom, alpha });
   } 
 
-  void set_render_area(RECT scissor_rect, glm::vec2 resizing_window_pos = {}) noexcept
+  void set_scissor_rect(RECT rect) noexcept
   {
-    push(CommandType::set_render_area, RenderAreaInfo{ scissor_rect, resizing_window_pos });
+    push(CommandType::set_scissor_rect, ScissorRectInfo{ rect });
+  }
+
+  void set_window_pos(glm::vec2 pos) noexcept
+  {
+    push(CommandType::set_window_pos, WindowPosInfo{ pos });
   }
 
   auto submit() noexcept -> CommandList&

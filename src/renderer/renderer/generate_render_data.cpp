@@ -218,11 +218,17 @@ void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
     }
     break;
 
-    case set_render_area:
+    case set_scissor_rect:
     {
-      auto info = reinterpret_cast<RenderAreaInfo*>(info_ptr);
-      render_data.scissor_rect        = info->scissor_rect;
-      render_data.resizing_window_pos = info->resizing_window_pos;
+      auto info = reinterpret_cast<ScissorRectInfo*>(info_ptr);
+      render_data.push_scissor_rect(info->rect);
+    }
+    break;
+
+    case set_window_pos:
+    {
+      auto info = reinterpret_cast<WindowPosInfo*>(info_ptr);
+      render_data.resizing_window_pos = info->pos;
     }
     break;
 

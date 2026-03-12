@@ -80,30 +80,48 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
   if (is_closed)
     *is_closed = _window->is_closed;
 
-  if (_window->cfg.display_title_bar)
+  // fullscreen process
+  fullscreen_process();  
+
+  if (is_use_title_bar_now())
     set_render_pos(0, Title_Bar_Height);
   else
     set_render_pos(0, 0);
 
   _window->clear_move_invalid_areas();
   _window->cmd()->wait().reset();
+
+  if (_window->snap.fullscreen_window)
+    g_ui_ctx._window->add_move_invald_areas(
+    {
+      0,
+      0,
+      static_cast<LONG>(_window->snap.width),
+      static_cast<LONG>(_window->snap.height)
+    });
+}
+
+void UIContext::fullscreen_process() noexcept
+{
+  if (_window->set_fullscreen)
+  {
+    // fullscreen window
+    if (!_window->snap.fullscreen_window)
+      g_wnd_mgr.fullscreen_window(_window->snap.handle);
+  }
+  else
+  {
+    // restore window
+    if (_window->snap.fullscreen_window)
+      g_wnd_mgr.restore_fullscreen_window(_window->snap.handle);
+  }
 }
 
 void UIContext::end() noexcept
 {
   err_if(!_call_begin, "begin is not called but end is called");
-  if (_window->cfg.display_title_bar)
+  if (is_use_title_bar_now())
     add_title_bar();
-
-  // draw real window wireframe, and virtual window wireframe
-#ifndef NDEBUG
-  set_render_pos(-Window_Shadow_Thickness, -Window_Shadow_Thickness);
-  auto extent = window_extent();
-  ui::rectangle({}, { extent.x + Window_Shadow_Thickness * 2, extent.y + Window_Shadow_Thickness * 2 }, 0x00ff00ff, 1);
-  set_render_pos(0, 0);
-  ui::rectangle({}, extent, 0xffff00ff, 1);
-#endif
-
   _call_begin = false;
   _window->switch_move_invalid_areas();
 }
@@ -153,6 +171,18 @@ void UIContext::close_window() noexcept
   });
 }
 
+void UIContext::fullscreen_window() noexcept
+{
+  if (_window->set_fullscreen) return;
+  _window->set_fullscreen = true;
+}
+
+void UIContext::restore_fullscreen_window() noexcept
+{
+  if (!_window->set_fullscreen) return;
+  _window->set_fullscreen = false;
+}
+
 void UIContext::preprocess_render() noexcept
 {
   close_window();
@@ -181,9 +211,27 @@ void UIContext::render() noexcept
     if (!wnd.snap.resizing)
     {
       auto thickness = wnd.shadow_thickness();
-      cmd->set_render_area({ thickness, thickness,
+      cmd->set_scissor_rect({ thickness, thickness,
         static_cast<LONG>(thickness + wnd.snap.width),
         static_cast<LONG>(thickness + wnd.snap.height)});
+      if (!wnd.snap.fullscreen_window && !wnd.snap.maximized)
+      {
+  // FIXME: tmp
+  // draw real window wireframe, and virtual window wireframe
+#ifndef NDEBUG
+  _call_begin = true;
+  _window = &wnd;
+  set_render_pos(-Window_Shadow_Thickness, -Window_Shadow_Thickness);
+  auto extent = window_extent();
+  ui::rectangle({}, { extent.x + Window_Shadow_Thickness * 2, extent.y + Window_Shadow_Thickness * 2 }, 0x00ff00ff, 1);
+  set_render_pos(0, 0);
+  ui::rectangle({}, extent, 0xffff00ff, 1);
+  _call_begin = false;
+#endif
+        cmd->set_scissor_rect({ 0, 0,
+          static_cast<LONG>(thickness * 2 + wnd.snap.width),
+          static_cast<LONG>(thickness * 2 + wnd.snap.height)});
+      }
       cmd->submit();
       render(wnd, cmd);
     }
@@ -194,7 +242,20 @@ void UIContext::render() noexcept
         wnd.need_clear = false;
         render(wnd, {});
       }
-      cmd->set_render_area(wnd.rect(), wnd.real_pos());
+
+      cmd->set_scissor_rect(wnd.rect());
+#ifndef NDEBUG
+  _call_begin = true;
+  _window = &wnd;
+  set_render_pos(-Window_Shadow_Thickness, -Window_Shadow_Thickness);
+  auto extent = window_extent();
+  ui::rectangle({}, { extent.x + Window_Shadow_Thickness * 2, extent.y + Window_Shadow_Thickness * 2 }, 0x00ff00ff, 1);
+  set_render_pos(0, 0);
+  ui::rectangle({}, extent, 0xffff00ff, 1);
+  _call_begin = false;
+#endif
+      cmd->set_scissor_rect(wnd.real_rect());
+      cmd->set_window_pos(wnd.real_pos());
       cmd->submit();
       render(_fullscreen_window, cmd);
     }

@@ -87,7 +87,7 @@ void end() noexcept
 void add_move_invalid_area(glm::vec2 left_top, glm::vec2 right_bottom) noexcept
 {
   g_ui_ctx.check_draw();
-  if (g_ui_ctx._window->cfg.display_title_bar && !g_ui_ctx.draw_title_bar)
+  if (g_ui_ctx.is_use_title_bar_now() && !g_ui_ctx.draw_title_bar)
   {
     left_top.y     += Title_Bar_Height;
     right_bottom.y += Title_Bar_Height;
@@ -115,10 +115,29 @@ auto window_extent() noexcept -> glm::vec2
 auto window_drawable_extent() noexcept -> glm::vec2
 {
   auto extent = window_extent();
-  if (g_ui_ctx._window->cfg.display_title_bar)
+  if (g_ui_ctx.is_use_title_bar_now())
     extent.y -= Title_Bar_Height;
   return extent;
 }
+
+auto is_fullscreen_window() noexcept -> bool
+{
+  g_ui_ctx.check_draw();
+  return g_ui_ctx._window->snap.fullscreen_window;
+}
+
+void fullscreen_window() noexcept
+{
+  g_ui_ctx.check_draw();
+  g_ui_ctx.fullscreen_window();
+}
+
+void restore_fullscreen_window() noexcept
+{
+  g_ui_ctx.check_draw();
+  g_ui_ctx.restore_fullscreen_window();
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                            Shape Operator
@@ -295,7 +314,7 @@ auto button(size_t id, int x, int y, uint32_t width, uint32_t height) noexcept->
   // button is a rectangle with width and height in specific position
   auto left_top     = glm::vec2{ x, y };
   auto right_bottom = glm::vec2{ x + width, y + height };
-  if (g_ui_ctx._window->cfg.display_title_bar && !g_ui_ctx.draw_title_bar)
+  if (g_ui_ctx.is_use_title_bar_now() && !g_ui_ctx.draw_title_bar)
   {
     left_top.y     += Title_Bar_Height;
     right_bottom.y += Title_Bar_Height;

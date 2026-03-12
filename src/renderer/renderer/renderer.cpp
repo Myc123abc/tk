@@ -201,7 +201,9 @@ void Renderer::render_sdf(RenderResource& res, RenderData& data) noexcept
     { "buffer", frame.buffer.shape_properties_gpu_handle()                                          },
   });
 
-  cmd->RSSetScissorRects(1, &data.scissor_rect);
+  // pop first scissor rect
+  auto scissor_rect = data.pop_scissor_rect();
+  cmd->RSSetScissorRects(1, &scissor_rect.rect);
 
   auto last_constants = Constants{};
   auto first          = true;
@@ -225,7 +227,33 @@ void Renderer::render_sdf(RenderResource& res, RenderData& data) noexcept
       cmd->DrawIndexedInstanced(draw_data.indices_size, 1, draw_data.indices_start, 0, 0);
     }
     else
-      cmd->DrawIndexedInstanced(draw_data.indices_size, 1, draw_data.indices_start, 0, 0);
+    {
+      auto indices_start      = draw_data.indices_start;
+      auto indices_size       = draw_data.indices_size;
+      auto total_indices_size = draw_data.indices_start + draw_data.indices_size;
+label_draw_call_again:
+      if (total_indices_size < scissor_rect.next_indices_idx)
+      {
+        cmd->DrawIndexedInstanced(indices_size, 1, indices_start, 0, 0);
+        continue;
+      }
+      if (total_indices_size == scissor_rect.next_indices_idx)
+      {
+        cmd->DrawIndexedInstanced(indices_size, 1, indices_start, 0, 0);
+        assert(data.is_scissor_rect_empty());
+        continue;
+      }
+      else
+      {
+        indices_size = scissor_rect.next_indices_idx - indices_start;
+        cmd->DrawIndexedInstanced(indices_size, 1, indices_start, 0, 0);
+        indices_start = scissor_rect.next_indices_idx;
+        scissor_rect  = data.pop_scissor_rect();
+        indices_size  = scissor_rect.next_indices_idx - indices_start;
+        cmd->RSSetScissorRects(1, &scissor_rect.rect);
+        goto label_draw_call_again;
+      }
+    }
   }
 }
 

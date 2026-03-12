@@ -122,4 +122,37 @@ void UIContext::MessageHandler::operator()(Message_Scale_Change const& msg) cons
   wnd.height = msg.height;
 }
 
+void UIContext::MessageHandler::operator()(Message_Window_Fullscreen const& msg) const noexcept
+{
+  auto& wnd = ctx.get_window(msg.handle).snap;
+  wnd.maximized         = false;
+  wnd.fullscreen_window = true;
+  wnd.x                 = msg.x;
+  wnd.y                 = msg.y;
+  wnd.width             = msg.width;
+  wnd.height            = msg.height;
+}
+
+void UIContext::MessageHandler::operator()(Message_Window_Restore_Fullscreen const& msg) const noexcept
+{
+  auto& wnd = ctx.get_window(msg.handle).snap;
+  wnd.fullscreen_window = false;
+  wnd.x                 = msg.x;
+  wnd.y                 = msg.y;
+  wnd.width             = msg.width;
+  wnd.height            = msg.height;
+}
+
+void UIContext::MessageHandler::operator()(Message_Window_Cancel_Fullscreen_Maximize const& msg) const noexcept
+{
+  auto& wnd = ctx.get_window(msg.handle).snap;
+  wnd.maximized         = false;
+  wnd.fullscreen_window = false;
+  wnd.x                 = msg.x;
+  wnd.y                 = msg.y;
+  wnd.width             = msg.width;
+  wnd.height            = msg.height;
+  ctx.get_window(msg.handle).set_fullscreen = false;
+}
+
 }}

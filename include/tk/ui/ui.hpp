@@ -181,6 +181,18 @@ auto window_extent() noexcept -> glm::vec2;
  */
 auto window_drawable_extent() noexcept -> glm::vec2;
 
+/**
+ * whether current window is fullscreen
+ * @return is window fullscreen
+ */
+auto is_fullscreen_window() noexcept -> bool;
+
+// fullscreen window
+void fullscreen_window() noexcept;
+
+// restore window if fullscreen
+void restore_fullscreen_window() noexcept;
+
 ////////////////////////////////////////////////////////////////////////////////
 ///                            Shape Operator
 ////////////////////////////////////////////////////////////////////////////////
@@ -348,6 +360,7 @@ auto button(
 
 #define KEY_LIST(X)                \
   X(Q,                 'Q')        \
+  X(F11,               VK_F11)     \
   X(Shift,             VK_SHIFT)   \
   X(Space,             VK_SPACE)   \
   X(Mouse_Left_Button, VK_LBUTTON)

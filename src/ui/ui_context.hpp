@@ -41,6 +41,10 @@ struct Window
   auto shadow_thickness() const noexcept -> LONG { return renderer::Window_Shadow_Thickness * snap.scale; }
   auto real_pos() const noexcept -> glm::vec2 { return { snap.x - shadow_thickness(), snap.y - shadow_thickness() }; }
   auto pos()      const noexcept -> glm::vec2 { return { snap.x, snap.y }; }
+  auto real_rect()   const noexcept { return RECT{ snap.x                                  - shadow_thickness(),
+                                                   snap.y                                  - shadow_thickness(),
+                                                   static_cast<LONG>(snap.x + snap.width)  + shadow_thickness(),
+                                                   static_cast<LONG>(snap.y + snap.height) + shadow_thickness() }; }
 
   auto is_moving_or_resizing() const noexcept { return snap.moving || snap.resizing; }
   auto is_active() const noexcept { return GetForegroundWindow() == snap.handle; }
@@ -66,6 +70,8 @@ struct Window
   void clear_move_invalid_areas() noexcept;
   void switch_move_invalid_areas() noexcept;
   auto access_move_invliad_areas() noexcept -> std::vector<RECT>&;
+
+  bool set_fullscreen{};
 };
 
 class UIContext
@@ -131,6 +137,10 @@ public:
   void image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha) noexcept;
   auto text(std::string_view text, glm::vec2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> glm::vec2;
 
+  void fullscreen_window() noexcept;
+  void restore_fullscreen_window() noexcept;
+  auto is_use_title_bar_now() const noexcept { return _window->cfg.display_title_bar && !_window->snap.fullscreen_window; }
+
 private:
   void preprocess_render() noexcept;
   void postprocess_render() noexcept;
@@ -138,6 +148,7 @@ private:
   auto& get_window(HWND handle) noexcept { return _windows[_window_names[handle]]; }
 
   void add_title_bar() noexcept;
+  void fullscreen_process() noexcept;
 
 public:
   Window*                                 _window{};
@@ -307,6 +318,33 @@ public:
     uint32_t height{};
   };
 
+  struct Message_Window_Fullscreen
+  {
+    HWND     handle{};
+    int      x{};
+    int      y{};
+    uint32_t width{};
+    uint32_t height{};
+  };
+
+  struct Message_Window_Restore_Fullscreen
+  {
+    HWND     handle{};
+    int      x{};
+    int      y{};
+    uint32_t width{};
+    uint32_t height{};
+  };
+
+  struct Message_Window_Cancel_Fullscreen_Maximize
+  {
+    HWND     handle{};
+    int      x{};
+    int      y{};
+    uint32_t width{};
+    uint32_t height{};
+  };
+
   using Message = std::variant<
     Message_Window_Close,
     Message_Cursor_On_Window,
@@ -320,7 +358,10 @@ public:
     Message_Window_Moving_From_Maximize_End,
     Message_Interruption,
     Message_Update_Fullscreen_Window,
-    Message_Scale_Change
+    Message_Scale_Change,
+    Message_Window_Fullscreen,
+    Message_Window_Restore_Fullscreen,
+    Message_Window_Cancel_Fullscreen_Maximize
   >;
 
   void send_message(Message&& msg) noexcept
@@ -345,6 +386,9 @@ private:
     void operator()(Message_Interruption const& msg) const noexcept;
     void operator()(Message_Update_Fullscreen_Window const& msg) const noexcept;
     void operator()(Message_Scale_Change const& msg) const noexcept;
+    void operator()(Message_Window_Fullscreen const& msg) const noexcept;
+    void operator()(Message_Window_Restore_Fullscreen const& msg) const noexcept;
+    void operator()(Message_Window_Cancel_Fullscreen_Maximize const& msg) const noexcept;
   };
   MessageQueue<Message, UI_Message_Queue_Capacity> _msg_queue;
 };

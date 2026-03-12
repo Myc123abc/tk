@@ -73,6 +73,7 @@ public:
   auto height() const noexcept { return _height; }
   auto scale() const noexcept { return _scale; }
 
+  auto is_fullscreen() const noexcept { return _fullscreen; }
   auto is_maximized() const noexcept { return _maximized; }
   auto is_moving() const noexcept { return _moving; }
   auto is_resizing() const noexcept { return _resizing; }
@@ -87,11 +88,14 @@ public:
   void reset_pos_size() noexcept;
   void update_by_real_rect(RECT rect, float scale) noexcept;
   void update_by_rect(RECT rect, float scale) noexcept;
-  void update_by_scale(float scale) noexcept;
 
   void maximize() noexcept;
   void cancel_maximize(RECT rect, float scale) noexcept;
   void restore() noexcept;
+  void fullscreen() noexcept;
+  void restore_fullscreen() noexcept;
+  void cancel_fullscreen(RECT rect, float scale) noexcept;
+  void cancel_fullscreen_maximize(RECT rect, float scale) noexcept;
 
   auto get_resize_type(glm::vec<2, int> const& p) const noexcept -> ResizeType;
 
@@ -120,6 +124,7 @@ private:
   HWND        _handle{};
   float       _scale{ 1.f };
 
+  bool        _fullscreen{};
   bool        _maximized{};
   bool        _moving{};
   bool        _move_from_maximize{};

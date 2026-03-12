@@ -7,6 +7,7 @@
 #include <windows.h>
 
 #include <vector>
+#include <queue>
 
 namespace tk { namespace renderer {
 
@@ -24,7 +25,6 @@ struct RenderData
   std::vector<Vertex>        vertices;
   std::vector<uint16_t>      indices;
   std::vector<ShapeProperty> shape_properties;
-  RECT                       scissor_rect{};
   glm::vec2                  resizing_window_pos;
   std::vector<DrawData>      draw_datas;
 
@@ -33,11 +33,11 @@ struct RenderData
     vertices.clear();
     indices.clear();
     shape_properties.clear();
-    scissor_rect        = {};
     resizing_window_pos = {};
     draw_datas.clear();
     _prev_is_image_type = {};
     _last_indices_size  = {};
+    assert(_scissor_infos.empty());
   }
 
   void try_push_draw_data(ui::CommandType type) noexcept
@@ -72,9 +72,30 @@ struct RenderData
     data.image_alpha                 = alpha;
   }
 
+  void push_scissor_rect(RECT rect) noexcept
+  {
+    _scissor_infos.emplace(rect, indices.size());
+  }
+
+  auto pop_scissor_rect() noexcept
+  {
+    auto info = _scissor_infos.front();
+    _scissor_infos.pop();
+    return info;
+  }
+
+  auto is_scissor_rect_empty() const noexcept { return _scissor_infos.empty(); }
+
 private:
   bool     _prev_is_image_type{};
   uint32_t _last_indices_size{};
+
+  struct ScissorInfo
+  {
+    RECT     rect{};
+    uint32_t next_indices_idx;
+  };
+  std::queue<ScissorInfo> _scissor_infos;
 };
 
 }}

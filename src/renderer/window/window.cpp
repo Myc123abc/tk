@@ -168,13 +168,6 @@ void Window::reset_pos_size() noexcept
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
-void Window::update_by_scale(float scale) noexcept
-{
-  _scale = scale;
-  g_ui_ctx.send_message(UIContext::Message_Scale_Change{ _handle, scale, _x, _y, _width, _height });
-  SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
-}
-
 void Window::update_by_rect(RECT rect, float scale) noexcept
 {
   _rect  = rect;
@@ -396,8 +389,8 @@ void Window::bottom_offset(int dy) noexcept
 void Window::maximize() noexcept
 {
   _maximized   = true;
-  _backup_rect =_rect;
-  _rect        = Monitor{_handle }.work_rect();
+  _backup_rect = _rect;
+  _rect        = Monitor{ _handle }.work_rect();
   update_by_rect();
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
   g_ui_ctx.send_message(UIContext::Message_Window_Maximize{ _handle, _x, _y, _width, _height });
@@ -411,9 +404,49 @@ void Window::cancel_maximize(RECT rect, float scale) noexcept
   update_by_real_rect(rect, scale);
 }
 
+void Window::cancel_fullscreen(RECT rect, float scale) noexcept
+{
+  _fullscreen = false;
+  g_ui_ctx.send_message(UIContext::Message_Window_Restore_Fullscreen{ _handle, _x, _y, _width, _height });
+  update_by_real_rect(rect, scale);
+}
+
+void Window::cancel_fullscreen_maximize(RECT rect, float scale) noexcept
+{
+  auto monitor = Monitor{ rect };
+  if (_maximized)  rect = monitor.work_rect();
+  if (_fullscreen) rect = monitor.rect();
+  _maximized  = false;
+  _fullscreen = false; 
+  g_ui_ctx.send_message(UIContext::Message_Window_Cancel_Fullscreen_Maximize{ _handle, _x, _y, _width, _height });
+  update_by_real_rect(rect, scale);
+}
+
 void Window::restore() noexcept
 {
   cancel_maximize(_backup_rect, _scale);
+}
+
+void Window::fullscreen() noexcept
+{
+  _maximized   = false;
+  _fullscreen  = true;
+  _backup_rect = _rect;
+  _rect        = Monitor{ _handle }.rect();
+  update_by_rect();
+  g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
+  g_ui_ctx.send_message(UIContext::Message_Window_Fullscreen{ _handle, _x, _y, _width, _height });
+  SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+void Window::restore_fullscreen() noexcept
+{
+  _fullscreen = false;
+  _rect       = _backup_rect;
+  update_by_rect();
+  g_ui_ctx.send_message(UIContext::Message_Window_Restore_Fullscreen{ _handle, _x, _y, _width, _height });
+  g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
+  SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 auto Window::get_resize_type(glm::vec<2, int> const& p) const noexcept -> ResizeType
