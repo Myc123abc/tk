@@ -3,6 +3,7 @@
 #include "../renderer/resource/image.hpp"
 #include "../util/object_pool.hpp"
 #include "config.hpp"
+#include "../util/singleton.hpp"
 
 #include <string>
 #include <unordered_map>
@@ -10,23 +11,8 @@
 
 namespace tk { namespace ui {
 
-class ImageManager
-{
-private:
-  ImageManager()                           = default;
-  ~ImageManager()                          = default;
+Singleton(ImageManager, g_img_mgr,
 public:
-  ImageManager(ImageManager const&)            = delete;
-  ImageManager(ImageManager&&)                 = delete;
-  ImageManager& operator=(ImageManager const&) = delete;
-  ImageManager& operator=(ImageManager&&)      = delete;
-
-  static auto instance() noexcept -> ImageManager&
-  {
-    static ImageManager instance;
-    return instance;
-  }
-
   void destroy() noexcept;
 
 private:
@@ -69,9 +55,7 @@ private:
   std::unordered_map<std::string, ImageHandle> _loaded_images;
   std::unordered_set<ImageHandle>              _images;
   std::unordered_map<std::string, glm::vec2>   _image_extents;
-};
-
-inline static auto& g_img_mgr{ ImageManager::instance() };
+)
 
 using ImageHandle = ImageManager::ImageHandle;
 

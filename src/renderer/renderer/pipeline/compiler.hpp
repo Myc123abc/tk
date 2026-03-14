@@ -1,6 +1,7 @@
 #pragma once
 
-#include "../util/hash.hpp"
+#include "../../../util/hash.hpp"
+#include "../../../util/singleton.hpp"
 
 #include <directx/d3dx12.h>
 #include <dxcapi.h>
@@ -14,23 +15,8 @@
 
 namespace tk { namespace renderer {
 
-class Compiler
-{
-private:
-  Compiler()                           = default;
-  ~Compiler()                          = default;
+Singleton(Compiler, g_compiler,
 public:
-  Compiler(Compiler const&)            = delete;
-  Compiler(Compiler&&)                 = delete;
-  Compiler& operator=(Compiler const&) = delete;
-  Compiler& operator=(Compiler&&)      = delete;
-
-  static auto instance() noexcept -> Compiler&
-  {
-    static Compiler instance;
-    return instance;
-  }
-
   void init() noexcept;
 
   struct CompileResult
@@ -41,6 +27,7 @@ public:
     D3D12_INPUT_LAYOUT_DESC                     input_layout_desc;
     std::unordered_map<std::string, uint32_t>   resource_indices;
     Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature;
+    std::vector<CD3DX12_ROOT_PARAMETER1>        root_params;
 
   private:
     friend class Compiler;
@@ -57,7 +44,6 @@ public:
     Microsoft::WRL::ComPtr<IDxcBlob>      _cs_cso;
     std::vector<D3D12_INPUT_ELEMENT_DESC> _input_element_descs;
     std::vector<std::string>              _input_param_names;
-    std::vector<CD3DX12_ROOT_PARAMETER1>  _root_params;
     std::queue<CD3DX12_DESCRIPTOR_RANGE1> _ranges;
     bool                                  _has_sampler{};
     
@@ -94,8 +80,6 @@ private:
   Microsoft::WRL::ComPtr<IDxcCompiler3>      _compiler;
   Microsoft::WRL::ComPtr<IDxcUtils>          _utils;
   Microsoft::WRL::ComPtr<IDxcIncludeHandler> _include_handler;
-};
-
-inline static auto& g_compiler{ Compiler::instance() };
+)
 
 }}

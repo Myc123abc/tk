@@ -1,20 +1,14 @@
 #pragma once
 
 #include "engine.hpp"
+#include "../../util/singleton.hpp"
 
 #include <vector>
 
 namespace tk { namespace renderer {
 
-class ComputeEngine final : public Engine
-{
+Singleton_Derive(ComputeEngine, g_comp_engine, Engine,
 public:
-  static auto instance() noexcept -> ComputeEngine&
-  {
-    static ComputeEngine instance;
-    return instance;
-  }
-
   void init() noexcept { Engine::init(D3D12_COMMAND_LIST_TYPE_COMPUTE); }
 
   void acquire_slot() noexcept;
@@ -35,8 +29,6 @@ private:
 
   std::vector<Slot> _slots;
   Slot*             _slot{};
-};
-
-inline static auto& g_compute_engine{ ComputeEngine::instance() };
+)
 
 }}

@@ -8,7 +8,7 @@ namespace tk { namespace renderer {
 
 auto ComputeEngine::Slot::is_idle() const noexcept -> bool
 {
-  return g_compute_engine.fence_completed_value() >= fence_value;
+  return g_comp_engine.fence_completed_value() >= fence_value;
 }
 
 ComputeEngine::Slot::Slot() noexcept

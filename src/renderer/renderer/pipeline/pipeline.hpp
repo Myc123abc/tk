@@ -1,6 +1,6 @@
 #pragma once
 
-#include "resource/image.hpp"
+#include "../../resource/image.hpp"
 
 #include <string>
 #include <initializer_list>
@@ -14,21 +14,21 @@ public:
   Pipeline()                           = default;
   ~Pipeline()                          = default;
   Pipeline(Pipeline const&)            = delete;
-  Pipeline(Pipeline&&)                 = delete;
+  Pipeline(Pipeline&&)                 = default;
   Pipeline& operator=(Pipeline const&) = delete;
   Pipeline& operator=(Pipeline&&)      = delete;
   
   void init_graphics(
-    std::string shader,
-    std::string vs,
-    std::string ps,
-    std::string include,
-    ImageFormat rtv_format,
-    bool        use_blend      = false,
-    bool        use_depth_test = false
+    std::string_view shader,
+    std::string_view vs,
+    std::string_view ps,
+    std::string_view include,
+    ImageFormat      rtv_format,
+    bool             use_blend      = false,
+    bool             use_depth_test = false
   ) noexcept;
 
-  void init_compute(std::string shader, std::string cs, std::string include = {}) noexcept;
+  void init_compute(std::string_view shader, std::string_view cs, std::string_view include = {}) noexcept;
 
   void bind(ID3D12GraphicsCommandList1* cmd) const noexcept;
 
@@ -48,6 +48,7 @@ private:
   Microsoft::WRL::ComPtr<ID3D12RootSignature> _root_signature;
   std::unordered_map<std::string, uint32_t>   _resource_indices;
   bool                                        _is_graphics_pipeline{};
+  std::vector<CD3DX12_ROOT_PARAMETER1>        _root_params;
 };
 
 }}

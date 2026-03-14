@@ -171,7 +171,6 @@ void Image::set_state(ID3D12GraphicsCommandList1* cmd, ImageState state) noexcep
 void Image::create_descriptor(bool use_mipmap) noexcept
 {
   static auto device = g_core.device();
-  auto        mgr    = DescriptorHeapManager::instance();
 
   auto create_unordered_access_view = [&]
   {
@@ -205,13 +204,13 @@ void Image::create_descriptor(bool use_mipmap) noexcept
   if (!_descriptor_handle.is_valid())
   {
     if (_type == ImageType::uav)
-      _descriptor_handle = mgr->pop_handle(DescriptorHeapType::cbv_srv_uav, create_unordered_access_view);
+      _descriptor_handle = g_desc_heap_mgr.pop_handle(DescriptorHeapType::cbv_srv_uav, create_unordered_access_view);
     else if (_type == ImageType::rtv)
-      _descriptor_handle = mgr->pop_handle(DescriptorHeapType::rtv, create_render_target_view);
+      _descriptor_handle = g_desc_heap_mgr.pop_handle(DescriptorHeapType::rtv, create_render_target_view);
     else if (_type == ImageType::srv)
-      _descriptor_handle = mgr->pop_handle(DescriptorHeapType::cbv_srv_uav, create_shader_resource_view);
+      _descriptor_handle = g_desc_heap_mgr.pop_handle(DescriptorHeapType::cbv_srv_uav, create_shader_resource_view);
     else if (_type == ImageType::dsv)
-      _descriptor_handle = mgr->pop_handle(DescriptorHeapType::dsv, create_depth_stencil_view);
+      _descriptor_handle = g_desc_heap_mgr.pop_handle(DescriptorHeapType::dsv, create_depth_stencil_view);
     else
       std::unreachable();
   }
@@ -237,7 +236,7 @@ void Image::create_descriptor(bool use_mipmap) noexcept
     for (auto i : std::views::iota(1u, count))
     {
       // pop descriptor handle
-      auto handle = mgr->pop_handle(DescriptorHeapType::cbv_srv_uav);
+      auto handle = g_desc_heap_mgr.pop_handle(DescriptorHeapType::cbv_srv_uav);
 
       // create mipmap uav func
       auto create_mipmap_uav = [this, i, handle = handle.cpu_handle()]

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../util/singleton.hpp"
+
 #include <wrl/client.h>
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -7,23 +9,8 @@
 
 namespace tk { namespace renderer {
 
-class Core
-{
-private:
-  Core()                       = default;
-  ~Core()                      = default;
+Singleton(Core, g_core,
 public:
-  Core(Core const&)            = delete;
-  Core(Core&&)                 = delete;
-  Core& operator=(Core const&) = delete;
-  Core& operator=(Core&&)      = delete;
-
-  static auto instance() noexcept -> Core&
-  {
-    static Core instance;
-    return instance;
-  }
-
   void init() noexcept;
 
   auto create_cmd_alloc(D3D12_COMMAND_LIST_TYPE type) const noexcept -> Microsoft::WRL::ComPtr<ID3D12CommandAllocator>;
@@ -37,8 +24,6 @@ private:
   Microsoft::WRL::ComPtr<IDXGIFactory6>       _factory;
   Microsoft::WRL::ComPtr<ID3D12Device2>       _device;
   Microsoft::WRL::ComPtr<IDCompositionDevice> _comp_device;
-};
-
-inline static auto& g_core{ Core::instance() };
+)
 
 }}

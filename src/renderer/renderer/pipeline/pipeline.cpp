@@ -1,6 +1,6 @@
 #include "pipeline.hpp"
 #include "util/error_handling.hpp"
-#include "core.hpp"
+#include "../../core.hpp"
 #include "compiler.hpp"
 
 #include <directx/d3dx12.h>
@@ -12,19 +12,20 @@ using namespace Microsoft::WRL;
 namespace tk { namespace renderer {
 
 void Pipeline::init_graphics(
-    std::string shader,
-    std::string vs,
-    std::string ps,
-    std::string include,
-    ImageFormat rtv_format,
-    bool        use_blend,
-    bool        use_depth_test
+    std::string_view shader,
+    std::string_view vs,
+    std::string_view ps,
+    std::string_view include,
+    ImageFormat      rtv_format,
+    bool             use_blend,
+    bool             use_depth_test
   ) noexcept
 {
   _is_graphics_pipeline = true;
 
   auto compile_result = g_compiler.compile(shader, vs, ps, include);
-  _root_signature  = compile_result.root_signature;
+  _root_params      = compile_result.root_params;
+  _root_signature   = compile_result.root_signature;
   _resource_indices = compile_result.resource_indices;
 
   auto stream = CD3DX12_PIPELINE_STATE_STREAM{};
@@ -73,7 +74,7 @@ void Pipeline::init_graphics(
           "failed to create pipeline state");
 }
 
-void Pipeline::init_compute(std::string shader, std::string cs, std::string include) noexcept
+void Pipeline::init_compute(std::string_view shader, std::string_view cs, std::string_view include) noexcept
 {
   auto compile_result = g_compiler.compile(shader, cs, include);
   _root_signature   = compile_result.root_signature;

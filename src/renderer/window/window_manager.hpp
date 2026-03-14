@@ -1,6 +1,7 @@
 #pragma once
 
 #include "window.hpp"
+#include "../../util/singleton.hpp"
 
 #include <thread>
 #include <latch>
@@ -57,24 +58,8 @@ struct WindowSnapshot
   }
 };
 
-class WindowManager
-{
-  friend class Window;
-private:
-  WindowManager()                                = default;
-  ~WindowManager()                               = default;
+Singleton(WindowManager, g_wnd_mgr,
 public:
-  WindowManager(WindowManager const&)            = delete;
-  WindowManager(WindowManager&&)                 = delete;
-  WindowManager& operator=(WindowManager const&) = delete;
-  WindowManager& operator=(WindowManager&&)      = delete;
-
-  static auto instance() noexcept -> WindowManager&
-  {
-    static WindowManager instance;
-    return instance;
-  }
-
   enum class Message
   {
     create_window = WM_APP,
@@ -116,7 +101,7 @@ private:
   void update_monitor(HWND handle, glm::vec2 cursor_pos, glm::vec<2, int>& left_button_down_window_cursor_pos) noexcept;
   void update_fullscreen_window() noexcept;
 
-private:
+public:
   static constexpr wchar_t Auxiliary_Class[] = L"vn::window::WindowManager::AuxiliaryWindow";
   static constexpr wchar_t Window_Class[]    = L"vn::window::WindowManager::Window";
 
@@ -132,8 +117,6 @@ private:
   
   bool                             _update_monitors{};
   std::unordered_map<HWND, RECT>   _window_change_size{};
-};
-
-inline static auto& g_wnd_mgr{ WindowManager::instance() };
+)
 
 }}

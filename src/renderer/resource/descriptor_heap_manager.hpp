@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../../util/singleton.hpp"
+
 #include <d3d12.h>
 #include <wrl/client.h>
 
@@ -41,10 +43,11 @@ private:
   std::function<void()> _recreate_descriptor_func;
 };
 
-class DescriptorHeapManager
-{
+Singleton(DescriptorHeapManager, g_desc_heap_mgr,
+
   friend class DescriptorHandle;
 
+public:
   class DescriptorHeap
   {
     friend class DescriptorHandle;
@@ -73,21 +76,7 @@ class DescriptorHeapManager
     DescriptorHeapType                             _type{};
   };
 
-private:
-  DescriptorHeapManager()                                        = default;
-  ~DescriptorHeapManager()                                       = default;
 public:
-  DescriptorHeapManager(DescriptorHeapManager const&)            = delete;
-  DescriptorHeapManager(DescriptorHeapManager&&)                 = delete;
-  DescriptorHeapManager& operator=(DescriptorHeapManager const&) = delete;
-  DescriptorHeapManager& operator=(DescriptorHeapManager&&)      = delete;
-
-  static auto const instance() noexcept
-  {
-    static DescriptorHeapManager instance;
-    return &instance;
-  }
-
   void init() noexcept;
 
   auto pop_handle(DescriptorHeapType type, std::function<void()> recreate_descriptor_func = {}) noexcept { return _heaps[type].pop_handle(recreate_descriptor_func); }
@@ -104,8 +93,6 @@ public:
 
 private:
   std::unordered_map<DescriptorHeapType, DescriptorHeap> _heaps;
-};
-
-inline static auto& g_desc_heap_mgr{ *DescriptorHeapManager::instance() };
+)
 
 }}

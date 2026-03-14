@@ -2,7 +2,7 @@
 
 #include "../resource/render_data.hpp"
 #include "../resource/render_resource.hpp"
-#include "../pipeline.hpp"
+#include "pipeline/pipeline.hpp"
 #include "../config.hpp"
 #include "../../util/message_queue.hpp"
 #include "../../ui/command_list.hpp"
@@ -20,23 +20,8 @@
 
 namespace tk { namespace renderer {
 
-class Renderer
-{
-private:
-  Renderer()                           = default;
-  ~Renderer()                          = default;
+Singleton(Renderer, g_renderer,
 public:
-  Renderer(Renderer const&)            = delete;
-  Renderer(Renderer&&)                 = delete;
-  Renderer& operator=(Renderer const&) = delete;
-  Renderer& operator=(Renderer&&)      = delete;
-
-  static auto instance() noexcept -> Renderer&
-  {
-    static Renderer instance;
-    return instance;
-  }
-
   void init() noexcept;
   void destroy() noexcept;
 
@@ -69,6 +54,7 @@ private:
 
   std::unordered_map<HWND, RenderResource>              _res;
   Pipeline                                              _sdf_pipeline;
+  Pipeline                                              _image_pipeline;
   Pipeline                                              _mipmap_pipeline;
 
   std::unordered_set<HWND>                              _destroied_windows;
@@ -196,8 +182,6 @@ private:
   };
   MessageQueue<Message, Renderer_Msg_Queue_Capacity>          _msg_queue;
   MessageQueue<UIContextMessage, Renderer_Msg_Queue_Capacity> _ui_ctx_msg_queue;
-};
-
-inline static auto& g_renderer{ Renderer::instance() };
+)
 
 }}

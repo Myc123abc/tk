@@ -7,6 +7,7 @@
 #include "config.hpp"
 #include "ui/ui.hpp"
 #include "ui/lerpolator.hpp"
+#include "../util/singleton.hpp"
 
 #include <windows.h>
 
@@ -74,23 +75,8 @@ struct Window
   bool set_fullscreen{};
 };
 
-class UIContext
-{
-private:
-  UIContext()                            = default;
-  ~UIContext()                           = default;
+Singleton(UIContext, g_ui_ctx,
 public:
-  UIContext(UIContext const&)            = delete;
-  UIContext(UIContext&&)                 = delete;
-  UIContext& operator=(UIContext const&) = delete;
-  UIContext& operator=(UIContext&&)      = delete;
-
-  static auto instance() noexcept -> UIContext&
-  {
-    static UIContext instance;
-    return instance;
-  }
-
   void init() noexcept;
   void destroy() noexcept;
 
@@ -210,11 +196,10 @@ private:
     KeyState state{};
     double   dur{};
   };
+#define KEY_ENTRY_INIT(name, _) { Key::name, {} },
   std::unordered_map<Key, KeyContext> _keys
   {
-#define X(name, value) { Key::name, {} },
-    KEY_LIST(X)
-#undef X
+    KEY_LIST(KEY_ENTRY_INIT)
   };
   std::unordered_set<Key> _down_keys;
 
@@ -391,8 +376,6 @@ private:
     void operator()(Message_Window_Cancel_Fullscreen_Maximize const& msg) const noexcept;
   };
   MessageQueue<Message, UI_Message_Queue_Capacity> _msg_queue;
-};
-
-inline static auto& g_ui_ctx{ UIContext::instance() };
+)
 
 }}

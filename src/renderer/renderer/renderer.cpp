@@ -5,7 +5,7 @@
 #include "../engine/copy_engine.hpp"
 #include "util/error_handling.hpp"
 #include "../resource/descriptor_heap_manager.hpp"
-#include "../compiler.hpp"
+#include "pipeline/compiler.hpp"
 
 #include <stb_image.h>
 
@@ -21,10 +21,11 @@ void Renderer::init() noexcept
     g_compiler.init();
     g_desc_heap_mgr.init();
     g_graphics_engine.init();
-    g_compute_engine.init();
+    g_comp_engine.init();
     g_copy_engine.init();
 
     _sdf_pipeline.init_graphics("assets/shader/sdf.hlsl", "vs", "ps", "assets/shader", RenderResource::Render_Target_Format, true);
+    _image_pipeline.init_graphics("assets/shader/image.hlsl", "vs", "ps", "assets/shader", RenderResource::Render_Target_Format, true);
     _mipmap_pipeline.init_compute("assets/shader/mipmap.hlsl", "main");
 
     while (!_exit.load(std::memory_order_relaxed))
@@ -57,7 +58,7 @@ void Renderer::destroy() noexcept
 
   // destroy render resources
   g_graphics_engine.destroy();
-  g_compute_engine.destroy();
+  g_comp_engine.destroy();
   g_copy_engine.destroy();
   for (auto& res : _res | std::views::values) res.destroy();
 }
@@ -119,7 +120,7 @@ void Renderer::upload_images() noexcept
     g_graphics_engine.wait(g_copy_engine, fence_value);
     // also wait for compute engine if need to generate mipamp
     if (!_pending_mipmap_image_handles.empty())
-      g_compute_engine.wait(g_copy_engine, fence_value);
+      g_comp_engine.wait(g_copy_engine, fence_value);
 
     // move upload images to images
     for (auto& [idx, img] : _upload_images)
@@ -261,9 +262,9 @@ void Renderer::generate_mipmap() noexcept
 {
   if (_pending_mipmap_image_handles.empty()) return;
 
-  g_compute_engine.acquire_slot();
+  g_comp_engine.acquire_slot();
 
-  auto cmd = g_compute_engine.cmd();
+  auto cmd = g_comp_engine.cmd();
   _mipmap_pipeline.bind(cmd);
 
   // generate mipmaps of images
@@ -303,7 +304,7 @@ void Renderer::generate_mipmap() noexcept
   }
 
   // wait mipmap generation complete
-  g_graphics_engine.wait(g_compute_engine, g_compute_engine.submit_slot());
+  g_graphics_engine.wait(g_comp_engine, g_comp_engine.submit_slot());
 
   // release mipmap uavs after generation complete
   add_frame_render_complete_func([this, handles = std::move(_pending_mipmap_image_handles)]

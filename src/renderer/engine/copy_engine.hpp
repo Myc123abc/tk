@@ -1,6 +1,7 @@
 #pragma once
 
 #include "engine.hpp"
+#include "../../util/singleton.hpp"
 #include "../resource/image.hpp"
 #include "../resource/buffer.hpp"
 
@@ -23,15 +24,8 @@ private:
   std::vector<Info> _infos;
 };
 
-class CopyEngine final : public Engine
-{
+Singleton_Derive(CopyEngine, g_copy_engine, Engine,
 public:
-  static auto instance() noexcept -> CopyEngine&
-  {
-    static CopyEngine instance;
-    return instance;
-  }
-
   void init() noexcept { Engine::init(D3D12_COMMAND_LIST_TYPE_COPY); }
 
   void acquire_slot() noexcept;
@@ -55,8 +49,6 @@ private:
 
   std::vector<Slot> _slots;
   Slot*             _slot{};
-};
-
-inline static auto& g_copy_engine{ CopyEngine::instance() };
+)
 
 }}

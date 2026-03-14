@@ -1,6 +1,6 @@
 #include "compiler.hpp"
 #include "util/error_handling.hpp"
-#include "core.hpp"
+#include "../../core.hpp"
 
 #include <utf8.h>
 
@@ -193,9 +193,9 @@ auto Compiler::compile(std::string_view shader, std::string_view vertex_shader_e
 
   auto signature_desc = CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC{};
   if (compile_result._has_sampler)
-    signature_desc.Init_1_1(compile_result._root_params.size(), compile_result._root_params.data(), 1, &sampler_desc, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+    signature_desc.Init_1_1(compile_result.root_params.size(), compile_result.root_params.data(), 1, &sampler_desc, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
   else
-    signature_desc.Init_1_1(compile_result._root_params.size(), compile_result._root_params.data(), 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+    signature_desc.Init_1_1(compile_result.root_params.size(), compile_result.root_params.data(), 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
   auto signature = ComPtr<ID3DBlob>{};
   auto error     = ComPtr<ID3DBlob>{};
@@ -233,9 +233,9 @@ auto Compiler::compile(std::string_view shader, std::string_view compute_shader_
 
   auto signature_desc = CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC{};
   if (compile_result._has_sampler)
-    signature_desc.Init_1_1(compile_result._root_params.size(), compile_result._root_params.data(), 1, &sampler_desc);
+    signature_desc.Init_1_1(compile_result.root_params.size(), compile_result.root_params.data(), 1, &sampler_desc);
   else
-    signature_desc.Init_1_1(compile_result._root_params.size(), compile_result._root_params.data(), 0, nullptr);
+    signature_desc.Init_1_1(compile_result.root_params.size(), compile_result.root_params.data(), 0, nullptr);
 
   auto signature = ComPtr<ID3DBlob>{};
   auto error     = ComPtr<ID3DBlob>{};
@@ -302,7 +302,7 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
   shader_reflection->GetDesc(&desc);
 
   // get bound resources
-  _root_params.reserve(desc.BoundResources);
+  root_params.reserve(desc.BoundResources);
   for (auto i : std::views::iota(0u, desc.BoundResources))
   {
     auto resource_desc = D3D12_SHADER_INPUT_BIND_DESC{};
@@ -317,17 +317,17 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
     {
     case D3D_SIT_CBUFFER:
     {
-      err_if(std::ranges::find_if(_root_params, [](auto const& param) { return param.ParameterType == D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS; }) != _root_params.end(),
+      err_if(std::ranges::find_if(root_params, [](auto const& param) { return param.ParameterType == D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS; }) != root_params.end(),
               "Please only use single constant buffer");
 
-      resource_indices[resource_desc.Name] = _root_params.size();
+      resource_indices[resource_desc.Name] = root_params.size();
 
       auto constant_buffer = shader_reflection->GetConstantBufferByIndex(i);
       auto buffer_desc = D3D12_SHADER_BUFFER_DESC{};
       err_if(constant_buffer->GetDesc(&buffer_desc), "faild to get constant buffer description");
 
       root_param.InitAsConstants(buffer_desc.Size / 4, resource_desc.BindPoint, resource_desc.Space);
-      _root_params.emplace_back(root_param);
+      root_params.emplace_back(root_param);
       break;
     }
     
@@ -340,7 +340,7 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
 
     case D3D_SIT_TEXTURE:
     {
-      resource_indices[resource_desc.Name] = _root_params.size();
+      resource_indices[resource_desc.Name] = root_params.size();
 
       // For arrays, reflection reports BindCount > 1. For unbounded arrays, BindCount is commonly 0.
       // D3D12 root signature supports unbounded descriptor ranges via NumDescriptors = UINT_MAX.
@@ -353,14 +353,14 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
       _ranges.emplace(range);
 
       root_param.InitAsDescriptorTable(1, &_ranges.back(), is_compute_shader ? D3D12_SHADER_VISIBILITY_ALL : D3D12_SHADER_VISIBILITY_PIXEL);
-      _root_params.emplace_back(root_param);
+      root_params.emplace_back(root_param);
       break;
     }
 
     case D3D_SIT_BYTEADDRESS:
     case D3D_SIT_STRUCTURED:
     {
-      resource_indices[resource_desc.Name] = _root_params.size();
+      resource_indices[resource_desc.Name] = root_params.size();
 
       auto const num_descriptors = resource_desc.BindCount ? resource_desc.BindCount : UINT_MAX;
       auto const range_flags = (num_descriptors == 1)
@@ -371,13 +371,13 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
       _ranges.emplace(range);
 
       root_param.InitAsDescriptorTable(1, &_ranges.back(), D3D12_SHADER_VISIBILITY_ALL);
-      _root_params.emplace_back(root_param);
+      root_params.emplace_back(root_param);
       break;
     }
 
     case D3D_SIT_UAV_RWTYPED:
     {
-      resource_indices[resource_desc.Name] = _root_params.size();
+      resource_indices[resource_desc.Name] = root_params.size();
 
       auto const num_descriptors = resource_desc.BindCount ? resource_desc.BindCount : UINT_MAX;
       auto const range_flags = (num_descriptors == 1)
@@ -388,7 +388,7 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
       _ranges.emplace(range);
 
       root_param.InitAsDescriptorTable(1, &_ranges.back(), D3D12_SHADER_VISIBILITY_ALL);
-      _root_params.emplace_back(root_param);
+      root_params.emplace_back(root_param);
       break;
     }
 

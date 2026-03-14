@@ -33,24 +33,11 @@ private:
   float       _height{};
 };
 
-class TextEngine
-{
+Singleton(TextEngine, g_text_engine,
+
   friend class Font;
-private:
-  TextEngine()                             = default;
-  ~TextEngine()                            = default;
+
 public:
-  TextEngine(TextEngine const&)            = delete;
-  TextEngine(TextEngine&&)                 = delete;
-  TextEngine& operator=(TextEngine const&) = delete;
-  TextEngine& operator=(TextEngine&&)      = delete;
-
-  static auto instance() noexcept -> TextEngine&
-  {
-    static TextEngine instance;
-    return instance;
-  }
-
   void init() noexcept;
   void destroy() const noexcept;
 
@@ -71,8 +58,6 @@ private:
   std::unordered_map<FontStyle, std::vector<Font>> _fonts;
 
   std::vector<glm::vec2> _advances;
-};
-
-inline static auto& g_text_engine{ TextEngine::instance() };
+)
 
 }}
