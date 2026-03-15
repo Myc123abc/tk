@@ -2,7 +2,6 @@
 
 #include "../resource/render_data.hpp"
 #include "../resource/render_resource.hpp"
-#include "pipeline/pipeline.hpp"
 #include "../config.hpp"
 #include "../../util/message_queue.hpp"
 #include "../../ui/command_list.hpp"
@@ -42,7 +41,6 @@ private:
 
   void render() noexcept;
   void generate_mipmap() noexcept;
-  void render_sdf(RenderResource& res, RenderData& data) noexcept;
 
   void postprocess_render() noexcept;
 
@@ -53,9 +51,6 @@ private:
   std::deque<std::move_only_function<bool()>>           _frame_render_complete_funcs;
 
   std::unordered_map<HWND, RenderResource>              _res;
-  Pipeline                                              _sdf_pipeline;
-  Pipeline                                              _image_pipeline;
-  Pipeline                                              _mipmap_pipeline;
 
   std::unordered_set<HWND>                              _destroied_windows;
 

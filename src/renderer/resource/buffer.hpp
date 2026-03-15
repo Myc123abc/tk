@@ -1,7 +1,6 @@
 #pragma once
 
 #include "descriptor_heap_manager.hpp"
-#include "render_data.hpp"
 
 #include <d3d12.h>
 #include <wrl/client.h>
@@ -58,7 +57,7 @@ public:
     return *this;
   }
 
-  void upload(ID3D12GraphicsCommandList1* cmd, RenderData& data) noexcept;
+  void upload(ID3D12GraphicsCommandList1* cmd, class RenderData& data) noexcept;
 
   auto shape_properties_gpu_handle() const noexcept { return _shape_properties_buffer.gpu_handle(); }
 

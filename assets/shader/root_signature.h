@@ -3,7 +3,6 @@ struct Constants
   uint2  window_extent;
   float2 window_pos;
   float  image_alpha;
-  bool   is_image; // FIXME: discard
 };
 
 ConstantBuffer<Constants> constants : register(b0);

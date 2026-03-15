@@ -245,46 +245,40 @@ PSParameter vs(Vertex vertex)
 
 float4 ps(PSParameter args) : SV_TARGET
 {
-  if (constants.is_image)
-  {  
-    float4 color = image.Sample(g_sampler, args.uv);
-    return float4(color.rgb, color.a * constants.image_alpha);
-  }
-
   uint32_t offset = args.buffer_offset;
 
   ShapeProperty shape_property = get_shape_property(offset);
 
   float4 color = args.color;
 
-  if (shape_property.type == type_glyph)
-  {
-    // reference: https://computergraphics.stackexchange.com/questions/306/sharp-corners-with-signed-distance-fields-fonts
-    // author: Detheroc
-    float d = images[NonUniformResourceIndex(get_uint(offset))].Sample(g_sampler, args.uv).r - 0.5;
-    float w = fwidth(d);
-    float inner_alpha = clamp(d / w + 0.5, 0.0, 1.0);
+  // if (shape_property.type == type_glyph)
+  // {
+  //   // reference: https://computergraphics.stackexchange.com/questions/306/sharp-corners-with-signed-distance-fields-fonts
+  //   // author: Detheroc
+  //   float d = images[NonUniformResourceIndex(get_uint(offset))].Sample(g_sampler, args.uv).r - 0.5;
+  //   float w = fwidth(d);
+  //   float inner_alpha = clamp(d / w + 0.5, 0.0, 1.0);
 
-    float4 inner_color = get_float4(offset);
-    float4 outer_color = get_float4(offset);
+  //   float4 inner_color = get_float4(offset);
+  //   float4 outer_color = get_float4(offset);
 
-    if (outer_color.a == 0.0)
-      color = float4(inner_color.rgb, inner_color.a * inner_alpha);
-    else
-    {
-      // reference: https://www.redblobgames.com/x/2404-distance-field-effects/
-      float outline_width = get_float(offset);
-      float outer_alpha   = clamp((d + outline_width) / w + 0.5, 0.0, 1.0);
+  //   if (outer_color.a == 0.0)
+  //     color = float4(inner_color.rgb, inner_color.a * inner_alpha);
+  //   else
+  //   {
+  //     // reference: https://www.redblobgames.com/x/2404-distance-field-effects/
+  //     float outline_width = get_float(offset);
+  //     float outer_alpha   = clamp((d + outline_width) / w + 0.5, 0.0, 1.0);
 
-      if (inner_color.a == 0)
-        inner_color = float4(0.0, 0.0, 0.0, 0.0);
-      else
-        inner_color *= inner_alpha;
+  //     if (inner_color.a == 0)
+  //       inner_color = float4(0.0, 0.0, 0.0, 0.0);
+  //     else
+  //       inner_color *= inner_alpha;
 
-      color = inner_color + (outer_color * (outer_alpha - inner_alpha));
-    }
-    return color;
-  }
+  //     color = inner_color + (outer_color * (outer_alpha - inner_alpha));
+  //   }
+  //   return color;
+  // }
 
   float w = length(float2(ddx_fine(args.pos.x), ddy_fine(args.pos.y)));
   float d = get_sd(args.pos.xy, shape_property.type, offset);

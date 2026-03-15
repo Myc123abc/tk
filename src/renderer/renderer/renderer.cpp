@@ -5,7 +5,7 @@
 #include "../engine/copy_engine.hpp"
 #include "util/error_handling.hpp"
 #include "../resource/descriptor_heap_manager.hpp"
-#include "pipeline/compiler.hpp"
+#include "pipeline/pipeline_system.hpp"
 
 #include <stb_image.h>
 
@@ -18,15 +18,11 @@ void Renderer::init() noexcept
   _thread = std::jthread([this]
   {
     g_core.init();
-    g_compiler.init();
+    g_pipe_sys.init();
     g_desc_heap_mgr.init();
     g_graphics_engine.init();
     g_comp_engine.init();
     g_copy_engine.init();
-
-    _sdf_pipeline.init_graphics("assets/shader/sdf.hlsl", "vs", "ps", "assets/shader", RenderResource::Render_Target_Format, true);
-    _image_pipeline.init_graphics("assets/shader/image.hlsl", "vs", "ps", "assets/shader", RenderResource::Render_Target_Format, true);
-    _mipmap_pipeline.init_compute("assets/shader/mipmap.hlsl", "main");
 
     while (!_exit.load(std::memory_order_relaxed))
     {
@@ -156,7 +152,7 @@ void Renderer::render() noexcept
     auto& res = _res.at(handle);
     res.wait_frame_complete();
     res.render_begin();
-    if (cmd) render_sdf(res, _render_datas.at(handle));
+    if (cmd) g_pipe_sys.render(res, _render_datas.at(handle));
     res.render_end();
   }
 
@@ -179,87 +175,9 @@ void Renderer::postprocess_render() noexcept
   _render_windows.clear();
 }
 
-void Renderer::render_sdf(RenderResource& res, RenderData& data) noexcept
-{
-  auto& frame               = res.current_frame();
-  auto& render_target_image = frame.image;
-  auto  cmd                 = g_graphics_engine.cmd();
-
-  // bind pipeline
-  _sdf_pipeline.bind(cmd);
-
-  // upload data to buffer
-  frame.buffer.clear().upload(cmd, data);
-
-  // set descriptors
-  auto constants = Constants{};
-  constants.window_extent = render_target_image.extent();
-  constants.window_pos    = data.resizing_window_pos;
-  _sdf_pipeline.set_descriptors(cmd,
-  {
-    { "images", _images.empty() ? D3D12_GPU_DESCRIPTOR_HANDLE{}
-                                : g_desc_heap_mgr.first_gpu_handle(DescriptorHeapType::cbv_srv_uav) },
-    { "buffer", frame.buffer.shape_properties_gpu_handle()                                          },
-  });
-
-  // pop first scissor rect
-  auto scissor_rect = data.pop_scissor_rect();
-  cmd->RSSetScissorRects(1, &scissor_rect.rect);
-
-  auto last_constants = Constants{};
-  auto first          = true;
-  for (auto const& draw_data : data.draw_datas)
-  {
-    constants.is_image = draw_data.is_image;
-
-    if (draw_data.is_image)
-      constants.image_alpha = draw_data.image_alpha;
-
-    if (first || memcmp(&last_constants, &constants, sizeof(Constants)))
-    {
-      _sdf_pipeline.set_constants(cmd, "constants", constants);
-      last_constants = constants;
-      first = false;
-    }
-
-    if (draw_data.is_image)
-    {
-      _sdf_pipeline.set_descriptor(cmd, "image", draw_data.image_descriptor_gpu_handle);
-      cmd->DrawIndexedInstanced(draw_data.indices_size, 1, draw_data.indices_start, 0, 0);
-    }
-    else
-    {
-      auto indices_start      = draw_data.indices_start;
-      auto indices_size       = draw_data.indices_size;
-      auto total_indices_size = draw_data.indices_start + draw_data.indices_size;
-label_draw_call_again:
-      if (total_indices_size < scissor_rect.next_indices_idx)
-      {
-        cmd->DrawIndexedInstanced(indices_size, 1, indices_start, 0, 0);
-        continue;
-      }
-      if (total_indices_size == scissor_rect.next_indices_idx)
-      {
-        cmd->DrawIndexedInstanced(indices_size, 1, indices_start, 0, 0);
-        assert(data.is_scissor_rect_empty());
-        continue;
-      }
-      else
-      {
-        indices_size = scissor_rect.next_indices_idx - indices_start;
-        cmd->DrawIndexedInstanced(indices_size, 1, indices_start, 0, 0);
-        indices_start = scissor_rect.next_indices_idx;
-        scissor_rect  = data.pop_scissor_rect();
-        indices_size  = scissor_rect.next_indices_idx - indices_start;
-        cmd->RSSetScissorRects(1, &scissor_rect.rect);
-        goto label_draw_call_again;
-      }
-    }
-  }
-}
-
 void Renderer::generate_mipmap() noexcept
 {
+#if 0
   if (_pending_mipmap_image_handles.empty()) return;
 
   g_comp_engine.acquire_slot();
@@ -313,6 +231,7 @@ void Renderer::generate_mipmap() noexcept
       _images.at(handle).release_mipmap_uavs();
   });
   _pending_mipmap_image_handles.clear();
+#endif
 }
 
 }}

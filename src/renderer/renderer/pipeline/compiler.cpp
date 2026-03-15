@@ -8,6 +8,7 @@
 #include <ranges>
 
 using namespace tk;
+using namespace tk::renderer;
 using namespace Microsoft::WRL;
 
 namespace
@@ -102,6 +103,41 @@ auto to_dxgi_format(D3D12_SIGNATURE_PARAMETER_DESC const& d) noexcept -> DXGI_FO
   }
 }
 
+auto create_root_signature(std::span<CD3DX12_ROOT_PARAMETER1> root_params, bool use_sampler, bool is_graphics) noexcept
+{
+  auto root_signature = ComPtr<ID3D12RootSignature>{};
+
+  auto sampler_desc = D3D12_STATIC_SAMPLER_DESC{};
+  sampler_desc.Filter         = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+  sampler_desc.AddressU       = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+  sampler_desc.AddressV       = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+  sampler_desc.AddressW       = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+  sampler_desc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+  sampler_desc.MaxLOD         = D3D12_FLOAT32_MAX;
+  if (!is_graphics)
+    sampler_desc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; 
+
+  auto flag           = is_graphics ? D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT : D3D12_ROOT_SIGNATURE_FLAG_NONE;
+  auto signature_desc = CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC{};
+  if (use_sampler)
+    signature_desc.Init_1_1(root_params.size(), root_params.data(), 1, &sampler_desc, flag);
+  else
+    signature_desc.Init_1_1(root_params.size(), root_params.data(), 0, nullptr, flag);
+
+  auto signature = Microsoft::WRL::ComPtr<ID3DBlob>{};
+  auto error     = Microsoft::WRL::ComPtr<ID3DBlob>{};
+  if (FAILED(D3DX12SerializeVersionedRootSignature(&signature_desc, D3D_ROOT_SIGNATURE_VERSION_1_1, &signature, &error)))
+  {
+    auto msg = std::string{};
+    msg.resize(error->GetBufferSize());
+    memcpy(msg.data(), error->GetBufferPointer(), msg.size());
+    err_if(true, "failed to serialize root signature.\n{}", msg);
+  }
+  err_if(g_core.device()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&root_signature)),
+          "failed to create root signature");
+  return root_signature;
+}
+
 }
 
 namespace tk { namespace renderer {
@@ -115,6 +151,64 @@ void Compiler::init() noexcept
   err_if(_utils->CreateDefaultIncludeHandler(&_include_handler),
           "failed to create default include handler in dxc");
 }
+
+auto generate_root_signature(std::vector<DescriptorInfo> const& desc_infos, bool is_graphics) noexcept -> RootSignatureResult
+{
+  auto res         = RootSignatureResult{};
+  auto root_param  = CD3DX12_ROOT_PARAMETER1{};
+  auto ranges      = std::queue<CD3DX12_DESCRIPTOR_RANGE1>{};
+  auto range       = CD3DX12_DESCRIPTOR_RANGE1{};
+  auto use_sampler = false;
+
+  for (auto const& info : desc_infos)
+  {
+    res.root_param_indices.emplace(info.name, res.root_params.size());
+
+    using enum DescriptorInfo::Type;
+    switch (info.type)
+    {
+    case constants:
+    {
+      root_param.InitAsConstants(info.constants_size / 4, info.bind_point, info.space);
+    }
+    break;
+
+    case bytebuffer:
+    {
+      range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, info.bind_point, info.space, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+      ranges.emplace(range);
+      root_param.InitAsDescriptorTable(1, &ranges.back(), D3D12_SHADER_VISIBILITY_ALL);
+    }
+    break;
+
+    case texture:
+    {
+      use_sampler = true;
+      range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, info.bind_point, info.space, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+      ranges.emplace(range);
+      root_param.InitAsDescriptorTable(1, &ranges.back(), D3D12_SHADER_VISIBILITY_PIXEL);
+    }
+    break;
+
+    case textures:
+    {
+      use_sampler = true;
+      range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, info.bind_point, info.space, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+      ranges.emplace(range);
+      root_param.InitAsDescriptorTable(1, &ranges.back(), D3D12_SHADER_VISIBILITY_PIXEL);
+    }
+    break;
+
+    }
+
+    res.root_params.emplace_back(root_param);
+  }
+
+  res.root_signature = create_root_signature(res.root_params, use_sampler, is_graphics);
+
+  return res;
+}
+
 
 auto Compiler::compile(std::string_view shader_path, std::string_view include, std::wstring_view profile, std::string_view entry_point) noexcept -> std::pair<Microsoft::WRL::ComPtr<IDxcResult>, Microsoft::WRL::ComPtr<IDxcBlob>>
 {
@@ -160,7 +254,7 @@ auto Compiler::compile(std::string_view shader_path, std::string_view include, s
   return { result, cso };
 }
 
-auto Compiler::compile(std::string_view shader, std::string_view vertex_shader_entry_point, std::string_view pixel_shader_entry_point, std::string_view include) noexcept -> CompileResult
+auto Compiler::compile(std::string_view shader, std::string_view vertex_shader_entry_point, std::string_view pixel_shader_entry_point, std::string_view include, std::optional<RootSignatureResult> res) noexcept -> CompileResult
 {
   // compile shaders
   auto [vs_res, vs_cso] = compile(shader, include, L"vs_6_0", vertex_shader_entry_point);
@@ -173,81 +267,47 @@ auto Compiler::compile(std::string_view shader, std::string_view vertex_shader_e
   compile_result.vs      = { vs_cso->GetBufferPointer(), vs_cso->GetBufferSize() };
   compile_result.ps      = { ps_cso->GetBufferPointer(), ps_cso->GetBufferSize() };
   auto vs_reflection = compile_result.get_shader_reflection(vs_res.Get());
-  auto ps_reflection = compile_result.get_shader_reflection(ps_res.Get());
 
   // get vertex input layout
   compile_result.get_vertex_input_layout(vs_reflection.Get());
 
-  // create root signature
-  compile_result.get_root_parameters(vs_reflection.Get(), false);
-  compile_result.get_root_parameters(ps_reflection.Get(), false);
-
-  auto sampler_desc = D3D12_STATIC_SAMPLER_DESC{};
-  sampler_desc.Filter           = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-  sampler_desc.AddressU         = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-  sampler_desc.AddressV         = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-  sampler_desc.AddressW         = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-  sampler_desc.ComparisonFunc   = D3D12_COMPARISON_FUNC_NEVER;
-  sampler_desc.MaxLOD           = D3D12_FLOAT32_MAX;
-  sampler_desc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; 
-
-  auto signature_desc = CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC{};
-  if (compile_result._has_sampler)
-    signature_desc.Init_1_1(compile_result.root_params.size(), compile_result.root_params.data(), 1, &sampler_desc, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-  else
-    signature_desc.Init_1_1(compile_result.root_params.size(), compile_result.root_params.data(), 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-  auto signature = ComPtr<ID3DBlob>{};
-  auto error     = ComPtr<ID3DBlob>{};
-  if (FAILED(D3DX12SerializeVersionedRootSignature(&signature_desc, D3D_ROOT_SIGNATURE_VERSION_1_1, &signature, &error)))
+  if (!res)
   {
-    auto msg = std::string{};
-    msg.resize(error->GetBufferSize());
-    memcpy(msg.data(), error->GetBufferPointer(), msg.size());
-    err_if(true, "failed to serialize root signature.\n{}", msg);
+    compile_result.get_root_parameters(vs_reflection.Get(), false);
+    auto ps_reflection = compile_result.get_shader_reflection(ps_res.Get());
+    compile_result.get_root_parameters(ps_reflection.Get(), false);
+    compile_result.root_signature = create_root_signature(compile_result.root_params, compile_result._has_sampler, true);
   }
-  err_if(g_core.device()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&compile_result.root_signature)),
-          "failed to create root signature");
+  else
+  {
+    compile_result.root_signature     = res.value().root_signature;
+    compile_result.root_param_indices = res.value().root_param_indices;
+    compile_result.root_params        = res.value().root_params;
+  }
 
   return compile_result;
 }
 
-auto Compiler::compile(std::string_view shader, std::string_view compute_shader_entry_point, std::string_view include) noexcept -> CompileResult
+auto Compiler::compile(std::string_view shader, std::string_view compute_shader_entry_point, std::string_view include, std::optional<RootSignatureResult> res) noexcept -> CompileResult
 {
-  auto [res, cso] = compile(shader, include, L"cs_6_0", compute_shader_entry_point);
+  auto [comp_res, cso] = compile(shader, include, L"cs_6_0", compute_shader_entry_point);
 
   auto compile_result = CompileResult{};
   compile_result._cs_cso = cso;
   compile_result.cs      = { cso->GetBufferPointer(), cso->GetBufferSize() };
 
-  auto reflection = compile_result.get_shader_reflection(res.Get());
-  compile_result.get_root_parameters(reflection.Get(), true);
-
-  auto sampler_desc = D3D12_STATIC_SAMPLER_DESC{};
-  sampler_desc.Filter           = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-  sampler_desc.AddressU         = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-  sampler_desc.AddressV         = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-  sampler_desc.AddressW         = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-  sampler_desc.ComparisonFunc   = D3D12_COMPARISON_FUNC_NEVER;
-  sampler_desc.MaxLOD           = D3D12_FLOAT32_MAX;
-
-  auto signature_desc = CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC{};
-  if (compile_result._has_sampler)
-    signature_desc.Init_1_1(compile_result.root_params.size(), compile_result.root_params.data(), 1, &sampler_desc);
-  else
-    signature_desc.Init_1_1(compile_result.root_params.size(), compile_result.root_params.data(), 0, nullptr);
-
-  auto signature = ComPtr<ID3DBlob>{};
-  auto error     = ComPtr<ID3DBlob>{};
-  if (FAILED(D3DX12SerializeVersionedRootSignature(&signature_desc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error)))
+  if (!res)
   {
-    auto msg = std::string{};
-    msg.resize(error->GetBufferSize());
-    memcpy(msg.data(), error->GetBufferPointer(), msg.size());
-    err_if(true, "failed to serialize root signature.\n{}", msg);
+    auto reflection = compile_result.get_shader_reflection(comp_res.Get());
+    compile_result.get_root_parameters(reflection.Get(), true);
+    compile_result.root_signature = create_root_signature(compile_result.root_params, false, false);
   }
-  err_if(g_core.device()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&compile_result.root_signature)),
-          "failed to create root signature");
+  else
+  {
+    compile_result.root_signature     = res.value().root_signature;
+    compile_result.root_param_indices = res.value().root_param_indices;
+    compile_result.root_params        = res.value().root_params;
+  }
 
   return compile_result;
 }
@@ -320,7 +380,7 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
       err_if(std::ranges::find_if(root_params, [](auto const& param) { return param.ParameterType == D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS; }) != root_params.end(),
               "Please only use single constant buffer");
 
-      resource_indices[resource_desc.Name] = root_params.size();
+      root_param_indices[resource_desc.Name] = root_params.size();
 
       auto constant_buffer = shader_reflection->GetConstantBufferByIndex(i);
       auto buffer_desc = D3D12_SHADER_BUFFER_DESC{};
@@ -340,7 +400,7 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
 
     case D3D_SIT_TEXTURE:
     {
-      resource_indices[resource_desc.Name] = root_params.size();
+      root_param_indices[resource_desc.Name] = root_params.size();
 
       // For arrays, reflection reports BindCount > 1. For unbounded arrays, BindCount is commonly 0.
       // D3D12 root signature supports unbounded descriptor ranges via NumDescriptors = UINT_MAX.
@@ -360,7 +420,7 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
     case D3D_SIT_BYTEADDRESS:
     case D3D_SIT_STRUCTURED:
     {
-      resource_indices[resource_desc.Name] = root_params.size();
+      root_param_indices[resource_desc.Name] = root_params.size();
 
       auto const num_descriptors = resource_desc.BindCount ? resource_desc.BindCount : UINT_MAX;
       auto const range_flags = (num_descriptors == 1)
@@ -377,7 +437,7 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
 
     case D3D_SIT_UAV_RWTYPED:
     {
-      resource_indices[resource_desc.Name] = root_params.size();
+      root_param_indices[resource_desc.Name] = root_params.size();
 
       auto const num_descriptors = resource_desc.BindCount ? resource_desc.BindCount : UINT_MAX;
       auto const range_flags = (num_descriptors == 1)

@@ -4,6 +4,7 @@
 #include "../renderer/renderer.hpp"
 #include "../../util/align.hpp"
 #include "../config.hpp"
+#include "render_data.hpp"
 
 #include <directx/d3dx12.h>
 

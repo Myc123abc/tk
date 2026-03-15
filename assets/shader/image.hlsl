@@ -2,9 +2,9 @@
 
 struct Vertex
 {
-  float3 pos             : POSITION;
-  float2 uv              : TEXCOORD;
-  uint32_t buffer_offset : BUFFER_OFFSET; // TODO: try to use different Vertex Input
+  float3   pos           : POSITION;
+  float2   uv            : TEXCOORD;
+  uint32_t buffer_offset : BUFFER_OFFSET;
 };
 
 struct PSParameter

@@ -1,7 +1,8 @@
 #pragma once
 
-#include "../shader/sdf/type.hpp"
+#include "shader_type.hpp"
 #include "../../ui/command_list.hpp"
+#include "../renderer/pipeline/pipeline_system.hpp"
 
 #include <d3d12.h>
 #include <windows.h>
@@ -17,7 +18,7 @@ struct DrawData
   uint32_t                    indices_start{};
   float                       image_alpha{};
   D3D12_GPU_DESCRIPTOR_HANDLE image_descriptor_gpu_handle{};
-  bool                        is_image{};
+  PipelineType                pipe_type{};
 };
 
 struct RenderData
@@ -67,7 +68,7 @@ struct RenderData
   void set_image_info(D3D12_GPU_DESCRIPTOR_HANDLE handle, float alpha) noexcept
   {
     auto& data = draw_datas.back();
-    data.is_image                    = true;
+    data.pipe_type                   = PipelineType::image;
     data.image_descriptor_gpu_handle = handle;
     data.image_alpha                 = alpha;
   }

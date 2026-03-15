@@ -12,8 +12,35 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <queue>
+#include <optional>
 
 namespace tk { namespace renderer {
+
+struct DescriptorInfo
+{
+  enum class Type
+  {
+    constants,
+    bytebuffer,
+    texture,
+    textures
+  };
+
+  Type        type{};
+  std::string name;
+  uint32_t    bind_point{};
+  uint32_t    space{};
+  uint32_t    constants_size{};
+};
+
+struct RootSignatureResult
+{
+  Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature;
+  std::unordered_map<std::string, uint32_t>   root_param_indices;
+  std::vector<CD3DX12_ROOT_PARAMETER1>        root_params;
+};
+
+auto generate_root_signature(std::vector<DescriptorInfo> const& desc_infos, bool is_graphics) noexcept -> RootSignatureResult;
 
 Singleton(Compiler, g_compiler,
 public:
@@ -25,7 +52,7 @@ public:
     D3D12_SHADER_BYTECODE                       ps;
     D3D12_SHADER_BYTECODE                       cs;
     D3D12_INPUT_LAYOUT_DESC                     input_layout_desc;
-    std::unordered_map<std::string, uint32_t>   resource_indices;
+    std::unordered_map<std::string, uint32_t>   root_param_indices;
     Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature;
     std::vector<CD3DX12_ROOT_PARAMETER1>        root_params;
 
@@ -70,8 +97,8 @@ public:
     std::unordered_set<ResourceKey, ResourceKeyHash> _resource_keys;
   };
 
-  auto compile(std::string_view shader, std::string_view vertex_shader_entry_point, std::string_view pixel_shader_entry_point, std::string_view include) noexcept -> CompileResult;
-  auto compile(std::string_view shader, std::string_view compute_shader_entry_point, std::string_view include) noexcept -> CompileResult;
+  auto compile(std::string_view shader, std::string_view vertex_shader_entry_point, std::string_view pixel_shader_entry_point, std::string_view include, std::optional<RootSignatureResult> res = {}) noexcept -> CompileResult;
+  auto compile(std::string_view shader, std::string_view compute_shader_entry_point, std::string_view include, std::optional<RootSignatureResult> res = {}) noexcept -> CompileResult;
 
 private:
   auto compile(std::string_view shader_path, std::string_view include, std::wstring_view profile, std::string_view entry_point) noexcept -> std::pair<Microsoft::WRL::ComPtr<IDxcResult>, Microsoft::WRL::ComPtr<IDxcBlob>>;
