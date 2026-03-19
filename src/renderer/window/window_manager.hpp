@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 inline auto get_cursor_pos() noexcept
 {
@@ -119,4 +119,4 @@ private:
   std::unordered_map<HWND, RECT>   _window_change_size{};
 )
 
-}}
+}

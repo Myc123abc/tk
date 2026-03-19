@@ -7,7 +7,7 @@
 #include <optional>
 #include <semaphore>
 
-namespace tk { namespace ui {
+namespace tk::ui {
 
 enum class CommandType : uint16_t
 {
@@ -285,4 +285,4 @@ private:
   std::binary_semaphore  _sem{ 1 };
 };
 
-}}
+}

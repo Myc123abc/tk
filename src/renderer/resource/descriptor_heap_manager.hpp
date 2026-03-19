@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <functional>
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 inline auto RTV_Size         = 0u;
 inline auto CBV_SRV_UAV_Size = 0u;
@@ -95,4 +95,4 @@ private:
   std::unordered_map<DescriptorHeapType, DescriptorHeap> _heaps;
 )
 
-}}
+}

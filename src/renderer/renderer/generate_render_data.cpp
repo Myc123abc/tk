@@ -44,7 +44,7 @@ auto is_integer_scale(float s)
 
 }
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
 {
@@ -212,8 +212,9 @@ void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
       auto info = reinterpret_cast<ImageInfo*>(info_ptr);
       if (_images.contains(info->handle))
       {
+        if (!hh.valid()) hh = info->handle;
         add_vertices_indices(render_data, { info->left_top, info->right_bottom });
-        render_data.set_image_info(_images.at(info->handle).gpu_handle(), static_cast<float>(info->alpha) / 0xff);
+        render_data.set_image_info(_images.at(info->handle).srv().gpu_handle(), static_cast<float>(info->alpha) / 0xff);
       }
     }
     break;
@@ -294,4 +295,4 @@ add_shape_property:
   add_shape_property(render_data, type, color, thickness, values);
 }
 
-}}
+}

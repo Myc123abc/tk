@@ -2,7 +2,7 @@
 #include "../core.hpp"
 #include "util/error_handling.hpp"
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 void Engine::init(D3D12_COMMAND_LIST_TYPE type) noexcept
 {
@@ -65,4 +65,4 @@ auto Engine::reset_cmd(ID3D12CommandAllocator* alloc) const noexcept -> ID3D12Gr
   return _cmd.Get();
 }
 
-}}
+}

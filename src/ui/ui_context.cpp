@@ -8,7 +8,7 @@
 
 using namespace tk::renderer;
 
-namespace tk { namespace ui {
+namespace tk::ui {
 
 auto is_caps_locked() noexcept -> bool
 {
@@ -658,4 +658,4 @@ auto UIContext::text(std::string_view text, glm::vec2 pos, float size, Color inn
   return res.extent;
 }
 
-}}
+}

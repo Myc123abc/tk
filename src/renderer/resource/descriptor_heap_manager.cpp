@@ -42,7 +42,7 @@ auto dx12_descriptor_size(DescriptorHeapType type) noexcept
 
 }
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 void DescriptorHandle::release() noexcept
 {
@@ -139,4 +139,4 @@ void DescriptorHeapManager::bind_heaps(ID3D12GraphicsCommandList1* cmd) noexcept
   cmd->SetDescriptorHeaps(descriptor_heaps.size(), descriptor_heaps.data());
 }
 
-}}
+}

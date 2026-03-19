@@ -18,7 +18,7 @@ auto in_range(float v, float min, float max) noexcept
 
 }
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 void Window::init(int x, int y, uint32_t width, uint32_t height) noexcept
 {
@@ -477,4 +477,4 @@ auto Window::get_resize_type(glm::vec<2, int> const& p) const noexcept -> Resize
   return none;
 }
 
-}}
+}

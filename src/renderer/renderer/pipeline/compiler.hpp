@@ -14,7 +14,7 @@
 #include <queue>
 #include <optional>
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 struct DescriptorInfo
 {
@@ -30,6 +30,7 @@ struct DescriptorInfo
   std::string name;
   uint32_t    bind_point{};
   uint32_t    space{};
+  bool        is_volatile{};
   uint32_t    constants_size{};
 };
 
@@ -63,7 +64,7 @@ public:
 
     void get_vertex_input_layout(ID3D12ShaderReflection* shader_reflection) noexcept;
 
-    void get_root_parameters(ID3D12ShaderReflection* shader_reflection, bool is_compute_shader) noexcept;
+    void get_root_parameters(ID3D12ShaderReflection* shader_reflection, bool is_compute_shader, std::unordered_set<std::string> const& volatile_descs) noexcept;
  
   private:
     Microsoft::WRL::ComPtr<IDxcBlob>      _vs_cso;
@@ -97,8 +98,20 @@ public:
     std::unordered_set<ResourceKey, ResourceKeyHash> _resource_keys;
   };
 
-  auto compile(std::string_view shader, std::string_view vertex_shader_entry_point, std::string_view pixel_shader_entry_point, std::string_view include, std::optional<RootSignatureResult> res = {}) noexcept -> CompileResult;
-  auto compile(std::string_view shader, std::string_view compute_shader_entry_point, std::string_view include, std::optional<RootSignatureResult> res = {}) noexcept -> CompileResult;
+  auto compile(
+    std::string_view                       shader,
+    std::string_view                       vertex_shader_entry_point,
+    std::string_view                       pixel_shader_entry_point,
+    std::string_view                       include        = {},
+    std::optional<RootSignatureResult>     res            = {},
+    std::unordered_set<std::string> const& volatile_descs = {}) noexcept -> CompileResult;
+
+  auto compile(
+    std::string_view                       shader,
+    std::string_view                       compute_shader_entry_point,
+    std::string_view                       include        = {},
+    std::optional<RootSignatureResult>     res            = {},
+    std::unordered_set<std::string> const& volatile_descs = {}) noexcept -> CompileResult;
 
 private:
   auto compile(std::string_view shader_path, std::string_view include, std::wstring_view profile, std::string_view entry_point) noexcept -> std::pair<Microsoft::WRL::ComPtr<IDxcResult>, Microsoft::WRL::ComPtr<IDxcBlob>>;
@@ -109,4 +122,4 @@ private:
   Microsoft::WRL::ComPtr<IDxcIncludeHandler> _include_handler;
 )
 
-}}
+}

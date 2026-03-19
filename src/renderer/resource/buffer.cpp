@@ -33,7 +33,7 @@ auto calculate_capacity(uint32_t old_capacity, uint32_t need_capacity)
 
 }
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 void Buffer::init(uint32_t size, bool use_descriptor) noexcept
 {
@@ -140,4 +140,4 @@ void FrameBuffer::upload(ID3D12GraphicsCommandList1* cmd, RenderData& data) noex
     _shape_properties_buffer.append(shape_property.data(), shape_property.byte_size());
 }
 
-}}
+}

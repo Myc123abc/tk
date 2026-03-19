@@ -4,7 +4,7 @@
 
 using namespace Microsoft::WRL;
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 void Core::init() noexcept
 {
@@ -57,4 +57,4 @@ auto Core::create_cmd(D3D12_COMMAND_LIST_TYPE type, ID3D12CommandAllocator* allo
   return cmd;
 }
 
-}}
+}

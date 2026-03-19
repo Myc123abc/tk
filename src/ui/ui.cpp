@@ -6,7 +6,7 @@
 
 using namespace tk::renderer;
 
-namespace tk { namespace ui {
+namespace tk::ui {
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                              Misc
@@ -383,7 +383,7 @@ auto button(
   if (mouse_down_color && state.hovered)
   {
     auto state = g_ui_ctx.get_key(Key::Mouse_Left_Button);
-    if (state &  KeyState::down || state == KeyState::press)
+    if (has_flag(state, KeyState::down) || state == KeyState::press)
       button_color = mouse_down_color.value();
   }
 
@@ -426,4 +426,4 @@ auto get_key(Key key) noexcept -> GetKeyResult
   return {};
 }
 
-}}
+}

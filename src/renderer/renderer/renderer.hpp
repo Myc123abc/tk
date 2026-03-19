@@ -17,10 +17,11 @@
 #include <variant>
 #include <unordered_set>
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 Singleton(Renderer, g_renderer,
 public:
+  ui::ImageHandle hh{};
   void init() noexcept;
   void destroy() noexcept;
 
@@ -179,4 +180,4 @@ private:
   MessageQueue<UIContextMessage, Renderer_Msg_Queue_Capacity> _ui_ctx_msg_queue;
 )
 
-}}
+}

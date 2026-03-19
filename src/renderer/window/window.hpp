@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <string>
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 enum class CursorType
 {
@@ -136,4 +136,4 @@ private:
   std::string _monitor{};
 };
 
-}}
+}

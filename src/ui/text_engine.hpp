@@ -13,7 +13,7 @@
 #include FT_FREETYPE_H
 #include <hb.h>
 
-namespace tk { namespace ui {
+namespace tk::ui {
 
 class Font
 {
@@ -60,4 +60,4 @@ private:
   std::vector<glm::vec2> _advances;
 )
 
-}}
+}

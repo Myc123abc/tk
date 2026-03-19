@@ -6,7 +6,7 @@
 
 using namespace tk::renderer;
 
-namespace tk { namespace ui {
+namespace tk::ui {
 
 void ImageManager::destroy() noexcept
 {
@@ -117,4 +117,4 @@ void ImageManager::generate_mipmap(std::string_view path) noexcept
   // and destroy old resources with fence complete
 }
 
-}}
+}

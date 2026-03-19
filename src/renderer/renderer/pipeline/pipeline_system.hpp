@@ -6,13 +6,14 @@
 
 #include <span>
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 enum class PipelineType
 {
   sdf,
   image,
   // TODO: split text render from sdf
+  blur,
 };
 
 Singleton(PipelineSystem, g_pipe_sys,
@@ -20,6 +21,10 @@ public:
   void init() noexcept;
 
   void render(RenderResource& res, class RenderData& data) noexcept;
+
+  auto ctx() noexcept { return &_ctx; }
+
+  auto pipe(PipelineType type) const noexcept { return &_pipes.at(type); }
 
 private:
   auto find_root_param(std::span<CD3DX12_ROOT_PARAMETER1> params) const noexcept -> ID3D12RootSignature*;
@@ -31,36 +36,48 @@ private:
     D3D_PRIMITIVE_TOPOLOGY                      primive_topology{ D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST };
 
     Pipeline(
-      std::string_view                   shader,
-      std::string_view                   vs,
-      std::string_view                   ps,
-      std::string_view                   include,
-      ImageFormat                        rtv_format,
-      bool                               use_blend      = false,
-      bool                               use_depth_test = false,
-      std::optional<RootSignatureResult> res = {}
+      std::string_view                       shader,
+      std::string_view                       vs,
+      std::string_view                       ps,
+      std::string_view                       include,
+      ImageFormat                            rtv_format,
+      bool                                   use_blend      = false,
+      bool                                   use_depth_test = false,
+      std::optional<RootSignatureResult>     res            = {},
+      std::unordered_set<std::string> const& volatile_descs = {}
     ) noexcept
     {
-      init_graphics(shader, vs, ps, include, rtv_format, use_blend, use_depth_test, res);
+      init_graphics(shader, vs, ps, include, rtv_format, use_blend, use_depth_test, res, volatile_descs);
     }
 
-    Pipeline(std::string_view shader, std::string_view cs, std::string_view include = {}, std::optional<RootSignatureResult> res = {}) noexcept
+    Pipeline(
+      std::string_view                       shader,
+      std::string_view                       cs,
+      std::string_view                       include = {},
+      std::optional<RootSignatureResult>     res = {},
+      std::unordered_set<std::string> const& volatile_descs = {}) noexcept
     {
-      init_compute(shader, cs, include, res);
+      init_compute(shader, cs, include, res, volatile_descs);
     }
 
     void init_graphics(
-      std::string_view                   shader,
-      std::string_view                   vs,
-      std::string_view                   ps,
-      std::string_view                   include,
-      ImageFormat                        rtv_format,
-      bool                               use_blend      = false,
-      bool                               use_depth_test = false,
-      std::optional<RootSignatureResult> res = {}
+      std::string_view                       shader,
+      std::string_view                       vs,
+      std::string_view                       ps,
+      std::string_view                       include,
+      ImageFormat                            rtv_format,
+      bool                                   use_blend      = false,
+      bool                                   use_depth_test = false,
+      std::optional<RootSignatureResult>     res            = {},
+      std::unordered_set<std::string> const& volatile_descs = {}
     ) noexcept;
   
-    void init_compute(std::string_view shader, std::string_view cs, std::string_view include = {}, std::optional<RootSignatureResult> res = {}) noexcept;
+    void init_compute(
+      std::string_view                       shader,
+      std::string_view                       cs,
+      std::string_view                       include = {},
+      std::optional<RootSignatureResult>     res = {},
+      std::unordered_set<std::string> const& volatile_descs = {}) noexcept;
   
     auto root_param_idx(std::string_view name) const noexcept { return _root_param_idxs.at(name.data()); }
   private:
@@ -80,6 +97,7 @@ private:
     void set_primitive_topology(D3D_PRIMITIVE_TOPOLOGY primitive_topology) noexcept;
     void set_scissor_rect(RECT rect) noexcept;
     void draw(uint32_t start_idx, uint32_t size) const noexcept;
+    void dispatch(uint32_t width, uint32_t height) const noexcept;
 
     template <typename T>
     requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
@@ -107,4 +125,36 @@ private:
   } _ctx;
 )
 
-}}
+template <typename T>
+requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
+void PipelineSystem::Context::set_graphics_constants(uint32_t root_param_idx, T const& constants) noexcept
+{
+  auto size = sizeof(constants);
+  if (_graphics_constants_root_param_idx != root_param_idx ||
+      _graphics_constants.size()         != size           ||
+      memcmp(_graphics_constants.data(), &constants, size))
+  {
+    _graphics_constants_root_param_idx = root_param_idx;
+    _graphics_constants.resize(size);
+    memcpy(_graphics_constants.data(), &constants, size);
+    _cmd->SetGraphicsRoot32BitConstants(root_param_idx, _graphics_constants.size() / 4, _graphics_constants.data(), 0);
+  }
+}
+
+template <typename T>
+requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
+void PipelineSystem::Context::set_compute_constants(uint32_t root_param_idx, T const& constants)
+{
+  auto size = sizeof(constants);
+  if (_compute_constants_root_param_idx != root_param_idx ||
+      _compute_constants.size()         != size           ||
+      memcmp(_compute_constants.data(), &constants, size))
+  {
+    _compute_constants_root_param_idx = root_param_idx;
+    _compute_constants.resize(size);
+    memcpy(_compute_constants.data(), &constants, size);
+    _cmd->SetComputeRoot32BitConstants(root_param_idx, _compute_constants.size() / 4, _compute_constants.data(), 0);
+  }
+}
+
+}

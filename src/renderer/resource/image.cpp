@@ -3,97 +3,74 @@
 #include "util/error_handling.hpp"
 #include "../../util/align.hpp"
 
-#include <ranges>
-
 using namespace tk;
 using namespace tk::renderer;
 using namespace Microsoft::WRL;
 
 namespace {
 
-auto dx12_resource_flag(ImageType type) noexcept
+template<auto T>
+struct dx12_traits;
+
+template<>
+struct dx12_traits<ImageType::srv>
+{
+  static constexpr auto flag  = D3D12_RESOURCE_FLAG_NONE;
+  static constexpr auto state = D3D12_RESOURCE_STATE_COMMON;
+};
+
+template<>
+struct dx12_traits<ImageType::uav>
+{
+  static constexpr auto flag  = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+  static constexpr auto state = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+};
+
+template<>
+struct dx12_traits<ImageType::rtv>
+{
+  static constexpr auto flag  = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+  static constexpr auto state = D3D12_RESOURCE_STATE_RENDER_TARGET;
+};
+
+template<>
+struct dx12_traits<ImageType::dsv>
+{
+  static constexpr auto flag  = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+  static constexpr auto state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+};
+
+constexpr auto dx12_resource_flags(ImageType type) noexcept
 {
   using enum ImageType;
-  auto static const map = std::unordered_map<ImageType, D3D12_RESOURCE_FLAGS>
-  {
-    { uav, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS },
-    { rtv, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET    },
-    { srv, D3D12_RESOURCE_FLAG_NONE                   },
-    { dsv, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL    },
-  };
-  err_if(!map.contains(type), "unsupport image type now");
-  return map.at(type);
+  auto flags = D3D12_RESOURCE_FLAG_NONE;
+  if (has_flag(type, uav)) flags |= dx12_traits<uav>::flag;
+  if (has_flag(type, rtv)) flags |= dx12_traits<rtv>::flag;
+  if (has_flag(type, dsv)) flags |= dx12_traits<dsv>::flag;
+  return flags;
 }
 
-auto dx12_resource_state(ImageType type) noexcept
+}
+
+namespace tk::renderer {
+
+void Image::destroy() noexcept
 {
-  using enum ImageType;
-  auto static const map = std::unordered_map<ImageType, D3D12_RESOURCE_STATES>
-  {
-    { uav, D3D12_RESOURCE_STATE_UNORDERED_ACCESS },
-    { rtv, D3D12_RESOURCE_STATE_PRESENT          },
-    { srv, D3D12_RESOURCE_STATE_COMMON           },
-    { dsv, D3D12_RESOURCE_STATE_DEPTH_WRITE      },
-  };
-  err_if(!map.contains(type), "unsupport image type now");
-  return map.at(type);
+  _handle.Reset();
+  _desc.srv.release();
+  _desc.uav.release();
+  _desc.rtv.release();
+  _desc.dsv.release();
 }
 
-auto dx12_resource_state(ImageState state) noexcept
-{
-  using enum ImageState;
-  auto static const map = std::unordered_map<ImageState, D3D12_RESOURCE_STATES>
-  {
-    { copy_dst,              D3D12_RESOURCE_STATE_COPY_DEST             },
-    { copy_src,              D3D12_RESOURCE_STATE_COPY_SOURCE           },
-    { present,               D3D12_RESOURCE_STATE_PRESENT               },
-    { unorder_access,        D3D12_RESOURCE_STATE_UNORDERED_ACCESS      },
-    { common,                D3D12_RESOURCE_STATE_COMMON                },
-    { render_target,         D3D12_RESOURCE_STATE_RENDER_TARGET         },
-    { pixel_shader_resource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE },
-  };
-  err_if(!map.contains(state), "unsupport image state now");
-  return map.at(state);
-}
-
-auto byte_size_of(DXGI_FORMAT format) noexcept
-{
-  auto static const map = std::unordered_map<DXGI_FORMAT, uint32_t>
-  {
-    { DXGI_FORMAT_R8G8B8A8_UNORM, 4 },
-    { DXGI_FORMAT_B8G8R8A8_UNORM, 4 },
-  };
-  err_if(!map.contains(format), "unsupport dxgi format for byte size now");
-  return map.at(format);
-}
-
-}
-
-namespace tk { namespace renderer {
-
-auto dxgi_format(ImageFormat format) noexcept -> DXGI_FORMAT
-{
-  using enum ImageFormat;
-  auto static const map = std::unordered_map<ImageFormat, DXGI_FORMAT>
-  {
-    { r8_unorm,    DXGI_FORMAT_R8_UNORM       },
-    { bgra8_unorm, DXGI_FORMAT_B8G8R8A8_UNORM },
-    { rgba8_unorm, DXGI_FORMAT_R8G8B8A8_UNORM },
-    { d32,         DXGI_FORMAT_D32_FLOAT      },
-  };
-  err_if(!map.contains(format), "unsupport image format now");
-  return map.at(format);
-}
-
-void Image::init(ImageType type, DXGI_FORMAT format, uint32_t width , uint32_t height, bool use_mipmap) noexcept
+void Image::init(uint32_t width , uint32_t height, ImageFormat format, ImageType type, bool use_mipmap) noexcept
 {
   auto device = g_core.device();
 
-  _type   = type;
-  _format = format;
-  _state  = dx12_resource_state(type);
   _width  = width;
   _height = height;
+  _format = static_cast<DXGI_FORMAT>(format);
+  _type   = type;
 
   // create image
   auto texture_desc = D3D12_RESOURCE_DESC{};
@@ -103,7 +80,7 @@ void Image::init(ImageType type, DXGI_FORMAT format, uint32_t width , uint32_t h
   texture_desc.DepthOrArraySize = 1;
   texture_desc.SampleDesc.Count = 1;
   texture_desc.Dimension        = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-  texture_desc.Flags            = dx12_resource_flag(type);
+  texture_desc.Flags            = dx12_resource_flags(_type);
   auto heap_properties          = CD3DX12_HEAP_PROPERTIES{ D3D12_HEAP_TYPE_DEFAULT };
   if (use_mipmap)
     texture_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
@@ -111,57 +88,43 @@ void Image::init(ImageType type, DXGI_FORMAT format, uint32_t width , uint32_t h
     texture_desc.MipLevels = 1;
 
   auto clear_value = D3D12_CLEAR_VALUE{};
-  if (type == ImageType::dsv)
-  {
-    clear_value.Format             = DXGI_FORMAT_D32_FLOAT;
+  clear_value.Format = texture_desc.Format;
+  if (has_flag(_type, ImageType::dsv))
     clear_value.DepthStencil.Depth = 1.f;
-    err_if(device->CreateCommittedResource(&heap_properties, D3D12_HEAP_FLAG_NONE, &texture_desc, _state, &clear_value, IID_PPV_ARGS(_handle.ReleaseAndGetAddressOf())),
-            "failed to create image");
-  }
-  else if (type == ImageType::rtv)
-  {
-    clear_value.Format = texture_desc.Format;
-    err_if(device->CreateCommittedResource(&heap_properties, D3D12_HEAP_FLAG_NONE, &texture_desc, _state, &clear_value, IID_PPV_ARGS(_handle.ReleaseAndGetAddressOf())),
-            "failed to create image");
-  }
-  else
-    err_if(device->CreateCommittedResource(&heap_properties, D3D12_HEAP_FLAG_NONE, &texture_desc, _state, nullptr, IID_PPV_ARGS(_handle.ReleaseAndGetAddressOf())),
-            "failed to create image");
+  auto clear_value_ptr = (has_flag(_type, ImageType::rtv) | has_flag(_type, ImageType::dsv)) ? &clear_value : nullptr;
+  err_if(device->CreateCommittedResource(&heap_properties, D3D12_HEAP_FLAG_NONE, &texture_desc, _state, clear_value_ptr, IID_PPV_ARGS(_handle.ReleaseAndGetAddressOf())),
+          "failed to create image");
 
   create_descriptor(use_mipmap);
 }
 
-void Image::init(ImageType type, ImageFormat format, uint32_t width , uint32_t height, bool use_mipmap) noexcept
-{
-  init(type, dxgi_format(format), width, height, use_mipmap);
-}
-
 void Image::init(IDXGISwapChain1* swapchain, uint32_t index) noexcept
 {
-  _state = dx12_resource_state(ImageType::rtv);
   err_if(swapchain->GetBuffer(index, IID_PPV_ARGS(_handle.ReleaseAndGetAddressOf())),
          "failed to get descriptor");
   DXGI_SWAP_CHAIN_DESC1 desc{};
   err_if(swapchain->GetDesc1(&desc), "failed to get swapchain description");
-  _type   = ImageType::rtv;
-  _format = desc.Format;
+
   _width  = desc.Width;
   _height = desc.Height;
+  _format = desc.Format;
+  _type   = ImageType::rtv;
+
   create_descriptor();
 }
 
-void Image::init(ImageType type, HANDLE handle, uint32_t width, uint32_t height) noexcept
-{
-  _state  = dx12_resource_state(type);
-  _width  = width;
-  _height = height;
-  err_if(g_core.device()->OpenSharedHandle(handle, IID_PPV_ARGS(_handle.ReleaseAndGetAddressOf())), "failed to share d3d11 texture");
-  create_descriptor();
-}
+// void Image::init(ImageType type, HANDLE handle, uint32_t width, uint32_t height) noexcept
+// {
+//   _state  = dx12_resource_state(type);
+//   _width  = width;
+//   _height = height;
+//   err_if(g_core.device()->OpenSharedHandle(handle, IID_PPV_ARGS(_handle.ReleaseAndGetAddressOf())), "failed to share d3d11 texture");
+//   create_descriptor();
+// }
 
 void Image::set_state(ID3D12GraphicsCommandList1* cmd, ImageState state) noexcept
 {
-  auto transition_state = dx12_resource_state(state);
+  auto transition_state = static_cast<D3D12_RESOURCE_STATES>(state);
   if (_state == transition_state) return;
   auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_handle.Get(), _state, transition_state);
   cmd->ResourceBarrier(1, &barrier);
@@ -177,11 +140,11 @@ void Image::create_descriptor(bool use_mipmap) noexcept
     auto uav_desc          = D3D12_UNORDERED_ACCESS_VIEW_DESC{};
     uav_desc.Format        = _format;
     uav_desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-    device->CreateUnorderedAccessView(_handle.Get(), nullptr, &uav_desc, _descriptor_handle.cpu_handle());
+    device->CreateUnorderedAccessView(_handle.Get(), nullptr, &uav_desc, _desc.uav.cpu_handle());
   };
   auto create_render_target_view = [&]
   {
-    device->CreateRenderTargetView(_handle.Get(), nullptr, _descriptor_handle.cpu_handle());
+    device->CreateRenderTargetView(_handle.Get(), nullptr, _desc.rtv.cpu_handle());
   };
   auto create_shader_resource_view = [&, use_mipmap = use_mipmap]
   {
@@ -190,78 +153,71 @@ void Image::create_descriptor(bool use_mipmap) noexcept
     srv_desc.Format                  = _format;
     srv_desc.ViewDimension           = D3D12_SRV_DIMENSION_TEXTURE2D;
     srv_desc.Texture2D.MipLevels     = use_mipmap ? -1 : 1;
-    device->CreateShaderResourceView(_handle.Get(), &srv_desc, _descriptor_handle.cpu_handle());
+    device->CreateShaderResourceView(_handle.Get(), &srv_desc, _desc.srv.cpu_handle());
   };
   auto create_depth_stencil_view = [&]
   {
     auto dsv_desc = D3D12_DEPTH_STENCIL_VIEW_DESC{};
     dsv_desc.Format        = DXGI_FORMAT_D32_FLOAT;
     dsv_desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-    device->CreateDepthStencilView(_handle.Get(), &dsv_desc, _descriptor_handle.cpu_handle());
+    device->CreateDepthStencilView(_handle.Get(), &dsv_desc, _desc.dsv.cpu_handle());
   };
 
   // first initialize image, get descriptor handle
-  if (!_descriptor_handle.is_valid())
-  {
-    if (_type == ImageType::uav)
-      _descriptor_handle = g_desc_heap_mgr.pop_handle(DescriptorHeapType::cbv_srv_uav, create_unordered_access_view);
-    else if (_type == ImageType::rtv)
-      _descriptor_handle = g_desc_heap_mgr.pop_handle(DescriptorHeapType::rtv, create_render_target_view);
-    else if (_type == ImageType::srv)
-      _descriptor_handle = g_desc_heap_mgr.pop_handle(DescriptorHeapType::cbv_srv_uav, create_shader_resource_view);
-    else if (_type == ImageType::dsv)
-      _descriptor_handle = g_desc_heap_mgr.pop_handle(DescriptorHeapType::dsv, create_depth_stencil_view);
-    else
-      std::unreachable();
-  }
+  if (has_flag(_type, ImageType::srv) && !_desc.srv.is_valid())
+    _desc.srv = g_desc_heap_mgr.pop_handle(DescriptorHeapType::cbv_srv_uav, create_shader_resource_view);
+  if (has_flag(_type, ImageType::uav) && !_desc.uav.is_valid())
+    _desc.uav = g_desc_heap_mgr.pop_handle(DescriptorHeapType::cbv_srv_uav, create_unordered_access_view);
+  if (has_flag(_type, ImageType::rtv) && !_desc.rtv.is_valid())
+    _desc.rtv = g_desc_heap_mgr.pop_handle(DescriptorHeapType::rtv, create_render_target_view);
+  if (has_flag(_type, ImageType::dsv) && !_desc.dsv.is_valid())
+    _desc.dsv = g_desc_heap_mgr.pop_handle(DescriptorHeapType::dsv, create_depth_stencil_view);
 
   // create descriptor
-  if (_type == ImageType::uav)
-    create_unordered_access_view();
-  else if (_type == ImageType::rtv)
-    create_render_target_view();
-  else if (_type == ImageType::srv)
+  if (has_flag(_type, ImageType::srv))
     create_shader_resource_view();
-  else if (_type == ImageType::dsv)
+  if (has_flag(_type, ImageType::uav))
+    create_unordered_access_view();
+  if (has_flag(_type, ImageType::rtv))
+    create_render_target_view();
+  if (has_flag(_type, ImageType::dsv))
     create_depth_stencil_view();
-  else
-    std::unreachable();
 
-  // create mipmap uavs for generate mipmap
-  if (use_mipmap)
-  {
-    // get count of mipmap images
-    auto count = _handle->GetDesc().MipLevels;
-    _mipmap_uavs.reserve(count);
-    for (auto i : std::views::iota(1u, count))
-    {
-      // pop descriptor handle
-      auto handle = g_desc_heap_mgr.pop_handle(DescriptorHeapType::cbv_srv_uav);
+  // // create mipmap uavs for generate mipmap
+  // if (use_mipmap)
+  // {
+  //   // get count of mipmap images
+  //   auto count = _handle->GetDesc().MipLevels;
+  //   _mipmap_uavs.reserve(count);
+  //   for (auto i : std::views::iota(1u, count))
+  //   {
+  //     // pop descriptor handle
+  //     auto handle = g_desc_heap_mgr.pop_handle(DescriptorHeapType::cbv_srv_uav);
 
-      // create mipmap uav func
-      auto create_mipmap_uav = [this, i, handle = handle.cpu_handle()]
-      {
-        auto desc               = D3D12_UNORDERED_ACCESS_VIEW_DESC{};
-        desc.Format             = _format;
-        desc.ViewDimension      = D3D12_UAV_DIMENSION_TEXTURE2D;
-        desc.Texture2D.MipSlice = i;
-        device->CreateUnorderedAccessView(_handle.Get(), nullptr, &desc, handle);
-      };
+  //     // create mipmap uav func
+  //     auto create_mipmap_uav = [this, i, handle = handle.cpu_handle()]
+  //     {
+  //       auto desc               = D3D12_UNORDERED_ACCESS_VIEW_DESC{};
+  //       desc.Format             = _format;
+  //       desc.ViewDimension      = D3D12_UAV_DIMENSION_TEXTURE2D;
+  //       desc.Texture2D.MipSlice = i;
+  //       device->CreateUnorderedAccessView(_handle.Get(), nullptr, &desc, handle);
+  //     };
       
-      // create uav
-      create_mipmap_uav();
+  //     // create uav
+  //     create_mipmap_uav();
 
-      // store creatation func to descriptor handle avoid dynamic expand handle invalidation
-      handle.set(std::move(create_mipmap_uav));
+  //     // store creatation func to descriptor handle avoid dynamic expand handle invalidation
+  //     handle.set(std::move(create_mipmap_uav));
 
-      _mipmap_uavs.emplace_back(std::move(handle));
-    }
-  }
+  //     _mipmap_uavs.emplace_back(std::move(handle));
+  //   }
+  // }
 }
 
 void Image::clear(ID3D12GraphicsCommandList1* cmd, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) const noexcept
 {
-  err_if(_type != ImageType::uav, "clear operator only use on uav");
+  err_if(!has_flag(_type, ImageType::uav), "clear operator only use on uav");
   float values[4]{};
   auto rect = D3D12_RECT{};
   rect.right  = _width;
@@ -271,15 +227,23 @@ void Image::clear(ID3D12GraphicsCommandList1* cmd, D3D12_CPU_DESCRIPTOR_HANDLE c
 
 void Image::clear_render_target(ID3D12GraphicsCommandList1* cmd) noexcept
 {
-  err_if(_type != ImageType::rtv, "clear render target only use on rtv");
+  err_if(!has_flag(_type, ImageType::rtv), "clear render target only use on rtv");
   set_state(cmd, ImageState::render_target);
   float constexpr clear_color[4]{};
-  cmd->ClearRenderTargetView(cpu_handle(), clear_color, 0, nullptr);
+  cmd->ClearRenderTargetView(_desc.rtv.cpu_handle(), clear_color, 0, nullptr);
 }
 
 auto Image::per_pixel_size() const noexcept -> uint32_t
 {
-  return byte_size_of(_format);
+  switch (_format)
+  {
+  case DXGI_FORMAT_B8G8R8A8_UNORM:
+  case DXGI_FORMAT_R8G8B8A8_UNORM:
+    return 4;
+  default:
+    err_if(true, "unsupport Image::per_pixel_size now for current format");
+    std::unreachable();
+  }
 }
 
 auto Image::readback(ID3D12GraphicsCommandList1* cmd, RECT rect) noexcept -> std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, Bitmap>
@@ -373,11 +337,11 @@ void copy(Bitmap const& src, Bitmap const& dst) noexcept
   }
 }
 
-void Image::release_mipmap_uavs() noexcept
-{
-  assert(!_mipmap_uavs.empty());
-  for (auto& uav : _mipmap_uavs) uav.release(); 
-  _mipmap_uavs.clear();
-}
+// void Image::release_mipmap_uavs() noexcept
+// {
+//   assert(!_mipmap_uavs.empty());
+//   for (auto& uav : _mipmap_uavs) uav.release(); 
+//   _mipmap_uavs.clear();
+// }
 
-}}
+}

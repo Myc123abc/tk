@@ -5,7 +5,7 @@
 #include "../resource/image.hpp"
 #include "../resource/buffer.hpp"
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 class UploadBuffer
 {
@@ -51,4 +51,4 @@ private:
   Slot*             _slot{};
 )
 
-}}
+}

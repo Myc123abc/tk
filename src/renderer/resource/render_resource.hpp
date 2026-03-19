@@ -8,7 +8,7 @@
 
 #include <array>
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 class RenderResource
 {
@@ -60,4 +60,4 @@ private:
 };
 
 
-}}
+}

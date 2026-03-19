@@ -10,17 +10,17 @@
 
 using namespace Microsoft::WRL;
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
 {
   // create offscreen images
   for (auto& frame : _frames)
-    frame.image.init(ImageType::rtv, Render_Target_Format, width, height);
+    frame.image.init(width, height, Render_Target_Format, ImageType::rtv);
   
   // create depth test image
   if (Enable_Depth_Test)
-    _dsv_image.init(ImageType::dsv, ImageFormat::d32, width, height);
+    _dsv_image.init(width, height, ImageFormat::d32, ImageType::dsv);
 
   // create swapchain
   ComPtr<IDXGISwapChain1> swapchain;
@@ -28,7 +28,7 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
   swapchain_desc.BufferCount      = Frame_Count;
   swapchain_desc.Width            = width;
   swapchain_desc.Height           = height;
-  swapchain_desc.Format           = dxgi_format(Render_Target_Format);
+  swapchain_desc.Format           = static_cast<DXGI_FORMAT>(Render_Target_Format);
   swapchain_desc.BufferUsage      = DXGI_USAGE_RENDER_TARGET_OUTPUT;
   swapchain_desc.SwapEffect       = DXGI_SWAP_EFFECT_FLIP_DISCARD;
   swapchain_desc.SampleDesc.Count = 1;
@@ -188,10 +188,10 @@ void RenderResource::clear_image() noexcept
   auto& frame               = current_frame();
   auto& render_target_image = frame.image;
   auto  cmd                 = g_graphics_engine.cmd();
-  auto  rtv_handle          = render_target_image.cpu_handle();
+  auto  rtv_handle          = render_target_image.rtv().cpu_handle();
   auto  dsv_handle          = D3D12_CPU_DESCRIPTOR_HANDLE{};
   if (Enable_Depth_Test)
-    dsv_handle = _dsv_image.cpu_handle();
+    dsv_handle = _dsv_image.dsv().cpu_handle();
 
   // set render target view
   if (Enable_Depth_Test)
@@ -209,4 +209,4 @@ void RenderResource::clear_image() noexcept
   }
 }
 
-}}
+}

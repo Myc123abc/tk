@@ -1,7 +1,7 @@
 #include "renderer.hpp"
 #include "util/error_handling.hpp"
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 void Renderer::MessageHandler::operator()(Message_Window_Create const& msg) const noexcept
 {
@@ -35,10 +35,10 @@ void Renderer::UIContextMessageHandler::operator()(Message_Upload_Image const& m
 {
   // create image resource
   auto image = Image{};
-  image.init(ImageType::srv, ImageFormat::rgba8_unorm, msg.bitmap.width, msg.bitmap.height, msg.use_mipmap);
+  image.init(msg.bitmap.width, msg.bitmap.height, ImageFormat::rgba8_unorm, ImageType::srv, msg.use_mipmap);
 
   // store image and bitmap for upload
-  renderer._upload_images[msg.handle] = image;
+  renderer._upload_images[msg.handle] = std::move(image);
   renderer._bitmaps[msg.handle]       = msg.bitmap;
 
   if (msg.use_mipmap)
@@ -49,7 +49,7 @@ void Renderer::UIContextMessageHandler::operator()(Message_Create_Image const& m
 {
   // create image resource
   auto image = Image{};
-  image.init(ImageType::srv, msg.format, msg.width, msg.height);
+  image.init(msg.width, msg.height, msg.format, ImageType::srv);
 
   assert(!renderer._images.contains(msg.handle));
   renderer._images.emplace(msg.handle, std::move(image));
@@ -68,9 +68,9 @@ void Renderer::UIContextMessageHandler::operator()(Message_Destroy_Image const& 
   else if (renderer._images.contains(msg.handle))
   {
     // already uploaded, release image resource
-    renderer.add_frame_render_complete_func([image = renderer._images.at(msg.handle)] mutable { image.destroy(); });
+    renderer.add_frame_render_complete_func([image = std::move(renderer._images.at(msg.handle))] mutable { image.destroy(); });
     renderer._images.erase(msg.handle);
   }
 }
 
-}}
+}

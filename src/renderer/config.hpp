@@ -1,6 +1,6 @@
 #pragma once
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 constexpr auto Frame_Count = 2;
 
@@ -26,4 +26,4 @@ constexpr auto Command_List_Queue_Capacity = 32;
 
 constexpr auto Mouse_Left_Down_Press_Start_Time = 400;
 
-}}
+}

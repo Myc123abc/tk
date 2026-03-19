@@ -5,7 +5,7 @@
 
 #include <ranges>
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 void PipelineSystem::init() noexcept
 {
@@ -14,15 +14,16 @@ void PipelineSystem::init() noexcept
   using enum DescriptorInfo::Type;
   auto res = generate_root_signature(
   {
-    { constants,  "constants", 0, 0, sizeof(Constants) },
-    { bytebuffer, "buffer",    0, 0                    },
-    { texture,    "image",     0, 1                    },
-    { textures,   "images",    0, 2                    }
+    { constants,  "constants", 0, 0, false, sizeof(Constants) },
+    { bytebuffer, "buffer",    0, 0                           },
+    { texture,    "image",     0, 1                           },
+    { textures,   "images",    0, 2                           }
   }, true);
 
   _pipes.emplace(PipelineType::sdf, Pipeline{ "assets/shader/sdf.hlsl", "vs", "ps", "assets/shader", RenderResource::Render_Target_Format, true, false, res });
   _pipes.emplace(PipelineType::image, Pipeline{ "assets/shader/image.hlsl", "vs", "ps", "assets/shader", RenderResource::Render_Target_Format, true, false, res });
   // _mipmap_pipeline.init_compute("assets/shader/mipmap.hlsl", "main");
+  _pipes.emplace(PipelineType::blur, Pipeline("assets/shader/box_blur.hlsl", "main", {}, {}, { "src", "dst" }));
 }
 
 void PipelineSystem::render(RenderResource& res, RenderData& data) noexcept
@@ -124,17 +125,18 @@ auto PipelineSystem::find_root_param(std::span<CD3DX12_ROOT_PARAMETER1> params) 
 }
 
 void PipelineSystem::Pipeline::init_graphics(
-    std::string_view                   shader,
-    std::string_view                   vs,
-    std::string_view                   ps,
-    std::string_view                   include,
-    ImageFormat                        rtv_format,
-    bool                               use_blend,
-    bool                               use_depth_test,
-    std::optional<RootSignatureResult> res
+    std::string_view                       shader,
+    std::string_view                       vs,
+    std::string_view                       ps,
+    std::string_view                       include,
+    ImageFormat                            rtv_format,
+    bool                                   use_blend,
+    bool                                   use_depth_test,
+    std::optional<RootSignatureResult>     res,
+    std::unordered_set<std::string> const& volatile_descs
   ) noexcept
 {
-  auto compile_result = g_compiler.compile(shader, vs, ps, include, res);
+  auto compile_result = g_compiler.compile(shader, vs, ps, include, res, volatile_descs);
   
   if (auto res = g_pipe_sys.find_root_param(compile_result.root_params))
     root_signature = res;
@@ -146,7 +148,7 @@ void PipelineSystem::Pipeline::init_graphics(
   
   auto render_target_formats = D3D12_RT_FORMAT_ARRAY{};
   render_target_formats.NumRenderTargets = 1;
-  render_target_formats.RTFormats[0]     = dxgi_format(rtv_format);
+  render_target_formats.RTFormats[0]     = static_cast<DXGI_FORMAT>(rtv_format);
   
   stream.pRootSignature        = root_signature;
   stream.InputLayout           = compile_result.input_layout_desc;
@@ -188,9 +190,9 @@ void PipelineSystem::Pipeline::init_graphics(
           "failed to create pipeline state");
 }
 
-void PipelineSystem::Pipeline::init_compute(std::string_view shader, std::string_view cs, std::string_view include, std::optional<RootSignatureResult> res) noexcept
+void PipelineSystem::Pipeline::init_compute(std::string_view shader, std::string_view cs, std::string_view include, std::optional<RootSignatureResult> res, std::unordered_set<std::string> const& volatile_descs) noexcept
 {
-  auto compile_result = g_compiler.compile(shader, cs, include, res);
+  auto compile_result = g_compiler.compile(shader, cs, include, res, volatile_descs);
   if (auto res = g_pipe_sys.find_root_param(compile_result.root_params))
     root_signature = res;
   else
@@ -273,6 +275,11 @@ void PipelineSystem::Context::draw(uint32_t start_idx, uint32_t size) const noex
   _cmd->DrawIndexedInstanced(size, 1, start_idx, 0, 0);
 }
 
+void PipelineSystem::Context::dispatch(uint32_t width, uint32_t height) const noexcept
+{
+  _cmd->Dispatch(((width + 7) / 8), ((height + 7) / 8), 1);
+}
+
 void PipelineSystem::Context::set_graphics_descriptor(uint32_t root_param_idx, D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept
 {
   if (!_graphics_descriptors.contains(root_param_idx))
@@ -301,36 +308,4 @@ void PipelineSystem::Context::set_compute_descriptor(uint32_t root_param_idx, D3
   }
 }
 
-template <typename T>
-requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
-void PipelineSystem::Context::set_graphics_constants(uint32_t root_param_idx, T const& constants) noexcept
-{
-  auto size = sizeof(constants);
-  if (_graphics_constants_root_param_idx != root_param_idx ||
-      _graphics_constants.size()         != size           ||
-      memcmp(_graphics_constants.data(), &constants, size))
-  {
-    _graphics_constants_root_param_idx = root_param_idx;
-    _graphics_constants.resize(size);
-    memcpy(_graphics_constants.data(), &constants, size);
-    _cmd->SetGraphicsRoot32BitConstants(root_param_idx, _graphics_constants.size() / 4, _graphics_constants.data(), 0);
-  }
 }
-
-template <typename T>
-requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
-void PipelineSystem::Context::set_compute_constants(uint32_t root_param_idx, T const& constants)
-{
-  auto size = sizeof(constants);
-  if (_compute_constants_root_param_idx != root_param_idx ||
-      _compute_constants.size()         != size           ||
-      memcmp(_compute_constants.data(), &constants, size))
-  {
-    _compute_constants_root_param_idx = root_param_idx;
-    _compute_constants.resize(size);
-    memcpy(_compute_constants.data(), &constants, size);
-    _cmd->SetComputeRoot32BitConstants(root_param_idx, _compute_constants.size() / 4, _compute_constants.data(), 0);
-  }
-}
-
-}}

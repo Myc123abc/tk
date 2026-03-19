@@ -6,7 +6,7 @@
 #include <assert.h>
 #include <string>
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 class Monitor
 {
@@ -86,4 +86,4 @@ inline auto get_virtual_workarea_rect() noexcept
   return rect;
 }
 
-}}
+}

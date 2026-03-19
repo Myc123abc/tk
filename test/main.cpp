@@ -200,7 +200,7 @@ int main()
         auto ext = wnd_ext - p2;
         auto scale = std::max(img_ext.x / ext.x, img_ext.y / ext.y);
         img_ext /= scale;
-        ui::image("assets/image/test.png", p2, p2 + img_ext);
+        // ui::image("assets/image/test.png", p2, p2 + img_ext);
       }
       loop_trigger.update();
       ui::image("assets/image/test.jpg", {}, wnd_ext, 0x44);

@@ -140,7 +140,7 @@ auto create_root_signature(std::span<CD3DX12_ROOT_PARAMETER1> root_params, bool 
 
 }
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 void Compiler::init() noexcept
 {
@@ -175,7 +175,7 @@ auto generate_root_signature(std::vector<DescriptorInfo> const& desc_infos, bool
 
     case bytebuffer:
     {
-      range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, info.bind_point, info.space, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+      range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, info.bind_point, info.space, info.is_volatile ? D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE : D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
       ranges.emplace(range);
       root_param.InitAsDescriptorTable(1, &ranges.back(), D3D12_SHADER_VISIBILITY_ALL);
     }
@@ -184,7 +184,7 @@ auto generate_root_signature(std::vector<DescriptorInfo> const& desc_infos, bool
     case texture:
     {
       use_sampler = true;
-      range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, info.bind_point, info.space, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+      range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, info.bind_point, info.space, info.is_volatile ? D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE : D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
       ranges.emplace(range);
       root_param.InitAsDescriptorTable(1, &ranges.back(), D3D12_SHADER_VISIBILITY_PIXEL);
     }
@@ -254,7 +254,13 @@ auto Compiler::compile(std::string_view shader_path, std::string_view include, s
   return { result, cso };
 }
 
-auto Compiler::compile(std::string_view shader, std::string_view vertex_shader_entry_point, std::string_view pixel_shader_entry_point, std::string_view include, std::optional<RootSignatureResult> res) noexcept -> CompileResult
+auto Compiler::compile(
+  std::string_view                       shader,
+  std::string_view                       vertex_shader_entry_point,
+  std::string_view                       pixel_shader_entry_point,
+  std::string_view                       include,
+  std::optional<RootSignatureResult>     res,
+  std::unordered_set<std::string> const& volatile_descs) noexcept -> CompileResult
 {
   // compile shaders
   auto [vs_res, vs_cso] = compile(shader, include, L"vs_6_0", vertex_shader_entry_point);
@@ -273,9 +279,9 @@ auto Compiler::compile(std::string_view shader, std::string_view vertex_shader_e
 
   if (!res)
   {
-    compile_result.get_root_parameters(vs_reflection.Get(), false);
+    compile_result.get_root_parameters(vs_reflection.Get(), false, volatile_descs);
     auto ps_reflection = compile_result.get_shader_reflection(ps_res.Get());
-    compile_result.get_root_parameters(ps_reflection.Get(), false);
+    compile_result.get_root_parameters(ps_reflection.Get(), false, volatile_descs);
     compile_result.root_signature = create_root_signature(compile_result.root_params, compile_result._has_sampler, true);
   }
   else
@@ -288,7 +294,12 @@ auto Compiler::compile(std::string_view shader, std::string_view vertex_shader_e
   return compile_result;
 }
 
-auto Compiler::compile(std::string_view shader, std::string_view compute_shader_entry_point, std::string_view include, std::optional<RootSignatureResult> res) noexcept -> CompileResult
+auto Compiler::compile(
+  std::string_view                       shader,
+  std::string_view                       compute_shader_entry_point,
+  std::string_view                       include,
+  std::optional<RootSignatureResult>     res,
+  std::unordered_set<std::string> const& volatile_descs) noexcept -> CompileResult
 {
   auto [comp_res, cso] = compile(shader, include, L"cs_6_0", compute_shader_entry_point);
 
@@ -299,7 +310,7 @@ auto Compiler::compile(std::string_view shader, std::string_view compute_shader_
   if (!res)
   {
     auto reflection = compile_result.get_shader_reflection(comp_res.Get());
-    compile_result.get_root_parameters(reflection.Get(), true);
+    compile_result.get_root_parameters(reflection.Get(), true, volatile_descs);
     compile_result.root_signature = create_root_signature(compile_result.root_params, false, false);
   }
   else
@@ -356,7 +367,7 @@ void Compiler::CompileResult::get_vertex_input_layout(ID3D12ShaderReflection* sh
   input_layout_desc = D3D12_INPUT_LAYOUT_DESC{ _input_element_descs.data(), static_cast<uint32_t>(_input_element_descs.size()) };
 }
 
-void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader_reflection, bool is_compute_shader) noexcept
+void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader_reflection, bool is_compute_shader, std::unordered_set<std::string> const& volatile_descs) noexcept
 {
   auto desc = D3D12_SHADER_DESC{};
   shader_reflection->GetDesc(&desc);
@@ -405,9 +416,11 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
       // For arrays, reflection reports BindCount > 1. For unbounded arrays, BindCount is commonly 0.
       // D3D12 root signature supports unbounded descriptor ranges via NumDescriptors = UINT_MAX.
       auto const num_descriptors = resource_desc.BindCount ? resource_desc.BindCount : UINT_MAX;
-      auto const range_flags = (num_descriptors == 1)
+      auto range_flags = (num_descriptors == 1)
         ? D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC
         : (D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+      if (volatile_descs.contains(resource_desc.Name))
+        range_flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
 
       range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, num_descriptors, resource_desc.BindPoint, resource_desc.Space, range_flags);
       _ranges.emplace(range);
@@ -423,9 +436,11 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
       root_param_indices[resource_desc.Name] = root_params.size();
 
       auto const num_descriptors = resource_desc.BindCount ? resource_desc.BindCount : UINT_MAX;
-      auto const range_flags = (num_descriptors == 1)
+      auto range_flags = (num_descriptors == 1)
         ? D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC
         : (D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+      if (volatile_descs.contains(resource_desc.Name))
+        range_flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
 
       range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, num_descriptors, resource_desc.BindPoint, resource_desc.Space, range_flags);
       _ranges.emplace(range);
@@ -440,9 +455,11 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
       root_param_indices[resource_desc.Name] = root_params.size();
 
       auto const num_descriptors = resource_desc.BindCount ? resource_desc.BindCount : UINT_MAX;
-      auto const range_flags = (num_descriptors == 1)
+      auto range_flags = (num_descriptors == 1)
         ? D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC
         : (D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+      if (volatile_descs.contains(resource_desc.Name))
+        range_flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
 
       range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, num_descriptors, resource_desc.BindPoint, resource_desc.Space, range_flags);
       _ranges.emplace(range);
@@ -458,4 +475,4 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
   }
 }
 
-}}
+}

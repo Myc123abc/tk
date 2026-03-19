@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-namespace tk { namespace ui {
+namespace tk::ui {
 
 void UIContext::MessageHandler::operator()(Message_Window_Close const& msg) const noexcept
 {
@@ -155,4 +155,4 @@ void UIContext::MessageHandler::operator()(Message_Window_Cancel_Fullscreen_Maxi
   ctx.get_window(msg.handle).set_fullscreen = false;
 }
 
-}}
+}

@@ -4,7 +4,7 @@
 
 #include <algorithm>
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Upload Buffer
@@ -94,4 +94,4 @@ auto CopyEngine::submit_slot() noexcept -> uint64_t
   return _slot->fence_value;
 }
 
-}}
+}

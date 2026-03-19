@@ -4,7 +4,7 @@
 
 #include <bit>
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 struct alignas(8) Vertex
 {
@@ -90,4 +90,4 @@ private:
   std::vector<uint32_t> _data{};
 };
 
-}}
+}

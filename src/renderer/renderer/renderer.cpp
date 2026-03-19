@@ -11,7 +11,7 @@
 
 #include <ranges>
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 void Renderer::init() noexcept
 {
@@ -92,6 +92,17 @@ void Renderer::message_process() noexcept
 void Renderer::preprocess_render() noexcept
 {
   upload_images();
+  g_comp_engine.update();
+
+  static bool only_once = true;
+  if (only_once && hh.valid())
+  {
+    only_once = false;
+    auto& src = _images.at(hh);
+    static Image test_img;
+    test_img.init(src.width(), src.height(), ImageFormat::bgra8_unorm, ImageType::srv | ImageType::uav);
+    g_comp_engine.blur(src, test_img, 55);
+  }
 }
 
 void Renderer::upload_images() noexcept
@@ -120,7 +131,7 @@ void Renderer::upload_images() noexcept
 
     // move upload images to images
     for (auto& [idx, img] : _upload_images)
-      _images[idx] = img;
+      _images[idx] = std::move(img);
 
     // free bitmaps
     for (auto const& bitmap : _bitmaps | std::views::values) stbi_image_free(bitmap.data);
@@ -234,4 +245,4 @@ void Renderer::generate_mipmap() noexcept
 #endif
 }
 
-}}
+}

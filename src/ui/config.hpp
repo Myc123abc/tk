@@ -1,6 +1,6 @@
 #pragma once
 
-namespace tk { namespace ui {
+namespace tk::ui {
 
 constexpr auto UI_Message_Queue_Capacity = 32;
 
@@ -16,4 +16,4 @@ constexpr auto Image_Pool_Init_Capacity = 32;
 constexpr auto Glyph_Atlas_Width  = 1024;
 constexpr auto Glyph_Atlas_Height = 1024;
 
-}}
+}

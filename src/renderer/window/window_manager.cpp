@@ -59,7 +59,7 @@ void set_cursor(HWND handle, ResizeType type) noexcept
 
 }
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 void WindowManager::init() noexcept
 {
@@ -605,4 +605,4 @@ auto WindowManager::get_cursor_on_window() const noexcept -> HWND
   return {};
 }
 
-}}
+}

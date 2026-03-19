@@ -10,7 +10,7 @@
 #include <vector>
 #include <queue>
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 struct DrawData
 {
@@ -99,4 +99,4 @@ private:
   std::queue<ScissorInfo> _scissor_infos;
 };
 
-}}
+}

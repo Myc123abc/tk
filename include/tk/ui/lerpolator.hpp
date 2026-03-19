@@ -4,7 +4,7 @@
 
 #include <algorithm>
 
-namespace tk { namespace ui {
+namespace tk::ui {
 
 class Lerpolator
 {
@@ -126,4 +126,4 @@ private:
   bool     _b{};
 };
 
-}}
+}

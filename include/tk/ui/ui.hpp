@@ -1,5 +1,7 @@
 #pragma once
 
+#include "util/flag.hpp"
+
 #include <windows.h>
 
 #include <string_view>
@@ -7,7 +9,7 @@
 
 #include <glm/glm.hpp>
 
-namespace tk { namespace ui {
+namespace tk::ui {
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                                Misc
@@ -372,20 +374,13 @@ enum class Key
 #undef X
 };
 
-enum class KeyState
-{
+Flag(KeyState,
   idle      = 0b0000,
   down      = 0b0001,
   down_idle = 0b0011,
   press     = 0b0101,
   up        = 0b1000,
-};
-
-constexpr auto operator&(KeyState lhs, KeyState rhs) noexcept
-{
-  using T = std::underlying_type_t<KeyState>;
-  return static_cast<T>(lhs) & static_cast<T>(rhs);
-}
+)
 
 struct GetKeyResult
 {
@@ -397,7 +392,7 @@ struct GetKeyResult
            state == KeyState::press;
   }
 
-  auto has_down() const noexcept { return state & KeyState::down; }
+  auto has_down() const noexcept { return has_flag(state, KeyState::down); }
 
   auto is_uppercase() const noexcept -> bool;
   auto is_lowercase() const noexcept -> bool { return !is_uppercase(); }
@@ -410,4 +405,4 @@ struct GetKeyResult
  */
 auto get_key(Key key) noexcept -> GetKeyResult;
 
-}}
+}

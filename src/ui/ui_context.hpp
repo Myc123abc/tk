@@ -17,7 +17,7 @@
 #include <optional>
 #include <unordered_set>
 
-namespace tk { namespace ui {
+namespace tk::ui {
 
 auto is_hover_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool;
 auto is_caps_locked() noexcept -> bool;
@@ -74,6 +74,8 @@ struct Window
 
   bool set_fullscreen{};
 };
+
+#define KEY_ENTRY_INIT(name, _) { Key::name, {} },
 
 Singleton(UIContext, g_ui_ctx,
 public:
@@ -196,7 +198,6 @@ private:
     KeyState state{};
     double   dur{};
   };
-#define KEY_ENTRY_INIT(name, _) { Key::name, {} },
   std::unordered_map<Key, KeyContext> _keys
   {
     KEY_LIST(KEY_ENTRY_INIT)
@@ -378,4 +379,4 @@ private:
   MessageQueue<Message, UI_Message_Queue_Capacity> _msg_queue;
 )
 
-}}
+}

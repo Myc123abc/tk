@@ -5,7 +5,7 @@
 #include <d3d12.h>
 #include <wrl/client.h>
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 class Buffer
 {
@@ -66,4 +66,4 @@ private:
   Buffer _shape_properties_buffer;
 };
 
-}}
+}

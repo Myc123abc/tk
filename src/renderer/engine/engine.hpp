@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <optional>
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 class Engine
 {
@@ -48,4 +48,4 @@ private:
   HANDLE                                             _fence_event{};
 };
 
-}}
+}

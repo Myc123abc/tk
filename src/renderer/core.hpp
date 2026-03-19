@@ -7,7 +7,7 @@
 #include <dxgi1_6.h>
 #include <dcomp.h>
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 Singleton(Core, g_core,
 public:
@@ -26,4 +26,4 @@ private:
   Microsoft::WRL::ComPtr<IDCompositionDevice> _comp_device;
 )
 
-}}
+}

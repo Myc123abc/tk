@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace tk { namespace ui {
+namespace tk::ui {
 
 Singleton(ImageManager, g_img_mgr,
 public:
@@ -59,4 +59,4 @@ private:
 
 using ImageHandle = ImageManager::ImageHandle;
 
-}}
+}
