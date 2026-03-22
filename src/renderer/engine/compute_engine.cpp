@@ -1,74 +1,52 @@
 #include "compute_engine.hpp"
-#include "../core.hpp"
 #include "../resource/descriptor_heap_manager.hpp"
 #include "../renderer/pipeline/pipeline_system.hpp"
+#include "../resource/shader_type.hpp"
+#include "graphics_engine.hpp"
 
 #include <assert.h>
+#include <ranges>
+
+using namespace tk::renderer;
 
 namespace {
 
-auto boxes_for_gauss(double sigma, uint32_t n) noexcept
+auto get_gauss_weights(float sigma) noexcept
 {
-  auto w_ideal = std::sqrt((12*sigma*sigma / n) + 1);
-  auto wl = static_cast<uint32_t>(std::floor(w_ideal));
-  if (wl % 2 == 0) --wl;
-  auto wu = wl + 2;
+  sigma = fmin(sigma, Max_Blur_Widget_Num / 2.f);
 
-  auto m_ideal = (12*sigma*sigma - n*wl*wl - 4*n*wl - 3*n) / (-4*wl - 4);
-  auto m = std::round(m_ideal);
+  float twoSigma2 = 2.0f*sigma*sigma;
 
-  auto sizes = std::vector<uint32_t>(n);
-  for (auto i = 0; i < n; ++i)
-    sizes[i] = i < m ? wl : wu;
-  return sizes;
+  // Estimate the blur radius based on sigma since sigma controls the "width" of the bell curve.
+  // For example, for sigma = 3, the width of the bell curve is 
+  int blurRadius = (int)ceil(2.0f * sigma);
+
+  std::vector<float> weights;
+  weights.resize(2 * blurRadius + 1);
+
+  float weightSum = 0.0f;
+
+  for(int i = -blurRadius; i <= blurRadius; ++i)
+  {
+    float x = (float)i;
+
+    weights[i + blurRadius] = expf(-x*x / twoSigma2);
+
+    weightSum += weights[i + blurRadius];
+  }
+
+  // Divide by the sum so all the weights add up to 1.0.
+  for(int i = 0; i < weights.size(); ++i)
+  {
+    weights[i] /= weightSum;
+  }
+
+  return weights;
 }
 
 }
 
 namespace tk::renderer {
-
-auto ComputeEngine::Slot::is_idle() const noexcept -> bool
-{
-  return g_comp_engine.fence_completed_value() >= fence_value;
-}
-
-ComputeEngine::Slot::Slot() noexcept
-{
-  cmd_alloc = g_core.create_cmd_alloc(D3D12_COMMAND_LIST_TYPE_COMPUTE);
-}
-
-void ComputeEngine::acquire_slot() noexcept
-{
-  if (auto it = std::ranges::find_if(_slots, [this](auto slot) { return slot.is_idle(); });
-      it != _slots.end())
-  {
-    _slot = &*it;
-  }
-  else
-  {
-    _slots.emplace_back(Slot{});
-    _slot = &_slots.back();
-  }
-  reset_cmd(_slot->cmd_alloc.Get());
-
-  // bind heaps
-  g_desc_heap_mgr.bind_heaps(cmd());
-}
-
-auto ComputeEngine::submit_slot() noexcept -> uint64_t
-{
-  assert(_slot && _slot->is_idle());
-  _slot->fence_value = submit(); 
-  return _slot->fence_value;
-}
-
-struct Constants
-{
-  uint32_t width{};
-  uint32_t height{};
-  uint32_t radius{};
-  uint32_t horizontal{};
-};
 
 auto ComputeEngine::get_tmp_img() noexcept -> std::pair<Image*, uint32_t>
 {
@@ -91,81 +69,58 @@ auto ComputeEngine::get_tmp_img() noexcept -> std::pair<Image*, uint32_t>
   return { tmp_img, idx };
 }
 
-void ComputeEngine::blur(Image& src, Image& dst, float radius) noexcept
+void ComputeEngine::blur(Image& src, Image& dst, float sigma, uint32_t blur_count) noexcept
 {
-  acquire_slot();
+  // copy image
+  g_graphics_engine.acquire_slot();
+  g_graphics_engine.copy(src, dst);
+  g_graphics_engine.submit_slot();
+
+  // calculate widgets and blur radius
+  auto widgets   = get_gauss_weights(sigma);
+  auto constants = BlurConstants{};
+  constants.blur_radius = widgets.size() / 2;
+  memcpy(&constants.widgets, widgets.data(), widgets.size() * sizeof(float));
+
+  _slots.acquire_slot();
+  g_desc_heap_mgr.bind_heaps(cmd());
 
   auto width  = src.width();
   auto height = src.height();
 
+  // get tmp image
   auto [tmp_img, idx] = get_tmp_img();
   if (!tmp_img->width())
-    tmp_img->init(width, height, RenderResource::Render_Target_Format, ImageType::srv | ImageType::uav);
+    tmp_img->init(width, height, src.format(), ImageType::srv | ImageType::uav);
   else
     tmp_img->resize(width, height);
 
-  auto pipe = g_pipe_sys.pipe(PipelineType::blur);
-  auto ctx  = g_pipe_sys.ctx();
+  auto ctx             = g_pipe_sys.ctx();
+  auto horizontal_pipe = g_pipe_sys.pipe(PipelineType::blur_horizontal_pass);
+  auto vertical_pipe   = g_pipe_sys.pipe(PipelineType::blur_vertical_pass);
 
   ctx->set_cmd(cmd());
-  ctx->set_pipe(pipe->pipe_state.Get());
-  ctx->set_compute_root_signature(pipe->root_signature);
+  ctx->set_compute_root_signature(horizontal_pipe->root_signature);
+  ctx->set_compute_constants(horizontal_pipe->root_param_idx("constants"), constants);
 
-  auto bxs = boxes_for_gauss(radius, 3);
+  for (auto i : std::views::iota(0u, blur_count))
+  {
+    ctx->set_pipe(horizontal_pipe->pipe_state.Get());
+    dst.set_state(cmd(), ImageState::non_pixel);
+    ctx->set_compute_descriptor(horizontal_pipe->root_param_idx("src"), dst.srv().gpu_handle());
+    tmp_img->set_state(cmd(), ImageState::compute_rw);
+    ctx->set_compute_descriptor(horizontal_pipe->root_param_idx("dst"), tmp_img->uav().gpu_handle());
+    ctx->dispatch(ceil(width / 128.f), height, 1);
 
-  auto constants = Constants{ width, height };
+    ctx->set_pipe(vertical_pipe->pipe_state.Get());
+    tmp_img->set_state(cmd(), ImageState::non_pixel);
+    ctx->set_compute_descriptor(vertical_pipe->root_param_idx("src"), tmp_img->srv().gpu_handle());
+    dst.set_state(cmd(), ImageState::compute_rw);
+    ctx->set_compute_descriptor(vertical_pipe->root_param_idx("dst"), dst.uav().gpu_handle());
+    ctx->dispatch(width, ceil(height / 128.f), 1);
+  }
 
-  constants.radius     = static_cast<uint32_t>((bxs[0] - 1) / 2);
-  constants.horizontal = 1;
-  ctx->set_compute_constants(pipe->root_param_idx("constants"), constants);
-  ctx->set_compute_descriptor(pipe->root_param_idx("src"), src.srv().gpu_handle());
-  tmp_img->set_state(cmd(), ImageState::unorder_access);
-  ctx->set_compute_descriptor(pipe->root_param_idx("dst"), tmp_img->uav().gpu_handle());
-  ctx->dispatch(width, height);
-
-  constants.horizontal = 0;
-  ctx->set_compute_constants(pipe->root_param_idx("constants"), constants);
-  tmp_img->set_state(cmd(), ImageState::common);
-  ctx->set_compute_descriptor(pipe->root_param_idx("src"), tmp_img->srv().gpu_handle());
-  dst.set_state(cmd(), ImageState::unorder_access);
-  ctx->set_compute_descriptor(pipe->root_param_idx("dst"), dst.uav().gpu_handle());
-  ctx->dispatch(width, height);
-
-  constants.radius     = static_cast<uint32_t>((bxs[1] - 1) / 2);
-  constants.horizontal = 1;
-  ctx->set_compute_constants(pipe->root_param_idx("constants"), constants);
-  dst.set_state(cmd(), ImageState::common);
-  ctx->set_compute_descriptor(pipe->root_param_idx("src"), dst.srv().gpu_handle());
-  tmp_img->set_state(cmd(), ImageState::unorder_access);
-  ctx->set_compute_descriptor(pipe->root_param_idx("dst"), tmp_img->uav().gpu_handle());
-  ctx->dispatch(width, height);
-
-  constants.horizontal = 0;
-  ctx->set_compute_constants(pipe->root_param_idx("constants"), constants);
-  tmp_img->set_state(cmd(), ImageState::common);
-  ctx->set_compute_descriptor(pipe->root_param_idx("src"), tmp_img->srv().gpu_handle());
-  dst.set_state(cmd(), ImageState::unorder_access);
-  ctx->set_compute_descriptor(pipe->root_param_idx("dst"), dst.uav().gpu_handle());
-  ctx->dispatch(width, height);
-
-  constants.radius     = static_cast<uint32_t>((bxs[2] - 1) / 2);
-  constants.horizontal = 1;
-  ctx->set_compute_constants(pipe->root_param_idx("constants"), constants);
-  dst.set_state(cmd(), ImageState::common);
-  ctx->set_compute_descriptor(pipe->root_param_idx("src"), dst.srv().gpu_handle());
-  tmp_img->set_state(cmd(), ImageState::unorder_access);
-  ctx->set_compute_descriptor(pipe->root_param_idx("dst"), tmp_img->uav().gpu_handle());
-  ctx->dispatch(width, height);
-
-  constants.horizontal = 0;
-  ctx->set_compute_constants(pipe->root_param_idx("constants"), constants);
-  tmp_img->set_state(cmd(), ImageState::common);
-  ctx->set_compute_descriptor(pipe->root_param_idx("src"), tmp_img->srv().gpu_handle());
-  dst.set_state(cmd(), ImageState::unorder_access);
-  ctx->set_compute_descriptor(pipe->root_param_idx("dst"), dst.uav().gpu_handle());
-  ctx->dispatch(width, height);
-
-  _used_blur_tmp_images.emplace_back(idx, submit_slot());
+  _used_blur_tmp_images.emplace_back(idx, _slots.submit_slot());
 }
 
 void ComputeEngine::update() noexcept

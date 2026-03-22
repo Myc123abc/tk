@@ -1,7 +1,6 @@
 #pragma once
 
-#include "engine.hpp"
-#include "../../util/singleton.hpp"
+#include "slots.hpp"
 #include "../resource/image.hpp"
 
 #include <deque>
@@ -11,14 +10,13 @@ namespace tk::renderer {
 
 Singleton_Derive(ComputeEngine, g_comp_engine, Engine,
 public:
-  void init() noexcept { Engine::init(D3D12_COMMAND_LIST_TYPE_COMPUTE); }
+  void init() noexcept
+  {
+    Engine::init(D3D12_COMMAND_LIST_TYPE_COMPUTE);
+    _slots.init(this);
+  }
 
-  void acquire_slot() noexcept;
-
-  [[nodiscard]]
-  auto submit_slot() noexcept -> uint64_t;
-
-  void blur(Image& src, Image& dst, float radius) noexcept;
+  void blur(Image& src, Image& dst, float sigma, uint32_t blur_count) noexcept;
 
   void update() noexcept;
 
@@ -26,18 +24,7 @@ private:
   auto get_tmp_img() noexcept -> std::pair<Image*, uint32_t>;
 
 private:
-  struct Slot
-  {
-    Microsoft::WRL::ComPtr<ID3D12CommandAllocator> cmd_alloc;
-    uint64_t                                       fence_value{};  
-
-    auto is_idle() const noexcept -> bool;
-
-    Slot() noexcept;
-  };
-
-  std::vector<Slot> _slots;
-  Slot*             _slot{};
+  Slots<D3D12_COMMAND_LIST_TYPE_COMPUTE> _slots;
 
   struct BlurTmpImage
   {

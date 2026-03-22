@@ -18,12 +18,19 @@ void PipelineSystem::init() noexcept
     { bytebuffer, "buffer",    0, 0                           },
     { texture,    "image",     0, 1                           },
     { textures,   "images",    0, 2                           }
-  }, true);
+  }, true, true);
 
   _pipes.emplace(PipelineType::sdf, Pipeline{ "assets/shader/sdf.hlsl", "vs", "ps", "assets/shader", RenderResource::Render_Target_Format, true, false, res });
   _pipes.emplace(PipelineType::image, Pipeline{ "assets/shader/image.hlsl", "vs", "ps", "assets/shader", RenderResource::Render_Target_Format, true, false, res });
-  // _mipmap_pipeline.init_compute("assets/shader/mipmap.hlsl", "main");
-  _pipes.emplace(PipelineType::blur, Pipeline("assets/shader/box_blur.hlsl", "main", {}, {}, { "src", "dst" }));
+
+  res = generate_root_signature(
+  {
+    { constants, "constants", 0, 0, false, sizeof(BlurConstants) },
+    { texture,   "src",       0, 0, true                         },
+    { rwtexture, "dst",       0, 0, true                         },
+  });
+  _pipes.emplace(PipelineType::blur_horizontal_pass, Pipeline{ "assets/shader/blur.hlsl", "horizontal_pass", {}, res, {} });
+  _pipes.emplace(PipelineType::blur_vertical_pass,   Pipeline{ "assets/shader/blur.hlsl", "vertical_pass",   {}, res, {} });
 }
 
 void PipelineSystem::render(RenderResource& res, RenderData& data) noexcept
@@ -92,7 +99,8 @@ label_draw_call_again:
       _ctx.set_pipe(pipe.pipe_state.Get());
       _ctx.set_graphics_root_signature(pipe.root_signature);
       _ctx.set_primitive_topology(pipe.primive_topology);
-      _ctx.set_graphics_descriptor(pipe.root_param_idx("image"), draw_data.image_descriptor_gpu_handle);
+      draw_data.image->set_state(cmd, ImageState::pixel);
+      _ctx.set_graphics_descriptor(pipe.root_param_idx("image"), draw_data.image->srv().gpu_handle());
       _ctx.set_graphics_constants(pipe.root_param_idx("constants"), Constants
       {
         .window_extent = frame.image.extent(),
@@ -270,14 +278,30 @@ void PipelineSystem::Context::set_scissor_rect(RECT rect) noexcept
   }
 }
 
+void PipelineSystem::Context::set_render_target(Image& img) const noexcept
+{
+  img.set_state(_cmd, ImageState::render_target);
+
+  auto handle = img.rtv().cpu_handle();
+  _cmd->OMSetRenderTargets(1, &handle, false, nullptr);
+
+  auto viewport = CD3DX12_VIEWPORT{ 0.f, 0.f, static_cast<float>(img.width()), static_cast<float>(img.height()) };
+  _cmd->RSSetViewports(1, &viewport);
+}
+
+void PipelineSystem::Context::draw(uint32_t count) const noexcept
+{
+  _cmd->DrawInstanced(3, count, 0, 0);
+}
+
 void PipelineSystem::Context::draw(uint32_t start_idx, uint32_t size) const noexcept
 {
   _cmd->DrawIndexedInstanced(size, 1, start_idx, 0, 0);
 }
 
-void PipelineSystem::Context::dispatch(uint32_t width, uint32_t height) const noexcept
+void PipelineSystem::Context::dispatch(uint32_t x, uint32_t y, uint32_t z) const noexcept
 {
-  _cmd->Dispatch(((width + 7) / 8), ((height + 7) / 8), 1);
+  _cmd->Dispatch(x, y, z);
 }
 
 void PipelineSystem::Context::set_graphics_descriptor(uint32_t root_param_idx, D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept

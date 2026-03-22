@@ -33,13 +33,15 @@ enum class ImageFormat
 
 enum class ImageState
 {
-  copy_src              = D3D12_RESOURCE_STATE_COPY_SOURCE,
-  copy_dst              = D3D12_RESOURCE_STATE_COPY_DEST,
-  present               = D3D12_RESOURCE_STATE_PRESENT,
-  unorder_access        = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-  common                = D3D12_RESOURCE_STATE_COMMON,
-  render_target         = D3D12_RESOURCE_STATE_RENDER_TARGET,
-  pixel_shader_resource = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+  copy_src      = D3D12_RESOURCE_STATE_COPY_SOURCE,
+  copy_dst      = D3D12_RESOURCE_STATE_COPY_DEST,
+  present       = D3D12_RESOURCE_STATE_PRESENT,
+  compute_rw    = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+  common        = D3D12_RESOURCE_STATE_COMMON,
+  render_target = D3D12_RESOURCE_STATE_RENDER_TARGET,
+  pixel         = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+  non_pixel     = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+  read          = D3D12_RESOURCE_STATE_GENERIC_READ,
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -97,7 +99,7 @@ public:
   void clear_render_target(ID3D12GraphicsCommandList1* cmd) noexcept;
 
   auto handle() const noexcept { return _handle.Get();                            }
-  auto format() const noexcept { return _format;                                  }
+  auto format() const noexcept { return static_cast<ImageFormat>(_format);        }
   auto width()  const noexcept { return _width;                                   }
   auto height() const noexcept { return _height;                                  }
   auto extent() const noexcept { return glm::vec<2, uint32_t>{ _width, _height }; }
@@ -152,7 +154,7 @@ void copy(
   uint32_t                    x = 0,
   uint32_t                    y = 0) noexcept;
 
-inline void copy(ID3D12GraphicsCommandList1* cmd, Image&  src, Image&  dst) noexcept
+inline void copy(ID3D12GraphicsCommandList1* cmd, Image& src, Image& dst) noexcept
 {
   copy(cmd, src, 0, 0, src.width(), src.height(), dst);
 }

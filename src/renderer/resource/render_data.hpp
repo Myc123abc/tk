@@ -14,11 +14,11 @@ namespace tk::renderer {
 
 struct DrawData
 {
-  uint32_t                    indices_size{};
-  uint32_t                    indices_start{};
-  float                       image_alpha{};
-  D3D12_GPU_DESCRIPTOR_HANDLE image_descriptor_gpu_handle{};
-  PipelineType                pipe_type{};
+  uint32_t     indices_size{};
+  uint32_t     indices_start{};
+  float        image_alpha{};
+  Image*       image{};
+  PipelineType pipe_type{};
 };
 
 struct RenderData
@@ -65,12 +65,12 @@ struct RenderData
     }
   }
 
-  void set_image_info(D3D12_GPU_DESCRIPTOR_HANDLE handle, float alpha) noexcept
+  void set_image_info(Image* image, float alpha) noexcept
   {
     auto& data = draw_datas.back();
-    data.pipe_type                   = PipelineType::image;
-    data.image_descriptor_gpu_handle = handle;
-    data.image_alpha                 = alpha;
+    data.pipe_type   = PipelineType::image;
+    data.image       = image;
+    data.image_alpha = alpha;
   }
 
   void push_scissor_rect(RECT rect) noexcept

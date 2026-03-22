@@ -90,4 +90,12 @@ private:
   std::vector<uint32_t> _data{};
 };
 
+constexpr auto Max_Blur_Widget_Num = 5;
+struct alignas(16) BlurConstants
+{
+  uint32_t  blur_radius{};
+  glm::vec3 padding{};
+  float     widgets[Max_Blur_Widget_Num * 2 + 1]{};
+};
+
 }

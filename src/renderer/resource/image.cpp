@@ -319,7 +319,7 @@ void copy(
   footprint.Footprint.Height   = bottom - top;
   footprint.Footprint.Depth    = 1;
   footprint.Footprint.RowPitch = align(src.per_pixel_size() * footprint.Footprint.Width, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
-  footprint.Footprint.Format   = src.format();
+  footprint.Footprint.Format   = static_cast<DXGI_FORMAT>(src.format());
   auto dst_loc = CD3DX12_TEXTURE_COPY_LOCATION{ readback_buffer, footprint };
 
   cmd->CopyTextureRegion(&dst_loc, 0, 0, 0, &src_loc, &region_box);

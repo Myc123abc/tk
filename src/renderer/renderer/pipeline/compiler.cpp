@@ -152,13 +152,12 @@ void Compiler::init() noexcept
           "failed to create default include handler in dxc");
 }
 
-auto generate_root_signature(std::vector<DescriptorInfo> const& desc_infos, bool is_graphics) noexcept -> RootSignatureResult
+auto generate_root_signature(std::vector<DescriptorInfo> const& desc_infos, bool is_graphics, bool use_sampler) noexcept -> RootSignatureResult
 {
-  auto res         = RootSignatureResult{};
-  auto root_param  = CD3DX12_ROOT_PARAMETER1{};
-  auto ranges      = std::queue<CD3DX12_DESCRIPTOR_RANGE1>{};
-  auto range       = CD3DX12_DESCRIPTOR_RANGE1{};
-  auto use_sampler = false;
+  auto res        = RootSignatureResult{};
+  auto root_param = CD3DX12_ROOT_PARAMETER1{};
+  auto ranges     = std::queue<CD3DX12_DESCRIPTOR_RANGE1>{};
+  auto range      = CD3DX12_DESCRIPTOR_RANGE1{};
 
   for (auto const& info : desc_infos)
   {
@@ -183,19 +182,27 @@ auto generate_root_signature(std::vector<DescriptorInfo> const& desc_infos, bool
 
     case texture:
     {
-      use_sampler = true;
       range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, info.bind_point, info.space, info.is_volatile ? D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE : D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
       ranges.emplace(range);
-      root_param.InitAsDescriptorTable(1, &ranges.back(), D3D12_SHADER_VISIBILITY_PIXEL);
+      auto const visibility = is_graphics ? D3D12_SHADER_VISIBILITY_PIXEL : D3D12_SHADER_VISIBILITY_ALL;
+      root_param.InitAsDescriptorTable(1, &ranges.back(), visibility);
+    }
+    break;
+
+    case rwtexture:
+    {
+      range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, info.bind_point, info.space, info.is_volatile ? D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE : D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+      ranges.emplace(range);
+      root_param.InitAsDescriptorTable(1, &ranges.back(), D3D12_SHADER_VISIBILITY_ALL);
     }
     break;
 
     case textures:
     {
-      use_sampler = true;
       range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, info.bind_point, info.space, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
       ranges.emplace(range);
-      root_param.InitAsDescriptorTable(1, &ranges.back(), D3D12_SHADER_VISIBILITY_PIXEL);
+      auto const visibility = is_graphics ? D3D12_SHADER_VISIBILITY_PIXEL : D3D12_SHADER_VISIBILITY_ALL;
+      root_param.InitAsDescriptorTable(1, &ranges.back(), visibility);
     }
     break;
 

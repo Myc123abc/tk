@@ -23,6 +23,7 @@ struct DescriptorInfo
     constants,
     bytebuffer,
     texture,
+    rwtexture,
     textures
   };
 
@@ -41,7 +42,7 @@ struct RootSignatureResult
   std::vector<CD3DX12_ROOT_PARAMETER1>        root_params;
 };
 
-auto generate_root_signature(std::vector<DescriptorInfo> const& desc_infos, bool is_graphics) noexcept -> RootSignatureResult;
+auto generate_root_signature(std::vector<DescriptorInfo> const& desc_infos, bool is_graphics = false, bool use_sampler = false) noexcept -> RootSignatureResult;
 
 Singleton(Compiler, g_compiler,
 public:

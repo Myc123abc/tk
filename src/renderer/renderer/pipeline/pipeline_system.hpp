@@ -13,7 +13,8 @@ enum class PipelineType
   sdf,
   image,
   // TODO: split text render from sdf
-  blur,
+  blur_horizontal_pass,
+  blur_vertical_pass,
 };
 
 Singleton(PipelineSystem, g_pipe_sys,
@@ -96,8 +97,10 @@ private:
     void set_compute_descriptor(uint32_t root_param_idx, D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept;
     void set_primitive_topology(D3D_PRIMITIVE_TOPOLOGY primitive_topology) noexcept;
     void set_scissor_rect(RECT rect) noexcept;
+    void set_render_target(Image& img) const noexcept;
+    void draw(uint32_t count) const noexcept;
     void draw(uint32_t start_idx, uint32_t size) const noexcept;
-    void dispatch(uint32_t width, uint32_t height) const noexcept;
+    void dispatch(uint32_t x, uint32_t y, uint32_t z) const noexcept;
 
     template <typename T>
     requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)

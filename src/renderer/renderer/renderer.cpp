@@ -100,8 +100,8 @@ void Renderer::preprocess_render() noexcept
     only_once = false;
     auto& src = _images.at(hh);
     static Image test_img;
-    test_img.init(src.width(), src.height(), ImageFormat::bgra8_unorm, ImageType::srv | ImageType::uav);
-    g_comp_engine.blur(src, test_img, 55);
+    test_img.init(src.width(), src.height(), ImageFormat::rgba8_unorm, ImageType::srv | ImageType::uav);
+    g_comp_engine.blur(src, test_img, 2.5f, 1);
   }
 }
 
