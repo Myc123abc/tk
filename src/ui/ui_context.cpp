@@ -173,7 +173,7 @@ void UIContext::close_window() noexcept
 
 void UIContext::fullscreen_window() noexcept
 {
-  if (_window->set_fullscreen) return;
+  if (_window->set_fullscreen || _window->is_moving_or_resizing()) return;
   _window->set_fullscreen = true;
 }
 
@@ -216,18 +216,7 @@ void UIContext::render() noexcept
         static_cast<LONG>(thickness + wnd.snap.height)});
       if (!wnd.snap.fullscreen_window && !wnd.snap.maximized)
       {
-  // FIXME: tmp
-  // draw real window wireframe, and virtual window wireframe
-#ifndef NDEBUG
-  _call_begin = true;
-  _window = &wnd;
-  set_render_pos(-Window_Shadow_Thickness, -Window_Shadow_Thickness);
-  auto extent = window_extent();
-  ui::rectangle({}, { extent.x + Window_Shadow_Thickness * 2, extent.y + Window_Shadow_Thickness * 2 }, 0x00ff00ff, 1);
-  set_render_pos(0, 0);
-  ui::rectangle({}, extent, 0xffff00ff, 1);
-  _call_begin = false;
-#endif
+        cmd->draw_window_shadow(wnd.extent(), wnd.shadow_thickness(), {}, 5, 15);
         cmd->set_scissor_rect({ 0, 0,
           static_cast<LONG>(thickness * 2 + wnd.snap.width),
           static_cast<LONG>(thickness * 2 + wnd.snap.height)});
@@ -244,16 +233,7 @@ void UIContext::render() noexcept
       }
 
       cmd->set_scissor_rect(wnd.rect());
-#ifndef NDEBUG
-  _call_begin = true;
-  _window = &wnd;
-  set_render_pos(-Window_Shadow_Thickness, -Window_Shadow_Thickness);
-  auto extent = window_extent();
-  ui::rectangle({}, { extent.x + Window_Shadow_Thickness * 2, extent.y + Window_Shadow_Thickness * 2 }, 0x00ff00ff, 1);
-  set_render_pos(0, 0);
-  ui::rectangle({}, extent, 0xffff00ff, 1);
-  _call_begin = false;
-#endif
+      cmd->draw_window_shadow(wnd.extent(), wnd.shadow_thickness(), {}, 5, 15);
       cmd->set_scissor_rect(wnd.real_rect());
       cmd->set_window_pos(wnd.real_pos());
       cmd->submit();

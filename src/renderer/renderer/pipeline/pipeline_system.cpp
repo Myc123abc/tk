@@ -12,6 +12,7 @@ void PipelineSystem::init() noexcept
   g_compiler.init();
 
   using enum DescriptorInfo::Type;
+
   auto res = generate_root_signature(
   {
     { constants,  "constants", 0, 0, false, sizeof(Constants) },
@@ -19,9 +20,9 @@ void PipelineSystem::init() noexcept
     { texture,    "image",     0, 1                           },
     { textures,   "images",    0, 2                           }
   }, true, true);
-
   _pipes.emplace(PipelineType::sdf, Pipeline{ "assets/shader/sdf.hlsl", "vs", "ps", "assets/shader", RenderResource::Render_Target_Format, true, false, res });
   _pipes.emplace(PipelineType::image, Pipeline{ "assets/shader/image.hlsl", "vs", "ps", "assets/shader", RenderResource::Render_Target_Format, true, false, res });
+  _pipes.emplace(PipelineType::window_shadow, Pipeline{ "assets/shader/window_shadow.hlsl", "vs", "ps", "assets/shader", RenderResource::Render_Target_Format, true, false, res });
 
   res = generate_root_signature(
   {
@@ -59,8 +60,8 @@ void PipelineSystem::render(RenderResource& res, RenderData& data) noexcept
       _ctx.set_graphics_descriptor(pipe.root_param_idx("buffer"), frame.buffer.shape_properties_gpu_handle());
       _ctx.set_graphics_constants(pipe.root_param_idx("constants"), Constants
       {
-        .window_extent = frame.image.extent(),
-        .window_pos    = data.resizing_window_pos
+        .render_target_extent = frame.image.extent(),
+        .window_pos           = data.resizing_window_pos
       });
 
       // draw data can be split by different scissor rect
@@ -78,7 +79,7 @@ label_draw_call_again:
       if (total_indices_size == scissor_rect.next_indices_idx)
       {
         _ctx.draw(indices_start, indices_size);
-        assert(data.is_scissor_rect_empty());
+        assert(data.is_scissor_rect_empty() || data.window_shadow_info);
         continue;
       }
       else
@@ -103,15 +104,36 @@ label_draw_call_again:
       _ctx.set_graphics_descriptor(pipe.root_param_idx("image"), draw_data.image->srv().gpu_handle());
       _ctx.set_graphics_constants(pipe.root_param_idx("constants"), Constants
       {
-        .window_extent = frame.image.extent(),
-        .window_pos    = data.resizing_window_pos,
-        .image_alpha   = draw_data.image_alpha,
+        .render_target_extent = frame.image.extent(),
+        .window_pos           = data.resizing_window_pos,
+        .image_alpha          = draw_data.image_alpha,
       });
       _ctx.set_scissor_rect(scissor_rect.rect);
       _ctx.draw(draw_data.indices_start, draw_data.indices_size);
       continue;
     }
     std::unreachable();
+  }
+
+  if (data.window_shadow_info)
+  {
+    auto pipe = g_pipe_sys.pipe(PipelineType::window_shadow);
+    _ctx.set_pipe(pipe->pipe_state.Get());
+    _ctx.set_graphics_root_signature(pipe->root_signature);
+    _ctx.set_primitive_topology(pipe->primive_topology);
+    _ctx.set_graphics_constants(pipe->root_param_idx("constants"), Constants
+    {
+      .render_target_extent = frame.image.extent(),
+      .window_extent        = data.window_shadow_info->window_extent,
+      .window_pos           = data.resizing_window_pos,
+      .shadow_thickness     = data.window_shadow_info->shadow_thickness,
+      .shadow_radius        = data.window_shadow_info->radius,
+      .shadow_color         = data.window_shadow_info->color,
+      .shadow_softness      = data.window_shadow_info->softness,
+    });
+    scissor_rect = data.pop_scissor_rect();
+    _ctx.set_scissor_rect(scissor_rect.rect);
+    _ctx.draw(2);
   }
 }
 
@@ -291,7 +313,7 @@ void PipelineSystem::Context::set_render_target(Image& img) const noexcept
 
 void PipelineSystem::Context::draw(uint32_t count) const noexcept
 {
-  _cmd->DrawInstanced(3, count, 0, 0);
+  _cmd->DrawInstanced(3 * count, 1, 0, 0);
 }
 
 void PipelineSystem::Context::draw(uint32_t start_idx, uint32_t size) const noexcept

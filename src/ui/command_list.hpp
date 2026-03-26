@@ -30,7 +30,9 @@ enum class CommandType : uint16_t
   image,
 
   set_scissor_rect,
-  set_window_pos
+  set_window_pos,
+
+  draw_window_shadow,
 };
 
 struct CommandHeader
@@ -119,6 +121,15 @@ struct ScissorRectInfo
 struct WindowPosInfo
 {
   glm::vec2 pos{};
+};
+
+struct WindowShadowInfo
+{
+  glm::vec<2, uint32_t> window_extent{};
+  float                 shadow_thickness{};
+  glm::vec3             color{};
+  float                 radius{};
+  float                 softness{};
 };
 
 class CommandList
@@ -258,6 +269,11 @@ public:
   void set_window_pos(glm::vec2 pos) noexcept
   {
     push(CommandType::set_window_pos, WindowPosInfo{ pos });
+  }
+
+  void draw_window_shadow(glm::vec<2, uint32_t> window_extent, float shadow_thickness, glm::vec3 color, float radius, float softness) noexcept
+  {
+    push(CommandType::draw_window_shadow, WindowShadowInfo{ window_extent, shadow_thickness, color, radius, softness });
   }
 
   auto submit() noexcept -> CommandList&

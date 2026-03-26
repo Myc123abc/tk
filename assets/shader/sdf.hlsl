@@ -4,13 +4,6 @@
 ///                                 Structure
 ////////////////////////////////////////////////////////////////////////////////
 
-struct Vertex
-{
-  float3   pos           : POSITION;
-  float2   uv            : TEXCOORD;
-  uint32_t buffer_offset : BUFFER_OFFSET;
-};
-
 struct PSParameter
 {
   float4 pos : SV_POSITION;
@@ -232,7 +225,7 @@ PSParameter vs(Vertex vertex)
   ShapeProperty shape_property = buffer.Load<ShapeProperty>(vertex.buffer_offset);
 
   PSParameter result;
-  result.pos           = float4((vertex.pos.xy + constants.window_pos) / constants.window_extent * float2(2, -2) + float2(-1, 1), vertex.pos.z, 1);
+  result.pos           = float4((vertex.pos.xy + constants.window_pos) / constants.render_target_extent * float2(2, -2) + float2(-1, 1), vertex.pos.z, 1);
   result.uv            = vertex.uv;
   result.color         = shape_property.color;
   result.buffer_offset = vertex.buffer_offset;

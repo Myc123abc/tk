@@ -233,6 +233,13 @@ void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
     }
     break;
 
+    case draw_window_shadow:
+    {
+      auto info = reinterpret_cast<WindowShadowInfo*>(info_ptr);
+      render_data.window_shadow_info = *info;
+    }
+    break;
+
     }
   }
 

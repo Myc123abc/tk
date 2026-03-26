@@ -1,12 +1,5 @@
 #include "root_signature.h"
 
-struct Vertex
-{
-  float3   pos           : POSITION;
-  float2   uv            : TEXCOORD;
-  uint32_t buffer_offset : BUFFER_OFFSET;
-};
-
 struct PSParameter
 {
   float4 pos : SV_POSITION;
@@ -16,7 +9,7 @@ struct PSParameter
 PSParameter vs(Vertex vertex)
 {
   PSParameter res;
-  res.pos = float4((vertex.pos.xy + constants.window_pos) / constants.window_extent * float2(2, -2) + float2(-1, 1), vertex.pos.z, 1);
+  res.pos = float4((vertex.pos.xy + constants.window_pos) / constants.render_target_extent * float2(2, -2) + float2(-1, 1), vertex.pos.z, 1);
   res.uv  = vertex.uv;
   return res;
 }

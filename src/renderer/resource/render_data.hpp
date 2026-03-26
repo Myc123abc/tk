@@ -23,11 +23,12 @@ struct DrawData
 
 struct RenderData
 {
-  std::vector<Vertex>        vertices;
-  std::vector<uint16_t>      indices;
-  std::vector<ShapeProperty> shape_properties;
-  glm::vec2                  resizing_window_pos;
-  std::vector<DrawData>      draw_datas;
+  std::vector<Vertex>                 vertices;
+  std::vector<uint16_t>               indices;
+  std::vector<ShapeProperty>          shape_properties;
+  glm::vec2                           resizing_window_pos;
+  std::vector<DrawData>               draw_datas;
+  std::optional<ui::WindowShadowInfo> window_shadow_info;
 
   void clear() noexcept
   {
@@ -39,6 +40,7 @@ struct RenderData
     _prev_is_image_type = {};
     _last_indices_size  = {};
     assert(_scissor_infos.empty());
+    window_shadow_info = {};
   }
 
   void try_push_draw_data(ui::CommandType type) noexcept

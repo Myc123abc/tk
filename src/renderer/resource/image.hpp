@@ -92,7 +92,7 @@ public:
 
   void set_state(ID3D12GraphicsCommandList1* cmd, ImageState state) noexcept;
 
-  void resize(uint32_t width, uint32_t height)            noexcept { if (_width != width || _height != height) init(width, height, static_cast<ImageFormat>(_format), _type); }
+  void resize(uint32_t width, uint32_t height)            noexcept { if (!_handle.Get() || _width != width || _height != height) init(width, height, static_cast<ImageFormat>(_format), _type); }
   void resize(IDXGISwapChain1* swapchain, uint32_t index) noexcept { init(swapchain, index); }
 
   void clear(ID3D12GraphicsCommandList1* cmd, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) const noexcept;

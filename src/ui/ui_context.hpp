@@ -26,6 +26,8 @@ struct Window
 {
   renderer::WindowSnapshot snap;
 
+  auto extent() const noexcept { return glm::vec<2, uint32_t>{ snap.width + shadow_thickness() * 2, snap.height + shadow_thickness() * 2 }; }
+
   auto rect() const noexcept { return RECT{ snap.x, snap.y, static_cast<LONG>(snap.x + snap.width), static_cast<LONG>(snap.y + snap.height) }; }
 
   auto cursor_pos() const noexcept -> glm::vec<2, int>
