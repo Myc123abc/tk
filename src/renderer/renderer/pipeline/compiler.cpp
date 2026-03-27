@@ -172,7 +172,8 @@ auto generate_root_signature(std::vector<DescriptorInfo> const& desc_infos, bool
     }
     break;
 
-    case bytebuffer:
+    case byte_buffer:
+    case structured_buffer:
     {
       range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, info.bind_point, info.space, info.is_volatile ? D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE : D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
       ranges.emplace(range);
@@ -189,7 +190,7 @@ auto generate_root_signature(std::vector<DescriptorInfo> const& desc_infos, bool
     }
     break;
 
-    case rwtexture:
+    case rw_texture:
     {
       range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, info.bind_point, info.space, info.is_volatile ? D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE : D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
       ranges.emplace(range);
@@ -358,12 +359,20 @@ void Compiler::CompileResult::get_vertex_input_layout(ID3D12ShaderReflection* sh
   {
     auto param_desc = D3D12_SIGNATURE_PARAMETER_DESC{};
     shader_reflection->GetInputParameterDesc(i, &param_desc);
+
+    if (param_desc.SystemValueType != D3D_NAME_UNDEFINED)
+      continue;
+
+    auto format = to_dxgi_format(param_desc);
+    if (format == DXGI_FORMAT_UNKNOWN)
+      continue;
+
     _input_param_names.emplace_back(param_desc.SemanticName);
     _input_element_descs.emplace_back(D3D12_INPUT_ELEMENT_DESC
     {
       .SemanticName         = _input_param_names.back().c_str(),
       .SemanticIndex        = param_desc.SemanticIndex,
-      .Format               = to_dxgi_format(param_desc),
+      .Format               = format,
       .InputSlot            = 0u,
       .AlignedByteOffset    = D3D12_APPEND_ALIGNED_ELEMENT,
       .InputSlotClass       = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
@@ -371,7 +380,8 @@ void Compiler::CompileResult::get_vertex_input_layout(ID3D12ShaderReflection* sh
     });
   }
 
-  input_layout_desc = D3D12_INPUT_LAYOUT_DESC{ _input_element_descs.data(), static_cast<uint32_t>(_input_element_descs.size()) };
+  if (!_input_element_descs.empty())
+    input_layout_desc = D3D12_INPUT_LAYOUT_DESC{ _input_element_descs.data(), static_cast<uint32_t>(_input_element_descs.size()) };
 }
 
 void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader_reflection, bool is_compute_shader, std::unordered_set<std::string> const& volatile_descs) noexcept

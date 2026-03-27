@@ -21,9 +21,10 @@ struct DescriptorInfo
   enum class Type
   {
     constants,
-    bytebuffer,
+    byte_buffer,
+    structured_buffer,
     texture,
-    rwtexture,
+    rw_texture,
     textures
   };
 

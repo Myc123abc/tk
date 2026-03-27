@@ -15,10 +15,10 @@ void PipelineSystem::init() noexcept
 
   auto res = generate_root_signature(
   {
-    { constants,  "constants", 0, 0, false, sizeof(Constants) },
-    { bytebuffer, "buffer",    0, 0                           },
-    { texture,    "image",     0, 1                           },
-    { textures,   "images",    0, 2                           }
+    { constants,   "constants", 0, 0, false, sizeof(Constants) },
+    { byte_buffer, "buffer",    0, 0                           },
+    { texture,     "image",     0, 1                           },
+    { textures,    "images",    0, 2                           }
   }, true, true);
   _pipes.emplace(PipelineType::sdf, Pipeline{ "assets/shader/sdf.hlsl", "vs", "ps", "assets/shader", RenderResource::Render_Target_Format, true, false, res });
   _pipes.emplace(PipelineType::image, Pipeline{ "assets/shader/image.hlsl", "vs", "ps", "assets/shader", RenderResource::Render_Target_Format, true, false, res });
@@ -26,9 +26,9 @@ void PipelineSystem::init() noexcept
 
   res = generate_root_signature(
   {
-    { constants, "constants", 0, 0, false, sizeof(BlurConstants) },
-    { texture,   "src",       0, 0, true                         },
-    { rwtexture, "dst",       0, 0, true                         },
+    { constants,  "constants", 0, 0, false, sizeof(BlurConstants) },
+    { texture,    "src",       0, 0, true                         },
+    { rw_texture, "dst",       0, 0, true                         },
   });
   _pipes.emplace(PipelineType::blur_horizontal_pass, Pipeline{ "assets/shader/blur.hlsl", "horizontal_pass", {}, res, {} });
   _pipes.emplace(PipelineType::blur_vertical_pass,   Pipeline{ "assets/shader/blur.hlsl", "vertical_pass",   {}, res, {} });
