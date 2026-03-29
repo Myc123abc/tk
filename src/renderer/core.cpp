@@ -39,6 +39,34 @@ void Core::init() noexcept
 
   err_if(DCompositionCreateDevice(nullptr, IID_PPV_ARGS(&_comp_device)),
         "failed to create composition device");
+
+  create_device_11on12();
+}
+
+void Core::create_device_11on12() noexcept
+{
+  // create command queue
+  auto queue_desc = D3D12_COMMAND_QUEUE_DESC{};
+  queue_desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+  err_if(_device->CreateCommandQueue(&queue_desc, IID_PPV_ARGS(&_cmd_queue)),
+          "failed to create command queue");
+
+  // create d3d11on12 device
+  auto d3d11_device  = ComPtr<ID3D11Device>{};
+  auto d3d11_context = ComPtr<ID3D11DeviceContext>{};
+  auto cmd_queue     = _cmd_queue.Get();
+  err_if(D3D11On12CreateDevice(_device.Get(), D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0,
+    reinterpret_cast<IUnknown**>(&cmd_queue), 1, 0, &d3d11_device, &d3d11_context, nullptr),
+    "failed to create d3d11on12");
+  _device_11on12 = TryAs<ID3D11On12Device>(d3d11_device);
+  err_if(!_device_11on12, "failed to get d3d11on12 device");
+
+  // create dxgi device
+  auto dxgi_device = TryAs<IDXGIDevice>(d3d11_device);
+  err_if(!dxgi_device, "failed to get dxgi device");
+
+  // create d2d device
+  err_if(D2D1CreateDevice(dxgi_device.Get(), {}, &_d2d_device), "failed to create d2d device");
 }
 
 auto Core::create_cmd_alloc(D3D12_COMMAND_LIST_TYPE type) const noexcept -> Microsoft::WRL::ComPtr<ID3D12CommandAllocator>

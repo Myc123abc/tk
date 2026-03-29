@@ -6,6 +6,7 @@
 #include "util/error_handling.hpp"
 #include "../resource/descriptor_heap_manager.hpp"
 #include "pipeline/pipeline_system.hpp"
+#include "backdrop_renderer.hpp"
 
 #include <stb_image.h>
 
@@ -18,11 +19,12 @@ void Renderer::init() noexcept
   _thread = std::jthread([this]
   {
     g_core.init();
+    g_backdrop_renderer.init();
     g_pipe_sys.init();
     g_desc_heap_mgr.init();
     g_graphics_engine.init();
     g_comp_engine.init();
-    g_copy_engine.init();
+    g_copy_engine.init(); 
 
     while (!_exit.load(std::memory_order_relaxed))
     {
@@ -57,6 +59,8 @@ void Renderer::destroy() noexcept
   g_comp_engine.destroy();
   g_copy_engine.destroy();
   for (auto& res : _res | std::views::values) res.destroy();
+
+  g_backdrop_renderer.destroy();
 }
 
 void Renderer::add_frame_render_complete_func(std::move_only_function<void()>&& func) noexcept
@@ -93,16 +97,6 @@ void Renderer::preprocess_render() noexcept
 {
   upload_images();
   g_comp_engine.update();
-
-  static bool only_once = true;
-  if (only_once && hh.valid())
-  {
-    only_once = false;
-    auto& src = _images.at(hh);
-    static Image test_img;
-    test_img.init(src.width(), src.height(), ImageFormat::rgba8_unorm, ImageType::srv | ImageType::uav);
-    g_comp_engine.blur(src, test_img, 2.5f, 1);
-  }
 }
 
 void Renderer::upload_images() noexcept

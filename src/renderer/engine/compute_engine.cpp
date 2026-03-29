@@ -133,6 +133,13 @@ void ComputeEngine::update() noexcept
     {
       _blur_tmp_images.at(idx).in_use = false;
       it = _used_blur_tmp_images.erase(it);
+      // TODO: only compute engine finish then other engine can use, otherwise lead the error as follow sometimes:
+      // D4D12 ERROR: ID3D12CommandQueue::ExecuteCommandLists: Non-simultaneous-access Texture Resource
+      // (0x0000022ED17257F0:'Unnamed Object') is still referenced by write|transition_barrier GPU operations
+      // in-flight on another Command Queue (0x0000022ED0F99010:'Unnamed ID3D12CommandQueue Object').
+      // It is not safe to start read|write|transition_barrier GPU operations now on this Command Queue
+      // (0x0000022EC7ECEAE0:'Unnamed ID3D12CommandQueue Object'). This can result in race conditions and
+      // application instability. [ EXECUTION ERROR #1047: OBJECT_ACCESSED_WHILE_STILL_IN_USE]
     }
     else
       ++it;

@@ -21,7 +21,6 @@ namespace tk::renderer {
 
 Singleton(Renderer, g_renderer,
 public:
-  ui::ImageHandle hh{};
   void init() noexcept;
   void destroy() noexcept;
 

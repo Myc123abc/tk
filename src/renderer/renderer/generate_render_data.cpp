@@ -212,7 +212,6 @@ void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
       auto info = reinterpret_cast<ImageInfo*>(info_ptr);
       if (_images.contains(info->handle))
       {
-        if (!hh.valid()) hh = info->handle;
         add_vertices_indices(render_data, { info->left_top, info->right_bottom });
         render_data.set_image_info(&_images.at(info->handle), static_cast<float>(info->alpha) / 0xff);
       }

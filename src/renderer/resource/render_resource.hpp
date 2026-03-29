@@ -48,6 +48,8 @@ private:
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> cmd_alloc;
   };
 
+  HWND                                        _handle{};
+
   std::array<Frame, Frame_Count>              _frames;
   Image                                       _dsv_image;
 
@@ -57,6 +59,12 @@ private:
   Microsoft::WRL::ComPtr<IDCompositionVisual> _comp_visual;
 
   uint32_t                                    _frame_index{};
+
+  enum class BackdropType
+  {
+    transparent,
+    blur,
+  } _backdrop_type{};
 };
 
 
