@@ -3,6 +3,7 @@
 #include "image.hpp"
 #include "buffer.hpp"
 #include "../config.hpp"
+#include "../compositor.hpp"
 
 #include <dcomp.h>
 
@@ -58,6 +59,8 @@ private:
   Microsoft::WRL::ComPtr<IDCompositionTarget> _comp_target;
   Microsoft::WRL::ComPtr<IDCompositionVisual> _comp_visual;
 
+  Compositor::Resource                        _comp_res;
+
   uint32_t                                    _frame_index{};
 
   enum class BackdropType
@@ -66,6 +69,5 @@ private:
     blur,
   } _backdrop_type{};
 };
-
 
 }

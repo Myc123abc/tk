@@ -49,12 +49,8 @@ target_link_libraries(tk
   PUBLIC
     glm::glm
   PRIVATE
-    # win32 libs
-    d3d12 dxgi dcomp dxguid dxcompiler d3d11 d2d1 # directx
-    shcore                                        # GetDpiForMonitor
-    runtimeobject coremessaging                   # backdrop process
-
-    # third part libs
+    d3d12 dxgi dcomp dxguid dxcompiler shcore
+    d3d11 d2d1 windowsapp
     DirectX-Headers
     SPSCQueue
     harfbuzz

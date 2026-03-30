@@ -6,7 +6,7 @@
 #include "util/error_handling.hpp"
 #include "../resource/descriptor_heap_manager.hpp"
 #include "pipeline/pipeline_system.hpp"
-#include "backdrop_renderer.hpp"
+#include "../compositor.hpp"
 
 #include <stb_image.h>
 
@@ -19,7 +19,7 @@ void Renderer::init() noexcept
   _thread = std::jthread([this]
   {
     g_core.init();
-    g_backdrop_renderer.init();
+    g_compositor.init(); 
     g_pipe_sys.init();
     g_desc_heap_mgr.init();
     g_graphics_engine.init();
@@ -59,8 +59,6 @@ void Renderer::destroy() noexcept
   g_comp_engine.destroy();
   g_copy_engine.destroy();
   for (auto& res : _res | std::views::values) res.destroy();
-
-  g_backdrop_renderer.destroy();
 }
 
 void Renderer::add_frame_render_complete_func(std::move_only_function<void()>&& func) noexcept

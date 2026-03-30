@@ -2,7 +2,6 @@
 #include "../core.hpp"
 #include "../engine/graphics_engine.hpp"
 #include "util/error_handling.hpp"
-#include "../renderer/backdrop_renderer.hpp"
 
 #include <directx/d3dx12.h>
 #include <windows.h>
@@ -39,31 +38,26 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
   swapchain_desc.SwapEffect       = DXGI_SWAP_EFFECT_FLIP_DISCARD;
   swapchain_desc.SampleDesc.Count = 1;
   swapchain_desc.Flags            = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT | DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
+  swapchain_desc.AlphaMode        = DXGI_ALPHA_MODE_PREMULTIPLIED;
+  err_if(g_core.factory()->CreateSwapChainForComposition(g_graphics_engine.queue(), &swapchain_desc, nullptr, &swapchain),
+          "failed to create swapchain for composition");
 
   if (_backdrop_type == BackdropType::transparent)
   {
-    swapchain_desc.AlphaMode        = DXGI_ALPHA_MODE_PREMULTIPLIED;
-    err_if(g_core.factory()->CreateSwapChainForComposition(g_graphics_engine.queue(), &swapchain_desc, nullptr, &swapchain),
-            "failed to create swapchain for composition");
-
     // create composition
-    err_if(g_core.comp_device()->CreateTargetForHwnd(handle, true, &_comp_target),
+    err_if(g_core.device_comp()->CreateTargetForHwnd(handle, true, &_comp_target),
             "failed to create composition target");
-    err_if(g_core.comp_device()->CreateVisual(&_comp_visual),
+    err_if(g_core.device_comp()->CreateVisual(&_comp_visual),
             "failed to create composition visual");
     err_if(_comp_visual->SetContent(swapchain.Get()),
             "failed to bind swapchain to composition visual");
     err_if(_comp_target->SetRoot(_comp_visual.Get()),
             "failed to bind composition visual to target");
-    err_if(g_core.comp_device()->Commit(),
+    err_if(g_core.device_comp()->Commit(),
             "failed to commit composition device");
   }
   else if (_backdrop_type == BackdropType::blur)
-  {
-    err_if(g_core.factory()->CreateSwapChainForHwnd(g_graphics_engine.queue(), handle, &swapchain_desc, nullptr, nullptr, &swapchain),
-            "failed to create swapchain for hwnd");
-    g_backdrop_renderer.create_desktop_window_target(handle);
-  }
+    _comp_res = g_compositor.create_resource(handle, swapchain.Get());
 
   // set swapchain property and get waitable object
   _swapchain = TryAs<IDXGISwapChain4>(swapchain);
@@ -98,7 +92,9 @@ void RenderResource::destroy() noexcept
     frame.buffer.destroy();
   }
   if (_backdrop_type == BackdropType::blur)
-    g_backdrop_renderer.destroy_desktop_window_target(_handle);
+  {
+    // TODO:
+  }
 }
 
 void RenderResource::resize(uint32_t width, uint32_t height) noexcept
@@ -127,8 +123,12 @@ void RenderResource::resize(uint32_t width, uint32_t height) noexcept
     // rebind composition resources
     err_if(_comp_visual->SetContent(_swapchain.Get()),
             "failed to bind swapchain to composition visual");
-    err_if(g_core.comp_device()->Commit(),
+    err_if(g_core.device_comp()->Commit(),
             "failed to commit composition device");
+  }
+  else if (_backdrop_type == BackdropType::blur)
+  {
+    // TODO: resize surface
   }
   
   // recreate images

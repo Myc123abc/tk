@@ -1,8 +1,8 @@
-#include "image_manager.hpp"
-#include "../renderer/renderer/renderer.hpp"
-
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+
+#include "image_manager.hpp"
+#include "../renderer/renderer/renderer.hpp"
 
 using namespace tk::renderer;
 
