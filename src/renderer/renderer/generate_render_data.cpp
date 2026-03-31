@@ -53,6 +53,16 @@ void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
   _shape_properties_offset = 0;
   _idx_beg                 = 0;
 
+  auto add_scissor = false;
+  auto try_push_draw_data = [&]
+  {
+    if (add_scissor)
+    {
+      add_scissor = false;
+      render_data.push_draw_data();
+    }
+  };
+
   while (auto res = cmd->pop())
   {
     auto [type, info_ptr] = res.value();
@@ -66,6 +76,7 @@ void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
     {
     case draw_rectangle:
     {
+      try_push_draw_data();
       auto info = reinterpret_cast<RectangleInfo*>(info_ptr);
       if (is_integer_scale(info->left_top.x)     &&
           is_integer_scale(info->left_top.y)     &&
@@ -83,6 +94,7 @@ void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
 
     case draw_triangle:
     {
+      try_push_draw_data();
       auto info = reinterpret_cast<TriangleInfo*>(info_ptr);
 	    add_shape(render_data, ShapeProperty::Type::triangle, info->color, info->thickness,
         { info->p0.x, info->p0.y, info->p1.x, info->p1.y, info->p2.x, info->p2.y },
@@ -92,6 +104,7 @@ void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
 
     case draw_circle:
     {
+      try_push_draw_data();
       auto info = reinterpret_cast<CircleInfo*>(info_ptr);
       auto r = info->radius - 1;
       if (r < 0) r = 1;
@@ -103,6 +116,7 @@ void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
 
     case draw_line:
     {
+      try_push_draw_data();
       auto info = reinterpret_cast<LineInfo*>(info_ptr);
       if (_path_data.empty())
         add_shape(render_data, ShapeProperty::Type::line, info->color, {},
@@ -123,6 +137,7 @@ void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
 
     case draw_bezier:
     {
+      try_push_draw_data();
       auto info = reinterpret_cast<BezierInfo*>(info_ptr);
       if (_path_data.empty())
         add_shape(render_data, ShapeProperty::Type::bezier, info->color, {},
@@ -143,6 +158,7 @@ void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
 
     case add_discard_rectangle:
     {
+      try_push_draw_data();
       auto info = reinterpret_cast<DiscardRectangleInfo*>(info_ptr);
 
       err_if(render_data.shape_properties.empty(), "failed must draw a shape then use discard rectangle");
@@ -155,6 +171,7 @@ void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
 
     case begin_path:
     {
+      try_push_draw_data();
       // record count
       _path_data.push_back(std::bit_cast<float>(0u));
     }
@@ -173,6 +190,7 @@ void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
 
     case begin_union:
     {
+      try_push_draw_data();
       _op_data.op     = ShapeProperty::Operator::u;
       _op_data.offset = _shape_properties_offset;
     }
@@ -220,6 +238,7 @@ void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
 
     case set_scissor_rect:
     {
+      add_scissor = true;
       auto info = reinterpret_cast<ScissorRectInfo*>(info_ptr);
       render_data.push_scissor_rect(info->rect);
     }

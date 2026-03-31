@@ -271,9 +271,9 @@ public:
     push(CommandType::set_window_pos, WindowPosInfo{ pos });
   }
 
-  void draw_window_shadow(glm::vec<2, uint32_t> window_extent, float shadow_thickness, glm::vec3 color, float radius, float softness) noexcept
+  void draw_window_shadow(glm::vec<2, uint32_t> window_extent, float shadow_thickness, Color color, float radius, float softness) noexcept
   {
-    push(CommandType::draw_window_shadow, WindowShadowInfo{ window_extent, shadow_thickness, color, radius, softness });
+    push(CommandType::draw_window_shadow, WindowShadowInfo{ window_extent, shadow_thickness, { color.r, color.g, color.b }, radius, softness });
   }
 
   auto submit() noexcept -> CommandList&

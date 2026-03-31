@@ -48,13 +48,17 @@ struct RenderData
     auto current_is_image_type = type == ui::CommandType::image;
     if (draw_datas.empty()) draw_datas.emplace_back(DrawData{});
     else if (_prev_is_image_type || current_is_image_type)
-    {
-      draw_datas.back().indices_size = indices.size() - _last_indices_size;
-      _last_indices_size = indices.size();
-      draw_datas.emplace_back(DrawData{});
-      draw_datas.back().indices_start = indices.size();
-    }
+      push_draw_data();
     _prev_is_image_type = current_is_image_type;
+  }
+
+  void push_draw_data() noexcept
+  {
+    if (draw_datas.empty()) draw_datas.emplace_back(DrawData{});
+    draw_datas.back().indices_size = indices.size() - _last_indices_size;
+    _last_indices_size = indices.size();
+    draw_datas.emplace_back(DrawData{});
+    draw_datas.back().indices_start = indices.size();
   }
 
   void generate_finish() noexcept

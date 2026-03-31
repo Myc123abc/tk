@@ -186,9 +186,10 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   {
     auto& window     = wnd_mgr._windows.at(handle);
     auto  cursor_pos = window.cursor_pos();
+    auto const& cfg  = g_ui_ctx.access_window_cfg(handle);
 
     // update cursor
-    if (auto type = window.get_resize_type(cursor_pos); type != last_resize_type && !window.is_fullscreen())
+    if (auto type = window.get_resize_type(cursor_pos); !cfg.no_resize && type != last_resize_type && !window.is_fullscreen())
     {
       last_resize_type = type;
       set_cursor(handle, type);
@@ -216,25 +217,31 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
       // moving
       if (left_button_down_resize_type == ResizeType::none)
       {
-        if (window.is_maximized())
+        if (!cfg.no_move)
         {
-          window.move_from_maximize();
-          left_button_down_window_cursor_pos = window.cursor_pos();
-        }
-        else
-        {
-          auto move_pos = pos - left_button_down_window_cursor_pos;
-          window.move_with_pos(move_pos.x, move_pos.y);
-          // resize window when moving window between different scale of monitors
-          wnd_mgr.update_monitor(handle, pos, left_button_down_window_cursor_pos);
+          if (window.is_maximized())
+          {
+            window.move_from_maximize();
+            left_button_down_window_cursor_pos = window.cursor_pos();
+          }
+          else
+          {
+            auto move_pos = pos - left_button_down_window_cursor_pos;
+            window.move_with_pos(move_pos.x, move_pos.y);
+            // resize window when moving window between different scale of monitors
+            wnd_mgr.update_monitor(handle, pos, left_button_down_window_cursor_pos);
+          }
         }
       }
       // resizing
       else
       {
-        auto offset = pos - last_cursor_pos;
-        window.adjust_offset(left_button_down_resize_type, pos, offset.x, offset.y);
-        window.resize(left_button_down_resize_type, offset.x, offset.y);
+        if (!cfg.no_resize)
+        {
+          auto offset = pos - last_cursor_pos;
+          window.adjust_offset(left_button_down_resize_type, pos, offset.x, offset.y);
+          window.resize(left_button_down_resize_type, offset.x, offset.y);
+        }
       }
     }
     last_cursor_pos = pos;

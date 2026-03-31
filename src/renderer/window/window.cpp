@@ -424,7 +424,12 @@ void Window::cancel_fullscreen_maximize(RECT rect, float scale) noexcept
 
 void Window::restore() noexcept
 {
-  cancel_maximize(_backup_rect, _scale);
+  _maximized = false;
+  _rect      = _backup_rect;
+  update_by_rect();
+  g_ui_ctx.send_message(UIContext::Message_Window_Restore{ _handle, _x, _y, _width, _height });
+  g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
+  SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 void Window::fullscreen() noexcept

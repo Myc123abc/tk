@@ -15,7 +15,7 @@ namespace tk::renderer {
 void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
 {
   // TODO: custom set backdrop type
-  _backdrop_type = BackdropType::blur;
+  _backdrop_type = BackdropType::transparent;
 
   _handle = handle;
 

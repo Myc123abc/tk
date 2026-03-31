@@ -79,7 +79,8 @@ label_draw_call_again:
       if (total_indices_size == scissor_rect.next_indices_idx)
       {
         _ctx.draw(indices_start, indices_size);
-        assert(data.is_scissor_rect_empty() || data.window_shadow_info);
+        if (!data.window_shadow_info && !data.is_scissor_rect_empty())
+          scissor_rect = data.pop_scissor_rect();
         continue;
       }
       else
@@ -131,7 +132,8 @@ label_draw_call_again:
       .shadow_color         = data.window_shadow_info->color,
       .shadow_softness      = data.window_shadow_info->softness,
     });
-    scissor_rect = data.pop_scissor_rect();
+    if (!data.is_scissor_rect_empty())
+      scissor_rect = data.pop_scissor_rect();
     _ctx.set_scissor_rect(scissor_rect.rect);
     _ctx.draw(2);
   }

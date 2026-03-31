@@ -8,6 +8,7 @@
 #include "ui/ui.hpp"
 #include "ui/lerpolator.hpp"
 #include "../util/singleton.hpp"
+#include "../util/double_buffer.hpp"
 
 #include <windows.h>
 
@@ -66,13 +67,10 @@ struct Window
   auto cmd()        noexcept { return &cmds[frame_index];                     }
   void next_frame() noexcept { frame_index = (frame_index + 1) % cmds.size(); }
 
-  std::array<std::vector<RECT>, 2> move_invalid_areas{};
-  std::atomic_uint32_t             move_invalid_areas_idx{};
+  DoubleBuffer<std::vector<RECT>> move_invalid_areas;
+  void add_move_invald_areas(RECT rect) noexcept { move_invalid_areas.data().emplace_back(rect); }
 
-  void add_move_invald_areas(RECT rect) noexcept;
-  void clear_move_invalid_areas() noexcept;
-  void switch_move_invalid_areas() noexcept;
-  auto access_move_invliad_areas() noexcept -> std::vector<RECT>&;
+  DoubleBuffer<WindowConfig> cfgs;
 
   bool set_fullscreen{};
 };
@@ -86,7 +84,7 @@ public:
 
   void close_window() noexcept;
 
-  void begin(std::string_view name, int x, int y, uint32_t width, uint32_t height, bool* is_closed, WindowConfig cfg) noexcept;
+  void begin(std::string_view name, int x, int y, uint32_t width, uint32_t height, bool* is_closed, WindowConfig const& cfg) noexcept;
   void end() noexcept;
 
   void check_draw() const noexcept;
@@ -122,7 +120,11 @@ public:
   void reset_lerpolator(size_t id) noexcept;
   auto lerp_ping_pong(bool b, size_t id, double duration) noexcept -> double;
 
-  auto access_move_invalid_areas(HWND handle) noexcept -> std::vector<RECT>&;
+private:
+  auto& get_window(HWND handle) noexcept { return _windows[_window_names[handle]]; }
+public:
+  auto& access_move_invalid_areas(HWND handle) noexcept { return get_window(handle).move_invalid_areas.access(); }
+  auto const& access_window_cfg(HWND handle) noexcept { return get_window(handle).cfgs.access(); }
 
   void image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha) noexcept;
   auto text(std::string_view text, glm::vec2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> glm::vec2;
@@ -135,10 +137,9 @@ private:
   void preprocess_render() noexcept;
   void postprocess_render() noexcept;
 
-  auto& get_window(HWND handle) noexcept { return _windows[_window_names[handle]]; }
-
   void add_title_bar() noexcept;
   void fullscreen_process() noexcept;
+  void window_shadow_wireframe_process(Window& wnd, RECT scissor_rect) noexcept;
 
 public:
   Window*                                 _window{};

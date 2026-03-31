@@ -126,7 +126,10 @@ int main()
   while (!wnd1_is_closed || !wnd2_is_closed)
   {
     auto cfg = ui::WindowConfig{};
-    cfg.display_title_bar = true;
+    cfg.display_title_bar             = true;
+		cfg.display_window_shadow         = true;
+    cfg.display_wireframe_only_active = true;
+    cfg.wireframe_color               = 0x7160e8ff;
 
     if (!wnd1_is_closed)
     {

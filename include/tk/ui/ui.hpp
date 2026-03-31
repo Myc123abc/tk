@@ -30,6 +30,9 @@ struct Color
   Color(glm::vec4 color) noexcept
     : r(color.r), g(color.g), b(color.b), a(color.a) {}
 
+  Color(float r, float g, float b, float a) noexcept
+    : r(r), g(g), b(b), a(a) {}
+
   operator glm::vec4() noexcept { return { r, g, b, a }; }
 
   float r{}, g{}, b{}, a{};
@@ -58,7 +61,12 @@ void render() noexcept;
 
 struct WindowConfig
 {
-  bool display_title_bar{};
+  bool                 display_title_bar{};
+  bool                 display_window_shadow{};
+  std::optional<Color> wireframe_color{};
+  bool                 display_wireframe_only_active{};
+  bool                 no_resize{};
+  bool                 no_move{};
 };
 
 /**
@@ -156,7 +164,7 @@ auto text(std::string_view text, glm::vec2 pos, float size, Color inner_color, C
  *                  if you want to close the window, stop call the begin and end of this window
  * @param cfg window config
  */
-void begin(std::string_view name, int x, int y, uint32_t width, uint32_t height, bool* is_closed, WindowConfig cfg = {}) noexcept;
+void begin(std::string_view name, int x, int y, uint32_t width, uint32_t height, bool* is_closed, WindowConfig const& cfg = {}) noexcept;
 
 // end a window
 void end() noexcept;

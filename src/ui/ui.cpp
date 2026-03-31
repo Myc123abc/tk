@@ -74,7 +74,7 @@ auto get_cursor_pos() noexcept -> glm::vec2
 ///                             Window
 ////////////////////////////////////////////////////////////////////////////////
 
-void begin(std::string_view name, int x, int y, uint32_t width, uint32_t height, bool* is_closed, WindowConfig cfg) noexcept
+void begin(std::string_view name, int x, int y, uint32_t width, uint32_t height, bool* is_closed, WindowConfig const& cfg) noexcept
 {
 	g_ui_ctx.begin(name, x, y, width, height, is_closed, cfg);
 }
@@ -129,12 +129,14 @@ auto is_fullscreen_window() noexcept -> bool
 void fullscreen_window() noexcept
 {
   g_ui_ctx.check_draw();
+  if (g_ui_ctx._window->cfg.no_resize) return;
   g_ui_ctx.fullscreen_window();
 }
 
 void restore_fullscreen_window() noexcept
 {
   g_ui_ctx.check_draw();
+  if (g_ui_ctx._window->cfg.no_resize) return;
   g_ui_ctx.restore_fullscreen_window();
 }
 
