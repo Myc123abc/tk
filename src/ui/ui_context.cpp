@@ -299,34 +299,35 @@ void UIContext::postprocess_render() noexcept
 
 void UIContext::window_shadow_wireframe_process(Window& wnd, RECT scissor_rect) noexcept
 {
+  if (!wnd.cfg.display_window_shadow && !wnd.cfg.wireframe_color)
+    return;
+
   auto cmd = wnd.cmd();
+  auto col = glm::vec4{};
 
-  // draw window shadow
-  if (wnd.cfg.display_window_shadow)
-    cmd->draw_window_shadow(wnd.extent(), wnd.shadow_thickness(), {}, 5, 15);
-
-  // draw wireframe
-  if (wnd.cfg.wireframe_color)
+  auto get_wireframe_color = [&] -> std::optional<glm::vec4>
   {
-    auto old_window = _window;
-    _window = &wnd;
-
-    auto color = wnd.cfg.wireframe_color.value();
-    if (wnd.cfg.display_wireframe_only_active)
+    if (wnd.cfg.wireframe_color)
     {
-      auto ratio = lerp_ping_pong(wnd.is_active(), generic_id("tk::ui::render::draw_wire_frame"), Window_Active_Response_Time);
-      color.a = wnd.cfg.wireframe_color.value().a * ratio;
+      auto old_window = _window;
+      _window = &wnd;
+
+      auto color = wnd.cfg.wireframe_color.value();
+      if (wnd.cfg.display_wireframe_only_active)
+      {
+        auto ratio = lerp_ping_pong(wnd.is_active(), generic_id("tk::ui::render::draw_wire_frame"), Window_Active_Response_Time);
+        color.a = wnd.cfg.wireframe_color.value().a * ratio;
+      }
+
+      _window = old_window;
+
+      return color;
     }
+    return {};
+  };
 
-    _call_begin = true;
-    rectangle({ -1, -1 }, ui::window_extent() + glm::vec2(1), color, 1.5);
-    _call_begin = false;
-
-    _window = old_window;
-  }
-
-  if (wnd.cfg.display_window_shadow || wnd.cfg.wireframe_color)
-    cmd->set_scissor_rect(scissor_rect);
+  cmd->draw_window_shadow(wnd.extent(), wnd.shadow_thickness(), {}, wnd.cfg.display_window_shadow ? 5 : 0, 15, get_wireframe_color());
+  cmd->set_scissor_rect(scissor_rect);
 }
 
 void UIContext::add_mouse_left_button_state(size_t id, glm::vec2 left_top, glm::vec2 right_bottom) noexcept
@@ -397,7 +398,7 @@ void UIContext::add_title_bar() noexcept
 
   // minimize button
   if (button("tk::ui::title_bar_minimize_button", w - btn_width * 3, 0, btn_width, btn_height, background_color, btn_hovered_color, btn_mouse_down_color,
-    [] (uint32_t width, uint32_t height) { ui::line({ 0, height / 2 }, { width, height / 2 }); },
+    [] (uint32_t width, uint32_t height) { ui::line({ 0, height / 2 }, { width, height / 2 }, 1); },
     icon_width, icon_height, 0x395063ff, 0x395063ff))
     g_wnd_mgr.minimize_window(handle);
 
@@ -423,8 +424,8 @@ void UIContext::add_title_bar() noexcept
   if (button("tk::ui::title_bar_close_button", w - btn_width, 0, btn_width, btn_height, background_color, close_btn_hovered_color, close_btn_mouse_down_color,
     [] (uint32_t width, uint32_t height)
     {
-      ui::line({}, { width, height });
-      ui::line({ width, 0 }, { 0, height });
+      ui::line({}, { width, height }, 1);
+      ui::line({ width, 0 }, { 0, height }, 1);
     }, icon_width, icon_height, 0x395063ff, 0xffffffff))
     _window->is_closed = true;
 

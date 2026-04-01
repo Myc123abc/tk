@@ -18,17 +18,38 @@ float4 vs(uint id : SV_VertexID) : SV_Position
 
 float4 ps(float4 pos : SV_Position) : SV_TARGET
 {
+  // get window rect
   float2 p0 = constants.window_pos + float2(constants.shadow_thickness, constants.shadow_thickness);
   float2 p1 = constants.window_pos + constants.window_extent - float2(constants.shadow_thickness, constants.shadow_thickness);
 
+  // discard window content region
   if (pos.x > p0.x && pos.x < p1.x && pos.y > p0.y && pos.y < p1.y)
     discard;
 
-  float2 extent_div2 = (p1 - p0) * 0.5;
-  float2 center = p0 + extent_div2;
-  float d = sdBox(pos.xy - center, extent_div2);
+  // calculate shadow color
+  float4 color = float4(0, 0, 0, 0);
 
-  float shadow = smoothstep(constants.shadow_radius, constants.shadow_radius - constants.shadow_softness, d);
+  if (constants.shadow_radius > 0)
+  {
+    float2 extent_div2 = (p1 - p0) * 0.5;
+    float2 center      = p0 + extent_div2;
+    float  d           = sdBox(pos.xy - center, extent_div2);
+    float  shadow      = smoothstep(constants.shadow_radius, constants.shadow_radius - constants.shadow_softness, d);
+    color = float4(constants.shadow_color, shadow);
+  }
 
-  return float4(constants.shadow_color, shadow);
+  // draw wireframe
+  if (constants.draw_wireframe == 1)
+  {
+    // if on wireframe
+    if (pos.x > p0.x - 1 && pos.x < p1.x + 1 && pos.y > p0.y - 1 && pos.y < p1.y + 1)
+    {
+      if (constants.shadow_radius > 0)
+        color = lerp(color, constants.wireframe_color, constants.wireframe_color.a);
+      else
+        color = constants.wireframe_color;
+    }
+  }
+
+  return color;
 }

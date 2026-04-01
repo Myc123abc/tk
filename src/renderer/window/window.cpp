@@ -180,11 +180,11 @@ void Window::update_by_rect(RECT rect, float scale) noexcept
 
 void Window::update_by_real_rect(RECT rect, float scale) noexcept
 {
+  _scale  = scale;
   _x      = rect.left + shadow_thickness();
   _y      = rect.top  + shadow_thickness();
-  _width  = (rect.right  - rect.left) * scale / _scale - shadow_thickness() * 2;
-  _height = (rect.bottom - rect.top)  * scale / _scale - shadow_thickness() * 2;
-  _scale  = scale;
+  _width  = (rect.right  - rect.left) - shadow_thickness() * 2;
+  _height = (rect.bottom - rect.top)  - shadow_thickness() * 2;
   update_rect();
   g_ui_ctx.send_message(UIContext::Message_Scale_Change{ _handle, scale, _x, _y, _width, _height });
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });

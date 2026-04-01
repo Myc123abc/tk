@@ -169,7 +169,7 @@ void begin_path() noexcept
 
 void end_path(Color color, float thickness) noexcept
 {
-  g_ui_ctx.end_path(color, thickness);
+  g_ui_ctx.end_path(color, thickness * g_ui_ctx.get_scale());
 }
 
 void begin_union() noexcept
@@ -179,7 +179,7 @@ void begin_union() noexcept
 
 void end_union(Color color, float thickness) noexcept
 {
-  g_ui_ctx.end_union(color, thickness);
+  g_ui_ctx.end_union(color, thickness * g_ui_ctx.get_scale());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -198,6 +198,7 @@ void rectangle(glm::vec2 left_top, glm::vec2 right_bottom, Color color, float th
   auto scale = g_ui_ctx.get_scale();
   left_top     *= scale;
   right_bottom *= scale;
+  thickness    *= scale;
 
   g_ui_ctx.cmd()->draw_rectangle(left_top, right_bottom, color, thickness);
 }
@@ -213,9 +214,10 @@ void triangle(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color, float thick
 	p2 += offset;
 
   auto scale = g_ui_ctx.get_scale();
-  p0 *= scale;
-  p1 *= scale;
-  p2 *= scale;
+  p0        *= scale;
+  p1        *= scale;
+  p2        *= scale;
+  thickness *= scale;
 
 	g_ui_ctx.cmd()->draw_triangle(p0, p1, p2, color, thickness);
 }
@@ -229,15 +231,18 @@ void circle(glm::vec2 center, float radius, Color color, float thickness) noexce
   center += offset;
 
   auto scale = g_ui_ctx.get_scale();
-  radius *= scale;
-  center *= scale;
+  radius    *= scale;
+  center    *= scale;
+  thickness *= scale;
 
   g_ui_ctx.cmd()->draw_circle(center, radius, color, thickness);
 }
 
-void line(glm::vec2 p0, glm::vec2 p1, Color color) noexcept
+void line(glm::vec2 p0, glm::vec2 p1, Color color, float thickness) noexcept
 {
   if (p0 == p1) return;
+
+  if (thickness < 1) thickness = 1;
 
 	g_ui_ctx.check_draw();
 
@@ -246,14 +251,17 @@ void line(glm::vec2 p0, glm::vec2 p1, Color color) noexcept
   p1 += offset;
 
   auto scale = g_ui_ctx.get_scale();
-  p0 *= scale;
-  p1 *= scale;
+  p0        *= scale;
+  p1        *= scale;
+  thickness *= scale;
 
-  g_ui_ctx.cmd()->draw_line(p0, p1, color);
+  g_ui_ctx.cmd()->draw_line(p0, p1, color, thickness);
 }
 
-void bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color) noexcept
+void bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color, float thickness) noexcept
 {
+  if (thickness < 1) thickness = 1;
+
 	g_ui_ctx.check_draw();
 
 	auto offset = g_ui_ctx.get_render_pos();
@@ -262,11 +270,12 @@ void bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color) noexcept
   p2 += offset;
 
   auto scale = g_ui_ctx.get_scale();
-  p0 *= scale;
-  p1 *= scale;
-  p2 *= scale;
+  p0        *= scale;
+  p1        *= scale;
+  p2        *= scale;
+  thickness *= scale;
 
-  g_ui_ctx.cmd()->draw_bezier(p0, p1, p2, color);
+  g_ui_ctx.cmd()->draw_bezier(p0, p1, p2, color, thickness);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

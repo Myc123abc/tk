@@ -131,6 +131,10 @@ label_draw_call_again:
       .shadow_radius        = data.window_shadow_info->radius,
       .shadow_color         = data.window_shadow_info->color,
       .shadow_softness      = data.window_shadow_info->softness,
+      .wireframe_color      = data.window_shadow_info->wireframe_color.has_value()
+                              ? data.window_shadow_info->wireframe_color.value()
+                              : glm::vec4{},
+      .draw_wireframe       = data.window_shadow_info->wireframe_color.has_value(),
     });
     if (!data.is_scissor_rect_empty())
       scissor_rect = data.pop_scissor_rect();

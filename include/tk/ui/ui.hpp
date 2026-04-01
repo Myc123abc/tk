@@ -271,8 +271,9 @@ void circle(glm::vec2 center, float radius, Color color = {}, float thickness = 
  * @param p0
  * @param p1
  * @param color
+ * @param thickness
  */
-void line(glm::vec2 p0, glm::vec2 p1, Color color = {}) noexcept;
+void line(glm::vec2 p0, glm::vec2 p1, Color color = {}, float thickness = 1.f) noexcept;
 
 /**
  * draw a quadratic bezier
@@ -280,8 +281,9 @@ void line(glm::vec2 p0, glm::vec2 p1, Color color = {}) noexcept;
  * @param p1
  * @param p2
  * @param color
+ * @param thickness
  */
-void bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color = 0) noexcept;
+void bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color = {}, float thickness = 1.f) noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                               Widget

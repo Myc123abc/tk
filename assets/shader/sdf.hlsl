@@ -34,11 +34,6 @@ enum : uint32_t
   op_discard
 };
 
-enum : uint32_t
-{
-  // flag_window_shadow = 0b1
-};
-
 struct ShapeProperty
 {
   uint32_t type;
@@ -46,11 +41,6 @@ struct ShapeProperty
   float    thickness;
   uint32_t op;
   uint32_t flags;
-
-  // bool use_window_shadow()
-  // {
-  //   return bool(flags & flag_window_shadow);
-  // }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -281,8 +271,8 @@ float4 ps(PSParameter args) : SV_TARGET
     if (shape_property.op == op_union)
     {
       shape_property = get_shape_property(offset);
-      color = shape_property.color;
-      d     = min(d, get_sd(args.pos.xy, shape_property.type, offset));
+      color          = shape_property.color;
+      d              = min(d, get_sd(args.pos.xy, shape_property.type, offset));
     }
     else if (shape_property.op == op_discard)
     {

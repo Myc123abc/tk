@@ -72,6 +72,7 @@ struct LineInfo
   glm::vec2 p0{};
   glm::vec2 p1{};
   Color     color{};
+  float     thickness{};
 };
 
 struct BezierInfo
@@ -80,6 +81,7 @@ struct BezierInfo
   glm::vec2 p1{};
   glm::vec2 p2{};
   Color     color{};
+  float     thickness{};
 };
 
 struct DiscardRectangleInfo
@@ -125,11 +127,12 @@ struct WindowPosInfo
 
 struct WindowShadowInfo
 {
-  glm::vec<2, uint32_t> window_extent{};
-  float                 shadow_thickness{};
-  glm::vec3             color{};
-  float                 radius{};
-  float                 softness{};
+  glm::vec<2, uint32_t>    window_extent{};
+  float                    shadow_thickness{};
+  glm::vec3                color{};
+  float                    radius{};
+  float                    softness{};
+  std::optional<glm::vec4> wireframe_color{};
 };
 
 class CommandList
@@ -211,14 +214,14 @@ public:
     push(CommandType::draw_circle, CircleInfo{ center, radius, color, thickness });
   }
 
-  void draw_line(glm::vec2 p0, glm::vec2 p1, Color color) noexcept
+  void draw_line(glm::vec2 p0, glm::vec2 p1, Color color, float thickness) noexcept
   {
-    push(CommandType::draw_line, LineInfo{ p0, p1, color });
+    push(CommandType::draw_line, LineInfo{ p0, p1, color, thickness });
   }
 
-  void draw_bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color) noexcept
+  void draw_bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color, float thickness) noexcept
   {
-    push(CommandType::draw_bezier, BezierInfo{ p0, p1, p2, color });
+    push(CommandType::draw_bezier, BezierInfo{ p0, p1, p2, color, thickness });
   }
 
   void add_discard_rectangle(glm::vec2 left_top, glm::vec2 right_bottom) noexcept
@@ -271,9 +274,9 @@ public:
     push(CommandType::set_window_pos, WindowPosInfo{ pos });
   }
 
-  void draw_window_shadow(glm::vec<2, uint32_t> window_extent, float shadow_thickness, Color color, float radius, float softness) noexcept
+  void draw_window_shadow(glm::vec<2, uint32_t> window_extent, float shadow_thickness, Color color, float radius, float softness, std::optional<glm::vec4> wireframe_color) noexcept
   {
-    push(CommandType::draw_window_shadow, WindowShadowInfo{ window_extent, shadow_thickness, { color.r, color.g, color.b }, radius, softness });
+    push(CommandType::draw_window_shadow, WindowShadowInfo{ window_extent, shadow_thickness, { color.r, color.g, color.b }, radius, softness, wireframe_color });
   }
 
   auto submit() noexcept -> CommandList&

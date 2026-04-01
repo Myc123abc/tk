@@ -17,11 +17,17 @@ struct alignas(16) Constants
 {
   glm::vec<2, uint32_t> render_target_extent{};
   glm::vec<2, uint32_t> window_extent{};
+
   glm::vec2             window_pos{};
   float                 shadow_thickness{};
   float                 shadow_radius{};
+
   glm::vec3             shadow_color{};
   float                 shadow_softness{};
+
+  glm::vec4             wireframe_color{};
+
+  uint32_t              draw_wireframe{};
   float                 image_alpha{};
 };
 

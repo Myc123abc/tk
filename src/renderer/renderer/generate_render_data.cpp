@@ -78,17 +78,17 @@ void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
     {
       try_push_draw_data();
       auto info = reinterpret_cast<RectangleInfo*>(info_ptr);
-      if (is_integer_scale(info->left_top.x)     &&
-          is_integer_scale(info->left_top.y)     &&
-          is_integer_scale(info->right_bottom.x) &&
-          is_integer_scale(info->right_bottom.y))
-	      add_shape(render_data, ShapeProperty::Type::rectangle, info->color, info->thickness,
-          { info->left_top.x, info->left_top.y, info->right_bottom.x, info->right_bottom.y },
-          { info->left_top, info->right_bottom });
-      else
-	      add_shape(render_data, ShapeProperty::Type::rectangle, info->color, info->thickness,
-          { info->left_top.x, info->left_top.y, info->right_bottom.x, info->right_bottom.y },
-          { info->left_top - glm::vec2(1), info->right_bottom + glm::vec2(1) });
+      auto lt = info->left_top;
+      auto rb = info->right_bottom;
+      if (info->thickness > 1)
+      {
+        auto t = info->thickness / 2;
+        lt -= t;
+        rb += t;
+      }
+	    add_shape(render_data, ShapeProperty::Type::rectangle, info->color, info->thickness,
+        { info->left_top.x, info->left_top.y, info->right_bottom.x, info->right_bottom.y },
+        { lt, rb });
     }
     break;
 
@@ -119,9 +119,21 @@ void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
       try_push_draw_data();
       auto info = reinterpret_cast<LineInfo*>(info_ptr);
       if (_path_data.empty())
-        add_shape(render_data, ShapeProperty::Type::line, info->color, {},
-          { info->p0.x, info->p0.y, info->p1.x, info->p1.y },
-          get_bounding_rectangle({ info->p0, info->p1 }));
+      {
+        if (info->thickness > 1)
+        {
+          auto p  = (info->p0 + info->p1) / 2.f;
+          auto dp = glm::abs(info->p1 - info->p0) / 2.f;
+          auto t  = info->thickness / 2;
+          add_shape(render_data, ShapeProperty::Type::line, info->color, info->thickness,
+            { info->p0.x, info->p0.y, info->p1.x, info->p1.y },
+            get_bounding_rectangle({ p - dp - t, p + dp + t }));
+        }
+        else
+          add_shape(render_data, ShapeProperty::Type::line, info->color, info->thickness,
+            { info->p0.x, info->p0.y, info->p1.x, info->p1.y },
+            get_bounding_rectangle({ info->p0, info->p1 }));
+      }
       else
       {
         _path_data[0] = std::bit_cast<float>(std::bit_cast<uint32_t>(_path_data[0]) + 1);
@@ -140,7 +152,7 @@ void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
       try_push_draw_data();
       auto info = reinterpret_cast<BezierInfo*>(info_ptr);
       if (_path_data.empty())
-        add_shape(render_data, ShapeProperty::Type::bezier, info->color, {},
+        add_shape(render_data, ShapeProperty::Type::bezier, info->color, info->thickness,
           { info->p0.x, info->p0.y, info->p1.x, info->p1.y, info->p2.x, info->p2.y },
           get_bounding_rectangle({ info->p0, info->p1, info->p2 }));
       else
