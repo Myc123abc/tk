@@ -63,8 +63,8 @@ void Window::init_blur_window() noexcept
 
   _blur_res = g_compositor.create_resource(_blur_window);
 
-  keep_blur_window_behind();
-  ShowWindow(_blur_window, SW_SHOW);
+  // show blur window after first frame present complete
+  g_renderer.send_message(Renderer::Message_Show_Blur_Window{ _handle, _blur_window });
 }
 
 void Window::init_auxiliary(int x, int y, uint32_t width, uint32_t height) noexcept
@@ -501,6 +501,12 @@ void Window::keep_blur_window_behind() const noexcept
 {
   if (_blur_window)
     SetWindowPos(_blur_window, _handle, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+}
+
+void Window::show_blur_window() const noexcept
+{
+  ShowWindow(_blur_window, SW_SHOW);
+  keep_blur_window_behind();
 }
 
 }

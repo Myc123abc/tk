@@ -31,6 +31,11 @@ void Renderer::MessageHandler::operator()(Message_Window_Update const& msg) cons
   renderer._res[msg.handle].resize(msg.width, msg.height);
 }
 
+void Renderer::MessageHandler::operator()(Message_Show_Blur_Window const& msg) const noexcept
+{
+  renderer._show_blur_wnds.emplace(msg.handle, msg.blur_handle);
+}
+
 void Renderer::UIContextMessageHandler::operator()(Message_Upload_Image const& msg) const noexcept
 {
   // create image resource

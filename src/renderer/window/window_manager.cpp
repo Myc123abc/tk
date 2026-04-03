@@ -488,6 +488,11 @@ void WindowManager::restore_fullscreen_window(HWND handle) const noexcept
   PostThreadMessageW(_thread_id, static_cast<UINT>(Message::restore_fullscreen_window), std::bit_cast<WPARAM>(handle), 0);
 }
 
+void WindowManager::show_blur_window(HWND handle) const noexcept
+{
+  PostThreadMessageW(_thread_id, static_cast<UINT>(Message::show_blur_window), std::bit_cast<WPARAM>(handle), 0);
+}
+
 void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LPARAM l_param) noexcept
 {
   switch (msg)
@@ -555,6 +560,12 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
   case Message::restore_fullscreen_window:
   {
     _windows.at(std::bit_cast<HWND>(w_param)).restore_fullscreen();
+    break;
+  }
+
+  case Message::show_blur_window:
+  {
+    _windows.at(std::bit_cast<HWND>(w_param)).show_blur_window();
     break;
   }
 

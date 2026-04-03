@@ -58,6 +58,8 @@ private:
   std::binary_semaphore                                 _frame_sem{ 1 };
   std::binary_semaphore                                 _cmds_empty{ 0 };
 
+  std::unordered_map<HWND, HWND> _show_blur_wnds;
+
 ////////////////////////////////////////////////////////////////////////////////
 ///                           Image
 ////////////////////////////////////////////////////////////////////////////////
@@ -118,10 +120,17 @@ public:
     uint32_t height{};
   };
 
+  struct Message_Show_Blur_Window
+  {
+    HWND handle{};
+    HWND blur_handle{};
+  };
+
   using Message = std::variant<
     Message_Window_Create,
     Message_Window_Destroy,
-    Message_Window_Update
+    Message_Window_Update,
+    Message_Show_Blur_Window
   >;
 
   void send_message(Message&& msg) noexcept
@@ -167,6 +176,7 @@ private:
     void operator()(Message_Window_Create const& msg) const noexcept;
     void operator()(Message_Window_Update const& msg) const noexcept;
     void operator()(Message_Window_Destroy const& msg) const noexcept;
+    void operator()(Message_Show_Blur_Window const& msg) const noexcept;
   };
   struct UIContextMessageHandler
   {

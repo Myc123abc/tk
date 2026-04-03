@@ -72,6 +72,7 @@ public:
     fullscreen_window,
     restore_fullscreen_window,
     signal,
+    show_blur_window,
   };
 
   void init() noexcept;
@@ -89,6 +90,7 @@ public:
   void restore_window(HWND handle) const noexcept;
   void fullscreen_window(HWND handle) const noexcept;
   void restore_fullscreen_window(HWND handle) const noexcept;
+  void show_blur_window(HWND handle) const noexcept;
 
   auto get_window_z_orders() const noexcept -> std::vector<HWND>;
   auto get_cursor_on_window() const noexcept -> HWND;

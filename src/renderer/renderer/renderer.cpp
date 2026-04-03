@@ -6,6 +6,9 @@
 #include "util/error_handling.hpp"
 #include "../resource/descriptor_heap_manager.hpp"
 #include "pipeline/pipeline_system.hpp"
+#include "../window/window_manager.hpp"
+
+#include <dwmapi.h>
 
 #include <stb_image.h>
 
@@ -163,6 +166,16 @@ void Renderer::render() noexcept
     for (auto handle : _render_windows | std::views::take(_render_windows.size() - 1))
       _res.at(handle).present(false);
     _res.at(_render_windows.back()).present(true);
+  }
+
+  // show blur window
+  if (!_show_blur_wnds.empty() &&
+      std::ranges::any_of(_render_windows, [&](auto handle) { return _show_blur_wnds.contains(handle); }))
+  {
+    DwmFlush();
+    for (auto wnd : _show_blur_wnds | std::views::keys)
+      g_wnd_mgr.show_blur_window(wnd);
+    _show_blur_wnds.clear();
   }
 
   postprocess_render();
