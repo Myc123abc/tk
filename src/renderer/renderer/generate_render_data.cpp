@@ -37,11 +37,6 @@ auto get_bounding_rectangle(std::vector<glm::vec2> const& data) noexcept -> std:
   return { min, max };
 }
 
-auto is_integer_scale(float s)
-{
-  return std::fabs(s - std::round(s)) < 0.0001f;
-}
-
 }
 
 namespace tk::renderer {

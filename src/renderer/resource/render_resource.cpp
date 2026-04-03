@@ -14,11 +14,6 @@ namespace tk::renderer {
 
 void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
 {
-  // TODO: custom set backdrop type
-  _backdrop_type = BackdropType::transparent;
-
-  _handle = handle;
-
   // create offscreen images
   for (auto& frame : _frames)
     frame.image.init(width, height, Render_Target_Format, ImageType::rtv);
@@ -42,22 +37,17 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
   err_if(g_core.factory()->CreateSwapChainForComposition(g_graphics_engine.queue(), &swapchain_desc, nullptr, &swapchain),
           "failed to create swapchain for composition");
 
-  if (_backdrop_type == BackdropType::transparent)
-  {
-    // create composition
-    err_if(g_core.device_comp()->CreateTargetForHwnd(handle, true, &_comp_target),
-            "failed to create composition target");
-    err_if(g_core.device_comp()->CreateVisual(&_comp_visual),
-            "failed to create composition visual");
-    err_if(_comp_visual->SetContent(swapchain.Get()),
-            "failed to bind swapchain to composition visual");
-    err_if(_comp_target->SetRoot(_comp_visual.Get()),
-            "failed to bind composition visual to target");
-    err_if(g_core.device_comp()->Commit(),
-            "failed to commit composition device");
-  }
-  else if (_backdrop_type == BackdropType::blur)
-    _comp_res = g_compositor.create_resource(handle, swapchain.Get());
+  // create composition
+  err_if(g_core.device_comp()->CreateTargetForHwnd(handle, true, &_comp_target),
+          "failed to create composition target");
+  err_if(g_core.device_comp()->CreateVisual(&_comp_visual),
+          "failed to create composition visual");
+  err_if(_comp_visual->SetContent(swapchain.Get()),
+          "failed to bind swapchain to composition visual");
+  err_if(_comp_target->SetRoot(_comp_visual.Get()),
+          "failed to bind composition visual to target");
+  err_if(g_core.device_comp()->Commit(),
+          "failed to commit composition device");
 
   // set swapchain property and get waitable object
   _swapchain = TryAs<IDXGISwapChain4>(swapchain);
@@ -91,10 +81,6 @@ void RenderResource::destroy() noexcept
     frame.swapchain_image.destroy();
     frame.buffer.destroy();
   }
-  if (_backdrop_type == BackdropType::blur)
-  {
-    // TODO:
-  }
 }
 
 void RenderResource::resize(uint32_t width, uint32_t height) noexcept
@@ -109,8 +95,7 @@ void RenderResource::resize(uint32_t width, uint32_t height) noexcept
     frame.swapchain_image.destroy();
     frame.image.destroy();
   }
-  if (_backdrop_type == BackdropType::transparent)
-    _comp_visual->SetContent(nullptr);
+  _comp_visual->SetContent(nullptr);
   if (Enable_Depth_Test)
     _dsv_image.destroy();
 
@@ -118,19 +103,12 @@ void RenderResource::resize(uint32_t width, uint32_t height) noexcept
   err_if(_swapchain->ResizeBuffers(Frame_Count, width, height, DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT | DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING),
           "failed to resize swapchain");
 
-  if (_backdrop_type == BackdropType::transparent)
-  {
-    // rebind composition resources
-    err_if(_comp_visual->SetContent(_swapchain.Get()),
-            "failed to bind swapchain to composition visual");
-    err_if(g_core.device_comp()->Commit(),
-            "failed to commit composition device");
-  }
-  else if (_backdrop_type == BackdropType::blur)
-  {
-    // TODO: resize surface
-  }
-  
+  // rebind composition resources
+  err_if(_comp_visual->SetContent(_swapchain.Get()),
+          "failed to bind swapchain to composition visual");
+  err_if(g_core.device_comp()->Commit(),
+          "failed to commit composition device");
+
   // recreate images
   for (auto [i, frame] : _frames | std::views::enumerate)
   {

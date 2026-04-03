@@ -6,7 +6,6 @@
 #include "util/error_handling.hpp"
 #include "../resource/descriptor_heap_manager.hpp"
 #include "pipeline/pipeline_system.hpp"
-#include "../compositor.hpp"
 
 #include <stb_image.h>
 
@@ -19,7 +18,6 @@ void Renderer::init() noexcept
   _thread = std::jthread([this]
   {
     g_core.init();
-    g_compositor.init(); 
     g_pipe_sys.init();
     g_desc_heap_mgr.init();
     g_graphics_engine.init();
@@ -66,8 +64,6 @@ void Renderer::add_frame_render_complete_func(std::move_only_function<void()>&& 
   auto last_fence_values = std::vector<std::pair<Engine&, uint64_t>>
   {
     { g_graphics_engine, g_graphics_engine.signal() },
-    // TODO: need this?
-    // { g_copy_engine,     g_copy_engine.signal() },
   };
   _frame_render_complete_funcs.emplace_back([func = std::move(func), last_fence_values = std::move(last_fence_values)]() mutable
   {
