@@ -111,6 +111,7 @@ public:
   struct Message_Window_Destroy
   {
     HWND handle{};
+    HWND blur_handle{};
   };
 
   struct Message_Window_Update

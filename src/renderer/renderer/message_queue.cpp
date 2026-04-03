@@ -1,5 +1,6 @@
 #include "renderer.hpp"
 #include "util/error_handling.hpp"
+#include "../window/window_manager.hpp"
 
 namespace tk::renderer {
 
@@ -15,10 +16,10 @@ void Renderer::MessageHandler::operator()(Message_Window_Create const& msg) cons
 void Renderer::MessageHandler::operator()(Message_Window_Destroy const& msg) const noexcept
 {
   err_if(!renderer._res.contains(msg.handle), "failed to destroy window render resource, it's unexist");
-  renderer.add_frame_render_complete_func([handle = msg.handle, res = std::move(renderer._res.at(msg.handle))] mutable
+  renderer.add_frame_render_complete_func([handle = msg.handle, blur_handle = msg.blur_handle, res = std::move(renderer._res.at(msg.handle))] mutable
   {
     res.destroy();
-    DestroyWindow(handle);
+    g_wnd_mgr.destroy_window(handle, blur_handle);
   });
   renderer._res.erase(msg.handle);
   renderer._render_datas.erase(msg.handle);

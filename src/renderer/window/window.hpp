@@ -141,8 +141,10 @@ private:
   Compositor::Resource _blur_res{};
 private:
   void init_blur_window() noexcept;
-  void keep_blur_window_behind() const noexcept;
   void show_blur_window() const noexcept;
+  void keep_blur_window_behind() const noexcept;
+  void keep_blur_window_behind_move() const noexcept;
+  void keep_blur_window_behind_resize() const noexcept;
 };
 
 }

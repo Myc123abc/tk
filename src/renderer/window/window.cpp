@@ -58,8 +58,13 @@ void Window::init(int x, int y, uint32_t width, uint32_t height, bool blur_backd
 void Window::init_blur_window() noexcept
 {
   _blur_window = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
-    WindowManager::Auxiliary_Class, nullptr, WS_POPUP, _x, _y, _width, _height, 0, 0, GetModuleHandleW(nullptr), 0);
+    WindowManager::Blur_Class, nullptr, WS_POPUP, _x, _y, _width, _height, 0, 0, GetModuleHandleW(nullptr), 0);
   err_if(!_handle, "failed to create window");
+  
+  // INFO: don't make blur window owned host as follow
+  // SetWindowLongPtr(hwndBlur, GWLP_HWNDPARENT, (LONG_PTR)hwndHost);
+  // this seem make dwm reset z-order lead g_wnd_mgr.blur_wnd_proc's WM_WINDOWPOSCHANGED's keep_blur_window_behind invalid.
+  // lead blinking reappear!!!
 
   _blur_res = g_compositor.create_resource(_blur_window);
 
@@ -100,8 +105,10 @@ void Window::update_rect() noexcept
 
 void Window::destroy() const noexcept
 {
+  if (_blur_window)
+    ShowWindow(_blur_window, SW_HIDE);
   ShowWindow(_handle, SW_HIDE);
-  g_renderer.send_message(Renderer::Message_Window_Destroy{ _handle });
+  g_renderer.send_message(Renderer::Message_Window_Destroy{ _handle, _blur_window });
 }
 
 auto Window::cursor_pos() const noexcept -> glm::vec<2, int>
@@ -497,16 +504,28 @@ auto Window::get_resize_type(glm::vec<2, int> const& p) const noexcept -> Resize
   return none;
 }
 
+void Window::show_blur_window() const noexcept
+{
+  ShowWindow(_blur_window, SW_SHOW);
+  keep_blur_window_behind();
+}
+
 void Window::keep_blur_window_behind() const noexcept
 {
   if (_blur_window)
     SetWindowPos(_blur_window, _handle, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
 }
 
-void Window::show_blur_window() const noexcept
+void Window::keep_blur_window_behind_move() const noexcept
 {
-  ShowWindow(_blur_window, SW_SHOW);
-  keep_blur_window_behind();
+  if (_blur_window)
+    SetWindowPos(_blur_window, _handle, _x, _y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+}
+
+void Window::keep_blur_window_behind_resize() const noexcept
+{
+  if (_blur_window)
+    SetWindowPos(_blur_window, _handle, _x, _y, _width, _height, SWP_NOACTIVATE | SWP_NOOWNERZORDER);
 }
 
 }

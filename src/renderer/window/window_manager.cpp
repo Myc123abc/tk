@@ -85,6 +85,9 @@ void WindowManager::init() noexcept
     wnd_class.lpszClassName = Window_Class;
     wnd_class.lpfnWndProc   = wnd_proc;
     err_if(!RegisterClassExW(&wnd_class), "failed register class");
+    wnd_class.lpszClassName = Blur_Class;
+    wnd_class.lpfnWndProc   = blur_wnd_proc;
+    err_if(!RegisterClassExW(&wnd_class), "failed register class");
 
     // create message queue, avoid the first PostMessage failed because message queue is unexit
     PeekMessageW(nullptr, nullptr, 0, 0, PM_NOREMOVE);
@@ -116,6 +119,26 @@ void WindowManager::destroy() noexcept
   PostThreadMessageW(_thread_id, WM_QUIT, 0, 0);
   _thread.join();
   CloseHandle(_signal_event);
+}
+
+LRESULT CALLBACK WindowManager::blur_wnd_proc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param) noexcept
+{
+  static auto& wnd_mgr   = WindowManager::instance();
+  static auto& wnds      = wnd_mgr._windows;
+  static auto& blur_wnds = wnd_mgr._blur_windows;
+
+  switch (msg)
+  {
+  case WM_WINDOWPOSCHANGED:
+  {
+    // avoid window hide lead other blur windows z-order changed
+    if (blur_wnds.contains(handle))
+      wnds.at(blur_wnds.at(handle)).keep_blur_window_behind();
+    break;
+  }
+  }
+
+  return DefWindowProcW(handle, msg, w_param, l_param);
 }
 
 LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param) noexcept
@@ -248,6 +271,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
             // resize window when moving window between different scale of monitors
             wnd_mgr.update_monitor(handle, pos, left_button_down_window_cursor_pos);
           }
+          window.keep_blur_window_behind_move();
         }
       }
       // resizing
@@ -258,6 +282,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
           auto offset = pos - last_cursor_pos;
           window.adjust_offset(left_button_down_resize_type, pos, offset.x, offset.y);
           window.resize(left_button_down_resize_type, offset.x, offset.y);
+          window.keep_blur_window_behind_resize();
         }
       }
     }
@@ -493,6 +518,11 @@ void WindowManager::show_blur_window(HWND handle) const noexcept
   PostThreadMessageW(_thread_id, static_cast<UINT>(Message::show_blur_window), std::bit_cast<WPARAM>(handle), 0);
 }
 
+void WindowManager::destroy_window(HWND handle, HWND blur_handle) const noexcept
+{
+  PostThreadMessageW(_thread_id, static_cast<UINT>(Message::destroy_window), std::bit_cast<WPARAM>(handle), std::bit_cast<LPARAM>(blur_handle));
+}
+
 void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LPARAM l_param) noexcept
 {
   switch (msg)
@@ -521,6 +551,7 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
   {
     auto handle = std::bit_cast<HWND>(w_param);
     _windows.at(handle).destroy();
+    _blur_windows.erase(_windows.at(handle)._blur_window);
     _windows.erase(handle);
     _using_mouse_pass_through_windows.erase(handle);
     _window_change_size.erase(handle);
@@ -569,6 +600,15 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
     break;
   }
 
+  case Message::destroy_window:
+  {
+    auto blur_handle = std::bit_cast<HWND>(l_param);
+    if (blur_handle)
+      DestroyWindow(blur_handle);
+    DestroyWindow(std::bit_cast<HWND>(w_param));
+    break;
+  }
+
   }
   
   if (static_cast<UINT>(msg) == WM_TIMER)
@@ -608,6 +648,9 @@ void WindowManager::msg_create_window(WPARAM w_param) noexcept
   auto window = Window{};
   window.init(info->x, info->y, info->width, info->height, info->blur_backdrop);
   info->handle = window._handle;
+  
+  if (info->blur_backdrop)
+    _blur_windows.emplace(window._blur_window, window._handle);
 
   // store window
   _windows.emplace(window._handle, std::move(window));

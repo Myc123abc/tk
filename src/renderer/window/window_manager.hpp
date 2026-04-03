@@ -73,6 +73,7 @@ public:
     restore_fullscreen_window,
     signal,
     show_blur_window,
+    destroy_window,
   };
 
   void init() noexcept;
@@ -80,6 +81,7 @@ public:
   void destroy() noexcept;
 
   static LRESULT CALLBACK wnd_proc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param) noexcept;
+  static LRESULT CALLBACK blur_wnd_proc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param) noexcept;
 
   auto create_fullscreen_window() noexcept -> WindowSnapshot;
   auto create_window(int x, int y, uint32_t width, uint32_t height, bool blur_backdrop) noexcept -> WindowSnapshot;
@@ -91,6 +93,7 @@ public:
   void fullscreen_window(HWND handle) const noexcept;
   void restore_fullscreen_window(HWND handle) const noexcept;
   void show_blur_window(HWND handle) const noexcept;
+  void destroy_window(HWND handle, HWND blur_handle) const noexcept;
 
   auto get_window_z_orders() const noexcept -> std::vector<HWND>;
   auto get_cursor_on_window() const noexcept -> HWND;
@@ -106,6 +109,7 @@ private:
 public:
   static constexpr wchar_t Auxiliary_Class[] = L"vn::window::WindowManager::AuxiliaryWindow";
   static constexpr wchar_t Window_Class[]    = L"vn::window::WindowManager::Window";
+  static constexpr wchar_t Blur_Class[]      = L"vn::window::WindowManager::BlurWindow";
 
 private:
   std::jthread                     _thread;
@@ -119,6 +123,8 @@ private:
   
   bool                             _update_monitors{};
   std::unordered_map<HWND, RECT>   _window_change_size{};
+
+  std::unordered_map<HWND, HWND>   _blur_windows;
 )
 
 }
