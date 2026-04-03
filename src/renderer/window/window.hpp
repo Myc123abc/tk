@@ -147,6 +147,7 @@ private:
   void keep_blur_window_behind_move() const noexcept;
   void keep_blur_window_behind_resize() const noexcept;
   void resize_blur_window(RECT rect) const noexcept;
+  void remove_blur_window() noexcept;
 };
 
 }

@@ -552,4 +552,11 @@ void Window::resize_blur_window(RECT rect) const noexcept
   keep_blur_window_behind();
 }
 
+void Window::remove_blur_window() noexcept
+{
+  ShowWindow(_blur_window, SW_HIDE);
+  DestroyWindow(_blur_window);
+  _blur_window = {};
+}
+
 }

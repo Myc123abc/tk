@@ -548,6 +548,16 @@ void WindowManager::destroy_window(HWND handle, HWND blur_handle) const noexcept
   PostThreadMessageW(_thread_id, static_cast<UINT>(Message::destroy_window), std::bit_cast<WPARAM>(handle), std::bit_cast<LPARAM>(blur_handle));
 }
 
+void WindowManager::init_blur_window(HWND handle) const noexcept
+{
+  PostThreadMessageW(_thread_id, static_cast<UINT>(Message::init_blur_window), std::bit_cast<WPARAM>(handle), 0);
+}
+
+void WindowManager::remove_blur_window(HWND handle) const noexcept
+{
+  PostThreadMessageW(_thread_id, static_cast<UINT>(Message::remove_blur_window), std::bit_cast<WPARAM>(handle), 0);
+}
+
 void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LPARAM l_param) noexcept
 {
   switch (msg)
@@ -576,7 +586,8 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
   {
     auto handle = std::bit_cast<HWND>(w_param);
     _windows.at(handle).destroy();
-    _blur_windows.erase(_windows.at(handle)._blur_window);
+    if (auto blur_window = _windows.at(handle)._blur_window)
+      _blur_windows.erase(blur_window);
     _windows.erase(handle);
     _using_mouse_pass_through_windows.erase(handle);
     _window_change_size.erase(handle);
@@ -631,6 +642,22 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
     if (blur_handle)
       DestroyWindow(blur_handle);
     DestroyWindow(std::bit_cast<HWND>(w_param));
+    break;
+  }
+
+  case Message::init_blur_window:
+  {
+    auto& wnd = _windows.at(std::bit_cast<HWND>(w_param));
+    wnd.init_blur_window();
+    _blur_windows.emplace(wnd._blur_window, wnd._handle);
+    break;
+  }
+
+  case Message::remove_blur_window:
+  {
+    auto& wnd = _windows.at(std::bit_cast<HWND>(w_param));
+    wnd.remove_blur_window();
+    _blur_windows.erase(wnd._blur_window);
     break;
   }
 
