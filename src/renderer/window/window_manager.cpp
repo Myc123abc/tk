@@ -160,8 +160,21 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     return 0;
   }
 
+  case WM_ACTIVATE:
+  case WM_SETFOCUS:
+  case WM_MOVE:
+  case WM_SIZE:
+  {
+    if (windows.contains(handle))
+      windows.at(handle).keep_blur_window_behind();
+    break;
+  }
+
   case WM_WINDOWPOSCHANGED:
   {
+    if (windows.contains(handle))
+      windows.at(handle).keep_blur_window_behind();
+
     if (IsIconic(handle)) return 0;
     auto info = reinterpret_cast<WINDOWPOS*>(l_param);
     wnd_mgr._window_change_size[handle] = { info->x, info->y, info->cx + info->x, info->cy + info->y };

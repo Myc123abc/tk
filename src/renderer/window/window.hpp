@@ -141,6 +141,7 @@ private:
   Compositor::Resource _blur_res{};
 private:
   void init_blur_window() noexcept;
+  void keep_blur_window_behind() const noexcept;
 };
 
 }

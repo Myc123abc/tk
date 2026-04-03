@@ -57,13 +57,13 @@ void Window::init(int x, int y, uint32_t width, uint32_t height, bool blur_backd
 
 void Window::init_blur_window() noexcept
 {
-  _blur_window = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW,
+  _blur_window = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
     WindowManager::Auxiliary_Class, nullptr, WS_POPUP, _x, _y, _width, _height, 0, 0, GetModuleHandleW(nullptr), 0);
   err_if(!_handle, "failed to create window");
 
   _blur_res = g_compositor.create_resource(_blur_window);
 
-  SetWindowPos(_blur_window, _handle, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+  keep_blur_window_behind();
   ShowWindow(_blur_window, SW_SHOW);
 }
 
@@ -495,6 +495,12 @@ auto Window::get_resize_type(glm::vec<2, int> const& p) const noexcept -> Resize
   if (left_side)  return left;
   if (right_side) return right;
   return none;
+}
+
+void Window::keep_blur_window_behind() const noexcept
+{
+  if (_blur_window)
+    SetWindowPos(_blur_window, _handle, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
 }
 
 }
