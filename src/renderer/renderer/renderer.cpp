@@ -94,6 +94,19 @@ void Renderer::preprocess_render() noexcept
 {
   upload_images();
   g_comp_engine.update();
+
+  if (_blur_host_window && _res.contains(_blur_host_window))
+  {
+    auto& res = _res.at(_blur_host_window);
+
+    if (res.is_frame_complete(_present_frame_idx))
+    {
+      g_wnd_mgr.resize_blur_window(_blur_host_window, _blur_window_rect);
+      _blur_host_window  = {};
+      _blur_window_rect  = {};
+      _present_frame_idx = {};
+    }
+  }
 }
 
 void Renderer::upload_images() noexcept
@@ -141,7 +154,7 @@ void Renderer::render() noexcept
   for (auto _ : std::views::iota(0u, _cmds.size()))
   {
     // pop command list
-    auto [handle, cmd] = *_cmds.front(); _cmds.pop();
+    auto [handle, cmd, blur_host_window, blur_window_rect] = *_cmds.front(); _cmds.pop();
 
     // continue if the window is destoried
     if (_destroied_windows.contains(handle)) continue;
@@ -155,6 +168,14 @@ void Renderer::render() noexcept
     res.wait_frame_complete();
     res.render_begin();
     if (cmd) g_pipe_sys.render(res, _render_datas.at(handle));
+
+    if (blur_host_window)
+    {
+      _blur_host_window  = blur_host_window;
+      _blur_window_rect  = blur_window_rect;
+      _present_frame_idx = res.frame_index();
+    }
+
     res.render_end();
   }
 

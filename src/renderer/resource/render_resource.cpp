@@ -119,7 +119,7 @@ void RenderResource::resize(uint32_t width, uint32_t height) noexcept
     _dsv_image.resize(width, height);
 }
 
-void RenderResource::wait_frame_complete() const noexcept
+void RenderResource::wait_frame_complete() noexcept
 {
   auto& frame = _frames[_frame_index];
   if (g_graphics_engine.fence_completed_value() < frame.fence_value)
@@ -133,6 +133,11 @@ void RenderResource::wait_frame_complete() const noexcept
   }
   else
     WaitForSingleObjectEx(_swapchain_waitable_obj, INFINITE, false);
+}
+
+auto RenderResource::is_frame_complete(uint32_t idx) noexcept -> bool
+{
+  return g_graphics_engine.fence_completed_value() >= _frames[idx].fence_value;
 }
 
 void RenderResource::render_begin() noexcept

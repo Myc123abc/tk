@@ -53,8 +53,10 @@ auto Compositor::create_resource(HWND handle) const noexcept -> Resource
   // create blur visual
   res.blur_visual = _compositor.CreateSpriteVisual();
   res.blur_visual.RelativeSizeAdjustment({ 1.f, 1.f });
+
+  // FIXME:
+  // when duplicate monitors, this blur backdrop brush will invalid on some monitors, but original color brush is ok
   res.blur_visual.Brush(CreateSimpleBackdropBlurBrush(_compositor));
-  // res.blur_visual.Brush(_compositor.CreateColorBrush(winrt::Windows::UI::Colors::Red()));
   res.root.Children().InsertAtBottom(res.blur_visual);
 
   return res;

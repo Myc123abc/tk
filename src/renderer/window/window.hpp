@@ -34,10 +34,6 @@ enum class ResizeType
   bottom,
 };
 
-/**
-FIXME:
-when duplicate monitors, some monitors blur window will transparent.
-*/
 class Window
 {
   friend class WindowManager;
@@ -150,6 +146,7 @@ private:
   void keep_blur_window_behind() const noexcept;
   void keep_blur_window_behind_move() const noexcept;
   void keep_blur_window_behind_resize() const noexcept;
+  void resize_blur_window(RECT rect) const noexcept;
 };
 
 }

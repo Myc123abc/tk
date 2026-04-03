@@ -179,9 +179,9 @@ void UIContext::render() noexcept
   auto need_wakeup = g_renderer.is_sleeping();
 
   // process window render datas
-  auto render = [](Window& wnd, CommandList* cmd) noexcept
+  auto render = [](Window& wnd, CommandList* cmd, HWND blur_host_window = {}, RECT blur_window_rect = {}) noexcept
   {
-    g_renderer.submit(wnd.snap.handle, cmd);
+    g_renderer.submit({ wnd.snap.handle, cmd, blur_host_window, blur_window_rect});
     if (cmd) wnd.next_frame();
   };
   for (auto& wnd : _windows | std::views::values)
@@ -212,7 +212,10 @@ void UIContext::render() noexcept
       window_shadow_wireframe_process(wnd, wnd.real_rect());
       cmd->set_window_pos(wnd.real_pos());
       cmd->submit();
-      render(_fullscreen_window, cmd);
+      if (wnd.cfg.blur_backdrop)
+        render(_fullscreen_window, cmd, wnd.snap.handle, wnd.rect());
+      else
+        render(_fullscreen_window, cmd);
     }
   }
   if (_fullscreen_window.need_clear)

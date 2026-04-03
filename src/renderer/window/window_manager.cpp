@@ -299,7 +299,6 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
           auto offset = pos - last_cursor_pos;
           window.adjust_offset(left_button_down_resize_type, pos, offset.x, offset.y);
           window.resize(left_button_down_resize_type, offset.x, offset.y);
-          window.keep_blur_window_behind_resize();
         }
       }
     }
@@ -418,6 +417,15 @@ void WindowManager::update() noexcept
       }
     }
     _window_change_size.clear();
+  }
+
+  // resize blur windows
+  for (auto _ : std::views::iota(0u, _blur_resize_infos.size()))
+  {
+    auto [handle, rect] = *_blur_resize_infos.front(); _blur_resize_infos.pop();
+
+    if (_windows.contains(handle))
+      _windows.at(handle).resize_blur_window(rect);
   }
 }
 

@@ -546,4 +546,10 @@ void Window::keep_blur_window_behind_resize() const noexcept
     SetWindowPos(_blur_window, _handle, _x, _y, _width, _height, SWP_NOACTIVATE | SWP_NOOWNERZORDER);
 }
 
+void Window::resize_blur_window(RECT rect) const noexcept
+{
+  SetWindowPos(_blur_window, _handle, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+  keep_blur_window_behind();
+}
+
 }

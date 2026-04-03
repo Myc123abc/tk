@@ -1,7 +1,10 @@
 #pragma once
 
 #include "window.hpp"
+#include "../config.hpp"
 #include "../../util/singleton.hpp"
+
+#include <rigtorp/SPSCQueue.h>
 
 #include <thread>
 #include <latch>
@@ -126,6 +129,14 @@ private:
   std::unordered_map<HWND, RECT>   _window_change_size{};
 
   std::unordered_map<HWND, HWND>   _blur_windows;
+  struct BlurWindowResizeInfo
+  {
+    HWND handle{};
+    RECT rect{};
+  };
+  rigtorp::SPSCQueue<BlurWindowResizeInfo> _blur_resize_infos{ Blur_Window_Resize_Info_Queue_Capacity };
+public:
+  void resize_blur_window(HWND handle, RECT rect) noexcept { _blur_resize_infos.emplace(BlurWindowResizeInfo{ handle, rect }); }
 )
 
 }
