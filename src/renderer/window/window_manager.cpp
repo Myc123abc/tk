@@ -3,6 +3,7 @@
 #include "../../ui/ui_context.hpp"
 #include "../renderer/renderer.hpp"
 #include "monitor.hpp"
+#include "compositor.hpp"
 
 #include <shellscalingapi.h>
 
@@ -67,6 +68,8 @@ void WindowManager::init() noexcept
   _thread = std::jthread([this]
   {
     _thread_id = GetCurrentThreadId();
+
+    g_compositor.init();
 
     // enable DPI awareness
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);

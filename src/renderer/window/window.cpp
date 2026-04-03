@@ -49,7 +49,22 @@ void Window::init(int x, int y, uint32_t width, uint32_t height, bool blur_backd
   // create window render resource
   g_renderer.send_message(Renderer::Message_Window_Create{ _handle, real_width(), real_height() });
 
+  if (blur_backdrop)
+    init_blur_window();
+
   ShowWindow(_handle, SW_SHOW);
+}
+
+void Window::init_blur_window() noexcept
+{
+  _blur_window = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW,
+    WindowManager::Auxiliary_Class, nullptr, WS_POPUP, _x, _y, _width, _height, 0, 0, GetModuleHandleW(nullptr), 0);
+  err_if(!_handle, "failed to create window");
+
+  _blur_res = g_compositor.create_resource(_blur_window);
+
+  SetWindowPos(_blur_window, _handle, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+  ShowWindow(_blur_window, SW_SHOW);
 }
 
 void Window::init_auxiliary(int x, int y, uint32_t width, uint32_t height) noexcept

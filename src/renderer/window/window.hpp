@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../config.hpp"
+#include "compositor.hpp"
 
 #include <glm/glm.hpp>
 
@@ -134,6 +135,12 @@ private:
   RECT        _backup_rect{};
 
   std::string _monitor{};
+
+private:
+  HWND                 _blur_window{};
+  Compositor::Resource _blur_res{};
+private:
+  void init_blur_window() noexcept;
 };
 
 }

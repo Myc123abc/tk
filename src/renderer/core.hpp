@@ -6,7 +6,6 @@
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <dcomp.h>
-#include <d3d11on12.h>
 
 namespace tk::renderer {
 
@@ -36,22 +35,11 @@ public:
   auto factory()     const noexcept { return _factory.Get();     }
   auto device()      const noexcept { return _device.Get();      }
   auto device_comp() const noexcept { return _device_comp.Get(); }
-  auto device_11()   const noexcept { return _device_11.Get();   }
-  auto device_d2d()  const noexcept { return _device_d2d.Get();  }
-
-private:
-  void create_device_11on12() noexcept;
 
 private:
   Microsoft::WRL::ComPtr<IDXGIFactory6>       _factory;
   Microsoft::WRL::ComPtr<ID3D12Device2>       _device;
   Microsoft::WRL::ComPtr<IDCompositionDevice> _device_comp;
-
-  Microsoft::WRL::ComPtr<ID3D11On12Device>    _device_11on12;
-  Microsoft::WRL::ComPtr<ID3D12CommandQueue>  _cmd_queue;
-  Microsoft::WRL::ComPtr<ID3D11Device>        _device_11;
-  Microsoft::WRL::ComPtr<ID3D11DeviceContext> _device_11_ctx;
-  Microsoft::WRL::ComPtr<ID2D1Device>         _device_d2d;
 )
 
 }
