@@ -183,13 +183,30 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     return 0;
   }
 
-  case WM_ACTIVATE:
   case WM_SETFOCUS:
-  case WM_MOVE:
+  case WM_ACTIVATE:
   case WM_SIZE:
+  case WM_MOVE:
   {
     if (windows.contains(handle))
       windows.at(handle).keep_blur_window_behind();
+    break;
+  }
+
+  case WM_SYSCOMMAND:
+  {
+    if (w_param == SC_RESTORE)
+    {
+      if (windows.contains(handle))
+      {
+        auto& wnd = windows.at(handle);
+        if (wnd._blur_window)
+        {
+          ShowWindow(wnd._blur_window, SW_RESTORE);
+          wnd.keep_blur_window_behind();
+        }
+      }
+    }
     break;
   }
 
@@ -271,7 +288,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
             // resize window when moving window between different scale of monitors
             wnd_mgr.update_monitor(handle, pos, left_button_down_window_cursor_pos);
           }
-          window.keep_blur_window_behind_move();
+          window.keep_blur_window_behind_resize();
         }
       }
       // resizing
@@ -330,7 +347,7 @@ void WindowManager::update() noexcept
         ShowWindow(handle, SW_SHOWNOACTIVATE);
         GetWindowRect(handle, &rect);
         window.cancel_fullscreen_maximize(rect, monitor.scale());
-        ShowWindow(handle, SW_MINIMIZE);
+        window.minimize();
         window.set_monitor(monitor.name());
         continue;
       }
@@ -566,7 +583,7 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
 
   case Message::minimize_window:
   {
-    ShowWindow(std::bit_cast<HWND>(w_param), SW_MINIMIZE);
+    _windows.at(std::bit_cast<HWND>(w_param)).minimize();
     break;
   }
 

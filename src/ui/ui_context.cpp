@@ -49,7 +49,11 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
 
   _window = &_windows[name.data()];
   _window->is_called = true;
-  _window->cfg       = cfg;
+
+  if (cfg.blur_backdrop && !_window->cfg.blur_backdrop)
+    g_wnd_mgr.init_blur_window(_window->snap.handle);
+  _window->cfg = cfg;
+
   if (is_closed)
     *is_closed = _window->is_closed;
 

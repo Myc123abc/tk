@@ -34,6 +34,10 @@ enum class ResizeType
   bottom,
 };
 
+/**
+FIXME:
+when duplicate monitors, some monitors blur window will transparent.
+*/
 class Window
 {
   friend class WindowManager;
@@ -91,6 +95,7 @@ public:
   void update_by_rect(RECT rect, float scale) noexcept;
 
   void maximize() noexcept;
+  void minimize() noexcept;
   void cancel_maximize(RECT rect, float scale) noexcept;
   void restore() noexcept;
   void fullscreen() noexcept;
