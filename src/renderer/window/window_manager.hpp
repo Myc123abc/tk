@@ -81,7 +81,7 @@ public:
   static LRESULT CALLBACK wnd_proc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param) noexcept;
 
   auto create_fullscreen_window() noexcept -> WindowSnapshot;
-  auto create_window(int x, int y, uint32_t width, uint32_t height) noexcept -> WindowSnapshot;
+  auto create_window(int x, int y, uint32_t width, uint32_t height, bool blur_backdrop) noexcept -> WindowSnapshot;
   void close_window(HWND handle) const noexcept;
   void close_fullscreen_window() const noexcept;
   void minimize_window(HWND handle) const noexcept;

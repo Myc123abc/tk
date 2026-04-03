@@ -20,7 +20,7 @@ auto in_range(float v, float min, float max) noexcept
 
 namespace tk::renderer {
 
-void Window::init(int x, int y, uint32_t width, uint32_t height) noexcept
+void Window::init(int x, int y, uint32_t width, uint32_t height, bool blur_backdrop) noexcept
 {
   auto monitor = Monitor{ { x, y, static_cast<LONG>(x + width), static_cast<LONG>(y + height) } };
 

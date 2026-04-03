@@ -130,6 +130,7 @@ int main()
 		cfg.display_window_shadow         = true;
     cfg.display_wireframe_only_active = true;
     cfg.wireframe_color               = 0x7160e8ff;
+    cfg.blur_backdrop                 = true;
 
     if (!wnd1_is_closed)
     {

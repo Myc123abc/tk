@@ -27,6 +27,7 @@ struct WindowCreateInfo
   HWND     handle{};
   int      x{}, y{};
   uint32_t width{}, height{};
+  bool     blur_backdrop{};
 };
 
 void set_cursor(HWND handle, ResizeType type) noexcept
@@ -413,15 +414,16 @@ auto WindowManager::create_fullscreen_window() noexcept -> WindowSnapshot
   return snap;
 }
 
-auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height) noexcept -> WindowSnapshot
+auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height, bool blur_backdrop) noexcept -> WindowSnapshot
 {
   // create WindowCreateInfo
   auto ptr = reinterpret_cast<WindowCreateInfo*>(malloc(sizeof(WindowCreateInfo)));
-  ptr->event  = CreateEventW(nullptr, false, false, nullptr);
-  ptr->x      = x;
-  ptr->y      = y;
-  ptr->width  = width;
-  ptr->height = height;
+  ptr->event         = CreateEventW(nullptr, false, false, nullptr);
+  ptr->x             = x;
+  ptr->y             = y;
+  ptr->width         = width;
+  ptr->height        = height;
+  ptr->blur_backdrop = blur_backdrop;
 
   // send window create message to window thread
   PostThreadMessageW(_thread_id, static_cast<UINT>(Message::create_window), std::bit_cast<WPARAM>(ptr), 0);
@@ -577,7 +579,7 @@ void WindowManager::msg_create_window(WPARAM w_param) noexcept
 
   // init window and set handle
   auto window = Window{};
-  window.init(info->x, info->y, info->width, info->height);
+  window.init(info->x, info->y, info->width, info->height, info->blur_backdrop);
   info->handle = window._handle;
 
   // store window

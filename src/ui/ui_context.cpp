@@ -41,7 +41,7 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
   // create window if not have
   if (!_windows.contains(name.data()))
   {
-    _windows.emplace(name.data(), g_wnd_mgr.create_window(x, y, width, height));
+    _windows.emplace(name.data(), g_wnd_mgr.create_window(x, y, width, height, cfg.blur_backdrop));
     _window = &_windows[name.data()];
     _window_names.emplace(_window->snap.handle, name.data());
     _window->can_be_closed = is_closed;
