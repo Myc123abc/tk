@@ -29,7 +29,14 @@ public:
 
   void acquire_frame() noexcept { _frame_sem.acquire(); }
 
-  void submit(HWND handle, ui::CommandList* cmd) noexcept { _cmds.emplace(handle, cmd); }
+  struct RenderInfo
+  {
+    HWND             handle{};
+    ui::CommandList* cmd{};
+    HWND             blur_host_window{};
+    RECT             blur_window_rect{};
+  };
+  void submit(RenderInfo const& info) noexcept { _cmds.emplace(info); }
 
   auto is_sleeping() const noexcept { return _cmds.empty(); }
   void wakeup() noexcept { _cmds_empty.release(); }
@@ -45,18 +52,20 @@ private:
   void postprocess_render() noexcept;
 
 private:
-  std::jthread                                          _thread;
-  std::atomic_bool                                      _exit{};
+  std::jthread                                _thread;
+  std::atomic_bool                            _exit{};
+  std::deque<std::move_only_function<bool()>> _frame_render_complete_funcs;
+  std::unordered_map<HWND, RenderResource>    _res;
+  std::unordered_set<HWND>                    _destroied_windows;
 
-  std::deque<std::move_only_function<bool()>>           _frame_render_complete_funcs;
+  rigtorp::SPSCQueue<RenderInfo> _cmds{ Command_List_Queue_Capacity };
+  std::binary_semaphore          _frame_sem{ 1 };
+  std::binary_semaphore          _cmds_empty{ 0 };
 
-  std::unordered_map<HWND, RenderResource>              _res;
-
-  std::unordered_set<HWND>                              _destroied_windows;
-
-  rigtorp::SPSCQueue<std::pair<HWND, ui::CommandList*>> _cmds{ Command_List_Queue_Capacity };
-  std::binary_semaphore                                 _frame_sem{ 1 };
-  std::binary_semaphore                                 _cmds_empty{ 0 };
+  std::unordered_map<HWND, HWND> _show_blur_wnds;
+  HWND                           _blur_host_window{};
+  RECT                           _blur_window_rect{};
+  uint32_t                       _present_frame_idx{};
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                           Image
@@ -109,6 +118,7 @@ public:
   struct Message_Window_Destroy
   {
     HWND handle{};
+    HWND blur_handle{};
   };
 
   struct Message_Window_Update
@@ -118,10 +128,17 @@ public:
     uint32_t height{};
   };
 
+  struct Message_Show_Blur_Window
+  {
+    HWND handle{};
+    HWND blur_handle{};
+  };
+
   using Message = std::variant<
     Message_Window_Create,
     Message_Window_Destroy,
-    Message_Window_Update
+    Message_Window_Update,
+    Message_Show_Blur_Window
   >;
 
   void send_message(Message&& msg) noexcept
@@ -167,6 +184,7 @@ private:
     void operator()(Message_Window_Create const& msg) const noexcept;
     void operator()(Message_Window_Update const& msg) const noexcept;
     void operator()(Message_Window_Destroy const& msg) const noexcept;
+    void operator()(Message_Show_Blur_Window const& msg) const noexcept;
   };
   struct UIContextMessageHandler
   {

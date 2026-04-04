@@ -123,14 +123,16 @@ int main()
 
   auto wnd1_is_closed = false;
   auto wnd2_is_closed = false;
+
+  auto cfg = ui::WindowConfig{};
+  cfg.display_title_bar             = true;
+	cfg.display_window_shadow         = true;
+  cfg.display_wireframe_only_active = true;
+  cfg.wireframe_color               = 0x7160e8ff;
+  cfg.backdrop.default_acrylic();
+
   while (!wnd1_is_closed || !wnd2_is_closed)
   {
-    auto cfg = ui::WindowConfig{};
-    cfg.display_title_bar             = true;
-		cfg.display_window_shadow         = true;
-    cfg.display_wireframe_only_active = true;
-    cfg.wireframe_color               = 0x7160e8ff;
-
     if (!wnd1_is_closed)
     {
       ui::begin("wnd1", 50, 50, 200, 200, &wnd1_is_closed, cfg);
@@ -158,7 +160,8 @@ int main()
 
     if (!wnd2_is_closed)
     {
-      ui::begin("wnd2", 0, 1080, 200, 200, &wnd2_is_closed, cfg);
+      auto cfg2 = cfg;
+      ui::begin("wnd2", 0, 1080, 200, 200, &wnd2_is_closed, cfg2);
 
       auto wnd_ext = ui::window_drawable_extent();
       ui::rectangle({}, wnd_ext, 0x282c34ff);
@@ -203,7 +206,7 @@ int main()
         auto ext = wnd_ext - p2;
         auto scale = std::max(img_ext.x / ext.x, img_ext.y / ext.y);
         img_ext /= scale;
-        // ui::image("assets/image/test.png", p2, p2 + img_ext);
+        ui::image("assets/image/test.png", p2, p2 + img_ext);
       }
       loop_trigger.update();
       ui::image("assets/image/test.jpg", {}, wnd_ext, 0x44);
@@ -216,6 +219,14 @@ int main()
       auto text_pos = p2 + Vec2{ 0, 10 };
       auto text_ext = ui::text("Hello, World!", text_pos, 32, 0xffff00ff);
       ui::rectangle(text_pos, text_ext, 0x00ff00ff, 1);
+
+      if (ui::button("blur onoff", 50, 50, 50, 50, 0x0000ffff, 0x00ff00ff))
+      {
+        if (cfg.backdrop.style == ui::BackdropStyle::blur)
+          cfg.backdrop.default_acrylic();
+        else if (cfg.backdrop.style == ui::BackdropStyle::acrylic)
+          cfg.backdrop.default_blur();
+      }
 
       ui::end();
     }

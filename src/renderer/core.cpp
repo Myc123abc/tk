@@ -41,6 +41,8 @@ void Core::init() noexcept
         "failed to create composition device");
 
   create_device_11on12();
+
+  _init_finish.count_down();
 }
 
 auto Core::create_cmd_alloc(D3D12_COMMAND_LIST_TYPE type) const noexcept -> Microsoft::WRL::ComPtr<ID3D12CommandAllocator>
@@ -81,6 +83,7 @@ void Core::create_device_11on12() noexcept
 
   // create d2d device
   err_if(D2D1CreateDevice(dxgi_device.Get(), {}, &_device_d2d), "failed to create d2d device");
+  _device_d2d->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &_device_d2d_ctx);
 }
 
 }

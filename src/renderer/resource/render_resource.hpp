@@ -27,7 +27,8 @@ public:
 
   void resize(uint32_t width, uint32_t height) noexcept;
 
-  void wait_frame_complete() const noexcept;
+  auto is_frame_complete(uint32_t idx) noexcept -> bool;
+  void wait_frame_complete() noexcept;
 
   void render_begin() noexcept;
   void render_end() noexcept;
@@ -36,6 +37,7 @@ public:
 
   void clear_image() noexcept;
 
+  auto  frame_index() const noexcept { return _frame_index; }
   auto& current_frame() noexcept { return _frames[_frame_index]; }
 
 private:

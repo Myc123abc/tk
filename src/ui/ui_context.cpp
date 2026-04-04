@@ -41,7 +41,7 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
   // create window if not have
   if (!_windows.contains(name.data()))
   {
-    _windows.emplace(name.data(), g_wnd_mgr.create_window(x, y, width, height));
+    _windows.emplace(name.data(), g_wnd_mgr.create_window(x, y, width, height, cfg.backdrop));
     _window = &_windows[name.data()];
     _window_names.emplace(_window->snap.handle, name.data());
     _window->can_be_closed = is_closed;
@@ -49,7 +49,9 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
 
   _window = &_windows[name.data()];
   _window->is_called = true;
-  _window->cfg       = cfg;
+
+  update_window_config(cfg);
+
   if (is_closed)
     *is_closed = _window->is_closed;
 
@@ -74,6 +76,23 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
     });
   
   _window->cfgs.data() = cfg;
+}
+
+void UIContext::update_window_config(WindowConfig const& cfg) noexcept
+{
+  if (cfg.backdrop.style != ui::BackdropStyle::none)
+  {
+    if (_window->cfg.backdrop.style == ui::BackdropStyle::none)
+      g_wnd_mgr.init_blur_window(_window->snap.handle, cfg.backdrop);
+    else
+      g_wnd_mgr.update_blur_window(_window->snap.handle, cfg.backdrop);
+  }
+  else
+  {
+    if (_window->cfg.backdrop.style != ui::BackdropStyle::none)
+      g_wnd_mgr.remove_blur_window(_window->snap.handle);
+  }
+  _window->cfg = cfg;
 }
 
 void UIContext::fullscreen_process() noexcept
@@ -175,9 +194,9 @@ void UIContext::render() noexcept
   auto need_wakeup = g_renderer.is_sleeping();
 
   // process window render datas
-  auto render = [](Window& wnd, CommandList* cmd) noexcept
+  auto render = [](Window& wnd, CommandList* cmd, HWND blur_host_window = {}, RECT blur_window_rect = {}) noexcept
   {
-    g_renderer.submit(wnd.snap.handle, cmd);
+    g_renderer.submit({ wnd.snap.handle, cmd, blur_host_window, blur_window_rect});
     if (cmd) wnd.next_frame();
   };
   for (auto& wnd : _windows | std::views::values)
@@ -208,7 +227,10 @@ void UIContext::render() noexcept
       window_shadow_wireframe_process(wnd, wnd.real_rect());
       cmd->set_window_pos(wnd.real_pos());
       cmd->submit();
-      render(_fullscreen_window, cmd);
+      if (wnd.cfg.backdrop.style != ui::BackdropStyle::none)
+        render(_fullscreen_window, cmd, wnd.snap.handle, wnd.rect());
+      else
+        render(_fullscreen_window, cmd);
     }
   }
   if (_fullscreen_window.need_clear)

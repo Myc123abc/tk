@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../config.hpp"
+#include "compositor.hpp"
+#include "ui/ui.hpp"
 
 #include <glm/glm.hpp>
 
@@ -44,7 +46,7 @@ public:
   Window& operator=(Window const&) = default;
   Window& operator=(Window&&)      = default;
 
-  void init(int x, int y, uint32_t width, uint32_t height) noexcept;
+  void init(int x, int y, uint32_t width, uint32_t height, ui::Backdrop const& backdrop) noexcept;
   void init_auxiliary(int x, int y, uint32_t width, uint32_t height) noexcept;
   void destroy() const noexcept;
   
@@ -90,6 +92,7 @@ public:
   void update_by_rect(RECT rect, float scale) noexcept;
 
   void maximize() noexcept;
+  void minimize() noexcept;
   void cancel_maximize(RECT rect, float scale) noexcept;
   void restore() noexcept;
   void fullscreen() noexcept;
@@ -134,6 +137,19 @@ private:
   RECT        _backup_rect{};
 
   std::string _monitor{};
+
+private:
+  HWND                 _blur_window{};
+  Compositor::Resource _blur_res{};
+private:
+  void init_blur_window(ui::Backdrop const& backdrop) noexcept;
+  void update_blur_window(ui::Backdrop const& backdrop) noexcept;
+  void show_blur_window() const noexcept;
+  void keep_blur_window_behind() const noexcept;
+  void keep_blur_window_behind_move() const noexcept;
+  void keep_blur_window_behind_resize() const noexcept;
+  void resize_blur_window(RECT rect) const noexcept;
+  void remove_blur_window() noexcept;
 };
 
 }

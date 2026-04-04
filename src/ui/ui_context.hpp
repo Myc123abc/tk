@@ -134,6 +134,8 @@ public:
   auto is_use_title_bar_now() const noexcept { return _window->cfg.display_title_bar && !_window->snap.fullscreen_window; }
 
 private:
+  void update_window_config(WindowConfig const& cfg) noexcept;
+
   void preprocess_render() noexcept;
   void postprocess_render() noexcept;
 
