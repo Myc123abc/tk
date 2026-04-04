@@ -221,8 +221,8 @@ int main()
       ui::rectangle(text_pos, text_ext, 0x00ff00ff, 1);
 
       if (ui::button("blur onoff", 50, 50, 50, 50, 0x0000ffff, 0x00ff00ff))
-        // cfg.blur_backdrop.enable = !cfg.blur_backdrop.enable;
-        cfg.blur_backdrop.blur_radius += 5.f;
+        cfg.blur_backdrop.enable = !cfg.blur_backdrop.enable;
+        // cfg.blur_backdrop.blur_radius += 5.f;
 
       ui::end();
     }

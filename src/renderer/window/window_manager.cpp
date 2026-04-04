@@ -122,6 +122,7 @@ void WindowManager::wait_event_process_complete() const noexcept
 
 void WindowManager::destroy() noexcept
 {
+  g_compositor.destroy();
   PostThreadMessageW(_thread_id, WM_QUIT, 0, 0);
   _thread.join();
   CloseHandle(_signal_event);
