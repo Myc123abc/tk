@@ -7,6 +7,7 @@
 
 #include <shellscalingapi.h>
 
+using namespace tk;
 using namespace tk::ui;
 using namespace tk::renderer;
 
@@ -24,17 +25,17 @@ auto to_32_bits(uint64_t x) noexcept -> std::pair<uint32_t, uint32_t>
 
 struct WindowCreateInfo
 {
-  HANDLE   event{};
-  HWND     handle{};
-  int      x{}, y{};
-  uint32_t width{}, height{};
-  WindowConfig::BlurBackdrop blur_backdrop;
+  HANDLE       event{};
+  HWND         handle{};
+  int          x{}, y{};
+  uint32_t     width{}, height{};
+  ui::Backdrop backdrop;
 };
 
 struct BlurWindowInfo
 {
-  HWND handle{};
-  WindowConfig::BlurBackdrop blur_backdrop;
+  HWND         handle{};
+  ui::Backdrop backdrop;
 };
 
 void set_cursor(HWND handle, ResizeType type) noexcept
@@ -487,16 +488,16 @@ auto WindowManager::create_fullscreen_window() noexcept -> WindowSnapshot
   return snap;
 }
 
-auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height, ui::WindowConfig::BlurBackdrop const& blur_backdrop) noexcept -> WindowSnapshot
+auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height, ui::Backdrop const& backdrop) noexcept -> WindowSnapshot
 {
   // create WindowCreateInfo
   auto ptr = reinterpret_cast<WindowCreateInfo*>(malloc(sizeof(WindowCreateInfo)));
-  ptr->event         = CreateEventW(nullptr, false, false, nullptr);
-  ptr->x             = x;
-  ptr->y             = y;
-  ptr->width         = width;
-  ptr->height        = height;
-  ptr->blur_backdrop = blur_backdrop;
+  ptr->event    = CreateEventW(nullptr, false, false, nullptr);
+  ptr->x        = x;
+  ptr->y        = y;
+  ptr->width    = width;
+  ptr->height   = height;
+  ptr->backdrop = backdrop;
 
   // send window create message to window thread
   PostThreadMessageW(_thread_id, static_cast<UINT>(Message::create_window), std::bit_cast<WPARAM>(ptr), 0);
@@ -510,19 +511,19 @@ auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height,
   return snap;
 }
 
-void WindowManager::init_blur_window(HWND handle, ui::WindowConfig::BlurBackdrop const& blur_backdrop) const noexcept
+void WindowManager::init_blur_window(HWND handle, ui::Backdrop const& backdrop) const noexcept
 {
   auto ptr = reinterpret_cast<BlurWindowInfo*>(malloc(sizeof(BlurWindowInfo)));
-  ptr->handle        = handle;
-  ptr->blur_backdrop = blur_backdrop;
+  ptr->handle   = handle;
+  ptr->backdrop = backdrop;
   PostThreadMessageW(_thread_id, static_cast<UINT>(Message::init_blur_window), std::bit_cast<WPARAM>(ptr), 0);
 }
 
-void WindowManager::update_blur_window(HWND handle, ui::WindowConfig::BlurBackdrop const& blur_backdrop) const noexcept
+void WindowManager::update_blur_window(HWND handle, ui::Backdrop const& backdrop) const noexcept
 {
   auto ptr = reinterpret_cast<BlurWindowInfo*>(malloc(sizeof(BlurWindowInfo)));
-  ptr->handle        = handle;
-  ptr->blur_backdrop = blur_backdrop;
+  ptr->handle   = handle;
+  ptr->backdrop = backdrop;
   PostThreadMessageW(_thread_id, static_cast<UINT>(Message::update_blur_window), std::bit_cast<WPARAM>(ptr), 0);
 }
 
@@ -667,7 +668,7 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
   {
     auto  info = reinterpret_cast<BlurWindowInfo*>(w_param);
     auto& wnd  = _windows.at(info->handle);
-    wnd.init_blur_window(info->blur_backdrop);
+    wnd.init_blur_window(info->backdrop);
     _blur_windows.emplace(wnd._blur_window, wnd._handle);
     free(info);
     break;
@@ -677,7 +678,7 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
   {
     auto  info = reinterpret_cast<BlurWindowInfo*>(w_param);
     auto& wnd  = _windows.at(info->handle);
-    wnd.update_blur_window(info->blur_backdrop);
+    wnd.update_blur_window(info->backdrop);
     free(info);
     break;
   }
@@ -727,10 +728,10 @@ void WindowManager::msg_create_window(WPARAM w_param) noexcept
 
   // init window and set handle
   auto window = Window{};
-  window.init(info->x, info->y, info->width, info->height, info->blur_backdrop);
+  window.init(info->x, info->y, info->width, info->height, info->backdrop);
   info->handle = window._handle;
   
-  if (info->blur_backdrop.enable)
+  if (info->backdrop.style != ui::BackdropStyle::none)
     _blur_windows.emplace(window._blur_window, window._handle);
 
   // store window

@@ -129,7 +129,7 @@ int main()
 	cfg.display_window_shadow         = true;
   cfg.display_wireframe_only_active = true;
   cfg.wireframe_color               = 0x7160e8ff;
-  cfg.blur_backdrop                 = { true, 5.f };
+  cfg.backdrop.default_acrylic();
 
   while (!wnd1_is_closed || !wnd2_is_closed)
   {
@@ -206,7 +206,7 @@ int main()
         auto ext = wnd_ext - p2;
         auto scale = std::max(img_ext.x / ext.x, img_ext.y / ext.y);
         img_ext /= scale;
-        // ui::image("assets/image/test.png", p2, p2 + img_ext);
+        ui::image("assets/image/test.png", p2, p2 + img_ext);
       }
       loop_trigger.update();
       ui::image("assets/image/test.jpg", {}, wnd_ext, 0x44);
@@ -221,8 +221,12 @@ int main()
       ui::rectangle(text_pos, text_ext, 0x00ff00ff, 1);
 
       if (ui::button("blur onoff", 50, 50, 50, 50, 0x0000ffff, 0x00ff00ff))
-        cfg.blur_backdrop.enable = !cfg.blur_backdrop.enable;
-        // cfg.blur_backdrop.blur_radius += 5.f;
+      {
+        if (cfg.backdrop.style == ui::BackdropStyle::blur)
+          cfg.backdrop.default_acrylic();
+        else if (cfg.backdrop.style == ui::BackdropStyle::acrylic)
+          cfg.backdrop.default_blur();
+      }
 
       ui::end();
     }

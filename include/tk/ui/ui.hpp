@@ -70,10 +70,58 @@ struct WindowConfig
 
   struct BlurBackdrop
   {
-    bool  enable{};
-    float blur_radius{};
-  } blur_backdrop;
+    enum class Style
+    {
+      none,
+      blur,
+      acrylic,
+    } style;
+
+    union
+    {
+      float blur_radius{};
+      struct Acrylic
+      {
+        float     opacity{};
+        float     blur{};
+        glm::vec4 tint_color{};
+        glm::vec4 luminosity_color{};
+      } acrylic;
+    };
+
+    void default_blur() noexcept
+    {
+      style       = Style::blur;
+      blur_radius = 4.f;
+    }
+
+    void default_acrylic() noexcept
+    {
+      style                    = Style::acrylic;
+      acrylic.opacity          = .02f;
+      acrylic.blur             = 30.f;
+      acrylic.tint_color       = { .125f, .125f, .125f, .4f };
+      acrylic.luminosity_color = { .125f, .125f, .125f, .8f };
+    }
+
+    auto operator!=(BlurBackdrop const& b) const noexcept
+    {
+      if (style != b.style) return true;
+      if (style == Style::blur)
+        return blur_radius != b.blur_radius;
+      else if (style == Style::acrylic)
+        return acrylic.opacity          != b.acrylic.opacity    ||
+               acrylic.blur             != b.acrylic.blur       ||
+               acrylic.tint_color       != b.acrylic.tint_color ||
+               acrylic.luminosity_color != b.acrylic.luminosity_color;
+      return false;
+    }
+
+  } backdrop;
 };
+
+using Backdrop      = WindowConfig::BlurBackdrop;
+using BackdropStyle = WindowConfig::BlurBackdrop::Style;
 
 /**
  * get frame delta time

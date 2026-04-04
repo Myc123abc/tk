@@ -20,7 +20,7 @@ auto in_range(float v, float min, float max) noexcept
 
 namespace tk::renderer {
 
-void Window::init(int x, int y, uint32_t width, uint32_t height, ui::WindowConfig::BlurBackdrop const& blur_backdrop) noexcept
+void Window::init(int x, int y, uint32_t width, uint32_t height, ui::Backdrop const& backdrop) noexcept
 {
   auto monitor = Monitor{ { x, y, static_cast<LONG>(x + width), static_cast<LONG>(y + height) } };
 
@@ -49,14 +49,14 @@ void Window::init(int x, int y, uint32_t width, uint32_t height, ui::WindowConfi
   // create window render resource
   g_renderer.send_message(Renderer::Message_Window_Create{ _handle, real_width(), real_height() });
 
-  init_blur_window(blur_backdrop);
+  init_blur_window(backdrop);
 
   ShowWindow(_handle, SW_SHOW);
 }
 
-void Window::init_blur_window(ui::WindowConfig::BlurBackdrop const& blur_backdrop) noexcept
+void Window::init_blur_window(ui::Backdrop const& backdrop) noexcept
 {
-  if (!blur_backdrop.enable) return;
+  if (backdrop.style == ui::BackdropStyle::none) return;
 
   _blur_window = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
     WindowManager::Blur_Class, nullptr, WS_POPUP, _x, _y, _width, _height, 0, 0, GetModuleHandleW(nullptr), 0);
@@ -67,15 +67,15 @@ void Window::init_blur_window(ui::WindowConfig::BlurBackdrop const& blur_backdro
   // this seem make dwm reset z-order lead g_wnd_mgr.blur_wnd_proc's WM_WINDOWPOSCHANGED's keep_blur_window_behind invalid.
   // lead blinking reappear!!!
 
-  _blur_res = g_compositor.create_resource(_blur_window, blur_backdrop.blur_radius);
+  _blur_res = g_compositor.create_resource(_blur_window, backdrop);
 
   // show blur window after first frame present complete
   g_renderer.send_message(Renderer::Message_Show_Blur_Window{ _handle, _blur_window });
 }
 
-void Window::update_blur_window(ui::WindowConfig::BlurBackdrop const& blur_backdrop) noexcept
+void Window::update_blur_window(ui::Backdrop const& backdrop) noexcept
 {
-  _blur_res.update(blur_backdrop.blur_radius);
+  _blur_res.update(backdrop);
 }
 
 void Window::init_auxiliary(int x, int y, uint32_t width, uint32_t height) noexcept

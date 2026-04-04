@@ -85,9 +85,11 @@ auto CreateBackdropBlurBrush(
 
 auto CreateAcrylicBrush(
   winrt::Windows::UI::Composition::Compositor const& compositor,
-  D2D1_COLOR_F tintColor = {0.125f, 0.125f, 0.125f, 0.4f}, D2D1_COLOR_F luminosityColor = {0.125f, 0.125f, 0.125f, 0.8f})
+  float opacity, float blur, glm::vec4 tint_color, glm::vec4 luminosity_color)
 -> winrt::Windows::UI::Composition::CompositionBrush
 {
+  D2D1_COLOR_F tintColor{ tint_color.x, tint_color.y, tint_color.z, tint_color.w };
+  D2D1_COLOR_F luminosityColor{ luminosity_color.x, luminosity_color.y, luminosity_color.z, luminosity_color.w };
 	// border effect
 	auto borderEffect{Make<BorderEffect>()};
 	borderEffect->SetExtendX(D2D1_BORDER_EDGE_MODE_WRAP);
@@ -97,13 +99,13 @@ auto CreateAcrylicBrush(
 	// opacity effect
 	auto opacityEffect{Make<OpacityEffect>()};
 	opacityEffect->put_Name(HStringReference(L"NoiceOpacity").Get());
-	opacityEffect->SetOpacity(0.02f);
+	opacityEffect->SetOpacity(opacity);
 	opacityEffect->SetInput(borderEffect.Get());
 
 	// gaussian blur
 	auto blurEffect{Make<GaussianBlurEffect>()};
 	blurEffect->put_Name(HStringReference(L"Blur").Get());
-	blurEffect->SetBlurAmount(30.f);
+	blurEffect->SetBlurAmount(blur);
 	blurEffect->SetBorderMode(D2D1_BORDER_MODE_HARD);
 	blurEffect->SetInput(CompositionEffectSource(HStringReference(L"Backdrop").Get()));
 
@@ -190,7 +192,7 @@ void Compositor::destroy() const noexcept
   _wic_factory->Release();
 }
 
-auto Compositor::create_resource(HWND handle, float blur_radius) const noexcept -> Resource
+auto Compositor::create_resource(HWND handle, ui::Backdrop const& backdrop) const noexcept -> Resource
 {
   auto res = Resource{};
 
@@ -206,19 +208,33 @@ auto Compositor::create_resource(HWND handle, float blur_radius) const noexcept 
   res.blur_visual = _compositor.CreateSpriteVisual();
   res.blur_visual.RelativeSizeAdjustment({ 1.f, 1.f });
 
-  // HACK:
-  // when duplicate monitors, this blur backdrop brush will invalid on some monitors, but original color brush is ok
-  // now i don't process it, because it's a rarely usage for me
-  // res.blur_visual.Brush(CreateBackdropBlurBrush(_compositor, blur_radius));
-  res.blur_visual.Brush(CreateAcrylicBrush(_compositor));
+  res.backdrop = backdrop;
+  res.create_blur_visual();
   res.root.Children().InsertAtBottom(res.blur_visual);
 
   return res;
 }
 
-void Compositor::Resource::update(float blur_radius) noexcept
+void Compositor::Resource::create_blur_visual() noexcept
 {
-  blur_visual.Brush(CreateBackdropBlurBrush(g_compositor._compositor, blur_radius));
+  // HACK:
+  // when duplicate monitors, this blur backdrop brush will invalid on some monitors, but original color brush is ok
+  // now i don't process it, because it's a rarely usage for me
+  assert(backdrop.style != ui::BackdropStyle::none);
+  if (backdrop.style == ui::BackdropStyle::blur)
+    blur_visual.Brush(CreateBackdropBlurBrush(g_compositor._compositor, backdrop.blur_radius));
+  else if (backdrop.style == ui::BackdropStyle::acrylic)
+    blur_visual.Brush(CreateAcrylicBrush(g_compositor._compositor,
+      backdrop.acrylic.opacity, backdrop.acrylic.blur, backdrop.acrylic.tint_color, backdrop.acrylic.luminosity_color));
+}
+
+void Compositor::Resource::update(ui::Backdrop const& backdrop) noexcept
+{
+  if (this->backdrop != backdrop)
+  {
+    this->backdrop = backdrop;
+    create_blur_visual();
+  }
 }
 
 auto Compositor::CreateNoiceBrush() -> winrt::Windows::UI::Composition::ICompositionSurfaceBrush

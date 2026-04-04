@@ -91,7 +91,7 @@ public:
   static LRESULT CALLBACK blur_wnd_proc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param) noexcept;
 
   auto create_fullscreen_window() noexcept -> WindowSnapshot;
-  auto create_window(int x, int y, uint32_t width, uint32_t height, ui::WindowConfig::BlurBackdrop const& blur_backdrop) noexcept -> WindowSnapshot;
+  auto create_window(int x, int y, uint32_t width, uint32_t height, ui::Backdrop const& backdrop) noexcept -> WindowSnapshot;
   void close_window(HWND handle) const noexcept;
   void close_fullscreen_window() const noexcept;
   void minimize_window(HWND handle) const noexcept;
@@ -101,8 +101,8 @@ public:
   void restore_fullscreen_window(HWND handle) const noexcept;
   void show_blur_window(HWND handle) const noexcept;
   void destroy_window(HWND handle, HWND blur_handle) const noexcept;
-  void init_blur_window(HWND handle, ui::WindowConfig::BlurBackdrop const& blur_backdrop) const noexcept;
-  void update_blur_window(HWND handle, ui::WindowConfig::BlurBackdrop const& blur_backdrop) const noexcept;
+  void init_blur_window(HWND handle, ui::Backdrop const& backdrop) const noexcept;
+  void update_blur_window(HWND handle, ui::Backdrop const& backdrop) const noexcept;
   void remove_blur_window(HWND handle) const noexcept;
 
   auto get_window_z_orders() const noexcept -> std::vector<HWND>;
