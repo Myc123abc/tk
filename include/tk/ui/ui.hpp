@@ -67,7 +67,12 @@ struct WindowConfig
   bool                 display_wireframe_only_active{};
   bool                 no_resize{};
   bool                 no_move{};
-  bool                 blur_backdrop{};
+
+  struct BlurBackdrop
+  {
+    bool  enable{};
+    float blur_radius{};
+  } blur_backdrop;
 };
 
 /**

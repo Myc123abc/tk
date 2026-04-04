@@ -50,17 +50,7 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
   _window = &_windows[name.data()];
   _window->is_called = true;
 
-  if (cfg.blur_backdrop)
-  {
-    if (!_window->cfg.blur_backdrop)
-      g_wnd_mgr.init_blur_window(_window->snap.handle);
-  }
-  else
-  {
-    if (_window->cfg.blur_backdrop)
-      g_wnd_mgr.remove_blur_window(_window->snap.handle);
-  }
-  _window->cfg = cfg;
+  update_window_config(cfg);
 
   if (is_closed)
     *is_closed = _window->is_closed;
@@ -86,6 +76,23 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
     });
   
   _window->cfgs.data() = cfg;
+}
+
+void UIContext::update_window_config(WindowConfig const& cfg) noexcept
+{
+  if (cfg.blur_backdrop.enable)
+  {
+    if (!_window->cfg.blur_backdrop.enable)
+      g_wnd_mgr.init_blur_window(_window->snap.handle, cfg.blur_backdrop);
+    else if (cfg.blur_backdrop.blur_radius != _window->cfg.blur_backdrop.blur_radius)
+      g_wnd_mgr.update_blur_window(_window->snap.handle, cfg.blur_backdrop);
+  }
+  else
+  {
+    if (_window->cfg.blur_backdrop.enable)
+      g_wnd_mgr.remove_blur_window(_window->snap.handle);
+  }
+  _window->cfg = cfg;
 }
 
 void UIContext::fullscreen_process() noexcept
@@ -220,7 +227,7 @@ void UIContext::render() noexcept
       window_shadow_wireframe_process(wnd, wnd.real_rect());
       cmd->set_window_pos(wnd.real_pos());
       cmd->submit();
-      if (wnd.cfg.blur_backdrop)
+      if (wnd.cfg.blur_backdrop.enable)
         render(_fullscreen_window, cmd, wnd.snap.handle, wnd.rect());
       else
         render(_fullscreen_window, cmd);

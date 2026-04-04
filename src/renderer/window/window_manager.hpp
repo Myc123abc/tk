@@ -3,6 +3,7 @@
 #include "window.hpp"
 #include "../config.hpp"
 #include "../../util/singleton.hpp"
+#include "ui/ui.hpp"
 
 #include <rigtorp/SPSCQueue.h>
 
@@ -78,6 +79,7 @@ public:
     show_blur_window,
     destroy_window,
     init_blur_window,
+    update_blur_window,
     remove_blur_window,
   };
 
@@ -89,7 +91,7 @@ public:
   static LRESULT CALLBACK blur_wnd_proc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param) noexcept;
 
   auto create_fullscreen_window() noexcept -> WindowSnapshot;
-  auto create_window(int x, int y, uint32_t width, uint32_t height, bool blur_backdrop) noexcept -> WindowSnapshot;
+  auto create_window(int x, int y, uint32_t width, uint32_t height, ui::WindowConfig::BlurBackdrop const& blur_backdrop) noexcept -> WindowSnapshot;
   void close_window(HWND handle) const noexcept;
   void close_fullscreen_window() const noexcept;
   void minimize_window(HWND handle) const noexcept;
@@ -99,7 +101,8 @@ public:
   void restore_fullscreen_window(HWND handle) const noexcept;
   void show_blur_window(HWND handle) const noexcept;
   void destroy_window(HWND handle, HWND blur_handle) const noexcept;
-  void init_blur_window(HWND handle) const noexcept;
+  void init_blur_window(HWND handle, ui::WindowConfig::BlurBackdrop const& blur_backdrop) const noexcept;
+  void update_blur_window(HWND handle, ui::WindowConfig::BlurBackdrop const& blur_backdrop) const noexcept;
   void remove_blur_window(HWND handle) const noexcept;
 
   auto get_window_z_orders() const noexcept -> std::vector<HWND>;

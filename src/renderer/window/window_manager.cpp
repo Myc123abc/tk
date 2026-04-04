@@ -28,7 +28,13 @@ struct WindowCreateInfo
   HWND     handle{};
   int      x{}, y{};
   uint32_t width{}, height{};
-  bool     blur_backdrop{};
+  WindowConfig::BlurBackdrop blur_backdrop;
+};
+
+struct BlurWindowInfo
+{
+  HWND handle{};
+  WindowConfig::BlurBackdrop blur_backdrop;
 };
 
 void set_cursor(HWND handle, ResizeType type) noexcept
@@ -480,7 +486,7 @@ auto WindowManager::create_fullscreen_window() noexcept -> WindowSnapshot
   return snap;
 }
 
-auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height, bool blur_backdrop) noexcept -> WindowSnapshot
+auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height, ui::WindowConfig::BlurBackdrop const& blur_backdrop) noexcept -> WindowSnapshot
 {
   // create WindowCreateInfo
   auto ptr = reinterpret_cast<WindowCreateInfo*>(malloc(sizeof(WindowCreateInfo)));
@@ -501,6 +507,22 @@ auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height,
   snap.init(_windows.at(ptr->handle));
   free(ptr);
   return snap;
+}
+
+void WindowManager::init_blur_window(HWND handle, ui::WindowConfig::BlurBackdrop const& blur_backdrop) const noexcept
+{
+  auto ptr = reinterpret_cast<BlurWindowInfo*>(malloc(sizeof(BlurWindowInfo)));
+  ptr->handle        = handle;
+  ptr->blur_backdrop = blur_backdrop;
+  PostThreadMessageW(_thread_id, static_cast<UINT>(Message::init_blur_window), std::bit_cast<WPARAM>(ptr), 0);
+}
+
+void WindowManager::update_blur_window(HWND handle, ui::WindowConfig::BlurBackdrop const& blur_backdrop) const noexcept
+{
+  auto ptr = reinterpret_cast<BlurWindowInfo*>(malloc(sizeof(BlurWindowInfo)));
+  ptr->handle        = handle;
+  ptr->blur_backdrop = blur_backdrop;
+  PostThreadMessageW(_thread_id, static_cast<UINT>(Message::update_blur_window), std::bit_cast<WPARAM>(ptr), 0);
 }
 
 void WindowManager::close_window(HWND handle) const noexcept
@@ -546,11 +568,6 @@ void WindowManager::show_blur_window(HWND handle) const noexcept
 void WindowManager::destroy_window(HWND handle, HWND blur_handle) const noexcept
 {
   PostThreadMessageW(_thread_id, static_cast<UINT>(Message::destroy_window), std::bit_cast<WPARAM>(handle), std::bit_cast<LPARAM>(blur_handle));
-}
-
-void WindowManager::init_blur_window(HWND handle) const noexcept
-{
-  PostThreadMessageW(_thread_id, static_cast<UINT>(Message::init_blur_window), std::bit_cast<WPARAM>(handle), 0);
 }
 
 void WindowManager::remove_blur_window(HWND handle) const noexcept
@@ -647,9 +664,20 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
 
   case Message::init_blur_window:
   {
-    auto& wnd = _windows.at(std::bit_cast<HWND>(w_param));
-    wnd.init_blur_window();
+    auto  info = reinterpret_cast<BlurWindowInfo*>(w_param);
+    auto& wnd  = _windows.at(info->handle);
+    wnd.init_blur_window(info->blur_backdrop);
     _blur_windows.emplace(wnd._blur_window, wnd._handle);
+    free(info);
+    break;
+  }
+
+  case Message::update_blur_window:
+  {
+    auto  info = reinterpret_cast<BlurWindowInfo*>(w_param);
+    auto& wnd  = _windows.at(info->handle);
+    wnd.update_blur_window(info->blur_backdrop);
+    free(info);
     break;
   }
 
@@ -701,7 +729,7 @@ void WindowManager::msg_create_window(WPARAM w_param) noexcept
   window.init(info->x, info->y, info->width, info->height, info->blur_backdrop);
   info->handle = window._handle;
   
-  if (info->blur_backdrop)
+  if (info->blur_backdrop.enable)
     _blur_windows.emplace(window._blur_window, window._handle);
 
   // store window

@@ -18,9 +18,11 @@ public:
     winrt::Windows::UI::Composition::Desktop::DesktopWindowTarget target{ nullptr };
     winrt::Windows::UI::Composition::ContainerVisual              root{ nullptr };
     winrt::Windows::UI::Composition::SpriteVisual                 blur_visual{ nullptr };
+
+    void update(float blur_radius) noexcept;
   };
 
-  auto create_resource(HWND handle) const noexcept -> Resource;
+  auto create_resource(HWND handle, float blur_radius) const noexcept -> Resource;
 
 private:
   winrt::Windows::System::DispatcherQueueController          _queue{ nullptr };
