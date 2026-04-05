@@ -98,9 +98,10 @@ float4 get_color(float4 color, float w, float d, float t)
     else
       value = -d - t + 1.0;
   }
-  if (value >= w) discard;
+  if (value >= w) return float4(0, 0, 0, 0);
 
-  float alpha = 1.0 - smoothstep(0.0, w, value);
+  // float alpha = 1.0 - smoothstep(0.0, w, value);
+  float alpha = saturate(1.f - value * rcp(w));
   return float4(color.rgb, color.a * alpha);
 }
 
@@ -212,12 +213,10 @@ float get_sd(float2 pos, uint32_t type, inout uint32_t offset)
 
 PSParameter vs(Vertex vertex)
 {
-  ShapeProperty shape_property = buffer.Load<ShapeProperty>(vertex.buffer_offset);
-
   PSParameter result;
   result.pos           = float4((vertex.pos.xy + constants.window_pos) / constants.render_target_extent * float2(2, -2) + float2(-1, 1), vertex.pos.z, 1);
   result.uv            = vertex.uv;
-  result.color         = shape_property.color;
+  result.color         = buffer.Load<ShapeProperty>(vertex.buffer_offset).color;
   result.buffer_offset = vertex.buffer_offset;
   return result;
 }
@@ -278,7 +277,7 @@ float4 ps(PSParameter args) : SV_TARGET
     {
       ShapeProperty discard_shape_property = get_shape_property(offset);
       float discard_d = get_sd(args.pos.xy, discard_shape_property.type, offset);
-      if (discard_d < 0) discard;
+      if (discard_d < 0) return float4(0, 0, 0, 0);
       break;
     }
   }
