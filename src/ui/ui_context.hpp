@@ -1,6 +1,6 @@
 #pragma once
 
-#include "command_list.hpp"
+#include "frame_data.hpp"
 #include "../renderer/window/window_manager.hpp"
 #include "../renderer/config.hpp"
 #include "../util/message_queue.hpp"
@@ -61,11 +61,11 @@ struct Window
   glm::vec2    render_pos{};
   bool         need_clear{};
 
-  uint32_t                                       frame_index{};
-  std::array<CommandList, renderer::Frame_Count> cmds;
+  uint32_t                                     frame_index{};
+  std::array<FrameData, renderer::Frame_Count> frame_datas;
 
-  auto cmd()        noexcept { return &cmds[frame_index];                     }
-  void next_frame() noexcept { frame_index = (frame_index + 1) % cmds.size(); }
+  auto frame_data() noexcept { return &frame_datas[frame_index];                     }
+  void next_frame() noexcept { frame_index = (frame_index + 1) % frame_datas.size(); }
 
   DoubleBuffer<std::vector<RECT>> move_invalid_areas;
   void add_move_invald_areas(RECT rect) noexcept { move_invalid_areas.data().emplace_back(rect); }
@@ -93,7 +93,7 @@ public:
   void check_union_draw() const noexcept;
   void check_union_not_draw() const noexcept;
 
-  auto cmd() noexcept { return _window->cmd(); }
+  auto frame_data() noexcept { return _window->frame_data(); }
 
   void render() noexcept;
 

@@ -3,6 +3,7 @@
 #include "../renderer/pipeline/pipeline_system.hpp"
 #include "../resource/shader_type.hpp"
 #include "graphics_engine.hpp"
+#include "../renderer/context.hpp"
 
 #include <assert.h>
 #include <ranges>
@@ -95,29 +96,28 @@ void ComputeEngine::blur(Image& src, Image& dst, float sigma, uint32_t blur_coun
   else
     tmp_img->resize(width, height);
 
-  auto ctx             = g_pipe_sys.ctx();
   auto horizontal_pipe = g_pipe_sys.pipe(PipelineType::blur_horizontal_pass);
   auto vertical_pipe   = g_pipe_sys.pipe(PipelineType::blur_vertical_pass);
 
-  ctx->set_cmd(cmd());
-  ctx->set_compute_root_signature(horizontal_pipe->root_signature);
-  ctx->set_compute_constants(horizontal_pipe->root_param_idx("constants"), constants);
+  g_ctx.set_cmd(cmd());
+  g_ctx.set_compute_root_signature(horizontal_pipe->root_signature);
+  g_ctx.set_compute_constants(horizontal_pipe->root_param_idx("constants"), constants);
 
   for (auto i : std::views::iota(0u, blur_count))
   {
-    ctx->set_pipe(horizontal_pipe->pipe_state.Get());
+    g_ctx.set_pipe(horizontal_pipe->pipe_state.Get());
     dst.set_state(cmd(), ImageState::non_pixel);
-    ctx->set_compute_descriptor(horizontal_pipe->root_param_idx("src"), dst.srv().gpu_handle());
+    g_ctx.set_compute_descriptor(horizontal_pipe->root_param_idx("src"), dst.srv().gpu_handle());
     tmp_img->set_state(cmd(), ImageState::compute_rw);
-    ctx->set_compute_descriptor(horizontal_pipe->root_param_idx("dst"), tmp_img->uav().gpu_handle());
-    ctx->dispatch(ceil(width / 128.f), height, 1);
+    g_ctx.set_compute_descriptor(horizontal_pipe->root_param_idx("dst"), tmp_img->uav().gpu_handle());
+    g_ctx.dispatch(ceil(width / 128.f), height, 1);
 
-    ctx->set_pipe(vertical_pipe->pipe_state.Get());
+    g_ctx.set_pipe(vertical_pipe->pipe_state.Get());
     tmp_img->set_state(cmd(), ImageState::non_pixel);
-    ctx->set_compute_descriptor(vertical_pipe->root_param_idx("src"), tmp_img->srv().gpu_handle());
+    g_ctx.set_compute_descriptor(vertical_pipe->root_param_idx("src"), tmp_img->srv().gpu_handle());
     dst.set_state(cmd(), ImageState::compute_rw);
-    ctx->set_compute_descriptor(vertical_pipe->root_param_idx("dst"), dst.uav().gpu_handle());
-    ctx->dispatch(width, ceil(height / 128.f), 1);
+    g_ctx.set_compute_descriptor(vertical_pipe->root_param_idx("dst"), dst.uav().gpu_handle());
+    g_ctx.dispatch(width, ceil(height / 128.f), 1);
   }
 
   _used_blur_tmp_images.emplace_back(idx, _slots.submit_slot());

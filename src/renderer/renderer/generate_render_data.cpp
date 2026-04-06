@@ -1,5 +1,4 @@
 #include "renderer.hpp"
-#include "../../ui/command_list.hpp"
 #include "util/error_handling.hpp"
 
 #include <assert.h>
@@ -40,7 +39,7 @@ auto get_bounding_rectangle(std::vector<glm::vec2> const& data) noexcept -> std:
 }
 
 namespace tk::renderer {
-
+#if 0
 void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
 {
   auto& render_data = _render_datas.at(handle);
@@ -326,5 +325,7 @@ void Renderer::add_shape(RenderData& render_data, ShapeProperty::Type type, glm:
 add_shape_property:
   add_shape_property(render_data, type, color, thickness, values);
 }
+
+#endif
 
 }

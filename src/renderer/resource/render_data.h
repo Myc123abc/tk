@@ -1,7 +1,7 @@
 #pragma once
 
 #include "shader_type.hpp"
-#include "../../ui/command_list.hpp"
+#include "../../ui/frame_data.hpp"
 #include "../renderer/pipeline/pipeline_system.hpp"
 
 #include <d3d12.h>
@@ -12,6 +12,7 @@
 
 namespace tk::renderer {
 
+#if 0
 struct DrawData
 {
   uint32_t     indices_size{};
@@ -104,5 +105,6 @@ private:
   };
   std::queue<ScissorInfo> _scissor_infos;
 };
+#endif
 
 }

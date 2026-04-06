@@ -159,7 +159,7 @@ void discard_rectangle(glm::vec2 left_top, glm::vec2 right_bottom) noexcept
   left_top     *= scale;
   right_bottom *= scale;
 
-  g_ui_ctx.cmd()->add_discard_rectangle(left_top, right_bottom);
+  // g_ui_ctx.cmd()->add_discard_rectangle(left_top, right_bottom);
 }
 
 void begin_path() noexcept
@@ -200,7 +200,7 @@ void rectangle(glm::vec2 left_top, glm::vec2 right_bottom, Color color, float th
   right_bottom *= scale;
   thickness    *= scale;
 
-  g_ui_ctx.cmd()->draw_rectangle(left_top, right_bottom, color, thickness);
+  g_ui_ctx.frame_data()->add_rect(left_top, right_bottom, color, thickness);
 }
 
 void triangle(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color, float thickness) noexcept
@@ -219,7 +219,7 @@ void triangle(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color, float thick
   p2        *= scale;
   thickness *= scale;
 
-	g_ui_ctx.cmd()->draw_triangle(p0, p1, p2, color, thickness);
+	// g_ui_ctx.cmd()->draw_triangle(p0, p1, p2, color, thickness);
 }
 
 void circle(glm::vec2 center, float radius, Color color, float thickness) noexcept
@@ -235,7 +235,7 @@ void circle(glm::vec2 center, float radius, Color color, float thickness) noexce
   center    *= scale;
   thickness *= scale;
 
-  g_ui_ctx.cmd()->draw_circle(center, radius, color, thickness);
+  // g_ui_ctx.cmd()->draw_circle(center, radius, color, thickness);
 }
 
 void line(glm::vec2 p0, glm::vec2 p1, Color color, float thickness) noexcept
@@ -255,7 +255,7 @@ void line(glm::vec2 p0, glm::vec2 p1, Color color, float thickness) noexcept
   p1        *= scale;
   thickness *= scale;
 
-  g_ui_ctx.cmd()->draw_line(p0, p1, color, thickness);
+  // g_ui_ctx.cmd()->draw_line(p0, p1, color, thickness);
 }
 
 void bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color, float thickness) noexcept
@@ -275,7 +275,7 @@ void bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color, float thickne
   p2        *= scale;
   thickness *= scale;
 
-  g_ui_ctx.cmd()->draw_bezier(p0, p1, p2, color, thickness);
+  // g_ui_ctx.cmd()->draw_bezier(p0, p1, p2, color, thickness);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -410,9 +410,9 @@ auto button(
     
     g_ui_ctx.render_on(x + x_offset, y + y_offset, [&]
     {
-      g_ui_ctx.cmd()->enable_tmp_color(icon_color);
+      // g_ui_ctx.cmd()->enable_tmp_color(icon_color);
       icon_update_func(icon_width, icon_height);
-      g_ui_ctx.cmd()->disable_tmp_color();
+      // g_ui_ctx.cmd()->disable_tmp_color();
     });
   }
 

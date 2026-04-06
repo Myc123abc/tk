@@ -7,6 +7,7 @@
 #include "../resource/descriptor_heap_manager.hpp"
 #include "pipeline/pipeline_system.hpp"
 #include "../window/window_manager.hpp"
+#include "context.hpp"
 
 #include <dwmapi.h>
 
@@ -30,7 +31,7 @@ void Renderer::init() noexcept
     while (!_exit.load(std::memory_order_relaxed))
     {
       message_process();
-      if (!_cmds.empty())
+      if (!_render_infos.empty())
       {
         render();
         _frame_sem.release();
@@ -151,23 +152,20 @@ void Renderer::render() noexcept
 
   generate_mipmap();
 
-  for (auto _ : std::views::iota(0u, _cmds.size()))
+  for (auto _ : std::views::iota(0u, _render_infos.size()))
   {
     // pop command list
-    auto [handle, cmd, blur_host_window, blur_window_rect] = *_cmds.front(); _cmds.pop();
+    auto [handle, data, blur_host_window, blur_window_rect] = *_render_infos.front(); _render_infos.pop();
 
     // continue if the window is destoried
     if (_destroied_windows.contains(handle)) continue;
     _render_windows.emplace_back(handle);
 
-    // generate render data
-    if (cmd) generate_render_data(handle, cmd);
-
     // render
     auto& res = _res.at(handle);
     res.wait_frame_complete();
     res.render_begin();
-    if (cmd) g_pipe_sys.render(res, _render_datas.at(handle));
+    render(res, data);
 
     if (blur_host_window)
     {
@@ -200,6 +198,38 @@ void Renderer::render() noexcept
   }
 
   postprocess_render();
+}
+
+void Renderer::render(RenderResource& res, ui::FrameData* frame_data) const noexcept
+{
+  if (!frame_data) return;
+
+  auto  cmd   = g_graphics_engine.cmd();
+  auto& frame = res.current_frame();
+
+  g_ctx.set_cmd(cmd);
+
+  frame.buffer.clear().upload(cmd, frame_data);
+
+  for (auto const& data : frame_data->draw_datas())
+  {
+    // TODO: only shape now
+    auto pipe = g_pipe_sys.pipe(PipelineType::shape);
+    g_ctx.set_pipe(pipe->pipe_state.Get());
+    g_ctx.set_graphics_root_signature(pipe->root_signature);
+    g_ctx.set_primitive_topology(pipe->primive_topology);
+    g_ctx.set_graphics_constants(pipe->root_param_idx("constants"), Constants
+    {
+      .render_target_extent = frame.image.extent(),
+      .window_pos           = frame_data->window_pos(),
+    });
+    g_ctx.set_scissor_rect(data.scissor_rect);
+    g_ctx.draw(data.index_beg, data.indices_size);
+  }
+
+  // TODO: window shadow info
+
+  frame_data->notify();
 }
 
 void Renderer::postprocess_render() noexcept

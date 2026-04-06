@@ -3,8 +3,6 @@
 #include "../core.hpp"
 #include "../renderer/renderer.hpp"
 #include "../../util/align.hpp"
-#include "../config.hpp"
-#include "render_data.hpp"
 
 #include <directx/d3dx12.h>
 
@@ -102,42 +100,6 @@ auto Buffer::append(void const* data, uint32_t size) noexcept -> uint32_t
     append(data, size);
   }
   return size;
-}
-
-void FrameBuffer::init() noexcept
-{
-  _vertices_indices_buffer.init(Vertices_Indices_Buffer_Size, false);
-  _shape_properties_buffer.init(Shape_Properties_Buffer_Size, true);
-}
-
-void FrameBuffer::upload(ID3D12GraphicsCommandList1* cmd, RenderData& data) noexcept
-{
-  auto vertices_offset = _vertices_indices_buffer.append_range(data.vertices);
-  auto indices_offset  = _vertices_indices_buffer.append_range(data.indices);
-
-  // get current buffer gpu address
-  auto address = _vertices_indices_buffer.gpu_address();
-
-  // set vertex buffer view
-  D3D12_VERTEX_BUFFER_VIEW vertex_buffer_view{};
-  vertex_buffer_view.BufferLocation = address;
-  vertex_buffer_view.StrideInBytes  = sizeof(Vertex);
-  vertex_buffer_view.SizeInBytes    = vertices_offset;
-  cmd->IASetVertexBuffers(0, 1, &vertex_buffer_view);
-
-  // add vertices offset
-  address += vertices_offset;
-
-  // set index buffer view
-  D3D12_INDEX_BUFFER_VIEW index_buffer_view{};
-  index_buffer_view.BufferLocation = address;
-  index_buffer_view.SizeInBytes    = indices_offset;
-  index_buffer_view.Format         = DXGI_FORMAT_R16_UINT;
-  cmd->IASetIndexBuffer(&index_buffer_view);
-
-  // shape properties
-  for (auto const& shape_property : data.shape_properties)
-    _shape_properties_buffer.append(shape_property.data(), shape_property.byte_size());
 }
 
 }

@@ -10,7 +10,6 @@ void Renderer::MessageHandler::operator()(Message_Window_Create const& msg) cons
   auto res = RenderResource{};
   res.init(msg.handle, msg.width, msg.height);
   renderer._res.emplace(msg.handle, std::move(res));
-  renderer._render_datas.emplace(msg.handle, RenderData{});
 }
 
 void Renderer::MessageHandler::operator()(Message_Window_Destroy const& msg) const noexcept
@@ -22,7 +21,6 @@ void Renderer::MessageHandler::operator()(Message_Window_Destroy const& msg) con
     g_wnd_mgr.destroy_window(handle, blur_handle);
   });
   renderer._res.erase(msg.handle);
-  renderer._render_datas.erase(msg.handle);
   renderer._destroied_windows.emplace(msg.handle);
 }
 

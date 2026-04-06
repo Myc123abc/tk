@@ -39,31 +39,4 @@ private:
   uint32_t                               _size{};
 };
 
-class FrameBuffer
-{
-public:
-  void init() noexcept;
-
-  void destroy() noexcept
-  {
-    _vertices_indices_buffer.destroy();
-    _shape_properties_buffer.destroy();
-  }
-
-  auto clear() noexcept -> FrameBuffer&
-  {
-    _vertices_indices_buffer.clear();
-    _shape_properties_buffer.clear();
-    return *this;
-  }
-
-  void upload(ID3D12GraphicsCommandList1* cmd, class RenderData& data) noexcept;
-
-  auto shape_properties_gpu_handle() const noexcept { return _shape_properties_buffer.gpu_handle(); }
-
-private:
-  Buffer _vertices_indices_buffer;
-  Buffer _shape_properties_buffer;
-};
-
 }

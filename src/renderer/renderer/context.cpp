@@ -1,0 +1,121 @@
+#include "context.hpp"
+
+namespace tk::renderer {
+
+void Context::set_cmd(ID3D12GraphicsCommandList1* cmd) noexcept
+{
+  _cmd = cmd;
+
+  _pipe_state                        = {};
+  _graphics_root_signature           = {};
+  _compute_root_signature            = {};
+  _graphics_constants_root_param_idx = {};
+  _compute_constants_root_param_idx  = {};
+  _primitive_topology                = {};
+  _scissor_rect                      = {};
+  _graphics_descriptors.clear();
+  _compute_descriptors.clear();
+  _graphics_constants.clear();
+  _compute_constants.clear();
+}
+
+void Context::set_pipe(ID3D12PipelineState* pipe_state) noexcept
+{
+  if (_pipe_state != pipe_state)
+  {
+    _pipe_state = pipe_state;
+    _cmd->SetPipelineState(_pipe_state);
+  }
+}
+
+void Context::set_graphics_root_signature(ID3D12RootSignature* root_signature) noexcept
+{
+  if (_graphics_root_signature != root_signature)
+  {
+    _graphics_root_signature = root_signature;
+    _cmd->SetGraphicsRootSignature(_graphics_root_signature);
+  }
+}
+
+void Context::set_compute_root_signature(ID3D12RootSignature* root_signature) noexcept
+{
+  if (_compute_root_signature != root_signature)
+  {
+    _compute_root_signature = root_signature;
+    _cmd->SetComputeRootSignature(_compute_root_signature);
+  }
+}
+
+void Context::set_primitive_topology(D3D_PRIMITIVE_TOPOLOGY primitive_topology) noexcept
+{
+  if (_primitive_topology != primitive_topology)
+  {
+    _primitive_topology = primitive_topology;
+    _cmd->IASetPrimitiveTopology(_primitive_topology);
+  }
+}
+
+void Context::set_scissor_rect(RECT rect) noexcept
+{
+  if (!EqualRect(&rect, &_scissor_rect))
+  {
+    _scissor_rect = rect;
+    _cmd->RSSetScissorRects(1, &_scissor_rect);
+  }
+}
+
+void Context::set_render_target(Image& img) const noexcept
+{
+  img.set_state(_cmd, ImageState::render_target);
+
+  auto handle = img.rtv().cpu_handle();
+  _cmd->OMSetRenderTargets(1, &handle, false, nullptr);
+
+  auto viewport = CD3DX12_VIEWPORT{ 0.f, 0.f, static_cast<float>(img.width()), static_cast<float>(img.height()) };
+  _cmd->RSSetViewports(1, &viewport);
+}
+
+void Context::draw(uint32_t count) const noexcept
+{
+  _cmd->DrawInstanced(3 * count, 1, 0, 0);
+}
+
+void Context::draw(uint32_t start_idx, uint32_t size) const noexcept
+{
+  _cmd->DrawIndexedInstanced(size, 1, start_idx, 0, 0);
+}
+
+void Context::dispatch(uint32_t x, uint32_t y, uint32_t z) const noexcept
+{
+  _cmd->Dispatch(x, y, z);
+}
+
+void Context::set_graphics_descriptor(uint32_t root_param_idx, D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept
+{
+  if (!_graphics_descriptors.contains(root_param_idx))
+  {
+    _graphics_descriptors[root_param_idx] = handle;
+    _cmd->SetGraphicsRootDescriptorTable(root_param_idx, handle);
+  }
+  else if (_graphics_descriptors.at(root_param_idx).ptr != handle.ptr)
+  {
+    _graphics_descriptors[root_param_idx] = handle;
+    _cmd->SetGraphicsRootDescriptorTable(root_param_idx, handle);
+  }
+}
+
+void Context::set_compute_descriptor(uint32_t root_param_idx, D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept
+{
+  if (!_compute_descriptors.contains(root_param_idx))
+  {
+    _compute_descriptors[root_param_idx] = handle;
+    _cmd->SetComputeRootDescriptorTable(root_param_idx, handle);
+  }
+  else if (_compute_descriptors.at(root_param_idx).ptr != handle.ptr)
+  {
+    _compute_descriptors[root_param_idx] = handle;
+    _cmd->SetComputeRootDescriptorTable(root_param_idx, handle);
+  }
+}
+
+}

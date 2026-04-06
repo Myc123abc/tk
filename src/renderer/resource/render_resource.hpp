@@ -3,12 +3,35 @@
 #include "image.hpp"
 #include "buffer.hpp"
 #include "../config.hpp"
+#include "../../ui/frame_data.hpp"
 
 #include <dcomp.h>
 
 #include <array>
 
 namespace tk::renderer {
+
+class FrameBuffer
+{
+public:
+  void init() noexcept;
+
+  void destroy() noexcept
+  {
+    _vertices_indices_buffer.destroy();
+  }
+
+  auto clear() noexcept -> FrameBuffer&
+  {
+    _vertices_indices_buffer.clear();
+    return *this;
+  }
+
+  void upload(ID3D12GraphicsCommandList1* cmd, ui::FrameData const* data) noexcept;
+
+private:
+  Buffer _vertices_indices_buffer;
+};
 
 class RenderResource
 {

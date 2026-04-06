@@ -64,7 +64,7 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
     set_render_pos(0, 0);
 
   _window->move_invalid_areas.data().clear();
-  _window->cmd()->wait().reset();
+  _window->frame_data()->wait_and_clear();
 
   if (_window->snap.fullscreen_window)
     g_ui_ctx._window->add_move_invald_areas(
@@ -158,7 +158,7 @@ void UIContext::close_window() noexcept
     }
     else
     {
-      for (auto& cmd : window.cmds) cmd.wait();
+      for (auto& frame_data : window.frame_datas) frame_data.wait_and_clear();
       g_wnd_mgr.close_window(window.snap.handle);
       _window_names.erase(window.snap.handle);
       return true;
@@ -194,27 +194,26 @@ void UIContext::render() noexcept
   auto need_wakeup = g_renderer.is_sleeping();
 
   // process window render datas
-  auto render = [](Window& wnd, CommandList* cmd, HWND blur_host_window = {}, RECT blur_window_rect = {}) noexcept
+  auto render = [](Window& wnd, FrameData* data, HWND blur_host_window = {}, RECT blur_window_rect = {}) noexcept
   {
-    g_renderer.submit({ wnd.snap.handle, cmd, blur_host_window, blur_window_rect});
-    if (cmd) wnd.next_frame();
+    g_renderer.submit({ wnd.snap.handle, data, blur_host_window, blur_window_rect});
+    if (data) wnd.next_frame();
   };
   for (auto& wnd : _windows | std::views::values)
   {
-    auto cmd = wnd.cmd();
+    auto data = wnd.frame_data();
 
     if (!wnd.snap.resizing)
     {
       auto thickness = wnd.shadow_thickness();
-      cmd->set_scissor_rect({ thickness, thickness,
+      data->add_scissor_rect({ thickness, thickness,
         static_cast<LONG>(thickness + wnd.snap.width),
         static_cast<LONG>(thickness + wnd.snap.height)});
       if (!wnd.snap.fullscreen_window && !wnd.snap.maximized)
         window_shadow_wireframe_process(wnd, { 0, 0,
           static_cast<LONG>(thickness * 2 + wnd.snap.width),
           static_cast<LONG>(thickness * 2 + wnd.snap.height)});
-      cmd->submit();
-      render(wnd, cmd);
+      render(wnd, data);
     }
     else
     { 
@@ -223,14 +222,13 @@ void UIContext::render() noexcept
         wnd.need_clear = false;
         render(wnd, {});
       }
-      cmd->set_scissor_rect(wnd.rect());
+      data->add_scissor_rect(wnd.rect());
       window_shadow_wireframe_process(wnd, wnd.real_rect());
-      cmd->set_window_pos(wnd.real_pos());
-      cmd->submit();
+      data->set_window_pos(wnd.real_pos());
       if (wnd.cfg.backdrop.style != ui::BackdropStyle::none)
-        render(_fullscreen_window, cmd, wnd.snap.handle, wnd.rect());
+        render(_fullscreen_window, data, wnd.snap.handle, wnd.rect());
       else
-        render(_fullscreen_window, cmd);
+        render(_fullscreen_window, data);
     }
   }
   if (_fullscreen_window.need_clear)
@@ -324,8 +322,8 @@ void UIContext::window_shadow_wireframe_process(Window& wnd, RECT scissor_rect) 
   if (!wnd.cfg.display_window_shadow && !wnd.cfg.wireframe_color)
     return;
 
-  auto cmd = wnd.cmd();
-  auto col = glm::vec4{};
+  auto data = wnd.frame_data();
+  auto col  = glm::vec4{};
 
   auto get_wireframe_color = [&] -> std::optional<glm::vec4>
   {
@@ -348,8 +346,8 @@ void UIContext::window_shadow_wireframe_process(Window& wnd, RECT scissor_rect) 
     return {};
   };
 
-  cmd->draw_window_shadow(wnd.extent(), wnd.shadow_thickness(), {}, wnd.cfg.display_window_shadow ? 5 : 0, 15, get_wireframe_color());
-  cmd->set_scissor_rect(scissor_rect);
+  data->set_window_shadow(wnd.extent(), wnd.shadow_thickness(), {}, wnd.cfg.display_window_shadow ? 5 : 0, 15, get_wireframe_color());
+  data->add_scissor_rect(scissor_rect);
 }
 
 void UIContext::add_mouse_left_button_state(size_t id, glm::vec2 left_top, glm::vec2 right_bottom) noexcept
@@ -526,7 +524,7 @@ void UIContext::begin_path() noexcept
   check_draw();
   check_path_not_draw();
   _path_begin = true;
-  cmd()->begin_path();
+  // cmd()->begin_path();
 }
 
 void UIContext::end_path(Color color, float thickness) noexcept
@@ -534,7 +532,7 @@ void UIContext::end_path(Color color, float thickness) noexcept
   check_draw();
   check_path_draw();
   _path_begin = false;
-  cmd()->end_path(color, thickness);
+  // cmd()->end_path(color, thickness);
 }
 
 void UIContext::begin_union() noexcept
@@ -543,7 +541,7 @@ void UIContext::begin_union() noexcept
   check_path_not_draw();
   check_union_not_draw();
   _union_begin = true;
-  cmd()->begin_union();
+  // cmd()->begin_union();
 }
 
 void UIContext::end_union(Color color, float thickness) noexcept
@@ -552,7 +550,7 @@ void UIContext::end_union(Color color, float thickness) noexcept
   check_path_not_draw();
   check_union_draw();
   _union_begin = false;
-  cmd()->end_union(color, thickness);
+  // cmd()->end_union(color, thickness);
 }
 
 void UIContext::update_keys() noexcept
@@ -625,7 +623,7 @@ void UIContext::image(std::string_view path, glm::vec2 left_top, glm::vec2 right
     left_top     *= scale;
     right_bottom *= scale;
 
-    cmd()->image(g_img_mgr.handle(path), left_top, right_bottom, alpha);
+    // cmd()->image(g_img_mgr.handle(path), left_top, right_bottom, alpha);
   }
   else
     warn("image {} is not exist", path);
