@@ -31,8 +31,6 @@ auto lerp(Color x, Color y, float v) noexcept -> glm::vec4
 auto lerp(glm::vec2 x, glm::vec2 y, float v) noexcept -> glm::vec2
 {
   return { std::lerp(x.x, y.x, v), std::lerp(x.y, y.y, v) };
-  // use round for small pixel level lerp for smooth
-  // return { std::round(std::lerp(a.x, b.x, t)), std::round(std::lerp(a.y, b.y, t)) };
 }
 
 auto delta_time() noexcept -> double
@@ -235,7 +233,7 @@ void circle(glm::vec2 center, float radius, Color color, float thickness) noexce
   center    *= scale;
   thickness *= scale;
 
-  // g_ui_ctx.cmd()->draw_circle(center, radius, color, thickness);
+  g_ui_ctx.frame_data()->draw_circle(center, radius, color, thickness);
 }
 
 void line(glm::vec2 p0, glm::vec2 p1, Color color, float thickness) noexcept

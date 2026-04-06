@@ -50,6 +50,7 @@ auto ImageManager::extent(std::string_view path) noexcept -> glm::vec2
   return _image_extents.at(path.data());
 }
 
+// TODO: big image load will lead block ui thread
 auto ImageManager::try_load(std::string_view path, glm::vec2 extent) noexcept -> bool
 {
   // if (_loaded_images.contains(path.data()))

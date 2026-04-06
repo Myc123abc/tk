@@ -49,6 +49,7 @@ public:
 
   void add_rect(glm::vec2 left_top, glm::vec2 right_bottom, Color color, float thickness) noexcept;
   void add_triangle(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color, float thickness) noexcept;
+  void draw_circle(glm::vec2 center, float radius, Color color, float thickness) noexcept;
 
   void add_scissor_rect(RECT rect) noexcept;
 

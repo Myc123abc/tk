@@ -61,6 +61,11 @@ void FrameData::add_triangle(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color col
   add_convex_poly_filled(color);
 }
 
+void FrameData::draw_circle(glm::vec2 center, float radius, Color color, float thickness) noexcept
+{
+
+}
+
 void FrameData::add_convex_poly_filled(Color color) noexcept
 {
   auto pt_cnt = _points.size();
