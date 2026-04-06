@@ -219,7 +219,7 @@ void triangle(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color, float thick
   p2        *= scale;
   thickness *= scale;
 
-	// g_ui_ctx.cmd()->draw_triangle(p0, p1, p2, color, thickness);
+	g_ui_ctx.frame_data()->add_triangle(p0, p1, p2, color, thickness);
 }
 
 void circle(glm::vec2 center, float radius, Color color, float thickness) noexcept

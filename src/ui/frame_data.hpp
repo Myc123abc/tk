@@ -33,6 +33,8 @@ public:
     _vertices.clear();
     _indices.clear();
     _draw_datas.clear();
+    _points.clear();
+    _normals.clear();
     _vertex_beg         = {};
     _index_beg          = {};
     _index              = {};
@@ -46,6 +48,7 @@ public:
   void notify() noexcept { _sem.release(); }
 
   void add_rect(glm::vec2 left_top, glm::vec2 right_bottom, Color color, float thickness) noexcept;
+  void add_triangle(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color, float thickness) noexcept;
 
   void add_scissor_rect(RECT rect) noexcept;
 
@@ -83,6 +86,9 @@ private:
     _index      += _tmp_vertices_size;
   }
 
+  void set_points(std::vector<glm::vec2>&& points) noexcept { _points = std::move(points); }
+  void add_convex_poly_filled(Color color) noexcept;
+
 private:
   std::binary_semaphore _sem{ 1 };
 
@@ -107,6 +113,9 @@ private:
   glm::vec2             _window_pos{};
 
   WindowShadowInfo      _window_shadow_info;
+
+  std::vector<glm::vec2> _points;
+  std::vector<glm::vec2> _normals;
 };
 
 }

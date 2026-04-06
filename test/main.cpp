@@ -122,11 +122,11 @@ int main()
   circle_lerplocator.init(250'000, ui::Lerpolator::Mode::loop);
 
   auto wnd1_is_closed = false;
-  auto wnd2_is_closed = false;
+  auto wnd2_is_closed = true;
 
   auto cfg = ui::WindowConfig{};
-  cfg.display_title_bar             = true;
-	cfg.display_window_shadow         = true;
+  cfg.display_title_bar             = false;
+	cfg.display_window_shadow         = false;
   cfg.display_wireframe_only_active = true;
   cfg.wireframe_color               = 0x7160e8ff;
   cfg.backdrop.default_acrylic();
@@ -136,7 +136,7 @@ int main()
     if (!wnd1_is_closed)
     {
       ui::begin("wnd1", 50, 50, 200, 200, &wnd1_is_closed, cfg);
-      ui::rectangle({}, ui::window_drawable_extent(), 0x282c3444);
+      ui::rectangle({}, ui::window_drawable_extent(), 0x000000ff);
       if (ui::get_key(ui::Key::F11))
       {
         if (ui::is_fullscreen_window())
@@ -148,7 +148,7 @@ int main()
       auto pos = glm::vec2{ extent.x / 2 - 50, extent.y - 50 };
       ui::rectangle(pos, pos + glm::vec2(100), 0x000000ff);
       auto size = ui::window_drawable_extent();
-      ui::triangle({ size.x / 2, 0 }, size, { 0, size.y }, 0x00ff004f, 10);
+      ui::triangle({ size.x / 2, size.y * .1f }, size * .9f, { size.y * .1f, size.y * .9 }, 0xffffffff, 10);
       if (ui::button("btn1", 0, 0, 100, 100, 0x00ff00ff, 0x0000ffff))
         circle_lerplocator.reverse();
       if (ui::button("btn2", 50, 50, 100, 100, 0x00ff00ff, 0x0000ffff))
