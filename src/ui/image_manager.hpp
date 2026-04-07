@@ -44,7 +44,7 @@ public:
 
   auto contains(std::string_view path) const noexcept { return _loaded_images.contains(path.data());   }
   auto extent(std::string_view path) noexcept -> glm::vec2;
-  auto handle(std::string_view path) const noexcept { return _loaded_images.at(path.data()); }
+  auto handle(std::string_view path) noexcept { return _loaded_images[path.data()]; }
 
 private:
   void load(std::string_view path, uint32_t width, uint32_t height, void* data, bool use_mipmap) noexcept;

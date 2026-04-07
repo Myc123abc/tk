@@ -82,6 +82,7 @@ void UIContext::update_window_config(WindowConfig const& cfg) noexcept
 {
   if (cfg.backdrop.style != ui::BackdropStyle::none)
   {
+    if (_window->first_time_call) goto label_end;
     if (_window->cfg.backdrop.style == ui::BackdropStyle::none)
       g_wnd_mgr.init_blur_window(_window->snap.handle, cfg.backdrop);
     else
@@ -92,6 +93,7 @@ void UIContext::update_window_config(WindowConfig const& cfg) noexcept
     if (_window->cfg.backdrop.style != ui::BackdropStyle::none)
       g_wnd_mgr.remove_blur_window(_window->snap.handle);
   }
+label_end:
   _window->cfg = cfg;
 }
 
@@ -119,6 +121,7 @@ void UIContext::end() noexcept
   _call_begin = false;
   _window->move_invalid_areas.swap();
   _window->cfgs.swap();
+  if (_window->first_time_call) _window->first_time_call = false;
 }
 
 void UIContext::check_draw() const noexcept
@@ -213,7 +216,10 @@ void UIContext::render() noexcept
         window_shadow_wireframe_process(wnd, { 0, 0,
           static_cast<LONG>(thickness * 2 + wnd.snap.width),
           static_cast<LONG>(thickness * 2 + wnd.snap.height)});
-      render(wnd, data);
+      if (_fullscreen_window.need_clear)
+        render(wnd, data, wnd.snap.handle, wnd.rect());
+      else
+        render(wnd, data);
     }
     else
     { 
@@ -470,7 +476,7 @@ auto UIContext::get_lerpolator(size_t id, double duration) noexcept -> Lerpolato
 {
   if (!_lerpolators.contains(id))
     _lerpolators[id].init(duration);
-  return &_lerpolators.at(id);
+  return &_lerpolators[id];
 }
 
 void UIContext::remove_lerpolator(size_t id) noexcept
@@ -482,7 +488,7 @@ void UIContext::remove_lerpolator(size_t id) noexcept
 void UIContext::reset_lerpolator(size_t id) noexcept
 {
   err_if(!_lerpolators.contains(id), "remove an unexist color lerpolator");
-  _lerpolators.at(id).reset();
+  _lerpolators[id].reset();
 }
 
 auto UIContext::lerp_ping_pong(bool b, size_t id, double duration) noexcept -> double
@@ -559,7 +565,7 @@ void UIContext::update_keys() noexcept
 
   for (auto it = _down_keys.begin(); it != _down_keys.end();)
   {
-    auto& ctx = _keys.at(*it);
+    auto& ctx = _keys[*it];
 
     if (ctx.state == down)
     {
@@ -596,7 +602,7 @@ auto UIContext::get_key(Key key) noexcept -> KeyState
 {
   using enum KeyState;
 
-  auto& ctx = _keys.at(key);
+  auto& ctx = _keys[key];
   if (ctx.state == idle && GetAsyncKeyState(static_cast<SHORT>(key)) < 0)
   {
     assert(!_down_keys.contains(key));

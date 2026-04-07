@@ -22,7 +22,7 @@ Singleton(PipelineSystem, g_pipe_sys,
 public:
   void init() noexcept;
 
-  auto pipe(PipelineType type) const noexcept { return &_pipes.at(type); }
+  auto pipe(PipelineType type) noexcept { return &_pipes[type]; }
 
 private:
   auto find_root_param(std::span<CD3DX12_ROOT_PARAMETER1> params) const noexcept -> ID3D12RootSignature*;
@@ -32,6 +32,8 @@ private:
     Microsoft::WRL::ComPtr<ID3D12PipelineState> pipe_state{};
     ID3D12RootSignature*                        root_signature{};
     D3D_PRIMITIVE_TOPOLOGY                      primive_topology{ D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST };
+
+    Pipeline() = default;
 
     Pipeline(
       std::string_view                       shader,
@@ -77,7 +79,7 @@ private:
       std::optional<RootSignatureResult>     res = {},
       std::unordered_set<std::string> const& volatile_descs = {}) noexcept;
   
-    auto root_param_idx(std::string_view name) const noexcept { return _root_param_idxs.at(name.data()); }
+    auto root_param_idx(std::string_view name) noexcept { return _root_param_idxs[name.data()]; }
   private:
     std::unordered_map<std::string, uint32_t> _root_param_idxs;
   };

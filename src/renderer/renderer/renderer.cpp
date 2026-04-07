@@ -96,17 +96,12 @@ void Renderer::preprocess_render() noexcept
   upload_images();
   g_comp_engine.update();
 
-  if (_blur_host_window && _res.contains(_blur_host_window))
+  if (_blur_host_window)
   {
-    auto& res = _res.at(_blur_host_window);
-
-    if (res.is_frame_complete(_present_frame_idx))
-    {
-      g_wnd_mgr.resize_blur_window(_blur_host_window, _blur_window_rect);
-      _blur_host_window  = {};
-      _blur_window_rect  = {};
-      _present_frame_idx = {};
-    }
+    DwmFlush();
+    g_wnd_mgr.resize_blur_window(_blur_host_window, _blur_window_rect);
+    _blur_host_window = {};
+    _blur_window_rect = {};
   }
 }
 
@@ -162,29 +157,27 @@ void Renderer::render() noexcept
     _render_windows.emplace_back(handle);
 
     // render
-    auto& res = _res.at(handle);
+    auto& res = _res[handle];
     res.wait_frame_complete();
     res.render_begin();
     render(res, data);
+    res.render_end();
 
     if (blur_host_window)
     {
-      _blur_host_window  = blur_host_window;
-      _blur_window_rect  = blur_window_rect;
-      _present_frame_idx = res.frame_index();
+      _blur_host_window = blur_host_window;
+      _blur_window_rect = blur_window_rect;
     }
-
-    res.render_end();
   }
 
   // present windows
   if (_render_windows.size() == 1)
-    _res.at(_render_windows.back()).present(true);
+    _res[_render_windows.back()].present(true);
   else if (_render_windows.size() > 1)
   {
     for (auto handle : _render_windows | std::views::take(_render_windows.size() - 1))
-      _res.at(handle).present(false);
-    _res.at(_render_windows.back()).present(true);
+      _res[handle].present(false);
+    _res[_render_windows.back()].present(true);
   }
 
   // show blur window
@@ -257,7 +250,7 @@ void Renderer::generate_mipmap() noexcept
   auto constants = MipmapGenerationCostant{};
   for (auto const& handle : _pending_mipmap_image_handles)
   {
-    auto const& img = _images.at(handle);
+    auto const& img = _images[handle];
 
     auto src_width  = img.width();
     auto src_height = img.height();
@@ -270,8 +263,8 @@ void Renderer::generate_mipmap() noexcept
       _mipmap_pipeline.set_constants(cmd, "constants", constants);
       _mipmap_pipeline.set_descriptors(cmd,
       {
-        { "src", img.gpu_handle()                     },
-        { "dst", img.mipmap_uavs().at(i).gpu_handle() },
+        { "src", img.gpu_handle()                  },
+        { "dst", img.mipmap_uavs()[i].gpu_handle() },
       });
 
       auto dst_width  = std::max(1u, src_width  >> 1);
@@ -291,7 +284,7 @@ void Renderer::generate_mipmap() noexcept
   add_frame_render_complete_func([this, handles = std::move(_pending_mipmap_image_handles)]
   {
     for (auto const& handle : handles)
-      _images.at(handle).release_mipmap_uavs();
+      _images[handle].release_mipmap_uavs();
   });
   _pending_mipmap_image_handles.clear();
 #endif

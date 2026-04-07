@@ -64,7 +64,6 @@ private:
   std::unordered_map<HWND, HWND> _show_blur_wnds;
   HWND                           _blur_host_window{};
   RECT                           _blur_window_rect{};
-  uint32_t                       _present_frame_idx{};
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                           Image

@@ -15,7 +15,7 @@ void Renderer::MessageHandler::operator()(Message_Window_Create const& msg) cons
 void Renderer::MessageHandler::operator()(Message_Window_Destroy const& msg) const noexcept
 {
   err_if(!renderer._res.contains(msg.handle), "failed to destroy window render resource, it's unexist");
-  renderer.add_frame_render_complete_func([handle = msg.handle, blur_handle = msg.blur_handle, res = std::move(renderer._res.at(msg.handle))] mutable
+  renderer.add_frame_render_complete_func([handle = msg.handle, blur_handle = msg.blur_handle, res = std::move(renderer._res[msg.handle])] mutable
   {
     res.destroy();
     g_wnd_mgr.destroy_window(handle, blur_handle);
@@ -72,7 +72,7 @@ void Renderer::UIContextMessageHandler::operator()(Message_Destroy_Image const& 
   else if (renderer._images.contains(msg.handle))
   {
     // already uploaded, release image resource
-    renderer.add_frame_render_complete_func([image = std::move(renderer._images.at(msg.handle))] mutable { image.destroy(); });
+    renderer.add_frame_render_complete_func([image = std::move(renderer._images[msg.handle])] mutable { image.destroy(); });
     renderer._images.erase(msg.handle);
   }
 }

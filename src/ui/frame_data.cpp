@@ -33,6 +33,11 @@ auto fix_normal(glm::vec2 p) noexcept
   return glm::vec2{};
 }
 
+auto calc_circle_segment_count(int idx) noexcept
+{
+  return 0;
+}
+
 }
 
 namespace tk::ui {
@@ -63,7 +68,7 @@ void FrameData::add_triangle(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color col
 
 void FrameData::draw_circle(glm::vec2 center, float radius, Color color, float thickness) noexcept
 {
-
+  path_arc_to(center, radius);
 }
 
 void FrameData::add_convex_poly_filled(Color color) noexcept
@@ -110,6 +115,20 @@ void FrameData::add_convex_poly_filled(Color color) noexcept
   }
 
   expand_end();
+}
+
+auto FrameData::get_circle_segment_count(float radius) noexcept -> uint32_t
+{
+  int const idx = radius + 0.999999f;
+  if (FrameData::_circle_segment_counts.contains(idx))
+    return _circle_segment_counts[idx];
+  _circle_segment_counts[idx] = calc_circle_segment_count(idx);
+  return _circle_segment_counts[idx];
+}
+
+void FrameData::path_arc_to(glm::vec2 center, float radius) noexcept
+{
+  //auto step = 48 / get_circle_segment_count(radius);
 }
 
 void FrameData::add_scissor_rect(RECT rect) noexcept

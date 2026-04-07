@@ -97,7 +97,7 @@ void Context::set_graphics_descriptor(uint32_t root_param_idx, D3D12_GPU_DESCRIP
     _graphics_descriptors[root_param_idx] = handle;
     _cmd->SetGraphicsRootDescriptorTable(root_param_idx, handle);
   }
-  else if (_graphics_descriptors.at(root_param_idx).ptr != handle.ptr)
+  else if (_graphics_descriptors[root_param_idx].ptr != handle.ptr)
   {
     _graphics_descriptors[root_param_idx] = handle;
     _cmd->SetGraphicsRootDescriptorTable(root_param_idx, handle);
@@ -111,7 +111,7 @@ void Context::set_compute_descriptor(uint32_t root_param_idx, D3D12_GPU_DESCRIPT
     _compute_descriptors[root_param_idx] = handle;
     _cmd->SetComputeRootDescriptorTable(root_param_idx, handle);
   }
-  else if (_compute_descriptors.at(root_param_idx).ptr != handle.ptr)
+  else if (_compute_descriptors[root_param_idx].ptr != handle.ptr)
   {
     _compute_descriptors[root_param_idx] = handle;
     _cmd->SetComputeRootDescriptorTable(root_param_idx, handle);

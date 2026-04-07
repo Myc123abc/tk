@@ -52,7 +52,7 @@ void PipelineSystem::render(RenderResource& res, RenderData& data) noexcept
   {
     if (draw_data.pipe_type == PipelineType::sdf)
     {
-      auto& pipe = _pipes.at(PipelineType::sdf);
+      auto& pipe = _pipes[PipelineType::sdf];
 
       _ctx.set_pipe(pipe.pipe_state.Get());
       _ctx.set_graphics_root_signature(pipe.root_signature);
@@ -96,7 +96,7 @@ label_draw_call_again:
     }
     else if (draw_data.pipe_type == PipelineType::image)
     {
-      auto& pipe = _pipes.at(PipelineType::image);
+      auto& pipe = _pipes[PipelineType::image];
 
       _ctx.set_pipe(pipe.pipe_state.Get());
       _ctx.set_graphics_root_signature(pipe.root_signature);

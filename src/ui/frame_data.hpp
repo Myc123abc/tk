@@ -90,6 +90,9 @@ private:
   void set_points(std::vector<glm::vec2>&& points) noexcept { _points = std::move(points); }
   void add_convex_poly_filled(Color color) noexcept;
 
+  auto get_circle_segment_count(float radius) noexcept -> uint32_t;
+  void path_arc_to(glm::vec2 center, float radius) noexcept;
+
 private:
   std::binary_semaphore _sem{ 1 };
 
@@ -117,6 +120,8 @@ private:
 
   std::vector<glm::vec2> _points;
   std::vector<glm::vec2> _normals;
+
+  inline static std::unordered_map<int, int> _circle_segment_counts;
 };
 
 }

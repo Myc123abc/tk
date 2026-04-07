@@ -47,7 +47,7 @@ auto ImageManager::extent(std::string_view path) noexcept -> glm::vec2
     stbi_info(path.data(), &w, &h, nullptr);
     _image_extents[path.data()] = { w, h };
   }
-  return _image_extents.at(path.data());
+  return _image_extents[path.data()];
 }
 
 // TODO: big image load will lead block ui thread
@@ -55,7 +55,7 @@ auto ImageManager::try_load(std::string_view path, glm::vec2 extent) noexcept ->
 {
   // if (_loaded_images.contains(path.data()))
   // {
-  //   auto const& info = _pool[_loaded_images.at(path.data())];
+  //   auto const& info = _pool[_loaded_images[path.data()]];
   //   if (!info.has_mipmap && (extent.x < info.width || extent.y < info.height))
   //     generate_mipmap(path);
   // }
@@ -95,7 +95,7 @@ void ImageManager::unload(std::string_view path) noexcept
   assert(_loaded_images.contains(path.data()));
 
   // get image handle
-  auto handle = _loaded_images.at(path.data());
+  auto handle = _loaded_images[path.data()];
 
   // remove image resource by index
   g_renderer.send_message(Renderer::Message_Destroy_Image{ handle });
@@ -110,7 +110,7 @@ void ImageManager::unload(std::string_view path) noexcept
 void ImageManager::generate_mipmap(std::string_view path) noexcept
 {
   assert(_loaded_images.contains(path.data()));
-  auto& info = _pool[_loaded_images.at(path.data())];
+  auto& info = _pool[_loaded_images[path.data()]];
   info.has_mipmap = true;
   // TODO:
   // copy srv image to uav image

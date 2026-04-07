@@ -131,7 +131,7 @@ void ComputeEngine::update() noexcept
     auto [idx, fence_value] = *it;
     if (fence_value <= finish_value)
     {
-      _blur_tmp_images.at(idx).in_use = false;
+      _blur_tmp_images[idx].in_use = false;
       it = _used_blur_tmp_images.erase(it);
       // TODO: only compute engine finish then other engine can use, otherwise lead the error as follow sometimes:
       // D4D12 ERROR: ID3D12CommandQueue::ExecuteCommandLists: Non-simultaneous-access Texture Resource

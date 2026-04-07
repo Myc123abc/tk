@@ -136,7 +136,7 @@ int main()
     if (!wnd1_is_closed)
     {
       ui::begin("wnd1", 50, 50, 200, 200, &wnd1_is_closed, cfg);
-      ui::rectangle({}, ui::window_drawable_extent(), 0x000000ff);
+      // ui::rectangle({}, ui::window_drawable_extent(), 0x000000ff);
       if (ui::get_key(ui::Key::F11))
       {
         if (ui::is_fullscreen_window())
@@ -152,7 +152,7 @@ int main()
       if (ui::button("btn1", 0, 0, 100, 100, 0x00ff00ff, 0x0000ffff))
         circle_lerplocator.reverse();
       if (ui::button("btn2", 50, 50, 100, 100, 0x00ff00ff, 0x0000ffff))
-        wnd2_is_closed = false;
+        wnd2_is_closed = !wnd2_is_closed;
       ui::add_move_invalid_area({}, { 150, 150 });
 
       ui::end();

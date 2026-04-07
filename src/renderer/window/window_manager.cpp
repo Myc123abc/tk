@@ -141,7 +141,7 @@ LRESULT CALLBACK WindowManager::blur_wnd_proc(HWND handle, UINT msg, WPARAM w_pa
   {
     // avoid window hide lead other blur windows z-order changed
     if (blur_wnds.contains(handle))
-      wnds.at(blur_wnds.at(handle)).keep_blur_window_behind();
+      wnds[blur_wnds[handle]].keep_blur_window_behind();
     break;
   }
   }
@@ -169,7 +169,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
 
     if (windows.contains(handle))
     {
-      auto& window = windows.at(handle);
+      auto& window = windows[handle];
       if (window.is_moving())
         window.move_end();
       else if (window.is_resizing())
@@ -197,7 +197,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   case WM_MOVE:
   {
     if (windows.contains(handle))
-      windows.at(handle).keep_blur_window_behind();
+      windows[handle].keep_blur_window_behind();
     break;
   }
 
@@ -207,7 +207,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     {
       if (windows.contains(handle))
       {
-        auto& wnd = windows.at(handle);
+        auto& wnd = windows[handle];
         if (wnd._blur_window)
         {
           ShowWindow(wnd._blur_window, SW_RESTORE);
@@ -221,7 +221,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   case WM_WINDOWPOSCHANGED:
   {
     if (windows.contains(handle))
-      windows.at(handle).keep_blur_window_behind();
+      windows[handle].keep_blur_window_behind();
 
     if (IsIconic(handle)) return 0;
     auto info = reinterpret_cast<WINDOWPOS*>(l_param);
@@ -232,7 +232,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   case WM_LBUTTONDOWN:
   {
     SetCapture(handle);
-    auto& window = windows.at(handle);
+    auto& window = windows[handle];
     last_cursor_pos                    = get_cursor_pos();
     left_button_down_window_cursor_pos = window.cursor_pos();
 
@@ -249,7 +249,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
 
   case WM_MOUSEMOVE:
   {
-    auto& window     = wnd_mgr._windows.at(handle);
+    auto& window     = wnd_mgr._windows[handle];
     auto  cursor_pos = window.cursor_pos();
     auto const& cfg  = g_ui_ctx.access_window_cfg(handle);
 
@@ -411,7 +411,7 @@ void WindowManager::update() noexcept
     for (auto [handle, rect] : _window_change_size)
     {
       if (!_windows.contains(handle)) continue;
-      auto& window = _windows.at(handle);
+      auto& window = _windows[handle];
       if (window.real_rect() != rect)
       {
         // the suck Windows operate system in some device have wrong monitor change process
@@ -433,13 +433,13 @@ void WindowManager::update() noexcept
     auto [handle, rect] = *_blur_resize_infos.front(); _blur_resize_infos.pop();
 
     if (_windows.contains(handle))
-      _windows.at(handle).resize_blur_window(rect);
+      _windows[handle].resize_blur_window(rect);
   }
 }
 
 void WindowManager::update_monitor(HWND handle, glm::vec2 cursor_pos, glm::vec<2, int>& left_button_down_window_cusor_pos) noexcept
 {
-  auto& window  = _windows.at(handle);
+  auto& window  = _windows[handle];
   auto  monitor = Monitor{ handle };
   if (monitor.name() != window.monitor())
   {
@@ -506,7 +506,7 @@ auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height,
   WaitForSingleObject(ptr->event, INFINITE);
   CloseHandle(ptr->event);
   auto snap = WindowSnapshot{};
-  snap.init(_windows.at(ptr->handle));
+  snap.init(_windows[ptr->handle]);
   free(ptr);
   return snap;
 }
@@ -604,8 +604,8 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
   case Message::close_window:
   {
     auto handle = std::bit_cast<HWND>(w_param);
-    _windows.at(handle).destroy();
-    if (auto blur_window = _windows.at(handle)._blur_window)
+    _windows[handle].destroy();
+    if (auto blur_window = _windows[handle]._blur_window)
       _blur_windows.erase(blur_window);
     _windows.erase(handle);
     _using_mouse_pass_through_windows.erase(handle);
@@ -621,37 +621,37 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
 
   case Message::minimize_window:
   {
-    _windows.at(std::bit_cast<HWND>(w_param)).minimize();
+    _windows[std::bit_cast<HWND>(w_param)].minimize();
     break;
   }
 
   case Message::maximize_window:
   {
-    _windows.at(std::bit_cast<HWND>(w_param)).maximize();
+    _windows[std::bit_cast<HWND>(w_param)].maximize();
     break;
   }
 
   case Message::restore_window:
   {
-    _windows.at(std::bit_cast<HWND>(w_param)).restore();
+    _windows[std::bit_cast<HWND>(w_param)].restore();
     break;
   }
 
   case Message::fullscreen_window:
   {
-    _windows.at(std::bit_cast<HWND>(w_param)).fullscreen();
+    _windows[std::bit_cast<HWND>(w_param)].fullscreen();
     break;
   }
 
   case Message::restore_fullscreen_window:
   {
-    _windows.at(std::bit_cast<HWND>(w_param)).restore_fullscreen();
+    _windows[std::bit_cast<HWND>(w_param)].restore_fullscreen();
     break;
   }
 
   case Message::show_blur_window:
   {
-    _windows.at(std::bit_cast<HWND>(w_param)).show_blur_window();
+    _windows[std::bit_cast<HWND>(w_param)].show_blur_window();
     break;
   }
 
@@ -667,7 +667,7 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
   case Message::init_blur_window:
   {
     auto  info = reinterpret_cast<BlurWindowInfo*>(w_param);
-    auto& wnd  = _windows.at(info->handle);
+    auto& wnd  = _windows[info->handle];
     wnd.init_blur_window(info->backdrop);
     _blur_windows.emplace(wnd._blur_window, wnd._handle);
     free(info);
@@ -677,7 +677,7 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
   case Message::update_blur_window:
   {
     auto  info = reinterpret_cast<BlurWindowInfo*>(w_param);
-    auto& wnd  = _windows.at(info->handle);
+    auto& wnd  = _windows[info->handle];
     wnd.update_blur_window(info->backdrop);
     free(info);
     break;
@@ -685,7 +685,7 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
 
   case Message::remove_blur_window:
   {
-    auto& wnd = _windows.at(std::bit_cast<HWND>(w_param));
+    auto& wnd = _windows[std::bit_cast<HWND>(w_param)];
     wnd.remove_blur_window();
     _blur_windows.erase(wnd._blur_window);
     break;
@@ -701,7 +701,7 @@ void WindowManager::message_process(HWND handle, Message msg, WPARAM w_param, LP
       for (auto it = _using_mouse_pass_through_windows.begin(); it != _using_mouse_pass_through_windows.end();)
       {
         auto handle = *it;
-        if (!_windows.at(handle).is_mouse_pass_through_area())
+        if (!_windows[handle].is_mouse_pass_through_area())
         {
           SetWindowLongPtrA(handle, GWL_EXSTYLE, GetWindowLong(handle, GWL_EXSTYLE) & ~(WS_EX_TRANSPARENT | WS_EX_LAYERED));
           it = _using_mouse_pass_through_windows.erase(it);
@@ -756,11 +756,11 @@ auto WindowManager::get_window_z_orders() const noexcept -> std::vector<HWND>
   return handles;
 }
 
-auto WindowManager::get_cursor_on_window() const noexcept -> HWND
+auto WindowManager::get_cursor_on_window() noexcept -> HWND
 {
   auto z_orders   = g_wnd_mgr.get_window_z_orders();
   auto cursor_pos = get_cursor_pos();
-  if (auto it = std::ranges::find_if(z_orders, [&](auto handle) { return _windows.at(handle).contains_point(cursor_pos); });
+  if (auto it = std::ranges::find_if(z_orders, [&](auto handle) { return _windows[handle].contains_point(cursor_pos); });
       it != z_orders.end())
     return *it;
   return {};

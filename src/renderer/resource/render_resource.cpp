@@ -135,11 +135,6 @@ void RenderResource::wait_frame_complete() noexcept
     WaitForSingleObjectEx(_swapchain_waitable_obj, INFINITE, false);
 }
 
-auto RenderResource::is_frame_complete(uint32_t idx) noexcept -> bool
-{
-  return g_graphics_engine.fence_completed_value() >= _frames[idx].fence_value;
-}
-
 void RenderResource::render_begin() noexcept
 {
   auto& frame = current_frame();

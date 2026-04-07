@@ -42,7 +42,7 @@ namespace tk::renderer {
 #if 0
 void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
 {
-  auto& render_data = _render_datas.at(handle);
+  auto& render_data = _render_datas[handle];
   render_data.clear();
   _shape_properties_offset = 0;
   _idx_beg                 = 0;
@@ -237,7 +237,7 @@ void Renderer::generate_render_data(HWND handle, ui::CommandList* cmd) noexcept
       if (_images.contains(info->handle))
       {
         add_vertices_indices(render_data, { info->left_top, info->right_bottom });
-        render_data.set_image_info(&_images.at(info->handle), static_cast<float>(info->alpha) / 0xff);
+        render_data.set_image_info(&_images[info->handle], static_cast<float>(info->alpha) / 0xff);
       }
     }
     break;

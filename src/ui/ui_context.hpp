@@ -73,6 +73,7 @@ struct Window
   DoubleBuffer<WindowConfig> cfgs;
 
   bool set_fullscreen{};
+  bool first_time_call{ true };
 };
 
 #define KEY_ENTRY_INIT(name, _) { Key::name, {} },

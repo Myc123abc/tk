@@ -14,30 +14,17 @@ using namespace Microsoft::WRL;
 
 namespace {
 
-auto dx12_descriptor_heap_type(DescriptorHeapType type) noexcept
-{
-  using enum DescriptorHeapType;
-  auto static const map = std::unordered_map<DescriptorHeapType, D3D12_DESCRIPTOR_HEAP_TYPE>
-  {
-    { cbv_srv_uav, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV },
-    { rtv,         D3D12_DESCRIPTOR_HEAP_TYPE_RTV         },
-    { dsv,         D3D12_DESCRIPTOR_HEAP_TYPE_DSV         },
-  };
-  err_if(!map.contains(type), "unsupport descriptor heap type now");
-  return map.at(type);
-}
-
 auto dx12_descriptor_size(DescriptorHeapType type) noexcept
 {
   using enum DescriptorHeapType;
-  auto static const map = std::unordered_map<DescriptorHeapType, uint32_t>
+  auto static map = std::unordered_map<DescriptorHeapType, uint32_t>
   {
     { cbv_srv_uav, CBV_SRV_UAV_Size },
     { rtv,         RTV_Size         },
     { dsv,         DSV_Size         },
   };
   err_if(!map.contains(type), "unsupport descriptor size now");
-  return map.at(type);
+  return map[type];
 }
 
 }
@@ -74,7 +61,7 @@ void DescriptorHeapManager::DescriptorHeap::init(DescriptorHeapType type, uint32
   // create descriptor heap
   auto heap_desc = D3D12_DESCRIPTOR_HEAP_DESC{};
   heap_desc.NumDescriptors = capacity;
-  heap_desc.Type           = dx12_descriptor_heap_type(type);
+  heap_desc.Type           = static_cast<D3D12_DESCRIPTOR_HEAP_TYPE>(type);
   heap_desc.Flags          = type == DescriptorHeapType::cbv_srv_uav ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
   err_if(g_core.device()->CreateDescriptorHeap(&heap_desc, IID_PPV_ARGS(&_heap)), "failed to create descriptor heap");
 

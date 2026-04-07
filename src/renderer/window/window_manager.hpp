@@ -106,7 +106,7 @@ public:
   void remove_blur_window(HWND handle) const noexcept;
 
   auto get_window_z_orders() const noexcept -> std::vector<HWND>;
-  auto get_cursor_on_window() const noexcept -> HWND;
+  auto get_cursor_on_window() noexcept -> HWND;
 
 private:
   void message_process(HWND handle, Message msg, WPARAM w_param, LPARAM l_param) noexcept;

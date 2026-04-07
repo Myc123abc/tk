@@ -17,9 +17,9 @@ inline auto DSV_Size         = 0u;
 
 enum class DescriptorHeapType
 {
-  cbv_srv_uav,
-  rtv,
-  dsv,
+  cbv_srv_uav = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+  rtv         = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+  dsv         = D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
 };
 
 class DescriptorHandle
@@ -83,13 +83,13 @@ public:
 
   void bind_heaps(ID3D12GraphicsCommandList1* cmd) noexcept;
 
-  void reserve(DescriptorHeapType type, uint32_t capacity) noexcept { _heaps.at(type).reserve(capacity); }
+  void reserve(DescriptorHeapType type, uint32_t capacity) noexcept { _heaps[type].reserve(capacity); }
 
-  auto size(DescriptorHeapType type) const noexcept { return _heaps.at(type).size(); }
+  auto size(DescriptorHeapType type) noexcept { return _heaps[type].size(); }
 
-  auto usable_handle_count(DescriptorHeapType type) const noexcept { return _heaps.at(type).usable_handle_count(); }
+  auto usable_handle_count(DescriptorHeapType type) noexcept { return _heaps[type].usable_handle_count(); }
 
-  auto first_gpu_handle(DescriptorHeapType type) const noexcept { return _heaps.at(type)._heap->GetGPUDescriptorHandleForHeapStart(); }
+  auto first_gpu_handle(DescriptorHeapType type) noexcept { return _heaps[type]._heap->GetGPUDescriptorHandleForHeapStart(); }
 
 private:
   std::unordered_map<DescriptorHeapType, DescriptorHeap> _heaps;
