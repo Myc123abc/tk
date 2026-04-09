@@ -164,7 +164,16 @@ void Window::move_from_maximize() noexcept
   update_rect();
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
   g_ui_ctx.send_message(UIContext::Message_Window_Moving_From_Maximize{ _handle, _x, _y, _width, _height });
-  SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
+
+  if (_blur_window)
+  {
+    auto info = BeginDeferWindowPos(2);
+    info = DeferWindowPos(info, _handle, nullptr, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
+    info = DeferWindowPos(info, _blur_window, _handle, _x, _y, _width, _height, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+    EndDeferWindowPos(info);
+  }
+  else
+    SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 void Window::move_with_pos(int x, int y) noexcept
@@ -174,6 +183,15 @@ void Window::move_with_pos(int x, int y) noexcept
   _moving = true;
   update_rect();
   g_ui_ctx.send_message(UIContext::Message_Update_Moving{ _handle, _moving, x, y });
+
+  if (_blur_window)
+  {
+    auto info = BeginDeferWindowPos(2);
+    info = DeferWindowPos(info, _handle, nullptr, real_x(), real_y(), 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    info = DeferWindowPos(info, _blur_window, _handle, _x, _y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+    EndDeferWindowPos(info);
+  }
+  else
   SetWindowPos(_handle, 0, real_x(), real_y(), 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
@@ -543,18 +561,18 @@ void Window::keep_blur_window_behind() const noexcept
 void Window::keep_blur_window_behind_move() const noexcept
 {
   if (_blur_window)
-    SetWindowPos(_blur_window, _handle, _x, _y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+    SetWindowPos(_blur_window, _handle, _x, _y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
 }
 
 void Window::keep_blur_window_behind_resize() const noexcept
 {
   if (_blur_window)
-    SetWindowPos(_blur_window, _handle, _x, _y, _width, _height, SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+    SetWindowPos(_blur_window, _handle, _x, _y, _width, _height, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
 }
 
 void Window::resize_blur_window(RECT rect) const noexcept
 {
-  SetWindowPos(_blur_window, _handle, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+  SetWindowPos(_blur_window, _handle, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
   keep_blur_window_behind();
 }
 

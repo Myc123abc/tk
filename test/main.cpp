@@ -136,7 +136,6 @@ int main()
     if (!wnd1_is_closed)
     {
       ui::begin("wnd1", 50, 50, 200, 200, &wnd1_is_closed, cfg);
-      // ui::rectangle({}, ui::window_drawable_extent(), 0x000000ff);
       if (ui::get_key(ui::Key::F11))
       {
         if (ui::is_fullscreen_window())
@@ -146,12 +145,12 @@ int main()
       }
       auto extent = ui::window_drawable_extent();
       auto pos = glm::vec2{ extent.x / 2 - 50, extent.y - 50 };
-      ui::rectangle(pos, pos + glm::vec2(100), 0x000000ff);
       auto size = ui::window_drawable_extent();
-      ui::triangle({ size.x / 2, size.y * .1f }, size * .9f, { size.y * .1f, size.y * .9 }, 0xffffffff, 10);
-      if (ui::button("btn1", 0, 0, 100, 100, 0x00ff00ff, 0x0000ffff))
+      // ui::triangle({ size.x / 2, size.y * .1f }, size * .9f, { size.y * .1f, size.y * .9 }, 0xffffffff, 10);
+
+      if (ui::button("btn1", 0, 0, 100, 100, 0xffffffff, 0xffffffff))
         circle_lerplocator.reverse();
-      if (ui::button("btn2", 50, 50, 100, 100, 0x00ff00ff, 0x0000ffff))
+      if (ui::button("btn2", 50, 50, 100, 100, 0xffffffff, 0xffffffff))
         wnd2_is_closed = !wnd2_is_closed;
       ui::add_move_invalid_area({}, { 150, 150 });
 

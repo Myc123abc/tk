@@ -39,7 +39,7 @@ target_compile_definitions(tk
 target_include_directories(tk
   PUBLIC
     include
-  PRAIVATE
+  PRIVATE
     include/tk
     vendor/stb
     vendor/utfcpp/source

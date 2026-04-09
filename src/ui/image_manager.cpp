@@ -3,6 +3,7 @@
 
 #include "image_manager.hpp"
 #include "../renderer/renderer/renderer.hpp"
+#include "util/file.hpp"
 
 using namespace tk::renderer;
 
@@ -50,7 +51,6 @@ auto ImageManager::extent(std::string_view path) noexcept -> glm::vec2
   return _image_extents[path.data()];
 }
 
-// TODO: big image load will lead block ui thread
 auto ImageManager::try_load(std::string_view path, glm::vec2 extent) noexcept -> bool
 {
   // if (_loaded_images.contains(path.data()))
@@ -63,7 +63,9 @@ auto ImageManager::try_load(std::string_view path, glm::vec2 extent) noexcept ->
   if (!_loaded_images.contains(path.data()))
   {
     int w, h; 
-    auto data = stbi_load(path.data(), reinterpret_cast<int*>(&w), reinterpret_cast<int*>(&h), nullptr, 4);
+    auto file = File{ path };
+    auto data = stbi_load_from_memory(file.data<stbi_uc>(), file.size(), reinterpret_cast<int*>(&w), reinterpret_cast<int*>(&h), nullptr, 4);
+    // auto data = stbi_load(path.data(), reinterpret_cast<int*>(&w), reinterpret_cast<int*>(&h), nullptr, 4);
     if (!data) return false;
     // load(path, w, h, data, extent.x < w || extent.y < h);
     load(path, w, h, data, false); // the quality of mipmap scale down not better than directly use sampler

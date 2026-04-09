@@ -216,10 +216,7 @@ void UIContext::render() noexcept
         window_shadow_wireframe_process(wnd, { 0, 0,
           static_cast<LONG>(thickness * 2 + wnd.snap.width),
           static_cast<LONG>(thickness * 2 + wnd.snap.height)});
-      if (_fullscreen_window.need_clear)
-        render(wnd, data, wnd.snap.handle, wnd.rect());
-      else
-        render(wnd, data);
+      render(wnd, data);
     }
     else
     { 

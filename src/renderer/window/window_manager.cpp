@@ -296,7 +296,6 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
             // resize window when moving window between different scale of monitors
             wnd_mgr.update_monitor(handle, pos, left_button_down_window_cursor_pos);
           }
-          window.keep_blur_window_behind_resize();
         }
       }
       // resizing
