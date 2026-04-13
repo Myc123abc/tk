@@ -19,37 +19,23 @@ namespace tk::renderer {
 
 void Renderer::init() noexcept
 {
-  _thread = std::jthread([this]
-  {
-    g_core.init();
-    g_pipe_sys.init();
-    g_desc_heap_mgr.init();
-    g_graphics_engine.init();
-    g_comp_engine.init();
-    g_copy_engine.init(); 
+  g_core.init();
+  g_pipe_sys.init();
+  g_desc_heap_mgr.init();
+  g_graphics_engine.init();
+  g_comp_engine.init();
+  g_copy_engine.init(); 
+}
 
-    while (!_exit.load(std::memory_order_relaxed))
-    {
-      message_process();
-      if (!_render_infos.empty())
-      {
-        render();
-        _frame_sem.release();
-      }
-      else
-        _cmds_empty.acquire();
-    }
-  });
+void Renderer::render() noexcept
+{
+  message_process();
+  if (!_render_infos.empty())
+    impl_render();
 }
 
 void Renderer::destroy() noexcept
 {
-  // exit render loop
-  _exit.store(true, std::memory_order_relaxed);
-  _frame_sem.release();
-  _cmds_empty.release();
-  _thread.join();
-
   // pop all message
   while (!_frame_render_complete_funcs.empty() ||
          !_msg_queue.empty()                   ||
@@ -141,17 +127,14 @@ void Renderer::upload_images() noexcept
   }
 }
 
-void Renderer::render() noexcept
+void Renderer::impl_render() noexcept
 {
   preprocess_render();
 
   generate_mipmap();
 
-  for (auto _ : std::views::iota(0u, _render_infos.size()))
+  for (auto [handle, data, blur_host_window, blur_window_rect] : _render_infos)
   {
-    // pop command list
-    auto [handle, data, blur_host_window, blur_window_rect] = *_render_infos.front(); _render_infos.pop();
-
     // continue if the window is destoried
     if (_destroied_windows.contains(handle)) continue;
     _render_windows.emplace_back(handle);
@@ -169,6 +152,7 @@ void Renderer::render() noexcept
       _blur_window_rect = blur_window_rect;
     }
   }
+  _render_infos.clear();
 
   // present windows
   if (_render_windows.size() == 1)
@@ -186,7 +170,7 @@ void Renderer::render() noexcept
   {
     DwmFlush();
     for (auto wnd : _show_blur_wnds | std::views::keys)
-      g_wnd_mgr.show_blur_window(wnd);
+      g_wnd_mgr.get_window(wnd)->show_blur_window();
     _show_blur_wnds.clear();
   }
 
@@ -221,8 +205,6 @@ void Renderer::render(RenderResource& res, ui::FrameData* frame_data) const noex
   }
 
   // TODO: window shadow info
-
-  frame_data->notify();
 }
 
 void Renderer::postprocess_render() noexcept

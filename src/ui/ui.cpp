@@ -1,6 +1,7 @@
 #include "ui/ui.hpp"
 #include "ui_context.hpp"
 #include "text_engine.hpp"
+#include "../renderer/window/window_manager.hpp"
 
 #include <stb_image.h>
 

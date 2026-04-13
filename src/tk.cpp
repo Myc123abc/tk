@@ -18,7 +18,6 @@ void init() noexcept
 void destroy() noexcept
 {
   g_ui_ctx.destroy();
-  g_wnd_mgr.wait_event_process_complete();
   g_renderer.destroy();
   g_wnd_mgr.destroy();
 }

@@ -3,8 +3,6 @@
 #include "ui/ui.hpp"
 #include "../renderer/resource/shader_type.hpp"
 
-#include <semaphore>
-
 namespace tk::ui {
 
 struct WindowShadowInfo
@@ -27,9 +25,8 @@ public:
   FrameData& operator=(FrameData const&) = delete;
   FrameData& operator=(FrameData&&)      = delete;
 
-  void wait_and_clear() noexcept
+  void clear() noexcept
   {
-    _sem.acquire();
     _vertices.clear();
     _indices.clear();
     _draw_datas.clear();
@@ -44,8 +41,6 @@ public:
     _window_pos         = {};
     _window_shadow_info = {};
   }
-  
-  void notify() noexcept { _sem.release(); }
 
   void add_rect(glm::vec2 left_top, glm::vec2 right_bottom, Color color, float thickness) noexcept;
   void add_triangle(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color, float thickness) noexcept;
@@ -94,8 +89,6 @@ private:
   void path_arc_to(glm::vec2 center, float radius) noexcept;
 
 private:
-  std::binary_semaphore _sem{ 1 };
-
   std::vector<Vertex>   _vertices;
   std::vector<uint16_t> _indices;
   uint32_t              _vertex_beg{};

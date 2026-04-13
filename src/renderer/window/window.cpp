@@ -123,6 +123,11 @@ auto Window::cursor_pos() const noexcept -> glm::vec<2, int>
   return { pos.x - _x, pos.y - _y };
 }
 
+auto Window::real_cursor_pos() const noexcept -> glm::vec<2, int>
+{
+  return cursor_pos() + glm::vec<2, int>{ Window_Shadow_Thickness };
+}
+
 auto Window::cursor_valid_area() const noexcept -> RECT
 {
   auto rect = _rect;
@@ -163,7 +168,6 @@ void Window::move_from_maximize() noexcept
 
   update_rect();
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
-  g_ui_ctx.send_message(UIContext::Message_Window_Moving_From_Maximize{ _handle, _x, _y, _width, _height });
 
   if (_blur_window)
   {
@@ -182,7 +186,6 @@ void Window::move_with_pos(int x, int y) noexcept
   _y = y;
   _moving = true;
   update_rect();
-  g_ui_ctx.send_message(UIContext::Message_Update_Moving{ _handle, _moving, x, y });
 
   if (_blur_window)
   {
@@ -197,20 +200,13 @@ void Window::move_with_pos(int x, int y) noexcept
 
 void Window::move_end() noexcept
 {
-  _moving = false;
-  if (_move_from_maximize)
-  {
-    _move_from_maximize = false;
-    g_ui_ctx.send_message(UIContext::Message_Window_Moving_From_Maximize_End{ _handle, _x, _y });
-  }
-  else
-    g_ui_ctx.send_message(UIContext::Message_Update_Moving{ _handle, _moving, _x, _y });
+  _moving             = false;
+  _move_from_maximize = false;
 }
 
 void Window::reset_pos_size() noexcept
 {
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
-  g_ui_ctx.send_message(UIContext::Message_Window_Update{ _handle, _x, _y, _width, _height });
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
   keep_blur_window_behind_resize();
 }
@@ -220,7 +216,6 @@ void Window::update_by_rect(RECT rect, float scale) noexcept
   _rect  = rect;
   _scale = scale;
   update_by_rect();
-  g_ui_ctx.send_message(UIContext::Message_Scale_Change{ _handle, scale, _x, _y, _width, _height });
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
   keep_blur_window_behind_resize();
@@ -234,7 +229,6 @@ void Window::update_by_real_rect(RECT rect, float scale) noexcept
   _width  = (rect.right  - rect.left) - shadow_thickness() * 2;
   _height = (rect.bottom - rect.top)  - shadow_thickness() * 2;
   update_rect();
-  g_ui_ctx.send_message(UIContext::Message_Scale_Change{ _handle, scale, _x, _y, _width, _height });
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
   keep_blur_window_behind_resize();
@@ -288,8 +282,6 @@ void Window::adjust_offset(ResizeType type, glm::vec<2, int> const& point, int& 
 
 void Window::resize(ResizeType type, int dx, int dy) noexcept
 {
-  _resizing = true;
-
   using enum ResizeType;
   switch (type)
   {
@@ -334,13 +326,17 @@ void Window::resize(ResizeType type, int dx, int dy) noexcept
   }
   update_by_rect();
 
-  g_ui_ctx.send_message(UIContext::Message_Update_Resizing{ _handle, _x, _y, _width, _height });
+  if (!_resizing)
+  {
+    _resizing = true;
+    g_ui_ctx.get_window_context(_handle)->need_clear = true;
+  }
 }
 
 void Window::resize_end() noexcept
 {
   _resizing = false;
-  g_ui_ctx.send_message(UIContext::Message_Resize_End{ _handle });
+  g_ui_ctx.clear_fullscreen_window();
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
 }
@@ -355,7 +351,6 @@ void Window::resize_by_scale(float scale, float ratio, glm::vec2 cursor_pos, glm
 
   update_rect();
 
-  g_ui_ctx.send_message(UIContext::Message_Scale_Change{ _handle, scale, _x, _y, _width, _height });
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
   keep_blur_window_behind_resize();
@@ -443,7 +438,6 @@ void Window::maximize() noexcept
   _rect        = Monitor{ _handle }.work_rect();
   update_by_rect();
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
-  g_ui_ctx.send_message(UIContext::Message_Window_Maximize{ _handle, _x, _y, _width, _height });
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
   keep_blur_window_behind_resize();
 }
@@ -458,7 +452,6 @@ void Window::minimize() noexcept
 void Window::cancel_maximize(RECT rect, float scale) noexcept
 {
   _maximized = false;
-  g_ui_ctx.send_message(UIContext::Message_Window_Restore{ _handle, _x, _y, _width, _height });
   update_by_real_rect(rect, scale);
   keep_blur_window_behind_resize();
 }
@@ -466,7 +459,6 @@ void Window::cancel_maximize(RECT rect, float scale) noexcept
 void Window::cancel_fullscreen(RECT rect, float scale) noexcept
 {
   _fullscreen = false;
-  g_ui_ctx.send_message(UIContext::Message_Window_Restore_Fullscreen{ _handle, _x, _y, _width, _height });
   update_by_real_rect(rect, scale);
   keep_blur_window_behind_resize();
 }
@@ -478,7 +470,7 @@ void Window::cancel_fullscreen_maximize(RECT rect, float scale) noexcept
   if (_fullscreen) rect = monitor.rect();
   _maximized  = false;
   _fullscreen = false; 
-  g_ui_ctx.send_message(UIContext::Message_Window_Cancel_Fullscreen_Maximize{ _handle, _x, _y, _width, _height });
+  g_ui_ctx.get_window_context(_handle)->set_fullscreen = false;
   update_by_real_rect(rect, scale);
   keep_blur_window_behind_resize();
 }
@@ -488,7 +480,6 @@ void Window::restore() noexcept
   _maximized = false;
   _rect      = _backup_rect;
   update_by_rect();
-  g_ui_ctx.send_message(UIContext::Message_Window_Restore{ _handle, _x, _y, _width, _height });
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
   keep_blur_window_behind_resize();
@@ -502,7 +493,6 @@ void Window::fullscreen() noexcept
   _rect        = Monitor{ _handle }.rect();
   update_by_rect();
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
-  g_ui_ctx.send_message(UIContext::Message_Window_Fullscreen{ _handle, _x, _y, _width, _height });
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
   keep_blur_window_behind_resize();
 }
@@ -512,7 +502,6 @@ void Window::restore_fullscreen() noexcept
   _fullscreen = false;
   _rect       = _backup_rect;
   update_by_rect();
-  g_ui_ctx.send_message(UIContext::Message_Window_Restore_Fullscreen{ _handle, _x, _y, _width, _height });
   g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
   keep_blur_window_behind_resize();

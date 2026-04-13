@@ -5,10 +5,6 @@
 #include "../../util/message_queue.hpp"
 #include "../../ui/image_manager.hpp"
 
-#include <rigtorp/SPSCQueue.h>
-
-#include <atomic>
-#include <thread>
 #include <functional>
 #include <deque>
 #include <unordered_map>
@@ -22,10 +18,10 @@ public:
   void init() noexcept;
   void destroy() noexcept;
 
+  void render() noexcept;
+
   void message_process() noexcept;
   void add_frame_render_complete_func(std::move_only_function<void()>&& func) noexcept;
-
-  void acquire_frame() noexcept { _frame_sem.acquire(); }
 
   struct RenderInfo
   {
@@ -34,32 +30,25 @@ public:
     HWND           blur_host_window{};
     RECT           blur_window_rect{};
   };
-  void submit(RenderInfo const& info) noexcept { _render_infos.emplace(info); }
-
-  auto is_sleeping() const noexcept { return _render_infos.empty(); }
-  void wakeup() noexcept { _cmds_empty.release(); }
+  void submit(RenderInfo const& info) noexcept { _render_infos.emplace_back(info); }
 
 private:
   void preprocess_render()  noexcept;
   void upload_images() noexcept;
 
-  void render() noexcept;
+  void impl_render() noexcept;
   void render(RenderResource& res, ui::FrameData* frame_data) const noexcept;
   void generate_mipmap() noexcept;
 
   void postprocess_render() noexcept;
 
 private:
-  std::jthread                                _thread;
-  std::atomic_bool                            _exit{};
   std::deque<std::move_only_function<bool()>> _frame_render_complete_funcs;
   std::unordered_map<HWND, RenderResource>    _res;
   std::unordered_set<HWND>                    _destroied_windows;
   std::vector<HWND>                           _render_windows;
 
-  rigtorp::SPSCQueue<RenderInfo> _render_infos{ Render_Info_Queue_Capacity };
-  std::binary_semaphore          _frame_sem{ 1 };
-  std::binary_semaphore          _cmds_empty{ 0 };
+  std::vector<RenderInfo> _render_infos;
 
   std::unordered_map<HWND, HWND> _show_blur_wnds;
   HWND                           _blur_host_window{};

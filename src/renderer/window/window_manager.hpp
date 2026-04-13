@@ -7,10 +7,9 @@
 
 #include <rigtorp/SPSCQueue.h>
 
-#include <thread>
-#include <latch>
 #include <unordered_map>
 #include <unordered_set>
+#include <ranges>
 
 namespace tk::renderer {
 
@@ -36,81 +35,32 @@ inline auto operator==(RECT lhs, RECT rhs) -> bool
   return EqualRect(&lhs, &rhs);
 }
 
-struct WindowSnapshot
-{
-  HWND     handle{};
-  int      x{};
-  int      y{};
-  uint32_t width{};
-  uint32_t height{};
-  bool     moving{};
-  bool     resizing{};
-  bool     maximized{};
-  bool     move_from_maximize{};
-  float    scale{};
-  bool     fullscreen_window{};
-  
-  void init(Window const& window) noexcept
-  {
-    handle    = window.handle();
-    x         = window.x();
-    y         = window.y();
-    width     = window.width();
-    height    = window.height();
-    maximized = window.is_maximized();
-    scale     = window.scale();
-  }
-};
-
 Singleton(WindowManager, g_wnd_mgr,
 public:
-  enum class Message
-  {
-    create_window = WM_APP,
-    create_fullscreen_window,
-    close_window,
-    close_fullscreen_window,
-    minimize_window,
-    maximize_window,
-    restore_window,
-    fullscreen_window,
-    restore_fullscreen_window,
-    signal,
-    show_blur_window,
-    destroy_window,
-    init_blur_window,
-    update_blur_window,
-    remove_blur_window,
-  };
-
   void init() noexcept;
-  void wait_event_process_complete() const noexcept;
+  void message_process() noexcept;
   void destroy() noexcept;
+
+  auto windows_view() const noexcept { return _windows | std::views::values; }
+  auto get_window(HWND handle) noexcept { assert(_windows.contains(handle)); return &_windows[handle]; }
 
   static LRESULT CALLBACK wnd_proc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param) noexcept;
   static LRESULT CALLBACK blur_wnd_proc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param) noexcept;
 
-  auto create_fullscreen_window() noexcept -> WindowSnapshot;
-  auto create_window(int x, int y, uint32_t width, uint32_t height, ui::Backdrop const& backdrop) noexcept -> WindowSnapshot;
-  void close_window(HWND handle) const noexcept;
+  auto create_fullscreen_window() noexcept -> HWND;
+  auto create_window(int x, int y, uint32_t width, uint32_t height, ui::Backdrop const& backdrop) noexcept -> HWND;
+  void close_window(HWND handle) noexcept;
   void close_fullscreen_window() const noexcept;
-  void minimize_window(HWND handle) const noexcept;
-  void maximize_window(HWND handle) const noexcept;
-  void restore_window(HWND handle) const noexcept;
-  void fullscreen_window(HWND handle) const noexcept;
-  void restore_fullscreen_window(HWND handle) const noexcept;
-  void show_blur_window(HWND handle) const noexcept;
   void destroy_window(HWND handle, HWND blur_handle) const noexcept;
-  void init_blur_window(HWND handle, ui::Backdrop const& backdrop) const noexcept;
-  void update_blur_window(HWND handle, ui::Backdrop const& backdrop) const noexcept;
-  void remove_blur_window(HWND handle) const noexcept;
+  void init_blur_window(HWND handle, ui::Backdrop const& backdrop) noexcept;
+  void update_blur_window(HWND handle, ui::Backdrop const& backdrop) noexcept;
+  void remove_blur_window(HWND handle) noexcept;
 
   auto get_window_z_orders() const noexcept -> std::vector<HWND>;
   auto get_cursor_on_window() noexcept -> HWND;
 
 private:
-  void message_process(HWND handle, Message msg, WPARAM w_param, LPARAM l_param) noexcept;
-  void msg_create_window(WPARAM w_param) noexcept;
+  void message_process(MSG const& msg) noexcept;
 
   void update() noexcept;
   void update_monitor(HWND handle, glm::vec2 cursor_pos, glm::vec<2, int>& left_button_down_window_cursor_pos) noexcept;
@@ -122,12 +72,8 @@ public:
   static constexpr wchar_t Blur_Class[]      = L"vn::window::WindowManager::BlurWindow";
 
 private:
-  std::jthread                     _thread;
-  DWORD                            _thread_id{};
-  std::latch                       _message_queue_create_complete{ 1 };
   Window                           _fullscreen_window;
   std::unordered_map<HWND, Window> _windows;
-  HANDLE                           _signal_event{};
   std::unordered_set<HWND>         _using_mouse_pass_through_windows;
   UINT_PTR                         _timer_mouse_pass_through{};
   
