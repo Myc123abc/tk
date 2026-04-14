@@ -12,7 +12,7 @@ public:                                             \
   ClassName& operator=(ClassName const&) = delete;  \
   ClassName& operator=(ClassName&&)      = delete;  \
                                                     \
-  static auto instance() noexcept -> ClassName&     \
+  static auto& instance() noexcept                  \
   {                                                 \
     static ClassName instance;                      \
     return instance;                                \
@@ -36,7 +36,7 @@ public:                                                           \
   ClassName& operator=(ClassName const&) = delete;                \
   ClassName& operator=(ClassName&&)      = delete;                \
                                                                   \
-  static auto instance() noexcept -> ClassName&                   \
+  static auto& instance() noexcept                                \
   {                                                               \
     static ClassName instance;                                    \
     return instance;                                              \

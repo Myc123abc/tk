@@ -230,7 +230,19 @@ int main()
       ui::end();
     }
 
-    ui::render();
+    tk::update();
+
+    // fps
+    static auto acc_time = 0;
+    acc_time += ui::delta_time();
+    static auto count = 0;
+    ++count;
+    if (acc_time >= 1000'000)
+    {
+      info("fps {}", count);
+      acc_time = 0;
+      count    = 0;
+    }
   }
 
   tk::destroy();

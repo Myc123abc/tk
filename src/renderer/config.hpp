@@ -21,9 +21,6 @@ constexpr auto Enable_Depth_Test = false;
 
 constexpr auto Image_Pool_Init_Capacity = 32;
 
-constexpr auto Renderer_Msg_Queue_Capacity            = 16;
-constexpr auto Blur_Window_Resize_Info_Queue_Capacity = 32;
-
 constexpr auto Mouse_Left_Down_Press_Start_Time = 400;
 
 }

@@ -1,11 +1,8 @@
 #pragma once
 
 #include "window.hpp"
-#include "../config.hpp"
 #include "../../util/singleton.hpp"
 #include "ui/ui.hpp"
-
-#include <rigtorp/SPSCQueue.h>
 
 #include <unordered_map>
 #include <unordered_set>
@@ -55,6 +52,7 @@ public:
   void init_blur_window(HWND handle, ui::Backdrop const& backdrop) noexcept;
   void update_blur_window(HWND handle, ui::Backdrop const& backdrop) noexcept;
   void remove_blur_window(HWND handle) noexcept;
+  void resize_blur_window(HWND handle, RECT rect) noexcept;
 
   auto get_window_z_orders() const noexcept -> std::vector<HWND>;
   auto get_cursor_on_window() noexcept -> HWND;
@@ -76,19 +74,9 @@ private:
   std::unordered_map<HWND, Window> _windows;
   std::unordered_set<HWND>         _using_mouse_pass_through_windows;
   UINT_PTR                         _timer_mouse_pass_through{};
-  
   bool                             _update_monitors{};
   std::unordered_map<HWND, RECT>   _window_change_size{};
-
   std::unordered_map<HWND, HWND>   _blur_windows;
-  struct BlurWindowResizeInfo
-  {
-    HWND handle{};
-    RECT rect{};
-  };
-  rigtorp::SPSCQueue<BlurWindowResizeInfo> _blur_resize_infos{ Blur_Window_Resize_Info_Queue_Capacity };
-public:
-  void resize_blur_window(HWND handle, RECT rect) noexcept { _blur_resize_infos.emplace(BlurWindowResizeInfo{ handle, rect }); }
 )
 
 }

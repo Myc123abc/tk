@@ -20,6 +20,7 @@ auto is_caps_locked() noexcept -> bool;
 
 struct WindowContext
 {
+  WindowContext() = default;
   WindowContext(HWND handle) noexcept : handle(handle) {}
 
   HWND      handle{};
@@ -87,6 +88,9 @@ public:
   void clear_fullscreen_window() noexcept { _fullscreen_window_need_clear = true; }
   void close_window(HWND handle) noexcept { get_window_context(handle)->is_closed = true; }
   void clear_state() noexcept;
+
+  auto window() const noexcept { return _wnd; }
+  auto frame_data() noexcept { return &_wnd_ctx->frame_data; }
 
 private:
   void update_window_config(WindowConfig const& cfg) noexcept;

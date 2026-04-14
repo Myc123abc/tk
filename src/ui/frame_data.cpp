@@ -1,6 +1,8 @@
 #include "frame_data.hpp"
 #include "ui_context.hpp"
 
+#include <ranges>
+
 namespace {
 
 auto sqrt(float x) noexcept
@@ -76,7 +78,7 @@ void FrameData::add_convex_poly_filled(Color color) noexcept
   auto pt_cnt = _points.size();
   assert(pt_cnt > 2);
 
-  auto aa_width = g_ui_ctx.get_scale();
+  auto aa_width = g_ui_ctx.window()->scale();
   auto aa_col   = Color{ color.r, color.g, color.b, 0.f };
 
   auto [vertices, indices] = expand_beg(pt_cnt * 2, (pt_cnt - 2) * 3 + pt_cnt * 6);

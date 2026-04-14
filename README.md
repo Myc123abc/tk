@@ -14,6 +14,5 @@ A visual novel engine.
 |glm|MIT|https://github.com/g-truc/glm|
 |harfbuzz|Old MIT|https://github.com/harfbuzz/harfbuzz|
 |libunibreak|Zlib|https://github.com/adah1972/libunibreak|
-|SPSCQueue|MIT|https://github.com/rigtorp/SPSCQueue|
 |stb|MIT|https://github.com/nothings/stb|
 |utfcpp|MIT|https://github.com/nemtrif/utfcpp|

@@ -246,22 +246,22 @@ void UIContext::postprocess_render() noexcept
   // update mouse state
   auto mouse_left_button_state = get_key(Key::Mouse_Left_Button);
   auto wnds                    = g_wnd_mgr.windows_view();
-  if (auto it = std::ranges::find_if(wnds, [](auto const& wnd) { return wnd.is_active(); }); it != wnds.end())
+  if (cursor_on_window)
   {
-    auto const& wnd = it.base()->second;
+    auto wnd = g_wnd_mgr.get_window(cursor_on_window);
     if (mouse_left_button_state == KeyState::down)
     {
-      mouse_down_window = wnd.handle();
-      mouse_down_pos    = wnd.cursor_pos();
+      mouse_down_window = wnd->handle();
+      mouse_down_pos    = wnd->cursor_pos();
       if (!is_move_from_maximize)
-        is_move_from_maximize = wnd.is_move_from_maximize();
+        is_move_from_maximize = wnd->is_move_from_maximize();
     }
     else if (mouse_left_button_state == KeyState::up)
     {
-      mouse_up_window = wnd.handle();
-      mouse_up_pos    = wnd.cursor_pos();
+      mouse_up_window = wnd->handle();
+      mouse_up_pos    = wnd->cursor_pos();
     }
-  }
+  };
 
   // update button state
   if (_btn_state.id)
@@ -278,18 +278,6 @@ void UIContext::postprocess_render() noexcept
   auto now = std::chrono::steady_clock::now();
   _delta_time = static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(now - tp).count());
   tp          = now;
-
-  // fps
-  static auto acc_time = 0;
-  acc_time += _delta_time;
-  static auto count = 0;
-  ++count;
-  if (acc_time >= 1000'000)
-  {
-    info("fps {}", count);
-    acc_time = 0;
-    count    = 0;
-  }
 }
 
 void UIContext::window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer::Window const& wnd, RECT scissor_rect) noexcept
@@ -431,7 +419,7 @@ void UIContext::add_title_bar() noexcept
 
 auto UIContext::get_id(std::string_view name) const noexcept -> size_t
 {
-  return generic_hash(_wnd->handle(), name);
+  return generic_hash(_wnd_ctx->handle, name);
 }
 
 auto UIContext::generic_id(std::string_view name) noexcept -> size_t
@@ -601,8 +589,6 @@ void UIContext::image(std::string_view path, glm::vec2 left_top, glm::vec2 right
 
     // cmd()->image(g_img_mgr.handle(path), left_top, right_bottom, alpha);
   }
-  else
-    warn("image {} is not exist", path);
 }
 
 auto UIContext::text(std::string_view text, glm::vec2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> glm::vec2

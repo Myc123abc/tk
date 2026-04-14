@@ -13,4 +13,7 @@ void init() noexcept;
 // destroy the tk library
 void destroy() noexcept;
 
+// process window message and renderer rendering
+void update() noexcept;
+
 }

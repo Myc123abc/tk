@@ -30,16 +30,13 @@ void Renderer::init() noexcept
 void Renderer::render() noexcept
 {
   message_process();
-  if (!_render_infos.empty())
-    impl_render();
+  process_render();
 }
 
 void Renderer::destroy() noexcept
 {
   // pop all message
-  while (!_frame_render_complete_funcs.empty() ||
-         !_msg_queue.empty()                   ||
-         !_ui_ctx_msg_queue.empty())
+  while (!_frame_render_complete_funcs.empty())
     message_process();
 
   // destroy render resources
@@ -47,6 +44,73 @@ void Renderer::destroy() noexcept
   g_comp_engine.destroy();
   g_copy_engine.destroy();
   for (auto& res : _res | std::views::values) res.destroy();
+}
+
+void Renderer::create_window_resource(HWND handle, uint32_t width, uint32_t height) noexcept
+{
+  err_if(_res.contains(handle), "failed to create window render resource, it's already exist");
+  auto res = RenderResource{};
+  res.init(handle, width, height);
+  _res.emplace(handle, std::move(res));
+}
+
+void Renderer::destroy_window_resource(HWND handle, HWND blur_handle) noexcept
+{
+  err_if(!_res.contains(handle), "failed to destroy window render resource, it's unexist");
+  add_frame_render_complete_func([handle = handle, blur_handle = blur_handle, res = std::move(_res[handle])] mutable
+  {
+    res.destroy();
+    g_wnd_mgr.destroy_window(handle, blur_handle);
+  });
+  _res.erase(handle);
+  _destroied_windows.emplace(handle);
+}
+
+void Renderer::resize_window_resource(HWND handle, uint32_t width, uint32_t height) noexcept
+{
+  err_if(!_res.contains(handle), "failed to destroy window render resource, it's unexist");
+  _res[handle].resize(width, height);
+}
+
+void Renderer::create_image(ui::ImageHandle handle, uint32_t width, uint32_t height, ImageFormat format) noexcept
+{
+  auto image = Image{};
+  image.init(width, height, format, ImageType::srv);
+
+  assert(!_images.contains(handle));
+  _images.emplace(handle, std::move(image));
+}
+
+void Renderer::destroy_image(ui::ImageHandle handle) noexcept
+{
+  if (_upload_images.contains(handle))
+  {
+    assert(_bitmaps.contains(handle));
+
+    // not upload yet, remove upload image
+    _upload_images.erase(handle);
+    _bitmaps.erase(handle);
+  }
+  else if (_images.contains(handle))
+  {
+    // already uploaded, release image resource
+    add_frame_render_complete_func([image = std::move(_images[handle])] mutable { image.destroy(); });
+    _images.erase(handle);
+  }
+}
+
+void Renderer::upload_image(ui::ImageHandle handle, uint32_t width, uint32_t height, Bitmap const& bitmap, bool use_mipmap) noexcept
+{
+  // create image resource
+  auto image = Image{};
+  image.init(bitmap.width, bitmap.height, ImageFormat::rgba8_unorm, ImageType::srv, use_mipmap);
+
+  // store image and bitmap for upload
+  _upload_images[handle] = std::move(image);
+  _bitmaps[handle]       = bitmap;
+
+  if (use_mipmap)
+    _pending_mipmap_image_handles.emplace_back(handle);
 }
 
 void Renderer::add_frame_render_complete_func(std::move_only_function<void()>&& func) noexcept
@@ -72,9 +136,6 @@ void Renderer::message_process() noexcept
 {
   for (auto it = _frame_render_complete_funcs.begin(); it != _frame_render_complete_funcs.end();)
     (*it)() ? it = _frame_render_complete_funcs.erase(it) : ++it;
-
-  _msg_queue.process(MessageHandler{ g_renderer });
-  _ui_ctx_msg_queue.process(UIContextMessageHandler{ g_renderer });
 }
 
 void Renderer::preprocess_render() noexcept
@@ -127,8 +188,8 @@ void Renderer::upload_images() noexcept
   }
 }
 
-void Renderer::impl_render() noexcept
-{
+void Renderer::process_render() noexcept
+{  
   preprocess_render();
 
   generate_mipmap();

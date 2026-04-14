@@ -5,6 +5,8 @@
 #include "../renderer/renderer/renderer.hpp"
 #include "util/file.hpp"
 
+#include <ranges>
+
 using namespace tk::renderer;
 
 namespace tk::ui {
@@ -22,7 +24,7 @@ auto ImageManager::create_image(uint32_t width, uint32_t height, ImageFormat for
   auto& info = _pool[handle];
   info.width  = width;
   info.height = height;
-  g_renderer.send_message(Renderer::Message_Create_Image{ handle, width, height, format });
+  g_renderer.create_image(handle, width, height, format);
   return handle;
 }
 
@@ -31,7 +33,7 @@ void ImageManager::destroy_image(ImageHandle handle) noexcept
   assert(_images.contains(handle));
 
   // remove image resource by index
-  g_renderer.send_message(Renderer::Message_Destroy_Image{ handle });
+  g_renderer.destroy_image(handle);
 
   // remove image
   _images.erase(handle);
@@ -53,22 +55,37 @@ auto ImageManager::extent(std::string_view path) noexcept -> glm::vec2
 
 auto ImageManager::try_load(std::string_view path, glm::vec2 extent) noexcept -> bool
 {
-  // if (_loaded_images.contains(path.data()))
-  // {
-  //   auto const& info = _pool[_loaded_images[path.data()]];
-  //   if (!info.has_mipmap && (extent.x < info.width || extent.y < info.height))
-  //     generate_mipmap(path);
-  // }
-  // else
+  if (_load_tasks.contains(path.data()))
+  {
+    if (_load_tasks[path.data()].is_completed())
+    {
+      debug("fine {}", path);
+      auto task = std::move(_load_tasks[path.data()]);
+      _load_tasks.erase(path.data());
+      auto [data, w, h] = task.take_result();
+      if (!data) return false;
+      load(path, w, h, data);
+      return true;
+    }
+    return false;
+  }
   if (!_loaded_images.contains(path.data()))
   {
-    int w, h; 
-    auto file = File{ path };
-    auto data = stbi_load_from_memory(file.data<stbi_uc>(), file.size(), reinterpret_cast<int*>(&w), reinterpret_cast<int*>(&h), nullptr, 4);
-    // auto data = stbi_load(path.data(), reinterpret_cast<int*>(&w), reinterpret_cast<int*>(&h), nullptr, 4);
-    if (!data) return false;
-    // load(path, w, h, data, extent.x < w || extent.y < h);
-    load(path, w, h, data, false); // the quality of mipmap scale down not better than directly use sampler
+    debug("load start {}", path);
+    auto beg = std::chrono::steady_clock::now();
+    _load_tasks.emplace(path, g_thread_pool.submit([path = std::string(path)]
+    {
+      debug("parse {}", path);
+      int w, h; 
+      auto file = File{ path };
+      auto data = stbi_load_from_memory(file.data<stbi_uc>(), file.size(), reinterpret_cast<int*>(&w), reinterpret_cast<int*>(&h), nullptr, 4);
+      if (!data) data = nullptr;
+      return LoadResult{ data, w, h };
+    }));
+    auto end = std::chrono::steady_clock::now();
+    auto dur = std::chrono::duration_cast<std::chrono::microseconds>(end - beg).count();
+    debug("load end {}\ntime {}", path, dur);
+    return false;
   }
   return true;
 }
@@ -84,12 +101,9 @@ void ImageManager::load(std::string_view path, uint32_t width, uint32_t height, 
   if (!_image_extents.contains(path.data()))
     _image_extents[path.data()] = { width, height };
 
-  // send message to renderer
-  auto msg = Renderer::Message_Upload_Image{};
-  msg.bitmap.init(width, height, 4, data);
-  msg.handle     = handle;
-  msg.use_mipmap = use_mipmap;
-  g_renderer.send_message(std::move(msg));
+  auto bitmap = Bitmap{};
+  bitmap.init(width, height, 4, data);
+  g_renderer.upload_image(handle, width, height, bitmap, use_mipmap);
 }
 
 void ImageManager::unload(std::string_view path) noexcept
@@ -100,24 +114,13 @@ void ImageManager::unload(std::string_view path) noexcept
   auto handle = _loaded_images[path.data()];
 
   // remove image resource by index
-  g_renderer.send_message(Renderer::Message_Destroy_Image{ handle });
+  g_renderer.destroy_image(handle);
 
   // remove image record
   _loaded_images.erase(path.data());
 
   // release image handle
   _pool.free(handle);
-}
-
-void ImageManager::generate_mipmap(std::string_view path) noexcept
-{
-  assert(_loaded_images.contains(path.data()));
-  auto& info = _pool[_loaded_images[path.data()]];
-  info.has_mipmap = true;
-  // TODO:
-  // copy srv image to uav image
-  // use uav image's mipmap uavs to generate mipmaps
-  // and destroy old resources with fence complete
 }
 
 }

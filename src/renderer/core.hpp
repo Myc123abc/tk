@@ -8,8 +8,6 @@
 #include <dcomp.h>
 #include <d3d11on12.h>
 
-#include <latch>
-
 namespace tk::renderer {
 
 template <typename To, typename From>
@@ -40,8 +38,6 @@ public:
   auto device_comp() const noexcept { return _device_comp.Get(); }
   auto device_11()   const noexcept { return _device_11.Get();   }
   auto device_d2d()  const noexcept { return _device_d2d.Get();  }
-  
-  auto wait_init_finish() const noexcept { _init_finish.wait(); }
 
 private:
   void create_device_11on12() noexcept;
@@ -57,8 +53,6 @@ private:
   Microsoft::WRL::ComPtr<ID3D11DeviceContext> _device_11_ctx;
   Microsoft::WRL::ComPtr<ID2D1Device>         _device_d2d;
   Microsoft::WRL::ComPtr<ID2D1DeviceContext>  _device_d2d_ctx;
-
-  std::latch                                  _init_finish{ 1 };
 )
 
 }

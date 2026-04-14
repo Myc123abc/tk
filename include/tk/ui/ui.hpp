@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util/flag.hpp"
+#include "../util/flag.hpp"
 
 #include <windows.h>
 
@@ -55,9 +55,6 @@ auto lerp(Color x, Color y, float v) noexcept -> glm::vec4;
  * @return lerp value
  */
 auto lerp(glm::vec2 x, glm::vec2 y, float v) noexcept -> glm::vec2;
-
-// render windows
-void render() noexcept;
 
 struct WindowConfig
 {

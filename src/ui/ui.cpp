@@ -13,11 +13,6 @@ namespace tk::ui {
 ///                              Misc
 ////////////////////////////////////////////////////////////////////////////////
 
-void render() noexcept
-{
-	g_ui_ctx.render();
-}
-
 auto lerp(Color x, Color y, float v) noexcept -> glm::vec4
 {
   return
@@ -92,11 +87,11 @@ void add_move_invalid_area(glm::vec2 left_top, glm::vec2 right_bottom) noexcept
     right_bottom.y += Title_Bar_Height;
   }
 
-  auto scale = g_ui_ctx.get_scale();
+  auto scale = g_ui_ctx.window()->scale();
   left_top     *= scale;
   right_bottom *= scale;
 
-  g_ui_ctx._window->add_move_invald_areas(
+  g_ui_ctx.window()->add_move_invalid_area(
   {
     static_cast<LONG>(left_top.x),
     static_cast<LONG>(left_top.y),
@@ -108,7 +103,7 @@ void add_move_invalid_area(glm::vec2 left_top, glm::vec2 right_bottom) noexcept
 auto window_extent() noexcept -> glm::vec2
 {
   g_ui_ctx.check_draw();
-  return glm::vec2{ g_ui_ctx._window->snap.width, g_ui_ctx._window->snap.height } / g_ui_ctx.get_scale();
+  return glm::vec2{ g_ui_ctx.window()->width(), g_ui_ctx.window()->height() } / g_ui_ctx.window()->scale();
 }
 
 auto window_drawable_extent() noexcept -> glm::vec2
@@ -122,20 +117,20 @@ auto window_drawable_extent() noexcept -> glm::vec2
 auto is_fullscreen_window() noexcept -> bool
 {
   g_ui_ctx.check_draw();
-  return g_ui_ctx._window->snap.fullscreen_window;
+  return g_ui_ctx.window()->is_fullscreen();
 }
 
 void fullscreen_window() noexcept
 {
   g_ui_ctx.check_draw();
-  if (g_ui_ctx._window->cfg.no_resize) return;
+  if (g_ui_ctx.window()->cfg().no_resize) return;
   g_ui_ctx.fullscreen_window();
 }
 
 void restore_fullscreen_window() noexcept
 {
   g_ui_ctx.check_draw();
-  if (g_ui_ctx._window->cfg.no_resize) return;
+  if (g_ui_ctx.window()->cfg().no_resize) return;
   g_ui_ctx.restore_fullscreen_window();
 }
 
@@ -154,7 +149,7 @@ void discard_rectangle(glm::vec2 left_top, glm::vec2 right_bottom) noexcept
   left_top     += offset;
   right_bottom += offset;
 
-  auto scale = g_ui_ctx.get_scale();
+  auto scale = g_ui_ctx.window()->scale();
   left_top     *= scale;
   right_bottom *= scale;
 
@@ -168,7 +163,7 @@ void begin_path() noexcept
 
 void end_path(Color color, float thickness) noexcept
 {
-  g_ui_ctx.end_path(color, thickness * g_ui_ctx.get_scale());
+  g_ui_ctx.end_path(color, thickness * g_ui_ctx.window()->scale());
 }
 
 void begin_union() noexcept
@@ -178,7 +173,7 @@ void begin_union() noexcept
 
 void end_union(Color color, float thickness) noexcept
 {
-  g_ui_ctx.end_union(color, thickness * g_ui_ctx.get_scale());
+  g_ui_ctx.end_union(color, thickness * g_ui_ctx.window()->scale());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -194,7 +189,7 @@ void rectangle(glm::vec2 left_top, glm::vec2 right_bottom, Color color, float th
 	left_top     += offset;
 	right_bottom += offset;
 
-  auto scale = g_ui_ctx.get_scale();
+  auto scale = g_ui_ctx.window()->scale();
   left_top     *= scale;
   right_bottom *= scale;
   thickness    *= scale;
@@ -212,7 +207,7 @@ void triangle(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color, float thick
 	p1 += offset;
 	p2 += offset;
 
-  auto scale = g_ui_ctx.get_scale();
+  auto scale = g_ui_ctx.window()->scale();
   p0        *= scale;
   p1        *= scale;
   p2        *= scale;
@@ -229,7 +224,7 @@ void circle(glm::vec2 center, float radius, Color color, float thickness) noexce
 	auto offset = g_ui_ctx.get_render_pos();
   center += offset;
 
-  auto scale = g_ui_ctx.get_scale();
+  auto scale = g_ui_ctx.window()->scale();
   radius    *= scale;
   center    *= scale;
   thickness *= scale;
@@ -249,7 +244,7 @@ void line(glm::vec2 p0, glm::vec2 p1, Color color, float thickness) noexcept
   p0 += offset;
   p1 += offset;
 
-  auto scale = g_ui_ctx.get_scale();
+  auto scale = g_ui_ctx.window()->scale();
   p0        *= scale;
   p1        *= scale;
   thickness *= scale;
@@ -268,7 +263,7 @@ void bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color, float thickne
   p1 += offset;
   p2 += offset;
 
-  auto scale = g_ui_ctx.get_scale();
+  auto scale = g_ui_ctx.window()->scale();
   p0        *= scale;
   p1        *= scale;
   p2        *= scale;
@@ -284,16 +279,16 @@ void bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color, float thickne
 auto is_hover_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
 {
   g_ui_ctx.check_draw();
-  auto p = g_ui_ctx._window->cursor_pos();
-  return g_ui_ctx.cursor_on_window == g_ui_ctx._window->snap.handle &&
-         !g_ui_ctx._window->snap.move_from_maximize                 &&
+  auto p = g_ui_ctx.window()->cursor_pos();
+  return g_ui_ctx.cursor_on_window == g_ui_ctx.window()->handle() &&
+         !g_ui_ctx.window()->is_move_from_maximize()              &&
          point_on(p, left_top, right_bottom);
 }
 
 auto is_click_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
 {
   g_ui_ctx.check_draw();
-  auto window = g_ui_ctx._window;
+  auto window = g_ui_ctx.window();
   if (!window->is_active()             ||
 		   window->is_moving_or_resizing() ||
       !g_ui_ctx.mouse_down_pos         ||
@@ -330,7 +325,7 @@ auto button(size_t id, int x, int y, uint32_t width, uint32_t height) noexcept->
     right_bottom.y += Title_Bar_Height;
   }
 
-  auto scale = g_ui_ctx.get_scale();
+  auto scale = g_ui_ctx.window()->scale();
   left_top     *= scale;
   right_bottom *= scale;
 
@@ -342,7 +337,7 @@ auto button(size_t id, int x, int y, uint32_t width, uint32_t height) noexcept->
     g_ui_ctx.add_mouse_left_button_state(id, left_top, right_bottom);
     is_hovered = !is_move_out                                                      &&
                  point_on(g_ui_ctx.mouse_down_pos.value(), left_top, right_bottom) &&
-                 g_ui_ctx.mouse_down_window == g_ui_ctx._window->snap.handle;
+                 g_ui_ctx.mouse_down_window == g_ui_ctx.window()->handle();
   }
 
   return { is_hovered && ui::is_click_on(left_top, right_bottom), is_hovered, is_move_out };
@@ -431,7 +426,7 @@ auto GetKeyResult::is_uppercase() const noexcept -> bool
 auto get_key(Key key) noexcept -> GetKeyResult
 {
   g_ui_ctx.check_draw();
-  if (g_ui_ctx._window->is_active())
+  if (g_ui_ctx.window()->is_active())
     return { g_ui_ctx.get_key(key) };
   return {};
 }

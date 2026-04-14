@@ -179,7 +179,6 @@ void Compositor::init() noexcept
   _compositor = winrt::Windows::UI::Composition::Compositor{};
 
   // create compositor graphics device
-  g_core.wait_init_finish();
   _device = CreateCompositionGraphicsDevice(_compositor, g_core.device_d2d());
 
   // create wic factory

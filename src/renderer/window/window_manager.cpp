@@ -391,15 +391,12 @@ void WindowManager::update() noexcept
     }
     _window_change_size.clear();
   }
+}
 
-  // resize blur windows
-  for (auto _ : std::views::iota(0u, _blur_resize_infos.size()))
-  {
-    auto [handle, rect] = *_blur_resize_infos.front(); _blur_resize_infos.pop();
-
-    if (_windows.contains(handle))
-      _windows[handle].resize_blur_window(rect);
-  }
+void WindowManager::resize_blur_window(HWND handle, RECT rect) noexcept
+{
+  if (_windows.contains(handle))
+    _windows[handle].resize_blur_window(rect);
 }
 
 void WindowManager::update_monitor(HWND handle, glm::vec2 cursor_pos, glm::vec<2, int>& left_button_down_window_cusor_pos) noexcept
@@ -428,8 +425,8 @@ void WindowManager::update_fullscreen_window() noexcept
 
   _fullscreen_window._rect = rect;
   _fullscreen_window.update_by_rect();
-  g_renderer.send_message(Renderer::Message_Window_Update{_fullscreen_window.handle(), _fullscreen_window._width, _fullscreen_window._height });
-  SetWindowPos(_fullscreen_window.handle(), 0, _fullscreen_window._x, g_wnd_mgr._fullscreen_window._y,
+  g_renderer.resize_window_resource(_fullscreen_window._handle, _fullscreen_window._width, _fullscreen_window._height);
+  SetWindowPos(_fullscreen_window._handle, 0, _fullscreen_window._x, g_wnd_mgr._fullscreen_window._y,
     _fullscreen_window._width, _fullscreen_window._height, SWP_NOZORDER | SWP_NOACTIVATE);
 }
 

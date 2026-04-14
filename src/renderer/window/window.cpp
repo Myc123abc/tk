@@ -47,7 +47,7 @@ void Window::init(int x, int y, uint32_t width, uint32_t height, ui::Backdrop co
   }
 
   // create window render resource
-  g_renderer.send_message(Renderer::Message_Window_Create{ _handle, real_width(), real_height() });
+  g_renderer.create_window_resource(_handle, real_width(), real_height());
 
   init_blur_window(backdrop);
 
@@ -70,7 +70,7 @@ void Window::init_blur_window(ui::Backdrop const& backdrop) noexcept
   _blur_res = g_compositor.create_resource(_blur_window, backdrop);
 
   // show blur window after first frame present complete
-  g_renderer.send_message(Renderer::Message_Show_Blur_Window{ _handle, _blur_window });
+  g_renderer.show_blur_window(_handle, _blur_window);
 }
 
 void Window::update_blur_window(ui::Backdrop const& backdrop) noexcept
@@ -91,7 +91,7 @@ void Window::init_auxiliary(int x, int y, uint32_t width, uint32_t height) noexc
   err_if(!_handle, "failed to create window");
 
   // create window render resource
-  g_renderer.send_message(Renderer::Message_Window_Create{ _handle, width, height });
+  g_renderer.create_window_resource(_handle, width, height);
 
   ShowWindow(_handle, SW_SHOW);
 }
@@ -114,7 +114,7 @@ void Window::destroy() const noexcept
   if (_blur_window)
     ShowWindow(_blur_window, SW_HIDE);
   ShowWindow(_handle, SW_HIDE);
-  g_renderer.send_message(Renderer::Message_Window_Destroy{ _handle, _blur_window });
+  g_renderer.destroy_window_resource(_handle, _blur_window);
 }
 
 auto Window::cursor_pos() const noexcept -> glm::vec<2, int>
@@ -167,7 +167,7 @@ void Window::move_from_maximize() noexcept
     _y -= limit;
 
   update_rect();
-  g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
+  g_renderer.resize_window_resource(_handle, real_width(), real_height());
 
   if (_blur_window)
   {
@@ -206,7 +206,7 @@ void Window::move_end() noexcept
 
 void Window::reset_pos_size() noexcept
 {
-  g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
+  g_renderer.resize_window_resource(_handle, real_width(), real_height());
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
   keep_blur_window_behind_resize();
 }
@@ -216,7 +216,7 @@ void Window::update_by_rect(RECT rect, float scale) noexcept
   _rect  = rect;
   _scale = scale;
   update_by_rect();
-  g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
+  g_renderer.resize_window_resource(_handle, real_width(), real_height());
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
   keep_blur_window_behind_resize();
 }
@@ -229,7 +229,7 @@ void Window::update_by_real_rect(RECT rect, float scale) noexcept
   _width  = (rect.right  - rect.left) - shadow_thickness() * 2;
   _height = (rect.bottom - rect.top)  - shadow_thickness() * 2;
   update_rect();
-  g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
+  g_renderer.resize_window_resource(_handle, real_width(), real_height());
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
   keep_blur_window_behind_resize();
 }
@@ -337,7 +337,7 @@ void Window::resize_end() noexcept
 {
   _resizing = false;
   g_ui_ctx.clear_fullscreen_window();
-  g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
+  g_renderer.resize_window_resource(_handle, real_width(), real_height());
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
@@ -351,7 +351,7 @@ void Window::resize_by_scale(float scale, float ratio, glm::vec2 cursor_pos, glm
 
   update_rect();
 
-  g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
+  g_renderer.resize_window_resource(_handle, real_width(), real_height());
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
   keep_blur_window_behind_resize();
 }
@@ -437,7 +437,7 @@ void Window::maximize() noexcept
   _backup_rect = _rect;
   _rect        = Monitor{ _handle }.work_rect();
   update_by_rect();
-  g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
+  g_renderer.resize_window_resource(_handle, real_width(), real_height());
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
   keep_blur_window_behind_resize();
 }
@@ -480,7 +480,7 @@ void Window::restore() noexcept
   _maximized = false;
   _rect      = _backup_rect;
   update_by_rect();
-  g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
+  g_renderer.resize_window_resource(_handle, real_width(), real_height());
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
   keep_blur_window_behind_resize();
 }
@@ -492,7 +492,7 @@ void Window::fullscreen() noexcept
   _backup_rect = _rect;
   _rect        = Monitor{ _handle }.rect();
   update_by_rect();
-  g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
+  g_renderer.resize_window_resource(_handle, real_width(), real_height());
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
   keep_blur_window_behind_resize();
 }
@@ -502,7 +502,7 @@ void Window::restore_fullscreen() noexcept
   _fullscreen = false;
   _rect       = _backup_rect;
   update_by_rect();
-  g_renderer.send_message(Renderer::Message_Window_Update{ _handle, real_width(), real_height() });
+  g_renderer.resize_window_resource(_handle, real_width(), real_height());
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
   keep_blur_window_behind_resize();
 }
