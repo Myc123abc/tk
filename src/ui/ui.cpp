@@ -304,14 +304,14 @@ auto is_click_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
          point_on(g_ui_ctx.mouse_up_pos.value(),   left_top, right_bottom);
 }
 
-auto lerp_ping_pong(std::string_view name, bool b, double duration) noexcept -> double
+auto ping_pong(std::string_view name, bool b, double duration, Tween::Ease ease) noexcept -> double
 {
-  return g_ui_ctx.lerp_ping_pong(b, g_ui_ctx.generic_id(name), duration);
+  return g_ui_ctx.ping_pong(b, g_ui_ctx.generic_id(name), duration, ease);
 }
 
-void reset_lerpolator(std::string_view name) noexcept
+void reset_tween(std::string_view name) noexcept
 {
-  g_ui_ctx.reset_lerpolator(g_ui_ctx.get_id(name));
+  g_ui_ctx.reset_tween(g_ui_ctx.get_id(name));
 }
 
 auto button(size_t id, int x, int y, uint32_t width, uint32_t height) noexcept-> ButtonState
@@ -385,8 +385,8 @@ auto button(
   auto id    = g_ui_ctx.generic_id(name);
   auto state = button(id, x, y, width, height);
 
-  auto value = g_ui_ctx.lerp_ping_pong(state.hovered, id, 200'000);
-  if (mouse_down_color && state.move_out) g_ui_ctx.reset_lerpolator(id);
+  auto value = g_ui_ctx.ping_pong(state.hovered, id, 200'000);
+  if (mouse_down_color && state.move_out) g_ui_ctx.reset_tween(id);
   button_color = lerp(button_color, button_hover_color, value);
 
   // when mouse down, color also change

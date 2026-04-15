@@ -300,7 +300,7 @@ void UIContext::window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer
       auto color = cfg.wireframe_color.value();
       if (cfg.display_wireframe_only_active)
       {
-        auto ratio = lerp_ping_pong(wnd.is_active(), generic_id("tk::ui::render::draw_wire_frame"), Window_Active_Response_Time);
+        auto ratio = ping_pong(wnd.is_active(), generic_id("tk::ui::render::draw_wire_frame"), Window_Active_Response_Time);
         color.a = cfg.wireframe_color.value().a * ratio;
       }
 
@@ -359,7 +359,7 @@ void UIContext::add_title_bar() noexcept
   auto icon_height = Title_Bar_Button_Icon_Height;
 
   auto is_active        = _wnd->is_active();
-  auto value            = lerp_ping_pong(is_active, generic_id("tk::ui::update_title_bar_background_color"), Window_Active_Response_Time);
+  auto value            = ping_pong(is_active, generic_id("tk::ui::update_title_bar_background_color"), Window_Active_Response_Time);
   auto background_color = lerp(0xffffffff, 0xeeeeeeff, value);
 
   auto btn_mouse_down_color       = 0xb0b0b0ff;
@@ -430,55 +430,55 @@ auto UIContext::generic_id(std::string_view name) noexcept -> size_t
   return id;
 }
 
-auto UIContext::get_lerpolator(size_t id, double duration) noexcept -> Lerpolator*
+auto UIContext::get_tween(size_t id, double duration, Tween::Ease ease) noexcept -> Tween*
 {
-  if (!_lerpolators.contains(id))
-    _lerpolators[id].init(duration);
-  return &_lerpolators[id];
+  if (!_tweens.contains(id))
+    _tweens[id].init(duration, {}, ease);
+  return &_tweens[id];
 }
 
-void UIContext::remove_lerpolator(size_t id) noexcept
+void UIContext::remove_tween(size_t id) noexcept
 {
-  err_if(!_lerpolators.contains(id), "remove an unexist color lerpolator");
-  _lerpolators.erase(id);
+  err_if(!_tweens.contains(id), "remove an unexist color tween");
+  _tweens.erase(id);
 }
 
-void UIContext::reset_lerpolator(size_t id) noexcept
+void UIContext::reset_tween(size_t id) noexcept
 {
-  err_if(!_lerpolators.contains(id), "remove an unexist color lerpolator");
-  _lerpolators[id].reset();
+  err_if(!_tweens.contains(id), "remove an unexist color tween");
+  _tweens[id].reset();
 }
 
-auto UIContext::lerp_ping_pong(bool b, size_t id, double duration) noexcept -> double
+auto UIContext::ping_pong(bool b, size_t id, double duration, Tween::Ease ease) noexcept -> double
 {
-  auto lerpolator = g_ui_ctx.get_lerpolator(id, duration);
+  auto tween = g_ui_ctx.get_tween(id, duration, ease);
 
   if (b)
   {
-    if (!lerpolator->is_finished())
+    if (!tween->is_finished())
     {
-      if (lerpolator->is_reversed())
-        lerpolator->reverse();
-      lerpolator->start();
+      if (tween->is_reversed())
+        tween->reverse();
+      tween->start();
     }
   }
   else
   {
-    if (lerpolator->is_finished())
+    if (tween->is_finished())
     {
-      lerpolator->reverse();
-      lerpolator->start();
+      tween->reverse();
+      tween->start();
     }
-    else if (lerpolator->is_started() && !lerpolator->is_reversed())
-      lerpolator->reverse();
+    else if (tween->is_started() && !tween->is_reversed())
+      tween->reverse();
   }
 
-  lerpolator->update(ui::delta_time());
+  tween->update(ui::delta_time());
 
-  auto value = lerpolator->get();
+  auto value = tween->get();
 
-  if (lerpolator->is_finished() && lerpolator->is_reversed())
-    g_ui_ctx.remove_lerpolator(id);
+  if (tween->is_finished() && tween->is_reversed())
+    g_ui_ctx.remove_tween(id);
 
   return value;
 }

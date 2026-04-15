@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../util/flag.hpp"
+#include "tween.hpp"
 
 #include <windows.h>
 
@@ -121,19 +122,14 @@ using Backdrop      = WindowConfig::BlurBackdrop;
 using BackdropStyle = WindowConfig::BlurBackdrop::Style;
 
 /**
- * get frame delta time
- * @return delta time(us)
- */
-auto delta_time() noexcept -> double;
-
-/**
  * get a lerp value in ping pong
  * @param name unique global name
  * @param b drive boolean value
  * @param duration duration (us)
+ * @param ease ease funcation for tween
  * @return lerp value (0.0 ~ 1.0)
  */
-auto lerp_ping_pong(std::string_view name, bool b, double duration) noexcept -> double;
+auto ping_pong(std::string_view name, bool b, double duration, Tween::Ease ease = Tween::linear) noexcept -> double;
 
 /**
  * get cursor position
@@ -142,10 +138,10 @@ auto lerp_ping_pong(std::string_view name, bool b, double duration) noexcept -> 
 auto get_cursor_pos() noexcept -> glm::vec2;
 
 /**
- * reset lerpolator
- * @param name name of lerpolator, TODO: now name only unique in single window, not global unique
+ * reset tween
+ * @param name name of tween, TODO: now name only unique in single window, not global unique
  */
-void reset_lerpolator(std::string_view name) noexcept;
+void reset_tween(std::string_view name) noexcept;
 
 /**
  * get extent of image

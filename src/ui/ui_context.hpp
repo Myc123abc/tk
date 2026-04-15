@@ -2,7 +2,7 @@
 
 #include "frame_data.hpp"
 #include "ui/ui.hpp"
-#include "ui/lerpolator.hpp"
+#include "ui/tween.hpp"
 #include "../util/singleton.hpp"
 #include "../renderer/window/window.hpp"
 
@@ -71,10 +71,10 @@ public:
 
   auto delta_time() const noexcept { return _delta_time; }
 
-  auto get_lerpolator(size_t id, double duration) noexcept -> Lerpolator*;
-  void remove_lerpolator(size_t id) noexcept;
-  void reset_lerpolator(size_t id) noexcept;
-  auto lerp_ping_pong(bool b, size_t id, double duration) noexcept -> double;
+  auto get_tween(size_t id, double duration, Tween::Ease ease = {}) noexcept -> Tween*;
+  void remove_tween(size_t id) noexcept;
+  void reset_tween(size_t id) noexcept;
+  auto ping_pong(bool b, size_t id, double duration, Tween::Ease ease = {}) noexcept -> double;
 
   auto image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha) noexcept -> bool;
   auto text(std::string_view text, glm::vec2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> glm::vec2;
@@ -120,11 +120,11 @@ public:
   //
   // widget ids
   //
-  std::unordered_set<size_t>             _hovered_widget_ids;
-  size_t                                 _last_hovered_widget_id{};
-  size_t                                 _prev_hovered_widget_id{};
-  std::unordered_map<size_t, Lerpolator> _lerpolators;
-  std::unordered_set<size_t>             _ids;
+  std::unordered_set<size_t>        _hovered_widget_ids;
+  size_t                            _last_hovered_widget_id{};
+  size_t                            _prev_hovered_widget_id{};
+  std::unordered_map<size_t, Tween> _tweens;
+  std::unordered_set<size_t>        _ids;
 
   //
   // mouse state

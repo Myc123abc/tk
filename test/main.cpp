@@ -27,7 +27,7 @@ public:
     if (hovered) color = hovered_color;
 
     if (clicked) _paused = !_paused;
-    auto v = ui::lerp_ping_pong(_lerp_name, !_paused, 100'000);
+    auto v = ui::ping_pong(_lerp_name, !_paused, 100'000);
 
     _lerp_pts = std::vector<LerpPoint>
     {
@@ -83,7 +83,7 @@ public:
   void reset() noexcept
   {
     _paused = true;
-    ui::reset_lerpolator(_lerp_name);
+    ui::reset_tween(_lerp_name);
   }
 
   auto is_paused() const noexcept { return _paused; }
@@ -117,14 +117,14 @@ int main()
   auto playback_btn = PlaybackButton{};
   playback_btn.init("playback button");
 
-  auto progress_lerpolator = ui::Lerpolator{};
-  progress_lerpolator.init(1'000'000);
+  auto progress_tween = ui::Tween{};
+  progress_tween.init(1'000'000);
 
   auto loop_trigger = ui::LoopTrigger{};
   loop_trigger.init(1'000'000, true);
 
-  auto circle_lerplocator = ui::Lerpolator{};
-  circle_lerplocator.init(250'000, ui::Lerpolator::Mode::loop);
+  auto circle_lerplocator = ui::Tween{};
+  circle_lerplocator.init(250'000, ui::Tween::Mode::loop);
 
   auto wnd1_is_closed = false;
   auto wnd2_is_closed = true;
@@ -179,12 +179,12 @@ int main()
       auto p1 = p0 + Vec2{ 12.5 * 1.414, 12.5 };
       auto p2 = p0 + Vec2{ 0, 25 };
       if (playback_btn(p0, p1, p2, 0xffffffff, 0xdcdcdcff, 1))
-        if (progress_lerpolator.is_not_started()) progress_lerpolator.start();
+        if (progress_tween.is_not_started()) progress_tween.start();
 
-      if (!playback_btn.is_paused()) progress_lerpolator.update();
-      if (progress_lerpolator.is_finished())
+      if (!playback_btn.is_paused()) progress_tween.update();
+      if (progress_tween.is_finished())
       {
-        progress_lerpolator.reset();
+        progress_tween.reset();
         playback_btn.pause();
       }
       if (ui::get_key(ui::Key::Space))
@@ -192,8 +192,8 @@ int main()
         if (playback_btn.is_paused())
         {
           playback_btn.play();
-          if (progress_lerpolator.is_not_started())
-            progress_lerpolator.start();
+          if (progress_tween.is_not_started())
+            progress_tween.start();
         }
         else
          playback_btn.pause();
@@ -201,7 +201,7 @@ int main()
 
       // progress bar
       auto p = p1 + Vec2{ 5, 0 };
-      auto progress = progress_lerpolator.get() * 100;
+      auto progress = progress_tween.get() * 100;
       ui::rectangle(p, p + Vec2{ 100,      3 }, 0x808080ff);
       ui::rectangle(p, p + Vec2{ progress, 3 }, 0x0000ffff);
 

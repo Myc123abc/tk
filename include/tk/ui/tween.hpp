@@ -1,20 +1,22 @@
 #pragma once
 
-#include "ui.hpp"
+#include "common.hpp"
 
 #include <algorithm>
+#include <functional>
+#include <assert.h>
 
 namespace tk::ui {
 
-class Lerpolator
+class Tween
 {
 public:
-  Lerpolator()                             = default;
-  ~Lerpolator()                            = default;
-  Lerpolator(Lerpolator const&)            = delete;
-  Lerpolator(Lerpolator&&)                 = delete;
-  Lerpolator& operator=(Lerpolator const&) = delete;
-  Lerpolator& operator=(Lerpolator&&)      = delete;
+  Tween()                        = default;
+  ~Tween()                       = default;
+  Tween(Tween const&)            = delete;
+  Tween(Tween&&)                 = delete;
+  Tween& operator=(Tween const&) = delete;
+  Tween& operator=(Tween&&)      = delete;
 
   enum class Mode
   {
@@ -22,39 +24,48 @@ public:
     loop,
   };
 
-  auto init(double dur, Mode mode = {}) noexcept -> Lerpolator&
+  static double linear(double x) noexcept { return x; }
+
+  using Ease = std::function<double(double)>;
+
+  auto init(double dur, Mode mode = {}, Ease ease = linear) noexcept -> Tween&
   {
+    assert(dur);
     _dur  = dur;
     _mode = mode;
+    _ease = ease ? ease : linear;
     if (mode == Mode::loop) start();
     return *this;
   }
 
-  auto start() noexcept -> Lerpolator&
+  auto start() noexcept -> Tween&
   {
     _state = State::started;
     return *this;
   }
 
-  auto reset() noexcept -> Lerpolator&
+  auto reset() noexcept -> Tween&
   {
     _state    = State::not_started;
-    _x        = 0.f;
+    _y        = 0.0;
+    _x        = 0.0;
     _reversed = false;
     return *this;
   }
 
-  auto update(double delta = ui::delta_time()) noexcept -> Lerpolator&
+  auto update(double delta = ui::delta_time()) noexcept -> Tween&
   {
     if (_state == State::started)
     {
       auto dx = delta / _dur;
       _x += _reversed ? -dx : dx;
       _x = std::clamp(_x, 0.0, 1.0);
-      if (_x == 1.f || _reversed && _x == 0.f)
+      _y = _ease(_x);
+
+      if (_x == 1.0 || _reversed && _x == 0.0)
       {
         if (_mode == Mode::loop)
-          _x = _reversed ? 1.f : 0.f;
+          _x = _reversed ? 1.0 : 0.0;
         else
           _state = State::finished;
       }
@@ -62,7 +73,7 @@ public:
     return *this;
   }
 
-  auto reverse() noexcept -> Lerpolator&
+  auto reverse() noexcept -> Tween&
   {
     _reversed = !_reversed;
     if (_state == State::finished) _state = State::not_started;
@@ -73,11 +84,13 @@ public:
   auto is_started()     const noexcept { return _state == State::started;     }
   auto is_finished()    const noexcept { return _state == State::finished;    }
   auto is_reversed()    const noexcept { return _reversed;                    }
-  auto get()            const noexcept { return _x;                           }
+  auto get()            const noexcept { return _y;                           }
 
 private:
   double _dur{};
   double _x{};
+  double _y{};
+  Ease   _ease;
 
   enum class State
   {
