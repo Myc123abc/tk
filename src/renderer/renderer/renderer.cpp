@@ -238,9 +238,11 @@ void Renderer::process_render() noexcept
   postprocess_render();
 }
 
-void Renderer::render(RenderResource& res, ui::FrameData* frame_data) const noexcept
+void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noexcept
 {
   if (!frame_data) return;
+
+  assert(frame_data->check());
 
   auto  cmd   = g_graphics_engine.cmd();
   auto& frame = res.current_frame();
@@ -251,21 +253,60 @@ void Renderer::render(RenderResource& res, ui::FrameData* frame_data) const noex
 
   for (auto const& data : frame_data->draw_datas())
   {
-    // TODO: only shape now
-    auto pipe = g_pipe_sys.pipe(PipelineType::shape);
+    if (data.type == ui::DrawDataType::shape)
+    {
+      auto pipe = g_pipe_sys.pipe(PipelineType::shape);
+      g_ctx.set_pipe(pipe->pipe_state.Get());
+      g_ctx.set_graphics_root_signature(pipe->root_signature);
+      g_ctx.set_primitive_topology(pipe->primive_topology);
+      g_ctx.set_graphics_constants(pipe->root_param_idx("constants"), Constants
+      {
+        .render_target_extent = frame.image.extent(),
+        .window_pos           = frame_data->window_pos(),
+      });
+      g_ctx.set_scissor_rect(data.scissor_rect);
+      g_ctx.draw(data.index_beg, data.indices_size);
+    }
+    else if (data.type == ui::DrawDataType::image)
+    {
+      auto pipe = g_pipe_sys.pipe(PipelineType::image);
+      g_ctx.set_pipe(pipe->pipe_state.Get());
+      g_ctx.set_graphics_root_signature(pipe->root_signature);
+      g_ctx.set_primitive_topology(pipe->primive_topology);
+      g_ctx.set_graphics_constants(pipe->root_param_idx("constants"), Constants
+      {
+        .render_target_extent = frame.image.extent(),
+        .window_pos           = frame_data->window_pos(),
+        .image_alpha          = data.image_alpha,
+      });
+      g_ctx.set_graphics_descriptor(pipe->root_param_idx("image"), _images[data.image_handle].srv().gpu_handle());
+      g_ctx.set_scissor_rect(data.scissor_rect);
+      g_ctx.draw(data.index_beg, data.indices_size);
+    }
+  }
+
+  auto const& window_shadow_info = frame_data->window_shadow_info();
+  if (window_shadow_info)
+  {
+    auto pipe = g_pipe_sys.pipe(PipelineType::window_shadow);
     g_ctx.set_pipe(pipe->pipe_state.Get());
     g_ctx.set_graphics_root_signature(pipe->root_signature);
     g_ctx.set_primitive_topology(pipe->primive_topology);
     g_ctx.set_graphics_constants(pipe->root_param_idx("constants"), Constants
     {
       .render_target_extent = frame.image.extent(),
+      .window_extent        = window_shadow_info->window_extent,
       .window_pos           = frame_data->window_pos(),
+      .shadow_thickness     = window_shadow_info->shadow_thickness,
+      .shadow_radius        = window_shadow_info->radius,
+      .shadow_color         = window_shadow_info->color,
+      .shadow_softness      = window_shadow_info->softness,
+      .wireframe_color      = window_shadow_info->wireframe_color ? window_shadow_info->wireframe_color.value() : glm::vec4{},
+      .draw_wireframe       = window_shadow_info->wireframe_color.has_value(),
     });
-    g_ctx.set_scissor_rect(data.scissor_rect);
-    g_ctx.draw(data.index_beg, data.indices_size);
+    g_ctx.set_scissor_rect(window_shadow_info->scissor_rect);
+    g_ctx.draw(2);
   }
-
-  // TODO: window shadow info
 }
 
 void Renderer::postprocess_render() noexcept

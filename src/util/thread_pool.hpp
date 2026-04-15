@@ -21,11 +21,17 @@ struct Task
     return std::move(_impl->result);
   }
 
+  operator bool() const noexcept
+  {
+    return _impl->exist;
+  }
+
 private:
   struct Impl
   {
     T                result;
     std::atomic_bool complete;
+    bool             exist{ true };
   };
   std::shared_ptr<Impl> _impl;
 
@@ -57,34 +63,7 @@ public:
     _threads.clear();
   }
 
-  // TODO: change to try_submit avoid block because all queues full
-  template <typename Func>
-  auto submit(Func&& f) noexcept
-  {
-    using T = std::invoke_result_t<Func>;
- 
-    auto task = Task<T>{};
-    task._impl = std::make_shared<typename Task<T>::Impl>();
-
-    enqueue([task, f = std::forward<Func>(f)] mutable
-    {
-      if constexpr (std::is_void_v<T>)
-        f();
-      else
-        task.set_result(f());
-      task.complete();
-    });
-
-    return task;
-  }
-
 private:
-  void enqueue(std::function<void()> f) noexcept
-  {
-    // TODO: task dispatch algorithm
-    _threads[0].enqueue(f);
-  }
-
   struct Thread
   {
     Thread() noexcept
@@ -106,6 +85,18 @@ private:
       std::lock_guard lock{ *_mutex };
       _tasks.emplace(f);
       _sem->release();
+    }
+
+    auto try_enqueue(std::function<void()> f) noexcept
+    {
+      if (_mutex->try_lock())
+      {
+        _tasks.emplace(f);
+        _sem->release();
+        _mutex->unlock();
+        return true;
+      }
+      return false;
     }
   
   private:
@@ -131,6 +122,59 @@ private:
     std::unique_ptr<std::mutex>            _mutex;
     std::unique_ptr<std::binary_semaphore> _sem;
   };
+
+private:
+  void enqueue(std::function<void()> f) noexcept
+  {
+    // TODO: task dispatch algorithm
+    _threads[0].enqueue(f);
+  }
+
+  auto try_enqueue(std::function<void()> f) noexcept
+  {
+    return _threads[0].try_enqueue(f);
+  }
+
+public:
+  template <typename Func>
+  auto submit(Func&& f) noexcept
+  {
+    using T = std::invoke_result_t<Func>;
+ 
+    auto task = Task<T>{};
+    task._impl = std::make_shared<typename Task<T>::Impl>();
+
+    enqueue([task, f = std::forward<Func>(f)] mutable
+    {
+      if constexpr (std::is_void_v<T>)
+        f();
+      else
+        task.set_result(f());
+      task.complete();
+    });
+
+    return task;
+  }
+
+  template <typename Func>
+  auto try_submit(Func&& f) noexcept
+  {
+    using T = std::invoke_result_t<Func>;
+ 
+    auto task = Task<T>{};
+    task._impl = std::make_shared<typename Task<T>::Impl>();
+
+    task._impl->exist = try_enqueue([task, f = std::forward<Func>(f)] mutable
+    {
+      if constexpr (std::is_void_v<T>)
+        f();
+      else
+        task.set_result(f());
+      task.complete();
+    });
+
+    return task;
+  }
 
 private:
   std::atomic_bool          _exit;

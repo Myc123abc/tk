@@ -43,7 +43,7 @@ private:
   void upload_images() noexcept;
 
   void process_render() noexcept;
-  void render(RenderResource& res, ui::FrameData* frame_data) const noexcept;
+  void render(RenderResource& res, ui::FrameData const* frame_data) noexcept;
   void generate_mipmap() noexcept;
 
   void postprocess_render() noexcept;

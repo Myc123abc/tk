@@ -155,6 +155,7 @@ void UIContext::close_window() noexcept
     {
       _wnd_names.erase(ctx.handle);
       g_wnd_mgr.close_window(ctx.handle);
+      cursor_on_window = {};
       return true;
     }
   });
@@ -310,8 +311,7 @@ void UIContext::window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer
     return {};
   };
 
-  data->set_window_shadow(wnd.real_extent(), wnd.shadow_thickness(), {}, cfg.display_window_shadow ? 5 : 0, 15, get_wireframe_color());
-  data->add_scissor_rect(scissor_rect);
+  data->set_window_shadow(scissor_rect, wnd.real_extent(), wnd.shadow_thickness(), {}, cfg.display_window_shadow ? 5 : 0, 15, get_wireframe_color());
 }
 
 void UIContext::add_mouse_left_button_state(size_t id, glm::vec2 left_top, glm::vec2 right_bottom) noexcept
@@ -571,13 +571,13 @@ auto UIContext::get_key(Key key) noexcept -> KeyState
   return ctx.state;
 }
 
-void UIContext::image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha) noexcept
+auto UIContext::image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha) noexcept -> bool
 {
   check_draw();
   check_path_not_draw();
   check_union_not_draw();
 
-  if (g_img_mgr.try_load(path, right_bottom - left_top))
+  if (g_img_mgr.try_load(path))
   {
     auto offset = get_render_pos();
     left_top     += offset;
@@ -587,8 +587,10 @@ void UIContext::image(std::string_view path, glm::vec2 left_top, glm::vec2 right
     left_top     *= scale;
     right_bottom *= scale;
 
-    // cmd()->image(g_img_mgr.handle(path), left_top, right_bottom, alpha);
+    frame_data()->add_image(g_img_mgr.handle(path), left_top, right_bottom, alpha);
+    return true;
   }
+  return false;
 }
 
 auto UIContext::text(std::string_view text, glm::vec2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> glm::vec2

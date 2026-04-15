@@ -39,7 +39,7 @@ private:
       std::string_view                       shader,
       std::string_view                       vs,
       std::string_view                       ps,
-      std::string_view                       include,
+      std::vector<std::string_view> const&   includes,
       ImageFormat                            rtv_format,
       bool                                   use_blend      = false,
       bool                                   use_depth_test = false,
@@ -47,24 +47,24 @@ private:
       std::unordered_set<std::string> const& volatile_descs = {}
     ) noexcept
     {
-      init_graphics(shader, vs, ps, include, rtv_format, use_blend, use_depth_test, res, volatile_descs);
+      init_graphics(shader, vs, ps, includes, rtv_format, use_blend, use_depth_test, res, volatile_descs);
     }
 
     Pipeline(
       std::string_view                       shader,
       std::string_view                       cs,
-      std::string_view                       include = {},
-      std::optional<RootSignatureResult>     res = {},
+      std::vector<std::string_view> const&   includes       = {},
+      std::optional<RootSignatureResult>     res            = {},
       std::unordered_set<std::string> const& volatile_descs = {}) noexcept
     {
-      init_compute(shader, cs, include, res, volatile_descs);
+      init_compute(shader, cs, includes, res, volatile_descs);
     }
 
     void init_graphics(
       std::string_view                       shader,
       std::string_view                       vs,
       std::string_view                       ps,
-      std::string_view                       include,
+      std::vector<std::string_view> const&   includes,
       ImageFormat                            rtv_format,
       bool                                   use_blend      = false,
       bool                                   use_depth_test = false,
@@ -75,8 +75,8 @@ private:
     void init_compute(
       std::string_view                       shader,
       std::string_view                       cs,
-      std::string_view                       include = {},
-      std::optional<RootSignatureResult>     res = {},
+      std::vector<std::string_view> const&   includes       = {},
+      std::optional<RootSignatureResult>     res            = {},
       std::unordered_set<std::string> const& volatile_descs = {}) noexcept;
   
     auto root_param_idx(std::string_view name) noexcept { return _root_param_idxs[name.data()]; }

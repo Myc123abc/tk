@@ -160,8 +160,15 @@ auto image_extent(std::string_view path) noexcept -> glm::vec2;
  * @param left_top
  * @param right_bottom
  * @param alpha
+ * @return false if image is unexist, or loading, or load failed
  */
-void image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha = 0xff) noexcept;
+auto image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha = 0xff) noexcept -> bool;
+
+/**
+ * load image
+ * @param path
+ */
+void load_image(std::string_view path) noexcept;
 
 /**
  * load font

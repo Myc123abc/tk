@@ -106,6 +106,11 @@ int main()
 {
   tk::init();
 
+  auto img1 = "assets/image/test.jpg";
+  auto img2 = "assets/image/test.png";
+  ui::load_image(img1);
+  ui::load_image(img2);
+
   ui::load_font("assets/font/NotoSansJP-Regular.ttf");
   ui::load_font("assets/font/NotoSansSC-Regular.ttf");
 
@@ -124,9 +129,11 @@ int main()
   auto wnd1_is_closed = false;
   auto wnd2_is_closed = true;
 
+  auto is_loaded = false;
+
   auto cfg = ui::WindowConfig{};
-  cfg.display_title_bar             = false;
-	cfg.display_window_shadow         = false;
+  cfg.display_title_bar             = true;
+	cfg.display_window_shadow         = true;
   cfg.display_wireframe_only_active = true;
   cfg.wireframe_color               = 0x7160e8ff;
   cfg.backdrop.default_acrylic();
@@ -146,7 +153,7 @@ int main()
       auto extent = ui::window_drawable_extent();
       auto pos = glm::vec2{ extent.x / 2 - 50, extent.y - 50 };
       auto size = ui::window_drawable_extent();
-      // ui::triangle({ size.x / 2, size.y * .1f }, size * .9f, { size.y * .1f, size.y * .9 }, 0xffffffff, 10);
+      ui::triangle({ size.x / 2, size.y * .1f }, size * .9f, { size.y * .1f, size.y * .9 }, 0xffffffff, 10);
 
       if (ui::button("btn1", 0, 0, 100, 100, 0xffffffff, 0xffffffff))
         circle_lerplocator.reverse();
@@ -201,14 +208,17 @@ int main()
       // image
       if (loop_trigger)
       {
-        auto img_ext = ui::image_extent("assets/image/test.png");
+        auto img_ext = ui::image_extent(img2);
         auto ext = wnd_ext - p2;
         auto scale = std::max(img_ext.x / ext.x, img_ext.y / ext.y);
         img_ext /= scale;
-        ui::image("assets/image/test.png", p2, p2 + img_ext);
+        if (is_loaded = ui::image(img2, p2, p2 + img_ext); !is_loaded)
+          info("loading {}", img2);
       }
-      loop_trigger.update();
-      ui::image("assets/image/test.jpg", {}, wnd_ext, 0x44);
+      if (is_loaded) loop_trigger.update();
+
+      if (!ui::image(img1, {}, wnd_ext, 0x44))
+        info("loading {}", img1);
 
       // circle point
       auto size = ui::window_drawable_extent();

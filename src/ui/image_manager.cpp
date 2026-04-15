@@ -6,6 +6,7 @@
 #include "util/file.hpp"
 
 #include <ranges>
+#include <filesystem>
 
 using namespace tk::renderer;
 
@@ -53,38 +54,61 @@ auto ImageManager::extent(std::string_view path) noexcept -> glm::vec2
   return _image_extents[path.data()];
 }
 
-auto ImageManager::try_load(std::string_view path, glm::vec2 extent) noexcept -> bool
+void ImageManager::update() noexcept
 {
-  if (_load_tasks.contains(path.data()))
+  // retry load images which failed because thread pool unidle
+  auto tmp_imgs = std::move(_load_retry_images);
+  _load_retry_images.clear();
+  for (auto const& path :tmp_imgs)
+    try_load(path);
+
+  // check images whether loeaded
+  for (auto it = _load_tasks.begin(); it != _load_tasks.end();)
   {
+    auto const& path = it->first;
     if (_load_tasks[path.data()].is_completed())
     {
-      debug("fine {}", path);
-      auto task = std::move(_load_tasks[path.data()]);
-      _load_tasks.erase(path.data());
+      auto path_cpy = path;
+      auto task = std::move(_load_tasks[path_cpy]);
+      it = _load_tasks.erase(it);
       auto [data, w, h] = task.take_result();
-      if (!data) return false;
-      load(path, w, h, data);
-      return true;
+      if (!data)
+      {
+        warn("image {} load failed by stbi_load_from_memory");
+        continue;
+      }
+      load(path_cpy, w, h, data);
     }
+    else ++it;
+  }
+}
+
+auto ImageManager::try_load(std::string_view path) noexcept -> bool
+{
+  if (!std::filesystem::exists(path))
+  {
+    warn("image {} is unexist!", path);
     return false;
   }
+
+  // still loading
+  if (_load_tasks.contains(path.data())) return false;
+
+  // load image if not loaded
   if (!_loaded_images.contains(path.data()))
   {
-    debug("load start {}", path);
-    auto beg = std::chrono::steady_clock::now();
-    _load_tasks.emplace(path, g_thread_pool.submit([path = std::string(path)]
+    auto task = g_thread_pool.try_submit([path = std::string(path)]
     {
-      debug("parse {}", path);
       int w, h; 
       auto file = File{ path };
       auto data = stbi_load_from_memory(file.data<stbi_uc>(), file.size(), reinterpret_cast<int*>(&w), reinterpret_cast<int*>(&h), nullptr, 4);
       if (!data) data = nullptr;
       return LoadResult{ data, w, h };
-    }));
-    auto end = std::chrono::steady_clock::now();
-    auto dur = std::chrono::duration_cast<std::chrono::microseconds>(end - beg).count();
-    debug("load end {}\ntime {}", path, dur);
+    });
+    if (task)
+      _load_tasks.emplace(path, std::move(task));
+    else
+      _load_retry_images.emplace_back(path);
     return false;
   }
   return true;

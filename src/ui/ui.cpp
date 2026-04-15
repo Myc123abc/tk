@@ -39,9 +39,14 @@ auto image_extent(std::string_view path) noexcept -> glm::vec2
   return g_img_mgr.extent(path);
 }
 
-void image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha) noexcept
+auto image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha) noexcept -> bool
 {
-  g_ui_ctx.image(path, left_top, right_bottom, alpha);
+  return g_ui_ctx.image(path, left_top, right_bottom, alpha);
+}
+
+void load_image(std::string_view path) noexcept
+{
+  g_img_mgr.try_load(path);
 }
 
 void load_font(std::string_view path) noexcept
@@ -381,7 +386,7 @@ auto button(
   auto state = button(id, x, y, width, height);
 
   auto value = g_ui_ctx.lerp_ping_pong(state.hovered, id, 200'000);
-  if (mouse_down_color && state.move_out) button_hover_color = mouse_down_color.value();
+  if (mouse_down_color && state.move_out) g_ui_ctx.reset_lerpolator(id);
   button_color = lerp(button_color, button_hover_color, value);
 
   // when mouse down, color also change

@@ -76,7 +76,7 @@ public:
   void reset_lerpolator(size_t id) noexcept;
   auto lerp_ping_pong(bool b, size_t id, double duration) noexcept -> double;
 
-  void image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha) noexcept;
+  auto image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha) noexcept -> bool;
   auto text(std::string_view text, glm::vec2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> glm::vec2;
 
   void fullscreen_window() noexcept;

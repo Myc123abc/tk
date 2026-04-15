@@ -104,19 +104,19 @@ public:
     std::string_view                       shader,
     std::string_view                       vertex_shader_entry_point,
     std::string_view                       pixel_shader_entry_point,
-    std::string_view                       include        = {},
+    std::vector<std::string_view> const&   includes       = {},
     std::optional<RootSignatureResult>     res            = {},
     std::unordered_set<std::string> const& volatile_descs = {}) noexcept -> CompileResult;
 
   auto compile(
     std::string_view                       shader,
     std::string_view                       compute_shader_entry_point,
-    std::string_view                       include        = {},
+    std::vector<std::string_view> const&   includes       = {},
     std::optional<RootSignatureResult>     res            = {},
     std::unordered_set<std::string> const& volatile_descs = {}) noexcept -> CompileResult;
 
 private:
-  auto compile(std::string_view shader_path, std::string_view include, std::wstring_view profile, std::string_view entry_point) noexcept -> std::pair<Microsoft::WRL::ComPtr<IDxcResult>, Microsoft::WRL::ComPtr<IDxcBlob>>;
+  auto compile(std::string_view shader_path, std::vector<std::string_view> const& includes, std::wstring_view profile, std::string_view entry_point) noexcept -> std::pair<Microsoft::WRL::ComPtr<IDxcResult>, Microsoft::WRL::ComPtr<IDxcBlob>>;
 
 private:
   Microsoft::WRL::ComPtr<IDxcCompiler3>      _compiler;

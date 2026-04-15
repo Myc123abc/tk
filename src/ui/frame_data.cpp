@@ -133,10 +133,42 @@ void FrameData::path_arc_to(glm::vec2 center, float radius) noexcept
   //auto step = 48 / get_circle_segment_count(radius);
 }
 
+void FrameData::add_draw_call(DrawDataType type, ImageHandle image_handle, uint8_t image_alpha) noexcept
+{
+  _draw_data_rect_idxs.emplace_back(_draw_datas.size());
+  _draw_datas.emplace_back(type, _draw_index_beg, _indices.size() - _draw_index_beg, image_handle, image_alpha);
+  _draw_index_beg = _indices.size();
+}
+
 void FrameData::add_scissor_rect(RECT rect) noexcept
 {
-  _draw_datas.emplace_back(rect, _draw_index_beg, _indices.size() - _draw_index_beg);
-  _draw_index_beg = _indices.size();
+  add_draw_call(DrawDataType::shape);
+
+  for (auto idx : _draw_data_rect_idxs)
+    _draw_datas[idx].scissor_rect = rect;
+  _draw_data_rect_idxs.clear();
+}
+
+void FrameData::add_image(ImageHandle handle, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha) noexcept
+{
+  // push exist shape draw call
+  if (_draw_index_beg != _indices.size())
+    add_draw_call(DrawDataType::shape);
+
+  auto [vertices, indices] = expand_beg(4, 6);
+  vertices[0] = { left_top, {}, {} };
+  vertices[1] = { { right_bottom.x, left_top.y }, {}, { 1, 0 } };
+  vertices[2] = { right_bottom, {}, { 1, 1 } };
+  vertices[3] = { { left_top.x, right_bottom.y }, {}, { 0, 1 } };
+  indices[0]  = _index + 0;
+  indices[1]  = _index + 1;
+  indices[2]  = _index + 2;
+  indices[3]  = _index + 0;
+  indices[4]  = _index + 2;
+  indices[5]  = _index + 3;
+  expand_end();
+
+  add_draw_call(DrawDataType::image, handle, alpha);
 }
 
 }
