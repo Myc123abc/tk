@@ -7,6 +7,18 @@
 
 using namespace tk::renderer;
 
+namespace {
+
+auto intersect_rect(RECT lhs, RECT rhs) noexcept -> std::optional<RECT>
+{
+  auto res = RECT{};
+  if (IntersectRect(&res, &lhs, &rhs))
+    return res;
+  return {};
+}
+
+}
+
 namespace tk::ui {
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -96,13 +108,11 @@ void add_move_invalid_area(glm::vec2 left_top, glm::vec2 right_bottom) noexcept
   left_top     *= scale;
   right_bottom *= scale;
 
-  g_ui_ctx.window()->add_move_invalid_area(
-  {
-    static_cast<LONG>(left_top.x),
-    static_cast<LONG>(left_top.y),
-    static_cast<LONG>(right_bottom.x),
-    static_cast<LONG>(right_bottom.y)
-  });
+  auto wnd = g_ui_ctx.window();
+  if (auto rect = intersect_rect({ static_cast<LONG>(left_top.x), static_cast<LONG>(left_top.y),
+                                   static_cast<LONG>(right_bottom.x), static_cast<LONG>(right_bottom.y) },
+                                 { 0, 0, static_cast<LONG>(wnd->width()), static_cast<LONG>(wnd->height()) }))
+    g_ui_ctx.window()->add_move_invalid_area(rect.value());
 }
 
 auto window_extent() noexcept -> glm::vec2
@@ -287,7 +297,7 @@ auto is_hover_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
   auto p = g_ui_ctx.window()->cursor_pos();
   return g_ui_ctx.cursor_on_window == g_ui_ctx.window()->handle() &&
          !g_ui_ctx.window()->is_move_from_maximize()              &&
-         point_on(p, left_top, right_bottom);
+         point_in(p, left_top, right_bottom);
 }
 
 auto is_click_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
@@ -300,8 +310,8 @@ auto is_click_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool
       !g_ui_ctx.mouse_up_pos           ||
        g_ui_ctx.mouse_down_window != g_ui_ctx.mouse_up_window) return false;
   return !g_ui_ctx.is_move_from_maximize                                   &&
-         point_on(g_ui_ctx.mouse_down_pos.value(), left_top, right_bottom) &&
-         point_on(g_ui_ctx.mouse_up_pos.value(),   left_top, right_bottom);
+         point_in(g_ui_ctx.mouse_down_pos.value(), left_top, right_bottom) &&
+         point_in(g_ui_ctx.mouse_up_pos.value(),   left_top, right_bottom);
 }
 
 auto ping_pong(std::string_view name, bool b, double duration, Tween::Ease ease) noexcept -> double
@@ -341,7 +351,7 @@ auto button(size_t id, int x, int y, uint32_t width, uint32_t height) noexcept->
   {
     g_ui_ctx.add_mouse_left_button_state(id, left_top, right_bottom);
     is_hovered = !is_move_out                                                      &&
-                 point_on(g_ui_ctx.mouse_down_pos.value(), left_top, right_bottom) &&
+                 point_in(g_ui_ctx.mouse_down_pos.value(), left_top, right_bottom) &&
                  g_ui_ctx.mouse_down_window == g_ui_ctx.window()->handle();
   }
 

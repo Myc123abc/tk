@@ -17,12 +17,17 @@ inline auto get_cursor_pos() noexcept
   return glm::vec<2, int>{ p.x, p.y };
 }
 
-inline auto point_on(glm::vec<2, int> const& p, glm::vec2 const& left_top, glm::vec2 const& right_bottom) noexcept
+inline auto point_in(glm::vec<2, int> const& p, glm::vec2 const& left_top, glm::vec2 const& right_bottom) noexcept
 {
-  return p.x >= left_top.x && p.x <= right_bottom.x && p.y >= left_top.y && p.y <= right_bottom.y;
+  return p.x > left_top.x && p.x < right_bottom.x && p.y > left_top.y && p.y < right_bottom.y;
 }
 
-inline auto point_on(glm::vec<2, int> const& p, RECT rect) noexcept
+inline auto point_in(glm::vec<2, int> const& p, RECT rect) noexcept
+{
+  return p.x > rect.left && p.x < rect.right && p.y > rect.top && p.y < rect.bottom;
+}
+
+inline auto point_in_with_bounding(glm::vec<2, int> const& p, RECT rect) noexcept
 {
   return p.x >= rect.left && p.x <= rect.right && p.y >= rect.top && p.y <= rect.bottom;
 }

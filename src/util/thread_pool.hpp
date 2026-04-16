@@ -8,6 +8,7 @@
 #include <queue>
 #include <functional>
 #include <mutex>
+#include <algorithm>
 
 namespace tk {
 
@@ -80,13 +81,6 @@ private:
 
     Thread(Thread&&) = default;
 
-    void enqueue(std::function<void()> f) noexcept
-    {
-      std::lock_guard lock{ *_mutex };
-      _tasks.emplace(f);
-      _sem->release();
-    }
-
     auto try_enqueue(std::function<void()> f) noexcept
     {
       if (_mutex->try_lock())
@@ -104,15 +98,23 @@ private:
     {
       while (!instance()._exit.load(std::memory_order_acquire))
       {
+        _sem->acquire();
+
+        while (true)
         {
-          std::lock_guard lock{ *_mutex };
-          while (!_tasks.empty())
+          auto task = std::function<void()>{};
+
           {
-            _tasks.front()();
+            std::lock_guard lock{ *_mutex };
+            if (_tasks.empty())
+              break;
+
+            task = std::move(_tasks.front());
             _tasks.pop();
           }
+
+          task();
         }
-        _sem->acquire();
       }
     }
 
@@ -124,38 +126,12 @@ private:
   };
 
 private:
-  void enqueue(std::function<void()> f) noexcept
-  {
-    // TODO: task dispatch algorithm
-    _threads[0].enqueue(f);
-  }
-
   auto try_enqueue(std::function<void()> f) noexcept
   {
-    return _threads[0].try_enqueue(f);
+    return std::ranges::any_of(_threads, [&](auto& thread) { return thread.try_enqueue(f); });
   }
 
 public:
-  template <typename Func>
-  auto submit(Func&& f) noexcept
-  {
-    using T = std::invoke_result_t<Func>;
- 
-    auto task = Task<T>{};
-    task._impl = std::make_shared<typename Task<T>::Impl>();
-
-    enqueue([task, f = std::forward<Func>(f)] mutable
-    {
-      if constexpr (std::is_void_v<T>)
-        f();
-      else
-        task.set_result(f());
-      task.complete();
-    });
-
-    return task;
-  }
-
   template <typename Func>
   auto try_submit(Func&& f) noexcept
   {

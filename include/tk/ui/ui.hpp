@@ -139,7 +139,7 @@ auto get_cursor_pos() noexcept -> glm::vec2;
 
 /**
  * reset tween
- * @param name name of tween, TODO: now name only unique in single window, not global unique
+ * @param name name of tween
  */
 void reset_tween(std::string_view name) noexcept;
 
@@ -218,7 +218,7 @@ auto text(std::string_view text, glm::vec2 pos, float size, Color inner_color, C
  *                  if you want to close the window, stop call the begin and end of this window
  * @param cfg window config
  */
-void begin(std::string_view name, int x, int y, uint32_t width, uint32_t height, bool* is_closed, WindowConfig const& cfg = {}) noexcept;
+void begin(std::string_view name, int x, int y, uint32_t width, uint32_t height, bool* is_closed = {}, WindowConfig const& cfg = {}) noexcept;
 
 // end a window
 void end() noexcept;

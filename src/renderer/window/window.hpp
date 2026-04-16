@@ -94,7 +94,7 @@ public:
   auto is_moving_or_resizing() const noexcept { return _moving || _resizing; }
   auto is_move_from_maximize() const noexcept { return _move_from_maximize; }
   void move_with_pos(int x, int y) noexcept;
-  void move_from_maximize() noexcept;
+  auto move_from_maximize() noexcept -> glm::vec<2, int>;
   void move_end() noexcept;
   void adjust_offset(ResizeType type, glm::vec<2, int> const& point, int& dx, int& dy) const noexcept;
   void resize(ResizeType type, int dx, int dy) noexcept;
@@ -148,30 +148,23 @@ public:
   void show_blur_window() const noexcept;
 
 private:
-  int                   _x{};
-  int                   _y{};
-  uint32_t              _width{};
-  uint32_t              _height{};
-
-  HWND                  _handle{};
-  float                 _scale{ 1.f };
-
-  bool                  _fullscreen{};
-  bool                  _maximized{};
-  bool                  _moving{};
-  bool                  _move_from_maximize{};
-  bool                  _resizing{};
-
-  RECT                  _rect{};
-  RECT                  _backup_rect{};
-
-  std::string           _monitor{};
-
+  int                  _x{};
+  int                  _y{};
+  uint32_t             _width{};
+  uint32_t             _height{};
+  HWND                 _handle{};
+  float                _scale{ 1.f };
+  bool                 _fullscreen{};
+  bool                 _maximized{};
+  bool                 _moving{};
+  bool                 _move_from_maximize{};
+  bool                 _resizing{};
+  RECT                 _rect{};
+  RECT                 _backup_rect{};
+  std::string          _monitor{};
   std::vector<RECT>    _move_invalid_areas;
-
   HWND                 _blur_window{};
   Compositor::Resource _blur_res{};
-
   ui::WindowConfig     _cfg{};
 };
 

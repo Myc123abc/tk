@@ -38,6 +38,8 @@ public:
   void destroy_image(ui::ImageHandle handle) noexcept;
   void upload_image(ui::ImageHandle handle, uint32_t width, uint32_t height, Bitmap const& bitmap, bool use_mipmap = false) noexcept;
 
+  void clear_blur_resize_data() noexcept { _blur_host_window = {}; _blur_window_rect = {}; }
+
 private:
   void preprocess_render()  noexcept;
   void upload_images() noexcept;

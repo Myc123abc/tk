@@ -4,7 +4,7 @@ using namespace tk;
 
 using Vec2 = glm::vec2;
 
-auto point_on_circle(Vec2 center, float radius, float theta) noexcept -> Vec2
+auto point_in_circle(Vec2 center, float radius, float theta) noexcept -> Vec2
 {
   auto a = glm::radians(theta);
   return { center.x + radius * std::cos(a), center.y + radius * std::sin(a) };
@@ -102,6 +102,39 @@ private:
   bool                   _paused{ true };
 };
 
+struct FrameRate
+{
+  float    deltas[60]{};
+  uint32_t idx{};
+  float    accum{};
+  uint32_t cnt{};
+  float    fps{};
+
+  void update() noexcept
+  {
+    // delta unit change to sec
+    auto delta = ui::delta_time() / 1000'000;
+
+    // calc accum
+    accum += delta - deltas[idx];
+
+    // store delta
+    deltas[idx] = delta;
+
+    // move to next
+    idx = (idx + 1) % _countof(deltas);
+
+    // get delta cnt
+    cnt = std::min(cnt + 1, static_cast<uint32_t>(_countof(deltas)));
+
+    // calc fps
+    fps = accum > 0.f ? 1.f / (accum / cnt) : std::numeric_limits<float>::max();
+  }
+
+  auto get() const noexcept { return fps; }
+
+} fps;
+
 int main()
 {
   tk::init();
@@ -136,6 +169,7 @@ int main()
 	cfg.display_window_shadow         = true;
   cfg.display_wireframe_only_active = true;
   cfg.wireframe_color               = 0x7160e8ff;
+  auto cfg2 = cfg;
   cfg.backdrop.default_acrylic();
 
   while (!wnd1_is_closed || !wnd2_is_closed)
@@ -166,7 +200,6 @@ int main()
 
     if (!wnd2_is_closed)
     {
-      auto cfg2 = cfg;
       ui::begin("wnd2", 0, 1080, 200, 200, &wnd2_is_closed, cfg2);
 
       auto wnd_ext = ui::window_drawable_extent();
@@ -222,7 +255,7 @@ int main()
 
       // circle point
       auto size = ui::window_drawable_extent();
-      ui::circle(point_on_circle({ size.x - 30, size.y - 30}, 20, circle_lerplocator.get() * 360), 3, 0xffffffff);
+      ui::circle(point_in_circle({ size.x - 30, size.y - 30}, 20, circle_lerplocator.get() * 360), 3, 0xffffffff);
       circle_lerplocator.update();
 
       auto text_pos = p2 + Vec2{ 0, 10 };
@@ -245,14 +278,12 @@ int main()
     // fps
     static auto acc_time = 0;
     acc_time += ui::delta_time();
-    static auto count = 0;
-    ++count;
     if (acc_time >= 1000'000)
     {
-      info("fps {}", count);
+      info("fps {}", fps.get());
       acc_time = 0;
-      count    = 0;
     }
+    fps.update();
   }
 
   tk::destroy();

@@ -268,7 +268,7 @@ void UIContext::postprocess_render() noexcept
   if (_btn_state.id)
   {
     auto pos = get_cursor_pos();
-    if (!point_on(get_cursor_pos(), _btn_state.left_top, _btn_state.right_bottom))
+    if (!point_in(get_cursor_pos(), _btn_state.left_top, _btn_state.right_bottom))
       _btn_state.move_out = true;
   }
 

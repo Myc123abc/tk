@@ -38,7 +38,7 @@ void Window::init(int x, int y, uint32_t width, uint32_t height, ui::Backdrop co
 
   // move window to primary monitor if it's not on any display monitors
   auto work_area = monitor.work_rect();
-  if (!point_on({ x, y }, work_area))
+  if (!point_in({ x, y }, work_area))
   {
     _x = work_area.left;
     _y = work_area.top;
@@ -142,16 +142,17 @@ auto Window::is_mouse_pass_through_area() const noexcept -> bool
 {
   auto rect = cursor_valid_area();
   auto pos  = get_cursor_pos();
-  return !PtInRect(&rect, { pos.x, pos.y });
+  return !point_in(pos, rect);
 }
 
 auto Window::contains_point(glm::vec<2, int> p) const noexcept -> bool
 {
-  return PtInRect(&_rect, { p.x, p.y });
+  return point_in(p, _rect);
 }
 
-void Window::move_from_maximize() noexcept
+auto Window::move_from_maximize() noexcept -> glm::vec<2, int>
 {
+  auto y       = 0;
   auto pos     = cursor_pos();
   auto ratio_x = static_cast<float>(pos.x) / _width;
 
@@ -164,7 +165,10 @@ void Window::move_from_maximize() noexcept
   
   auto limit = Window_Y_Pos_Moving_From_Maximize * _scale;
   if (pos.y < limit)
+  {
     _y -= limit;
+    y   = limit;
+  }
 
   update_rect();
   g_renderer.resize_window_resource(_handle, real_width(), real_height());
@@ -178,6 +182,8 @@ void Window::move_from_maximize() noexcept
   }
   else
     SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
+
+  return { cursor_pos().x, y };
 }
 
 void Window::move_with_pos(int x, int y) noexcept
@@ -338,7 +344,9 @@ void Window::resize_end() noexcept
   _resizing = false;
   g_ui_ctx.clear_fullscreen_window();
   g_renderer.resize_window_resource(_handle, real_width(), real_height());
+  g_renderer.clear_blur_resize_data();
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
+  keep_blur_window_behind_resize();
 }
 
 void Window::resize_by_scale(float scale, float ratio, glm::vec2 cursor_pos, glm::vec2 left_button_down_window_cusor_pos) noexcept
@@ -562,7 +570,6 @@ void Window::keep_blur_window_behind_resize() const noexcept
 void Window::resize_blur_window(RECT rect) const noexcept
 {
   SetWindowPos(_blur_window, _handle, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
-  keep_blur_window_behind();
 }
 
 void Window::remove_blur_window() noexcept

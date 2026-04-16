@@ -203,9 +203,8 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     left_button_down_window_cursor_pos = window.cursor_pos();
 
     // only moving in cursor valid areas
-    auto pt = POINT{ left_button_down_window_cursor_pos.x, left_button_down_window_cursor_pos.y };
     if (!window._move_from_maximize &&
-      std::ranges::any_of(window._move_invalid_areas, [pt](auto rect) { return PtInRect(&rect, pt); }))
+      std::ranges::any_of(window._move_invalid_areas, [](auto rect) { return point_in_with_bounding(left_button_down_window_cursor_pos, rect); }))
       break;
 
     left_button_down_resize_type = window.get_resize_type(left_button_down_window_cursor_pos);
@@ -252,16 +251,14 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
         {
           if (window.is_maximized())
           {
-            window.move_from_maximize();
-            left_button_down_window_cursor_pos = window.cursor_pos();
+            auto pos = window.move_from_maximize();
+            left_button_down_window_cursor_pos.x  = pos.x;
+            left_button_down_window_cursor_pos.y += pos.y;
           }
-          else
-          {
-            auto move_pos = pos - left_button_down_window_cursor_pos;
-            window.move_with_pos(move_pos.x, move_pos.y);
-            // resize window when moving window between different scale of monitors
-            wnd_mgr.update_monitor(handle, pos, left_button_down_window_cursor_pos);
-          }
+          auto move_pos = pos - left_button_down_window_cursor_pos;
+          window.move_with_pos(move_pos.x, move_pos.y);
+          // resize window when moving window between different scale of monitors
+          wnd_mgr.update_monitor(handle, pos, left_button_down_window_cursor_pos);
         }
       }
       // resizing

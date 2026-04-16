@@ -147,8 +147,7 @@ void Renderer::preprocess_render() noexcept
   {
     DwmFlush();
     g_wnd_mgr.resize_blur_window(_blur_host_window, _blur_window_rect);
-    _blur_host_window = {};
-    _blur_window_rect = {};
+    clear_blur_resize_data();
   }
 }
 
