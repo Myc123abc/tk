@@ -54,7 +54,6 @@ private:
 private:
   PoolType                                     _pool;
   std::unordered_map<std::string, ImageHandle> _loaded_images;
-  std::vector<std::string>                     _load_retry_images;
   std::unordered_set<ImageHandle>              _images;
   std::unordered_map<std::string, glm::vec2>   _image_extents;
 

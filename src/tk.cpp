@@ -19,6 +19,7 @@ void init() noexcept
 
 void destroy() noexcept
 {
+  update();
   g_thread_pool.destroy();
   g_ui_ctx.destroy();
   g_renderer.destroy();

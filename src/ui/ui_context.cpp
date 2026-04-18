@@ -445,7 +445,7 @@ void UIContext::remove_tween(size_t id) noexcept
 
 void UIContext::reset_tween(size_t id) noexcept
 {
-  err_if(!_tweens.contains(id), "remove an unexist color tween");
+  err_if(!_tweens.contains(id), "reset an unexist color tween");
   _tweens[id].reset();
 }
 

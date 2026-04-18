@@ -56,12 +56,6 @@ auto ImageManager::extent(std::string_view path) noexcept -> glm::vec2
 
 void ImageManager::update() noexcept
 {
-  // retry load images which failed because thread pool unidle
-  auto tmp_imgs = std::move(_load_retry_images);
-  _load_retry_images.clear();
-  for (auto const& path :tmp_imgs)
-    try_load(path);
-
   // check images whether loeaded
   for (auto it = _load_tasks.begin(); it != _load_tasks.end();)
   {
@@ -97,7 +91,7 @@ auto ImageManager::try_load(std::string_view path) noexcept -> bool
   // load image if not loaded
   if (!_loaded_images.contains(path.data()))
   {
-    auto task = g_thread_pool.try_submit([path = std::string(path)]
+    auto task = g_thread_pool.submit([path = std::string(path)]
     {
       int w, h; 
       auto file = File{ path };
@@ -105,10 +99,7 @@ auto ImageManager::try_load(std::string_view path) noexcept -> bool
       if (!data) data = nullptr;
       return LoadResult{ data, w, h };
     });
-    if (task)
-      _load_tasks.emplace(path, std::move(task));
-    else
-      _load_retry_images.emplace_back(path);
+    _load_tasks.emplace(path, std::move(task));
     return false;
   }
   return true;

@@ -3,7 +3,6 @@
 #include "../config.hpp"
 
 #include <thread>
-#include <semaphore>
 #include <vector>
 #include <queue>
 #include <functional>
@@ -22,17 +21,11 @@ struct Task
     return std::move(_impl->result);
   }
 
-  operator bool() const noexcept
-  {
-    return _impl->exist;
-  }
-
 private:
   struct Impl
   {
     T                result;
     std::atomic_bool complete;
-    bool             exist{ true };
   };
   std::shared_ptr<Impl> _impl;
 
@@ -60,7 +53,12 @@ public:
 
   void destroy() noexcept
   {
+    {
+      std::lock_guard lock(_mutex);
+      while (!_tasks.empty()) _tasks.pop();
+    }
     _exit.store(true, std::memory_order_release);
+    _cv.notify_all();
     _threads.clear();
   }
 
@@ -69,78 +67,66 @@ private:
   {
     Thread() noexcept
     {
-      _mutex  = std::make_unique<std::mutex>();
-      _sem    = std::make_unique<std::binary_semaphore>(0);
       _thread = std::thread(&Thread::main, this);
     }
+
     ~Thread() noexcept
     {
-      _sem->release();
-      _thread.join();
+      _thread.detach();
     }
 
     Thread(Thread&&) = default;
 
-    auto try_enqueue(std::function<void()> f) noexcept
-    {
-      if (_mutex->try_lock())
-      {
-        _tasks.emplace(f);
-        _sem->release();
-        _mutex->unlock();
-        return true;
-      }
-      return false;
-    }
-  
   private:
     void main() noexcept
     {
-      while (!instance()._exit.load(std::memory_order_acquire))
+      auto& pool = instance();
+      while (!pool._exit.load(std::memory_order_acquire))
       {
-        _sem->acquire();
+        auto task = std::function<void()>{};
 
-        while (true)
         {
-          auto task = std::function<void()>{};
+          std::unique_lock lock{ pool._mutex };
+          pool._cv.wait(lock, [&]{
+            return pool._exit.load(std::memory_order_acquire) ||
+                  !pool._tasks.empty();
+          });
 
-          {
-            std::lock_guard lock{ *_mutex };
-            if (_tasks.empty())
-              break;
+          if (pool._exit && pool._tasks.empty())
+            return;
 
-            task = std::move(_tasks.front());
-            _tasks.pop();
-          }
-
-          task();
+          task = std::move(pool._tasks.front());
+          pool._tasks.pop();
         }
+
+        task();
       }
     }
 
   private:
-    std::thread                            _thread;
-    std::queue<std::function<void()>>      _tasks;
-    std::unique_ptr<std::mutex>            _mutex;
-    std::unique_ptr<std::binary_semaphore> _sem;
+    std::thread _thread;
   };
 
 private:
-  auto try_enqueue(std::function<void()> f) noexcept
+  void enqueue(std::function<void()> f) noexcept
   {
-    return std::ranges::any_of(_threads, [&](auto& thread) { return thread.try_enqueue(f); });
+    {
+      std::lock_guard lock(_mutex);
+      _tasks.emplace(std::move(f));
+    }
+    _cv.notify_one();
   }
 
 public:
   template <typename Func>
-  auto try_submit(Func&& f) noexcept
+  auto submit(Func&& f) noexcept
   {
     using T = std::invoke_result_t<Func>;
  
     auto task = Task<T>{};
     task._impl = std::make_shared<typename Task<T>::Impl>();
 
-    task._impl->exist = try_enqueue([task, f = std::forward<Func>(f)] mutable
+    enqueue([task, f = std::forward<Func>(f)] mutable
     {
       if constexpr (std::is_void_v<T>)
         f();
@@ -153,8 +139,11 @@ public:
   }
 
 private:
-  std::atomic_bool          _exit;
-  std::vector<Thread>       _threads;
+  std::atomic_bool                  _exit;
+  std::vector<Thread>               _threads;
+  std::queue<std::function<void()>> _tasks;
+  std::mutex                        _mutex;
+  std::condition_variable           _cv;
 };
 
 inline static auto& g_thread_pool = ThreadPool::instance();

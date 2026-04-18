@@ -103,6 +103,9 @@ LRESULT CALLBACK WindowManager::blur_wnd_proc(HWND handle, UINT msg, WPARAM w_pa
 
   switch (msg)
   {
+  case WM_CLOSE:
+    return 0;
+    
   case WM_WINDOWPOSCHANGED:
   {
     // avoid window hide lead other blur windows z-order changed
