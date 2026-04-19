@@ -1,18 +1,13 @@
 #pragma once
 
 #include "frame_data.hpp"
-#include "../renderer/window/window_manager.hpp"
-#include "../renderer/config.hpp"
-#include "../util/message_queue.hpp"
-#include "config.hpp"
 #include "ui/ui.hpp"
-#include "ui/lerpolator.hpp"
+#include "ui/tween.hpp"
 #include "../util/singleton.hpp"
-#include "../util/double_buffer.hpp"
+#include "../renderer/window/window.hpp"
 
 #include <windows.h>
 
-#include <array>
 #include <unordered_map>
 #include <string>
 #include <optional>
@@ -23,57 +18,20 @@ namespace tk::ui {
 auto is_hover_on(glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool;
 auto is_caps_locked() noexcept -> bool;
 
-struct Window
+struct WindowContext
 {
-  renderer::WindowSnapshot snap;
+  WindowContext() = default;
+  WindowContext(HWND handle) noexcept : handle(handle) {}
 
-  auto extent() const noexcept { return glm::vec<2, uint32_t>{ snap.width + shadow_thickness() * 2, snap.height + shadow_thickness() * 2 }; }
-
-  auto rect() const noexcept { return RECT{ snap.x, snap.y, static_cast<LONG>(snap.x + snap.width), static_cast<LONG>(snap.y + snap.height) }; }
-
-  auto cursor_pos() const noexcept -> glm::vec<2, int>
-  {
-    auto pos = renderer::get_cursor_pos();
-    return { pos.x - snap.x, pos.y - snap.y };
-  }
-
-  auto real_cursor_pos() const noexcept -> glm::vec<2, int>
-  {
-    return cursor_pos() + glm::vec<2, int>{ renderer::Window_Shadow_Thickness };
-  }
-
-  auto shadow_thickness() const noexcept -> LONG { return renderer::Window_Shadow_Thickness * snap.scale; }
-  auto real_pos() const noexcept -> glm::vec2 { return { snap.x - shadow_thickness(), snap.y - shadow_thickness() }; }
-  auto pos()      const noexcept -> glm::vec2 { return { snap.x, snap.y }; }
-  auto real_rect()   const noexcept { return RECT{ snap.x                                  - shadow_thickness(),
-                                                   snap.y                                  - shadow_thickness(),
-                                                   static_cast<LONG>(snap.x + snap.width)  + shadow_thickness(),
-                                                   static_cast<LONG>(snap.y + snap.height) + shadow_thickness() }; }
-
-  auto is_moving_or_resizing() const noexcept { return snap.moving || snap.resizing; }
-  auto is_active() const noexcept { return GetForegroundWindow() == snap.handle; }
-
-  // ui window content
-  bool         is_called{};
-  bool         can_be_closed{};
-  bool         is_closed{};
-  WindowConfig cfg{};
-  glm::vec2    render_pos{};
-  bool         need_clear{};
-
-  uint32_t                                     frame_index{};
-  std::array<FrameData, renderer::Frame_Count> frame_datas;
-
-  auto frame_data() noexcept { return &frame_datas[frame_index];                     }
-  void next_frame() noexcept { frame_index = (frame_index + 1) % frame_datas.size(); }
-
-  DoubleBuffer<std::vector<RECT>> move_invalid_areas;
-  void add_move_invald_areas(RECT rect) noexcept { move_invalid_areas.data().emplace_back(rect); }
-
-  DoubleBuffer<WindowConfig> cfgs;
-
-  bool set_fullscreen{};
-  bool first_time_call{ true };
+  HWND      handle{};
+  bool      is_called{};
+  bool      can_be_closed{};
+  bool      is_closed{};
+  glm::vec2 render_pos{};
+  bool      need_clear{};
+  FrameData frame_data;
+  bool      set_fullscreen{};
+  bool      first_time_call{ true };
 };
 
 #define KEY_ENTRY_INIT(name, _) { Key::name, {} },
@@ -94,8 +52,6 @@ public:
   void check_union_draw() const noexcept;
   void check_union_not_draw() const noexcept;
 
-  auto frame_data() noexcept { return _window->frame_data(); }
-
   void render() noexcept;
 
   void begin_path() noexcept;
@@ -105,9 +61,8 @@ public:
 
   auto is_hover_on(size_t id, glm::vec2 left_top, glm::vec2 right_bottom) noexcept -> bool;
 
-  void set_render_pos(int x, int y) noexcept { _window->render_pos = { x + renderer::Window_Shadow_Thickness, y + renderer::Window_Shadow_Thickness }; }
-  auto get_render_pos() const noexcept { return _window->render_pos; }
-  auto get_scale() const noexcept { return _window->snap.scale; }
+  void set_render_pos(int x, int y) noexcept { _wnd_ctx->render_pos = { x + renderer::Window_Shadow_Thickness, y + renderer::Window_Shadow_Thickness }; }
+  auto get_render_pos() const noexcept { return _wnd_ctx->render_pos; }
 
   void render_on(int x, int y, std::move_only_function<void()>&& func) noexcept;
 
@@ -116,23 +71,26 @@ public:
 
   auto delta_time() const noexcept { return _delta_time; }
 
-  auto get_lerpolator(size_t id, double duration) noexcept -> Lerpolator*;
-  void remove_lerpolator(size_t id) noexcept;
-  void reset_lerpolator(size_t id) noexcept;
-  auto lerp_ping_pong(bool b, size_t id, double duration) noexcept -> double;
+  auto get_tween(size_t id, double duration, Tween::Ease ease = {}) noexcept -> Tween*;
+  void remove_tween(size_t id) noexcept;
+  void reset_tween(size_t id) noexcept;
+  auto ping_pong(bool b, size_t id, double duration, Tween::Ease ease = {}) noexcept -> double;
 
-private:
-  auto& get_window(HWND handle) noexcept { return _windows[_window_names[handle]]; }
-public:
-  auto& access_move_invalid_areas(HWND handle) noexcept { return get_window(handle).move_invalid_areas.access(); }
-  auto const& access_window_cfg(HWND handle) noexcept { return get_window(handle).cfgs.access(); }
-
-  void image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha) noexcept;
+  auto image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha) noexcept -> bool;
   auto text(std::string_view text, glm::vec2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> glm::vec2;
 
   void fullscreen_window() noexcept;
   void restore_fullscreen_window() noexcept;
-  auto is_use_title_bar_now() const noexcept { return _window->cfg.display_title_bar && !_window->snap.fullscreen_window; }
+
+  auto is_use_title_bar_now() const noexcept { return _wnd->cfg().display_title_bar && !_wnd->is_fullscreen(); }
+
+  auto get_window_context(HWND handle) noexcept { assert(_wnd_names.contains(handle)); return &_wnd_ctxs[_wnd_names[handle]]; }
+  void clear_fullscreen_window() noexcept { _fullscreen_window_need_clear = true; }
+  void close_window(HWND handle) noexcept { get_window_context(handle)->is_closed = true; }
+  void clear_state() noexcept;
+
+  auto window() const noexcept { return _wnd; }
+  auto frame_data() noexcept { return &_wnd_ctx->frame_data; }
 
 private:
   void update_window_config(WindowConfig const& cfg) noexcept;
@@ -142,28 +100,31 @@ private:
 
   void add_title_bar() noexcept;
   void fullscreen_process() noexcept;
-  void window_shadow_wireframe_process(Window& wnd, RECT scissor_rect) noexcept;
+  void window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer::Window const& wnd, RECT scissor_rect) noexcept;
 
-public:
-  Window*                                 _window{};
 private:
-  Window                                  _fullscreen_window{};
-  std::unordered_map<std::string, Window> _windows;
-  std::unordered_map<HWND, std::string>   _window_names;
-  bool                                    _call_begin{};
-  bool                                    _path_begin{};
-  bool                                    _union_begin{};
-  double                                  _delta_time{};
+  std::unordered_map<std::string, WindowContext> _wnd_ctxs;
+  std::unordered_map<HWND, std::string>          _wnd_names;
+
+  renderer::Window* _wnd{};
+  WindowContext*    _wnd_ctx{};
+  HWND              _fullscreen_window{};
+  bool              _fullscreen_window_need_clear{};
+
+  bool   _call_begin{};
+  bool   _path_begin{};
+  bool   _union_begin{};
+  double _delta_time{};
 
 public:
   //
   // widget ids
   //
-  std::unordered_set<size_t>             _hovered_widget_ids;
-  size_t                                 _last_hovered_widget_id{};
-  size_t                                 _prev_hovered_widget_id{};
-  std::unordered_map<size_t, Lerpolator> _lerpolators;
-  std::unordered_set<size_t>             _ids;
+  std::unordered_set<size_t>        _hovered_widget_ids;
+  size_t                            _last_hovered_widget_id{};
+  size_t                            _prev_hovered_widget_id{};
+  std::unordered_map<size_t, Tween> _tweens;
+  std::unordered_set<size_t>        _ids;
 
   //
   // mouse state
@@ -212,177 +173,6 @@ private:
 
 public:
   auto get_key(Key key) noexcept -> KeyState;
-
-////////////////////////////////////////////////////////////////////////////////
-///                              Message Process
-////////////////////////////////////////////////////////////////////////////////
-
-public:
-  struct Message_Window_Close
-  {
-    HWND handle{};
-  };
-  
-  struct Message_Cursor_On_Window
-  {
-    HWND handle{};
-  };
-
-  struct Message_Window_Update
-  {
-    HWND     handle{};
-    int      x{};
-    int      y{};
-    uint32_t width{};
-    uint32_t height{};
-  };
-
-  struct Message_Update_Moving
-  {
-    HWND handle{};
-    bool moving{};
-    int  x{};
-    int  y{};
-  };
-
-  struct Message_Update_Resizing
-  {
-    HWND     handle{};
-    int      x{};
-    int      y{};
-    uint32_t width{};
-    uint32_t height{};
-  };
-
-  struct Message_Resize_End
-  {
-    HWND handle{};
-  };
-
-  struct Message_Window_Maximize
-  {
-    HWND     handle{};
-    int      x{};
-    int      y{};
-    uint32_t width{};
-    uint32_t height{};
-  };
-
-  struct Message_Window_Restore
-  {
-    HWND     handle{};
-    int      x{};
-    int      y{};
-    uint32_t width{};
-    uint32_t height{};
-  };
-
-  struct Message_Window_Moving_From_Maximize
-  {
-    HWND     handle{};
-    int      x{};
-    int      y{};
-    uint32_t width{};
-    uint32_t height{};
-  };
-
-  struct Message_Window_Moving_From_Maximize_End
-  {
-    HWND handle{};
-    int  x{};
-    int  y{};
-  };
-
-  struct Message_Interruption {};
-  struct Message_Update_Fullscreen_Window
-  {
-    uint32_t width{};
-    uint32_t height{};
-  };
-
-  struct Message_Scale_Change
-  {
-    HWND     handle{};
-    float    scale{};
-    int      x{};
-    int      y{};
-    uint32_t width{};
-    uint32_t height{};
-  };
-
-  struct Message_Window_Fullscreen
-  {
-    HWND     handle{};
-    int      x{};
-    int      y{};
-    uint32_t width{};
-    uint32_t height{};
-  };
-
-  struct Message_Window_Restore_Fullscreen
-  {
-    HWND     handle{};
-    int      x{};
-    int      y{};
-    uint32_t width{};
-    uint32_t height{};
-  };
-
-  struct Message_Window_Cancel_Fullscreen_Maximize
-  {
-    HWND     handle{};
-    int      x{};
-    int      y{};
-    uint32_t width{};
-    uint32_t height{};
-  };
-
-  using Message = std::variant<
-    Message_Window_Close,
-    Message_Cursor_On_Window,
-    Message_Window_Update,
-    Message_Update_Moving,
-    Message_Update_Resizing,
-    Message_Resize_End,
-    Message_Window_Maximize,
-    Message_Window_Restore,
-    Message_Window_Moving_From_Maximize,
-    Message_Window_Moving_From_Maximize_End,
-    Message_Interruption,
-    Message_Update_Fullscreen_Window,
-    Message_Scale_Change,
-    Message_Window_Fullscreen,
-    Message_Window_Restore_Fullscreen,
-    Message_Window_Cancel_Fullscreen_Maximize
-  >;
-
-  void send_message(Message&& msg) noexcept
-  {
-    _msg_queue.send(std::move(msg));
-  }
-
-private:
-  struct MessageHandler
-  {
-    UIContext& ctx;
-    void operator()(Message_Window_Close const& msg) const noexcept;
-    void operator()(Message_Cursor_On_Window const& msg) const noexcept;
-    void operator()(Message_Window_Update const& msg) const noexcept;
-    void operator()(Message_Update_Moving const& msg) const noexcept;
-    void operator()(Message_Update_Resizing const& msg) const noexcept;
-    void operator()(Message_Resize_End const& msg) const noexcept;
-    void operator()(Message_Window_Maximize const& msg) const noexcept;
-    void operator()(Message_Window_Restore const& msg) const noexcept;
-    void operator()(Message_Window_Moving_From_Maximize const& msg) const noexcept;
-    void operator()(Message_Window_Moving_From_Maximize_End const& msg) const noexcept;
-    void operator()(Message_Interruption const& msg) const noexcept;
-    void operator()(Message_Update_Fullscreen_Window const& msg) const noexcept;
-    void operator()(Message_Scale_Change const& msg) const noexcept;
-    void operator()(Message_Window_Fullscreen const& msg) const noexcept;
-    void operator()(Message_Window_Restore_Fullscreen const& msg) const noexcept;
-    void operator()(Message_Window_Cancel_Fullscreen_Maximize const& msg) const noexcept;
-  };
-  MessageQueue<Message, UI_Message_Queue_Capacity> _msg_queue;
 )
 
 }

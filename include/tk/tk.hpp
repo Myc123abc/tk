@@ -2,7 +2,7 @@
 
 #include "util/log.hpp"
 #include "ui/ui.hpp"
-#include "ui/lerpolator.hpp"
+#include "ui/tween.hpp"
 #include "util/log.hpp"
 
 namespace tk {
@@ -12,5 +12,8 @@ void init() noexcept;
 
 // destroy the tk library
 void destroy() noexcept;
+
+// process window message and renderer rendering
+void update() noexcept;
 
 }

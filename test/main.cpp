@@ -4,7 +4,7 @@ using namespace tk;
 
 using Vec2 = glm::vec2;
 
-auto point_on_circle(Vec2 center, float radius, float theta) noexcept -> Vec2
+auto point_in_circle(Vec2 center, float radius, float theta) noexcept -> Vec2
 {
   auto a = glm::radians(theta);
   return { center.x + radius * std::cos(a), center.y + radius * std::sin(a) };
@@ -27,7 +27,7 @@ public:
     if (hovered) color = hovered_color;
 
     if (clicked) _paused = !_paused;
-    auto v = ui::lerp_ping_pong(_lerp_name, !_paused, 100'000);
+    auto v = ui::ping_pong(_lerp_name, !_paused, 100'000);
 
     _lerp_pts = std::vector<LerpPoint>
     {
@@ -83,7 +83,7 @@ public:
   void reset() noexcept
   {
     _paused = true;
-    ui::reset_lerpolator(_lerp_name);
+    ui::reset_tween(_lerp_name);
   }
 
   auto is_paused() const noexcept { return _paused; }
@@ -102,9 +102,47 @@ private:
   bool                   _paused{ true };
 };
 
+struct FrameRate
+{
+  float    deltas[60]{};
+  uint32_t idx{};
+  float    accum{};
+  uint32_t cnt{};
+  float    fps{};
+
+  void update() noexcept
+  {
+    // delta unit change to sec
+    auto delta = ui::delta_time() / 1000'000;
+
+    // calc accum
+    accum += delta - deltas[idx];
+
+    // store delta
+    deltas[idx] = delta;
+
+    // move to next
+    idx = (idx + 1) % _countof(deltas);
+
+    // get delta cnt
+    cnt = std::min(cnt + 1, static_cast<uint32_t>(_countof(deltas)));
+
+    // calc fps
+    fps = accum > 0.f ? 1.f / (accum / cnt) : std::numeric_limits<float>::max();
+  }
+
+  auto get() const noexcept { return fps; }
+
+} fps;
+
 int main()
 {
   tk::init();
+
+  auto img1 = "assets/image/test.jpg";
+  auto img2 = "assets/image/test.png";
+  ui::load_image(img1);
+  ui::load_image(img2);
 
   ui::load_font("assets/font/NotoSansJP-Regular.ttf");
   ui::load_font("assets/font/NotoSansSC-Regular.ttf");
@@ -112,23 +150,26 @@ int main()
   auto playback_btn = PlaybackButton{};
   playback_btn.init("playback button");
 
-  auto progress_lerpolator = ui::Lerpolator{};
-  progress_lerpolator.init(1'000'000);
+  auto progress_tween = ui::Tween{};
+  progress_tween.init(1'000'000);
 
   auto loop_trigger = ui::LoopTrigger{};
   loop_trigger.init(1'000'000, true);
 
-  auto circle_lerplocator = ui::Lerpolator{};
-  circle_lerplocator.init(250'000, ui::Lerpolator::Mode::loop);
+  auto circle_lerplocator = ui::Tween{};
+  circle_lerplocator.init(250'000, ui::Tween::Mode::loop);
 
   auto wnd1_is_closed = false;
   auto wnd2_is_closed = true;
 
+  auto is_loaded = false;
+
   auto cfg = ui::WindowConfig{};
-  cfg.display_title_bar             = false;
-	cfg.display_window_shadow         = false;
+  cfg.display_title_bar             = true;
+	cfg.display_window_shadow         = true;
   cfg.display_wireframe_only_active = true;
   cfg.wireframe_color               = 0x7160e8ff;
+  auto cfg2 = cfg;
   cfg.backdrop.default_acrylic();
 
   while (!wnd1_is_closed || !wnd2_is_closed)
@@ -146,7 +187,7 @@ int main()
       auto extent = ui::window_drawable_extent();
       auto pos = glm::vec2{ extent.x / 2 - 50, extent.y - 50 };
       auto size = ui::window_drawable_extent();
-      // ui::triangle({ size.x / 2, size.y * .1f }, size * .9f, { size.y * .1f, size.y * .9 }, 0xffffffff, 10);
+      ui::triangle({ size.x / 2, size.y * .1f }, size * .9f, { size.y * .1f, size.y * .9 }, 0xffffffff, 10);
 
       if (ui::button("btn1", 0, 0, 100, 100, 0xffffffff, 0xffffffff))
         circle_lerplocator.reverse();
@@ -159,7 +200,6 @@ int main()
 
     if (!wnd2_is_closed)
     {
-      auto cfg2 = cfg;
       ui::begin("wnd2", 0, 1080, 200, 200, &wnd2_is_closed, cfg2);
 
       auto wnd_ext = ui::window_drawable_extent();
@@ -172,12 +212,12 @@ int main()
       auto p1 = p0 + Vec2{ 12.5 * 1.414, 12.5 };
       auto p2 = p0 + Vec2{ 0, 25 };
       if (playback_btn(p0, p1, p2, 0xffffffff, 0xdcdcdcff, 1))
-        if (progress_lerpolator.is_not_started()) progress_lerpolator.start();
+        if (progress_tween.is_not_started()) progress_tween.start();
 
-      if (!playback_btn.is_paused()) progress_lerpolator.update();
-      if (progress_lerpolator.is_finished())
+      if (!playback_btn.is_paused()) progress_tween.update();
+      if (progress_tween.is_finished())
       {
-        progress_lerpolator.reset();
+        progress_tween.reset();
         playback_btn.pause();
       }
       if (ui::get_key(ui::Key::Space))
@@ -185,8 +225,8 @@ int main()
         if (playback_btn.is_paused())
         {
           playback_btn.play();
-          if (progress_lerpolator.is_not_started())
-            progress_lerpolator.start();
+          if (progress_tween.is_not_started())
+            progress_tween.start();
         }
         else
          playback_btn.pause();
@@ -194,25 +234,28 @@ int main()
 
       // progress bar
       auto p = p1 + Vec2{ 5, 0 };
-      auto progress = progress_lerpolator.get() * 100;
+      auto progress = progress_tween.get() * 100;
       ui::rectangle(p, p + Vec2{ 100,      3 }, 0x808080ff);
       ui::rectangle(p, p + Vec2{ progress, 3 }, 0x0000ffff);
 
       // image
       if (loop_trigger)
       {
-        auto img_ext = ui::image_extent("assets/image/test.png");
+        auto img_ext = ui::image_extent(img2);
         auto ext = wnd_ext - p2;
         auto scale = std::max(img_ext.x / ext.x, img_ext.y / ext.y);
         img_ext /= scale;
-        ui::image("assets/image/test.png", p2, p2 + img_ext);
+        if (is_loaded = ui::image(img2, p2, p2 + img_ext); !is_loaded)
+          info("loading {}", img2);
       }
-      loop_trigger.update();
-      ui::image("assets/image/test.jpg", {}, wnd_ext, 0x44);
+      if (is_loaded) loop_trigger.update();
+
+      if (!ui::image(img1, {}, wnd_ext, 0x44))
+        info("loading {}", img1);
 
       // circle point
       auto size = ui::window_drawable_extent();
-      ui::circle(point_on_circle({ size.x - 30, size.y - 30}, 20, circle_lerplocator.get() * 360), 3, 0xffffffff);
+      ui::circle(point_in_circle({ size.x - 30, size.y - 30}, 20, circle_lerplocator.get() * 360), 3, 0xffffffff);
       circle_lerplocator.update();
 
       auto text_pos = p2 + Vec2{ 0, 10 };
@@ -230,7 +273,17 @@ int main()
       ui::end();
     }
 
-    ui::render();
+    tk::update();
+
+    // fps
+    static auto acc_time = 0;
+    acc_time += ui::delta_time();
+    if (acc_time >= 1000'000)
+    {
+      info("fps {}", fps.get());
+      acc_time = 0;
+    }
+    fps.update();
   }
 
   tk::destroy();

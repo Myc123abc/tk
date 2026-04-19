@@ -1,6 +1,7 @@
 #pragma once
 
-#include "util/flag.hpp"
+#include "../util/flag.hpp"
+#include "tween.hpp"
 
 #include <windows.h>
 
@@ -55,9 +56,6 @@ auto lerp(Color x, Color y, float v) noexcept -> glm::vec4;
  * @return lerp value
  */
 auto lerp(glm::vec2 x, glm::vec2 y, float v) noexcept -> glm::vec2;
-
-// render windows
-void render() noexcept;
 
 struct WindowConfig
 {
@@ -124,19 +122,14 @@ using Backdrop      = WindowConfig::BlurBackdrop;
 using BackdropStyle = WindowConfig::BlurBackdrop::Style;
 
 /**
- * get frame delta time
- * @return delta time(us)
- */
-auto delta_time() noexcept -> double;
-
-/**
  * get a lerp value in ping pong
  * @param name unique global name
  * @param b drive boolean value
  * @param duration duration (us)
+ * @param ease ease funcation for tween
  * @return lerp value (0.0 ~ 1.0)
  */
-auto lerp_ping_pong(std::string_view name, bool b, double duration) noexcept -> double;
+auto ping_pong(std::string_view name, bool b, double duration, Tween::Ease ease = Tween::linear) noexcept -> double;
 
 /**
  * get cursor position
@@ -145,10 +138,10 @@ auto lerp_ping_pong(std::string_view name, bool b, double duration) noexcept -> 
 auto get_cursor_pos() noexcept -> glm::vec2;
 
 /**
- * reset lerpolator
- * @param name name of lerpolator, TODO: now name only unique in single window, not global unique
+ * reset tween
+ * @param name name of tween
  */
-void reset_lerpolator(std::string_view name) noexcept;
+void reset_tween(std::string_view name) noexcept;
 
 /**
  * get extent of image
@@ -163,8 +156,15 @@ auto image_extent(std::string_view path) noexcept -> glm::vec2;
  * @param left_top
  * @param right_bottom
  * @param alpha
+ * @return false if image is unexist, or loading, or load failed
  */
-void image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha = 0xff) noexcept;
+auto image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha = 0xff) noexcept -> bool;
+
+/**
+ * load image
+ * @param path
+ */
+void load_image(std::string_view path) noexcept;
 
 /**
  * load font
@@ -218,7 +218,7 @@ auto text(std::string_view text, glm::vec2 pos, float size, Color inner_color, C
  *                  if you want to close the window, stop call the begin and end of this window
  * @param cfg window config
  */
-void begin(std::string_view name, int x, int y, uint32_t width, uint32_t height, bool* is_closed, WindowConfig const& cfg = {}) noexcept;
+void begin(std::string_view name, int x, int y, uint32_t width, uint32_t height, bool* is_closed = {}, WindowConfig const& cfg = {}) noexcept;
 
 // end a window
 void end() noexcept;

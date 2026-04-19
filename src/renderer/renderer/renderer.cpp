@@ -19,41 +19,24 @@ namespace tk::renderer {
 
 void Renderer::init() noexcept
 {
-  _thread = std::jthread([this]
-  {
-    g_core.init();
-    g_pipe_sys.init();
-    g_desc_heap_mgr.init();
-    g_graphics_engine.init();
-    g_comp_engine.init();
-    g_copy_engine.init(); 
+  g_core.init();
+  g_pipe_sys.init();
+  g_desc_heap_mgr.init();
+  g_graphics_engine.init();
+  g_comp_engine.init();
+  g_copy_engine.init(); 
+}
 
-    while (!_exit.load(std::memory_order_relaxed))
-    {
-      message_process();
-      if (!_render_infos.empty())
-      {
-        render();
-        _frame_sem.release();
-      }
-      else
-        _cmds_empty.acquire();
-    }
-  });
+void Renderer::render() noexcept
+{
+  message_process();
+  process_render();
 }
 
 void Renderer::destroy() noexcept
 {
-  // exit render loop
-  _exit.store(true, std::memory_order_relaxed);
-  _frame_sem.release();
-  _cmds_empty.release();
-  _thread.join();
-
   // pop all message
-  while (!_frame_render_complete_funcs.empty() ||
-         !_msg_queue.empty()                   ||
-         !_ui_ctx_msg_queue.empty())
+  while (!_frame_render_complete_funcs.empty())
     message_process();
 
   // destroy render resources
@@ -61,6 +44,73 @@ void Renderer::destroy() noexcept
   g_comp_engine.destroy();
   g_copy_engine.destroy();
   for (auto& res : _res | std::views::values) res.destroy();
+}
+
+void Renderer::create_window_resource(HWND handle, uint32_t width, uint32_t height) noexcept
+{
+  err_if(_res.contains(handle), "failed to create window render resource, it's already exist");
+  auto res = RenderResource{};
+  res.init(handle, width, height);
+  _res.emplace(handle, std::move(res));
+}
+
+void Renderer::destroy_window_resource(HWND handle, HWND blur_handle) noexcept
+{
+  err_if(!_res.contains(handle), "failed to destroy window render resource, it's unexist");
+  add_frame_render_complete_func([handle = handle, blur_handle = blur_handle, res = std::move(_res[handle])] mutable
+  {
+    res.destroy();
+    g_wnd_mgr.destroy_window(handle, blur_handle);
+  });
+  _res.erase(handle);
+  _destroied_windows.emplace(handle);
+}
+
+void Renderer::resize_window_resource(HWND handle, uint32_t width, uint32_t height) noexcept
+{
+  err_if(!_res.contains(handle), "failed to destroy window render resource, it's unexist");
+  _res[handle].resize(width, height);
+}
+
+void Renderer::create_image(ui::ImageHandle handle, uint32_t width, uint32_t height, ImageFormat format) noexcept
+{
+  auto image = Image{};
+  image.init(width, height, format, ImageType::srv);
+
+  assert(!_images.contains(handle));
+  _images.emplace(handle, std::move(image));
+}
+
+void Renderer::destroy_image(ui::ImageHandle handle) noexcept
+{
+  if (_upload_images.contains(handle))
+  {
+    assert(_bitmaps.contains(handle));
+
+    // not upload yet, remove upload image
+    _upload_images.erase(handle);
+    _bitmaps.erase(handle);
+  }
+  else if (_images.contains(handle))
+  {
+    // already uploaded, release image resource
+    add_frame_render_complete_func([image = std::move(_images[handle])] mutable { image.destroy(); });
+    _images.erase(handle);
+  }
+}
+
+void Renderer::upload_image(ui::ImageHandle handle, uint32_t width, uint32_t height, Bitmap const& bitmap, bool use_mipmap) noexcept
+{
+  // create image resource
+  auto image = Image{};
+  image.init(bitmap.width, bitmap.height, ImageFormat::rgba8_unorm, ImageType::srv, use_mipmap);
+
+  // store image and bitmap for upload
+  _upload_images[handle] = std::move(image);
+  _bitmaps[handle]       = bitmap;
+
+  if (use_mipmap)
+    _pending_mipmap_image_handles.emplace_back(handle);
 }
 
 void Renderer::add_frame_render_complete_func(std::move_only_function<void()>&& func) noexcept
@@ -86,9 +136,6 @@ void Renderer::message_process() noexcept
 {
   for (auto it = _frame_render_complete_funcs.begin(); it != _frame_render_complete_funcs.end();)
     (*it)() ? it = _frame_render_complete_funcs.erase(it) : ++it;
-
-  _msg_queue.process(MessageHandler{ g_renderer });
-  _ui_ctx_msg_queue.process(UIContextMessageHandler{ g_renderer });
 }
 
 void Renderer::preprocess_render() noexcept
@@ -100,8 +147,7 @@ void Renderer::preprocess_render() noexcept
   {
     DwmFlush();
     g_wnd_mgr.resize_blur_window(_blur_host_window, _blur_window_rect);
-    _blur_host_window = {};
-    _blur_window_rect = {};
+    clear_blur_resize_data();
   }
 }
 
@@ -141,17 +187,14 @@ void Renderer::upload_images() noexcept
   }
 }
 
-void Renderer::render() noexcept
-{
+void Renderer::process_render() noexcept
+{  
   preprocess_render();
 
   generate_mipmap();
 
-  for (auto _ : std::views::iota(0u, _render_infos.size()))
+  for (auto [handle, data, blur_host_window, blur_window_rect] : _render_infos)
   {
-    // pop command list
-    auto [handle, data, blur_host_window, blur_window_rect] = *_render_infos.front(); _render_infos.pop();
-
     // continue if the window is destoried
     if (_destroied_windows.contains(handle)) continue;
     _render_windows.emplace_back(handle);
@@ -169,6 +212,7 @@ void Renderer::render() noexcept
       _blur_window_rect = blur_window_rect;
     }
   }
+  _render_infos.clear();
 
   // present windows
   if (_render_windows.size() == 1)
@@ -186,16 +230,18 @@ void Renderer::render() noexcept
   {
     DwmFlush();
     for (auto wnd : _show_blur_wnds | std::views::keys)
-      g_wnd_mgr.show_blur_window(wnd);
+      g_wnd_mgr.get_window(wnd)->show_blur_window();
     _show_blur_wnds.clear();
   }
 
   postprocess_render();
 }
 
-void Renderer::render(RenderResource& res, ui::FrameData* frame_data) const noexcept
+void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noexcept
 {
   if (!frame_data) return;
+
+  assert(frame_data->check());
 
   auto  cmd   = g_graphics_engine.cmd();
   auto& frame = res.current_frame();
@@ -206,23 +252,60 @@ void Renderer::render(RenderResource& res, ui::FrameData* frame_data) const noex
 
   for (auto const& data : frame_data->draw_datas())
   {
-    // TODO: only shape now
-    auto pipe = g_pipe_sys.pipe(PipelineType::shape);
+    if (data.type == ui::DrawDataType::shape)
+    {
+      auto pipe = g_pipe_sys.pipe(PipelineType::shape);
+      g_ctx.set_pipe(pipe->pipe_state.Get());
+      g_ctx.set_graphics_root_signature(pipe->root_signature);
+      g_ctx.set_primitive_topology(pipe->primive_topology);
+      g_ctx.set_graphics_constants(pipe->root_param_idx("constants"), Constants
+      {
+        .render_target_extent = frame.image.extent(),
+        .window_pos           = frame_data->window_pos(),
+      });
+      g_ctx.set_scissor_rect(data.scissor_rect);
+      g_ctx.draw(data.index_beg, data.indices_size);
+    }
+    else if (data.type == ui::DrawDataType::image)
+    {
+      auto pipe = g_pipe_sys.pipe(PipelineType::image);
+      g_ctx.set_pipe(pipe->pipe_state.Get());
+      g_ctx.set_graphics_root_signature(pipe->root_signature);
+      g_ctx.set_primitive_topology(pipe->primive_topology);
+      g_ctx.set_graphics_constants(pipe->root_param_idx("constants"), Constants
+      {
+        .render_target_extent = frame.image.extent(),
+        .window_pos           = frame_data->window_pos(),
+        .image_alpha          = data.image_alpha,
+      });
+      g_ctx.set_graphics_descriptor(pipe->root_param_idx("image"), _images[data.image_handle].srv().gpu_handle());
+      g_ctx.set_scissor_rect(data.scissor_rect);
+      g_ctx.draw(data.index_beg, data.indices_size);
+    }
+  }
+
+  auto const& window_shadow_info = frame_data->window_shadow_info();
+  if (window_shadow_info)
+  {
+    auto pipe = g_pipe_sys.pipe(PipelineType::window_shadow);
     g_ctx.set_pipe(pipe->pipe_state.Get());
     g_ctx.set_graphics_root_signature(pipe->root_signature);
     g_ctx.set_primitive_topology(pipe->primive_topology);
     g_ctx.set_graphics_constants(pipe->root_param_idx("constants"), Constants
     {
       .render_target_extent = frame.image.extent(),
+      .window_extent        = window_shadow_info->window_extent,
       .window_pos           = frame_data->window_pos(),
+      .shadow_thickness     = window_shadow_info->shadow_thickness,
+      .shadow_radius        = window_shadow_info->radius,
+      .shadow_color         = window_shadow_info->color,
+      .shadow_softness      = window_shadow_info->softness,
+      .wireframe_color      = window_shadow_info->wireframe_color ? window_shadow_info->wireframe_color.value() : glm::vec4{},
+      .draw_wireframe       = window_shadow_info->wireframe_color.has_value(),
     });
-    g_ctx.set_scissor_rect(data.scissor_rect);
-    g_ctx.draw(data.index_beg, data.indices_size);
+    g_ctx.set_scissor_rect(window_shadow_info->scissor_rect);
+    g_ctx.draw(2);
   }
-
-  // TODO: window shadow info
-
-  frame_data->notify();
 }
 
 void Renderer::postprocess_render() noexcept

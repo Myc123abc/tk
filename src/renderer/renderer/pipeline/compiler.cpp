@@ -218,7 +218,9 @@ auto generate_root_signature(std::vector<DescriptorInfo> const& desc_infos, bool
 }
 
 
-auto Compiler::compile(std::string_view shader_path, std::string_view include, std::wstring_view profile, std::string_view entry_point) noexcept -> std::pair<Microsoft::WRL::ComPtr<IDxcResult>, Microsoft::WRL::ComPtr<IDxcBlob>>
+auto Compiler::compile(std::string_view shader_path, std::vector<std::string_view> const& includes,
+  std::wstring_view profile, std::string_view entry_point) noexcept
+-> std::pair<Microsoft::WRL::ComPtr<IDxcResult>, Microsoft::WRL::ComPtr<IDxcBlob>>
 {
   auto buffer = DxcBuffer{};
   auto data   = read_file(shader_path);
@@ -226,9 +228,6 @@ auto Compiler::compile(std::string_view shader_path, std::string_view include, s
   buffer.Size     = data.size();
   buffer.Encoding = DXC_CP_UTF8;
 
-  auto include_str = std::wstring{};
-  if (!include.empty())
-    include_str = std::wstring(L"-I") + to_wstring(include);
   auto args = std::vector<LPCWSTR>
   {
 #ifndef NDEBUG
@@ -236,8 +235,19 @@ auto Compiler::compile(std::string_view shader_path, std::string_view include, s
     L"-Qembed_debug",
     L"-Od",
 #endif
-    include_str.c_str()
   };
+
+  auto include_strs = std::vector<std::wstring>{};
+  if (!includes.empty())
+  {
+    include_strs.reserve(includes.size());
+    args.reserve(args.size() + includes.size());
+    for (auto include : includes)
+    {
+      include_strs.emplace_back(std::wstring(L"-I") + to_wstring(include));
+      args.emplace_back(include_strs.back().c_str());
+    }
+  }
 
   auto dxc_args = ComPtr<IDxcCompilerArgs>{};
   err_if(_utils->BuildArguments(nullptr, to_wstring(entry_point).data(), profile.data(), args.data(), args.size(), nullptr, 0, dxc_args.GetAddressOf()),
@@ -266,13 +276,13 @@ auto Compiler::compile(
   std::string_view                       shader,
   std::string_view                       vertex_shader_entry_point,
   std::string_view                       pixel_shader_entry_point,
-  std::string_view                       include,
+  std::vector<std::string_view> const&   includes,
   std::optional<RootSignatureResult>     res,
   std::unordered_set<std::string> const& volatile_descs) noexcept -> CompileResult
 {
   // compile shaders
-  auto [vs_res, vs_cso] = compile(shader, include, L"vs_6_0", vertex_shader_entry_point);
-  auto [ps_res, ps_cso] = compile(shader, include, L"ps_6_0", pixel_shader_entry_point);
+  auto [vs_res, vs_cso] = compile(shader, includes, L"vs_6_0", vertex_shader_entry_point);
+  auto [ps_res, ps_cso] = compile(shader, includes, L"ps_6_0", pixel_shader_entry_point);
 
   // get reflection
   auto compile_result = CompileResult{};
@@ -305,11 +315,11 @@ auto Compiler::compile(
 auto Compiler::compile(
   std::string_view                       shader,
   std::string_view                       compute_shader_entry_point,
-  std::string_view                       include,
+  std::vector<std::string_view> const&   includes,
   std::optional<RootSignatureResult>     res,
   std::unordered_set<std::string> const& volatile_descs) noexcept -> CompileResult
 {
-  auto [comp_res, cso] = compile(shader, include, L"cs_6_0", compute_shader_entry_point);
+  auto [comp_res, cso] = compile(shader, includes, L"cs_6_0", compute_shader_entry_point);
 
   auto compile_result = CompileResult{};
   compile_result._cs_cso = cso;

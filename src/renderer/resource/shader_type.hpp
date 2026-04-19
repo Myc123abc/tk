@@ -8,6 +8,7 @@ struct alignas(8) Vertex
 {
   glm::vec2 pos{};
   glm::vec4 color{};
+  glm::vec2 uv{};
 };
 
 struct alignas(16) Constants

@@ -10,9 +10,6 @@
 [submodule "vendor/stb"]
 	path = vendor/stb
 	url = https://github.com/nothings/stb.git
-[submodule "vendor/SPSCQueue"]
-	path = vendor/SPSCQueue
-	url = https://github.com/rigtorp/SPSCQueue.git
 [submodule "vendor/freetype"]
 	path = vendor/freetype
 	url = https://gitlab.freedesktop.org/freetype/freetype.git

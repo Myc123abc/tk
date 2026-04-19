@@ -15,13 +15,11 @@ void PipelineSystem::init() noexcept
   auto res = generate_root_signature(
   {
     { constants,   "constants", 0, 0, false, sizeof(Constants) },
-    // { byte_buffer, "buffer",    0, 0                           },
-    // { texture,     "image",     0, 1                           },
-    // { textures,    "images",    0, 2                           }
+    { texture,     "image",     0, 0                           },
   }, true, true);
-  _pipes.emplace(PipelineType::shape, Pipeline{ "assets/shader/shape.hlsl", "vs", "ps", {}, RenderResource::Render_Target_Format, true, false, res });
-  // _pipes.emplace(PipelineType::image, Pipeline{ "assets/shader/image.hlsl", "vs", "ps", "assets/shader", RenderResource::Render_Target_Format, true, false, res });
-  // _pipes.emplace(PipelineType::window_shadow, Pipeline{ "assets/shader/window_shadow.hlsl", "vs", "ps", "assets/shader", RenderResource::Render_Target_Format, true, false, res });
+  _pipes.emplace(PipelineType::shape, Pipeline{ "assets/shader/ui/shape.hlsl", "vs", "ps", { "assets/shader/ui" }, RenderResource::Render_Target_Format, true, false, res });
+  _pipes.emplace(PipelineType::image, Pipeline{ "assets/shader/ui/image.hlsl", "vs", "ps", { "assets/shader/ui" }, RenderResource::Render_Target_Format, true, false, res });
+  _pipes.emplace(PipelineType::window_shadow, Pipeline{ "assets/shader/ui/window_shadow.hlsl", "vs", "ps", { "assets/shader/ui" }, RenderResource::Render_Target_Format, true, false, res });
 
   // res = generate_root_signature(
   // {
@@ -32,117 +30,6 @@ void PipelineSystem::init() noexcept
   // _pipes.emplace(PipelineType::blur_horizontal_pass, Pipeline{ "assets/shader/blur.hlsl", "horizontal_pass", {}, res, {} });
   // _pipes.emplace(PipelineType::blur_vertical_pass,   Pipeline{ "assets/shader/blur.hlsl", "vertical_pass",   {}, res, {} });
 }
-
-#if 0
-void PipelineSystem::render(RenderResource& res, RenderData& data) noexcept
-{
-  auto  cmd   = g_graphics_engine.cmd();
-  auto& frame = res.current_frame();
-
-  _ctx.set_cmd(cmd);
-
-  // upload data to buffer
-  frame.buffer.clear().upload(cmd, data);
-
-  // pop first scissor rect
-  auto scissor_rect = data.pop_scissor_rect();
-
-  // render data
-  for (auto const& draw_data : data.draw_datas)
-  {
-    if (draw_data.pipe_type == PipelineType::sdf)
-    {
-      auto& pipe = _pipes[PipelineType::sdf];
-
-      _ctx.set_pipe(pipe.pipe_state.Get());
-      _ctx.set_graphics_root_signature(pipe.root_signature);
-      _ctx.set_primitive_topology(pipe.primive_topology);
-      _ctx.set_graphics_descriptor(pipe.root_param_idx("buffer"), frame.buffer.shape_properties_gpu_handle());
-      _ctx.set_graphics_constants(pipe.root_param_idx("constants"), Constants
-      {
-        .render_target_extent = frame.image.extent(),
-        .window_pos           = data.resizing_window_pos
-      });
-
-      // draw data can be split by different scissor rect
-      _ctx.set_scissor_rect(scissor_rect.rect);
-
-      auto indices_start      = draw_data.indices_start;
-      auto indices_size       = draw_data.indices_size;
-      auto total_indices_size = draw_data.indices_start + draw_data.indices_size;
-label_draw_call_again:
-      if (total_indices_size < scissor_rect.next_indices_idx)
-      {
-        _ctx.draw(indices_start, indices_size);
-        continue;
-      }
-      if (total_indices_size == scissor_rect.next_indices_idx)
-      {
-        _ctx.draw(indices_start, indices_size);
-        if (!data.window_shadow_info && !data.is_scissor_rect_empty())
-          scissor_rect = data.pop_scissor_rect();
-        continue;
-      }
-      else
-      {
-        indices_size = scissor_rect.next_indices_idx - indices_start;
-        _ctx.draw(indices_start, indices_size);
-        indices_start = scissor_rect.next_indices_idx;
-        scissor_rect  = data.pop_scissor_rect();
-        indices_size  = scissor_rect.next_indices_idx - indices_start;
-        _ctx.set_scissor_rect(scissor_rect.rect);
-        goto label_draw_call_again;
-      }
-    }
-    else if (draw_data.pipe_type == PipelineType::image)
-    {
-      auto& pipe = _pipes[PipelineType::image];
-
-      _ctx.set_pipe(pipe.pipe_state.Get());
-      _ctx.set_graphics_root_signature(pipe.root_signature);
-      _ctx.set_primitive_topology(pipe.primive_topology);
-      draw_data.image->set_state(cmd, ImageState::pixel);
-      _ctx.set_graphics_descriptor(pipe.root_param_idx("image"), draw_data.image->srv().gpu_handle());
-      _ctx.set_graphics_constants(pipe.root_param_idx("constants"), Constants
-      {
-        .render_target_extent = frame.image.extent(),
-        .window_pos           = data.resizing_window_pos,
-        .image_alpha          = draw_data.image_alpha,
-      });
-      _ctx.set_scissor_rect(scissor_rect.rect);
-      _ctx.draw(draw_data.indices_start, draw_data.indices_size);
-      continue;
-    }
-    std::unreachable();
-  }
-
-  if (data.window_shadow_info)
-  {
-    auto pipe = g_pipe_sys.pipe(PipelineType::window_shadow);
-    _ctx.set_pipe(pipe->pipe_state.Get());
-    _ctx.set_graphics_root_signature(pipe->root_signature);
-    _ctx.set_primitive_topology(pipe->primive_topology);
-    _ctx.set_graphics_constants(pipe->root_param_idx("constants"), Constants
-    {
-      .render_target_extent = frame.image.extent(),
-      .window_extent        = data.window_shadow_info->window_extent,
-      .window_pos           = data.resizing_window_pos,
-      .shadow_thickness     = data.window_shadow_info->shadow_thickness,
-      .shadow_radius        = data.window_shadow_info->radius,
-      .shadow_color         = data.window_shadow_info->color,
-      .shadow_softness      = data.window_shadow_info->softness,
-      .wireframe_color      = data.window_shadow_info->wireframe_color.has_value()
-                              ? data.window_shadow_info->wireframe_color.value()
-                              : glm::vec4{},
-      .draw_wireframe       = data.window_shadow_info->wireframe_color.has_value(),
-    });
-    if (!data.is_scissor_rect_empty())
-      scissor_rect = data.pop_scissor_rect();
-    _ctx.set_scissor_rect(scissor_rect.rect);
-    _ctx.draw(2);
-  }
-}
-#endif
 
 auto PipelineSystem::find_root_param(std::span<CD3DX12_ROOT_PARAMETER1> params) const noexcept -> ID3D12RootSignature*
 {
@@ -165,7 +52,7 @@ void PipelineSystem::Pipeline::init_graphics(
     std::string_view                       shader,
     std::string_view                       vs,
     std::string_view                       ps,
-    std::string_view                       include,
+    std::vector<std::string_view> const&   includes,
     ImageFormat                            rtv_format,
     bool                                   use_blend,
     bool                                   use_depth_test,
@@ -173,7 +60,7 @@ void PipelineSystem::Pipeline::init_graphics(
     std::unordered_set<std::string> const& volatile_descs
   ) noexcept
 {
-  auto compile_result = g_compiler.compile(shader, vs, ps, include, res, volatile_descs);
+  auto compile_result = g_compiler.compile(shader, vs, ps, includes, res, volatile_descs);
   
   if (auto res = g_pipe_sys.find_root_param(compile_result.root_params))
     root_signature = res;
@@ -227,9 +114,10 @@ void PipelineSystem::Pipeline::init_graphics(
           "failed to create pipeline state");
 }
 
-void PipelineSystem::Pipeline::init_compute(std::string_view shader, std::string_view cs, std::string_view include, std::optional<RootSignatureResult> res, std::unordered_set<std::string> const& volatile_descs) noexcept
+void PipelineSystem::Pipeline::init_compute(std::string_view shader, std::string_view cs, std::vector<std::string_view> const& includes,
+  std::optional<RootSignatureResult> res, std::unordered_set<std::string> const& volatile_descs) noexcept
 {
-  auto compile_result = g_compiler.compile(shader, cs, include, res, volatile_descs);
+  auto compile_result = g_compiler.compile(shader, cs, includes, res, volatile_descs);
   if (auto res = g_pipe_sys.find_root_param(compile_result.root_params))
     root_signature = res;
   else

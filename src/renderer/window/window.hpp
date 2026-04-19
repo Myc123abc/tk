@@ -59,12 +59,24 @@ public:
                                                    _rect.top    - shadow_thickness(),
                                                    _rect.right  + shadow_thickness(),
                                                    _rect.bottom + shadow_thickness() }; }
+  auto rect() const noexcept { return _rect; }
+  
+  auto content_rect() const noexcept { return RECT{ shadow_thickness(),
+                                                    shadow_thickness(),
+                                                    static_cast<LONG>(_width  + shadow_thickness()),
+                                                    static_cast<LONG>(_height + shadow_thickness()) }; }
+  auto shadow_rect() const noexcept { return RECT{ 0, 0,
+    static_cast<LONG>(_width + shadow_thickness() * 2), static_cast<LONG>(_height + shadow_thickness()) * 2 }; }
 
   auto contains_point(glm::vec<2, int> p) const noexcept -> bool;
 
   auto handle() const noexcept { return _handle; }
   auto pos() const noexcept { return glm::vec<2, int>{ _x, _y }; }
+  auto real_pos() const noexcept { return glm::vec2 { _x - shadow_thickness(), _y - shadow_thickness() }; }
   auto cursor_pos() const noexcept -> glm::vec<2, int>;
+  auto real_cursor_pos() const noexcept -> glm::vec<2, int>;
+
+  auto real_extent() const noexcept { return glm::vec<2, uint32_t>{ _width + shadow_thickness() * 2, _height + shadow_thickness() * 2 }; }
 
   auto is_active() const noexcept { return GetForegroundWindow() == _handle; }
   auto is_mouse_pass_through_area() const noexcept -> bool;
@@ -80,8 +92,9 @@ public:
   auto is_moving() const noexcept { return _moving; }
   auto is_resizing() const noexcept { return _resizing; }
   auto is_moving_or_resizing() const noexcept { return _moving || _resizing; }
+  auto is_move_from_maximize() const noexcept { return _move_from_maximize; }
   void move_with_pos(int x, int y) noexcept;
-  void move_from_maximize() noexcept;
+  auto move_from_maximize() noexcept -> glm::vec<2, int>;
   void move_end() noexcept;
   void adjust_offset(ResizeType type, glm::vec<2, int> const& point, int& dx, int& dy) const noexcept;
   void resize(ResizeType type, int dx, int dy) noexcept;
@@ -105,6 +118,12 @@ public:
   auto monitor() const noexcept { return _monitor; }
   auto set_monitor(std::string monitor) noexcept { _monitor = monitor; }
 
+  void add_move_invalid_area(RECT rect) noexcept { _move_invalid_areas.emplace_back(rect); }
+  void clear_move_invalid_areas() noexcept { _move_invalid_areas.clear(); }
+
+  auto& cfg() noexcept { return _cfg; }
+  auto& cfg() const noexcept { return _cfg; }
+
 private:
   void update_by_rect() noexcept;
   void update_rect() noexcept;
@@ -118,38 +137,35 @@ private:
   auto min_width() const noexcept { return Window_Min_Width * _scale; }
   auto min_height() const noexcept { return Window_Min_Height * _scale; }
 
-private:
-  int         _x{};
-  int         _y{};
-  uint32_t    _width{};
-  uint32_t    _height{};
-
-  HWND        _handle{};
-  float       _scale{ 1.f };
-
-  bool        _fullscreen{};
-  bool        _maximized{};
-  bool        _moving{};
-  bool        _move_from_maximize{};
-  bool        _resizing{};
-
-  RECT        _rect{};
-  RECT        _backup_rect{};
-
-  std::string _monitor{};
-
-private:
-  HWND                 _blur_window{};
-  Compositor::Resource _blur_res{};
-private:
   void init_blur_window(ui::Backdrop const& backdrop) noexcept;
   void update_blur_window(ui::Backdrop const& backdrop) noexcept;
-  void show_blur_window() const noexcept;
   void keep_blur_window_behind() const noexcept;
   void keep_blur_window_behind_move() const noexcept;
   void keep_blur_window_behind_resize() const noexcept;
   void resize_blur_window(RECT rect) const noexcept;
   void remove_blur_window() noexcept;
+public:
+  void show_blur_window() const noexcept;
+
+private:
+  int                  _x{};
+  int                  _y{};
+  uint32_t             _width{};
+  uint32_t             _height{};
+  HWND                 _handle{};
+  float                _scale{ 1.f };
+  bool                 _fullscreen{};
+  bool                 _maximized{};
+  bool                 _moving{};
+  bool                 _move_from_maximize{};
+  bool                 _resizing{};
+  RECT                 _rect{};
+  RECT                 _backup_rect{};
+  std::string          _monitor{};
+  std::vector<RECT>    _move_invalid_areas;
+  HWND                 _blur_window{};
+  Compositor::Resource _blur_res{};
+  ui::WindowConfig     _cfg{};
 };
 
 }

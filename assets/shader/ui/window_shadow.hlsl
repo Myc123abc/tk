@@ -1,5 +1,5 @@
-#include "root_signature.h"
-#include "sdf.h"
+#include "common.hlsl"
+#include "sdf.hlsl"
 
 float4 vs(uint id : SV_VertexID) : SV_Position
 {

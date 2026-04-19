@@ -21,7 +21,7 @@ auto is_caps_locked() noexcept -> bool
 
 void UIContext::init() noexcept
 {
-  _fullscreen_window.snap = g_wnd_mgr.create_fullscreen_window();
+  _fullscreen_window = g_wnd_mgr.create_fullscreen_window();
   g_text_engine.init();
 }
 
@@ -39,21 +39,23 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
   _call_begin = true;
 
   // create window if not have
-  if (!_windows.contains(name.data()))
+  if (!_wnd_ctxs.contains(name.data()))
   {
-    _windows.emplace(name.data(), g_wnd_mgr.create_window(x, y, width, height, cfg.backdrop));
-    _window = &_windows[name.data()];
-    _window_names.emplace(_window->snap.handle, name.data());
-    _window->can_be_closed = is_closed;
+    auto handle = g_wnd_mgr.create_window(x, y, width, height, cfg.backdrop);
+    _wnd_ctxs.emplace(name.data(), handle);
+    _wnd_names.emplace(handle, name);
+    _wnd_ctx = &_wnd_ctxs[name.data()];
+    _wnd_ctx->can_be_closed = is_closed;
   }
-
-  _window = &_windows[name.data()];
-  _window->is_called = true;
+  else 
+    _wnd_ctx = &_wnd_ctxs[name.data()];
+  _wnd = g_wnd_mgr.get_window(_wnd_ctx->handle);
+  _wnd_ctx->is_called = true;
 
   update_window_config(cfg);
 
   if (is_closed)
-    *is_closed = _window->is_closed;
+    *is_closed = _wnd_ctx->is_closed;
 
   // fullscreen process
   fullscreen_process();  
@@ -63,53 +65,45 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
   else
     set_render_pos(0, 0);
 
-  _window->move_invalid_areas.data().clear();
-  _window->frame_data()->wait_and_clear();
-
-  if (_window->snap.fullscreen_window)
-    g_ui_ctx._window->add_move_invald_areas(
-    {
-      0,
-      0,
-      static_cast<LONG>(_window->snap.width),
-      static_cast<LONG>(_window->snap.height)
-    });
-  
-  _window->cfgs.data() = cfg;
+  _wnd->clear_move_invalid_areas();
+  _wnd_ctx->frame_data.clear();
+  if (_wnd->is_fullscreen())
+    _wnd->add_move_invalid_area({ 0, 0, static_cast<LONG>(_wnd->width()), static_cast<LONG>(_wnd->height()) });
 }
 
 void UIContext::update_window_config(WindowConfig const& cfg) noexcept
 {
+  auto& wnd_cfg = _wnd->cfg();
   if (cfg.backdrop.style != ui::BackdropStyle::none)
   {
-    if (_window->first_time_call) goto label_end;
-    if (_window->cfg.backdrop.style == ui::BackdropStyle::none)
-      g_wnd_mgr.init_blur_window(_window->snap.handle, cfg.backdrop);
+    if (_wnd_ctx->first_time_call) goto label_end;
+    if (wnd_cfg.backdrop.style == ui::BackdropStyle::none)
+      g_wnd_mgr.init_blur_window(_wnd_ctx->handle, cfg.backdrop);
     else
-      g_wnd_mgr.update_blur_window(_window->snap.handle, cfg.backdrop);
+      g_wnd_mgr.update_blur_window(_wnd_ctx->handle, cfg.backdrop);
   }
   else
   {
-    if (_window->cfg.backdrop.style != ui::BackdropStyle::none)
-      g_wnd_mgr.remove_blur_window(_window->snap.handle);
+    if (wnd_cfg.backdrop.style != ui::BackdropStyle::none)
+      g_wnd_mgr.remove_blur_window(_wnd_ctx->handle);
   }
 label_end:
-  _window->cfg = cfg;
+  wnd_cfg = cfg;
 }
 
 void UIContext::fullscreen_process() noexcept
 {
-  if (_window->set_fullscreen)
+  if (_wnd_ctx->set_fullscreen)
   {
     // fullscreen window
-    if (!_window->snap.fullscreen_window)
-      g_wnd_mgr.fullscreen_window(_window->snap.handle);
+    if (!_wnd->is_fullscreen())
+      _wnd->fullscreen();
   }
   else
   {
     // restore window
-    if (_window->snap.fullscreen_window)
-      g_wnd_mgr.restore_fullscreen_window(_window->snap.handle);
+    if (_wnd->is_fullscreen())
+      _wnd->restore_fullscreen();
   }
 }
 
@@ -119,9 +113,7 @@ void UIContext::end() noexcept
   if (is_use_title_bar_now())
     add_title_bar();
   _call_begin = false;
-  _window->move_invalid_areas.swap();
-  _window->cfgs.swap();
-  if (_window->first_time_call) _window->first_time_call = false;
+  if (_wnd_ctx->first_time_call) _wnd_ctx->first_time_call = false;
 }
 
 void UIContext::check_draw() const noexcept
@@ -151,19 +143,19 @@ void UIContext::check_union_not_draw() const noexcept
 
 void UIContext::close_window() noexcept
 {
-  std::erase_if(_windows, [this](auto& pair)
+  std::erase_if(_wnd_ctxs, [this](auto& pair)
   {
-    auto& window = pair.second;
-    if (window.is_called)
+    auto& ctx = pair.second;
+    if (ctx.is_called)
     {
-      window.is_called = false;
+      ctx.is_called = false;
       return false;
     }
     else
     {
-      for (auto& frame_data : window.frame_datas) frame_data.wait_and_clear();
-      g_wnd_mgr.close_window(window.snap.handle);
-      _window_names.erase(window.snap.handle);
+      _wnd_names.erase(ctx.handle);
+      g_wnd_mgr.close_window(ctx.handle);
+      cursor_on_window = {};
       return true;
     }
   });
@@ -171,14 +163,14 @@ void UIContext::close_window() noexcept
 
 void UIContext::fullscreen_window() noexcept
 {
-  if (_window->set_fullscreen || _window->is_moving_or_resizing()) return;
-  _window->set_fullscreen = true;
+  if (_wnd_ctx->set_fullscreen || _wnd->is_moving_or_resizing()) return;
+  _wnd_ctx->set_fullscreen = true;
 }
 
 void UIContext::restore_fullscreen_window() noexcept
 {
-  if (!_window->set_fullscreen) return;
-  _window->set_fullscreen = false;
+  if (!_wnd_ctx->set_fullscreen) return;
+  _wnd_ctx->set_fullscreen = false;
 }
 
 void UIContext::preprocess_render() noexcept
@@ -190,80 +182,60 @@ void UIContext::render() noexcept
 {
   preprocess_render();
 
-  // acquire frame, for synchronous with present vsync
-  g_renderer.acquire_frame();
-
-  // wakeup if renderer is sleeping, which is mean no commands submit
-  auto need_wakeup = g_renderer.is_sleeping();
-
   // process window render datas
-  auto render = [](Window& wnd, FrameData* data, HWND blur_host_window = {}, RECT blur_window_rect = {}) noexcept
+  for (auto& wnd_ctx : _wnd_ctxs | std::views::values)
   {
-    g_renderer.submit({ wnd.snap.handle, data, blur_host_window, blur_window_rect});
-    if (data) wnd.next_frame();
-  };
-  for (auto& wnd : _windows | std::views::values)
-  {
-    auto data = wnd.frame_data();
+    auto        handle = wnd_ctx.handle;
+    auto        data   = &wnd_ctx.frame_data;
+    auto const& wnd    = *g_wnd_mgr.get_window(handle);
 
-    if (!wnd.snap.resizing)
+    if (!wnd.is_resizing())
     {
-      auto thickness = wnd.shadow_thickness();
-      data->add_scissor_rect({ thickness, thickness,
-        static_cast<LONG>(thickness + wnd.snap.width),
-        static_cast<LONG>(thickness + wnd.snap.height)});
-      if (!wnd.snap.fullscreen_window && !wnd.snap.maximized)
-        window_shadow_wireframe_process(wnd, { 0, 0,
-          static_cast<LONG>(thickness * 2 + wnd.snap.width),
-          static_cast<LONG>(thickness * 2 + wnd.snap.height)});
-      render(wnd, data);
+      data->add_scissor_rect(wnd.content_rect());
+      if (!wnd.is_fullscreen() && !wnd.is_maximized())
+        window_shadow_wireframe_process(wnd_ctx, wnd, wnd.shadow_rect());
+      g_renderer.submit({ handle, data });
     }
     else
     { 
-      if (wnd.need_clear)
+      if (wnd_ctx.need_clear)
       {
-        wnd.need_clear = false;
-        render(wnd, {});
+        wnd_ctx.need_clear = false;
+        g_renderer.submit({ handle });
       }
       data->add_scissor_rect(wnd.rect());
-      window_shadow_wireframe_process(wnd, wnd.real_rect());
+      window_shadow_wireframe_process(wnd_ctx, wnd, wnd.real_rect());
       data->set_window_pos(wnd.real_pos());
-      if (wnd.cfg.backdrop.style != ui::BackdropStyle::none)
-        render(_fullscreen_window, data, wnd.snap.handle, wnd.rect());
+      if (wnd.cfg().backdrop.style != ui::BackdropStyle::none)
+        g_renderer.submit({ _fullscreen_window, data, handle, wnd.rect() });
       else
-        render(_fullscreen_window, data);
+        g_renderer.submit({ _fullscreen_window, data });
     }
   }
-  if (_fullscreen_window.need_clear)
+  if (_fullscreen_window_need_clear)
   {
-    _fullscreen_window.need_clear = false;
-    render(_fullscreen_window, {});
+    _fullscreen_window_need_clear = false;
+    g_renderer.submit({ _fullscreen_window });
   }
 
-  // wakeup renderer if prev frame no render data
-  if (need_wakeup && !_windows.empty())
-    g_renderer.wakeup();
-
-  // process message queue
-  _msg_queue.process(MessageHandler{ g_ui_ctx });
-
   postprocess_render();
+}
+
+void UIContext::clear_state() noexcept
+{
+  mouse_down_window     = {};
+  mouse_up_window       = {};
+  mouse_down_pos        = {};
+  mouse_up_pos          = {};
+  is_move_from_maximize = {};
+  _btn_state            = {};
 }
 
 void UIContext::postprocess_render() noexcept
 {
   // clear state
   _ids.clear();
-  if (mouse_up_window || _interrupte)
-  {
-    mouse_down_window     = {};
-    mouse_up_window       = {};
-    mouse_down_pos        = {};
-    mouse_up_pos          = {};
-    is_move_from_maximize = {};
-    _btn_state            = {};
-    _interrupte           = {};
-  }
+  if (mouse_up_window) clear_state();
 
   // update cursor hovered widget id
   if (!_hovered_widget_ids.empty())
@@ -274,28 +246,29 @@ void UIContext::postprocess_render() noexcept
 
   // update mouse state
   auto mouse_left_button_state = get_key(Key::Mouse_Left_Button);
-  if (auto it = std::ranges::find_if(_windows, [](auto const& pair) { return pair.second.is_active(); }); it != _windows.end())
+  auto wnds                    = g_wnd_mgr.windows_view();
+  if (cursor_on_window)
   {
-    auto& window = it->second;
+    auto wnd = g_wnd_mgr.get_window(cursor_on_window);
     if (mouse_left_button_state == KeyState::down)
     {
-      mouse_down_window = window.snap.handle;
-      mouse_down_pos    = window.cursor_pos();
+      mouse_down_window = wnd->handle();
+      mouse_down_pos    = wnd->cursor_pos();
       if (!is_move_from_maximize)
-        is_move_from_maximize = window.snap.move_from_maximize;
+        is_move_from_maximize = wnd->is_move_from_maximize();
     }
     else if (mouse_left_button_state == KeyState::up)
     {
-      mouse_up_window = window.snap.handle;
-      mouse_up_pos    = window.cursor_pos();
+      mouse_up_window = wnd->handle();
+      mouse_up_pos    = wnd->cursor_pos();
     }
-  }
+  };
 
   // update button state
   if (_btn_state.id)
   {
     auto pos = get_cursor_pos();
-    if (!point_on(get_cursor_pos(), _btn_state.left_top, _btn_state.right_bottom))
+    if (!point_in(get_cursor_pos(), _btn_state.left_top, _btn_state.right_bottom))
       _btn_state.move_out = true;
   }
 
@@ -306,51 +279,39 @@ void UIContext::postprocess_render() noexcept
   auto now = std::chrono::steady_clock::now();
   _delta_time = static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(now - tp).count());
   tp          = now;
-
-  // fps
-  static auto acc_time = 0;
-  acc_time += _delta_time;
-  static auto count = 0;
-  ++count;
-  if (acc_time >= 1000'000)
-  {
-    info("fps {}", count);
-    acc_time = 0;
-    count    = 0;
-  }
 }
 
-void UIContext::window_shadow_wireframe_process(Window& wnd, RECT scissor_rect) noexcept
+void UIContext::window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer::Window const& wnd, RECT scissor_rect) noexcept
 {
-  if (!wnd.cfg.display_window_shadow && !wnd.cfg.wireframe_color)
+  auto const& cfg = wnd.cfg();
+  if (!cfg.display_window_shadow && !cfg.wireframe_color)
     return;
 
-  auto data = wnd.frame_data();
+  auto data = &wnd_ctx.frame_data;
   auto col  = glm::vec4{};
 
   auto get_wireframe_color = [&] -> std::optional<glm::vec4>
   {
-    if (wnd.cfg.wireframe_color)
+    if (cfg.wireframe_color)
     {
-      auto old_window = _window;
-      _window = &wnd;
+      auto tmp_wnd_ctx = _wnd_ctx;
+      _wnd_ctx = &wnd_ctx;
 
-      auto color = wnd.cfg.wireframe_color.value();
-      if (wnd.cfg.display_wireframe_only_active)
+      auto color = cfg.wireframe_color.value();
+      if (cfg.display_wireframe_only_active)
       {
-        auto ratio = lerp_ping_pong(wnd.is_active(), generic_id("tk::ui::render::draw_wire_frame"), Window_Active_Response_Time);
-        color.a = wnd.cfg.wireframe_color.value().a * ratio;
+        auto ratio = ping_pong(wnd.is_active(), generic_id("tk::ui::render::draw_wire_frame"), Window_Active_Response_Time);
+        color.a = cfg.wireframe_color.value().a * ratio;
       }
 
-      _window = old_window;
+      _wnd_ctx = tmp_wnd_ctx;
 
       return color;
     }
     return {};
   };
 
-  data->set_window_shadow(wnd.extent(), wnd.shadow_thickness(), {}, wnd.cfg.display_window_shadow ? 5 : 0, 15, get_wireframe_color());
-  data->add_scissor_rect(scissor_rect);
+  data->set_window_shadow(scissor_rect, wnd.real_extent(), wnd.shadow_thickness(), {}, cfg.display_window_shadow ? 5 : 0, 15, get_wireframe_color());
 }
 
 void UIContext::add_mouse_left_button_state(size_t id, glm::vec2 left_top, glm::vec2 right_bottom) noexcept
@@ -358,7 +319,7 @@ void UIContext::add_mouse_left_button_state(size_t id, glm::vec2 left_top, glm::
   check_draw();
   if (!_btn_state.id)
   {
-    auto pos = _window->pos();
+    auto pos = _wnd->pos();
     left_top     += pos;
     right_bottom += pos;
     _btn_state = { id, left_top, right_bottom };
@@ -397,8 +358,8 @@ void UIContext::add_title_bar() noexcept
   auto icon_width  = Title_Bar_Button_Icon_Width;
   auto icon_height = Title_Bar_Button_Icon_Height;
 
-  auto is_active        = _window->is_active();
-  auto value            = lerp_ping_pong(is_active, generic_id("tk::ui::update_title_bar_background_color"), Window_Active_Response_Time);
+  auto is_active        = _wnd->is_active();
+  auto value            = ping_pong(is_active, generic_id("tk::ui::update_title_bar_background_color"), Window_Active_Response_Time);
   auto background_color = lerp(0xffffffff, 0xeeeeeeff, value);
 
   auto btn_mouse_down_color       = 0xb0b0b0ff;
@@ -406,9 +367,9 @@ void UIContext::add_title_bar() noexcept
   auto close_btn_mouse_down_color = 0xea6a75ff;
   auto close_btn_hovered_color    = is_active ? 0xe81123ff : 0xe81123ff;
 
-  auto scale = get_scale();
-  auto w     = _window->snap.width  / scale;
-  auto h     = _window->snap.height / scale;
+  auto scale = _wnd->scale();
+  auto w     = _wnd->width()  / scale;
+  auto h     = _wnd->height() / scale;
 
   set_render_pos(0, 0);
 
@@ -417,19 +378,19 @@ void UIContext::add_title_bar() noexcept
   ui::rectangle({}, { w, btn_height }, background_color);
   ui::add_move_invalid_area({ 0, btn_height }, { w, h });
 
-  auto handle = _window->snap.handle;
+  auto handle = _wnd->handle();
 
   // minimize button
   if (button("tk::ui::title_bar_minimize_button", w - btn_width * 3, 0, btn_width, btn_height, background_color, btn_hovered_color, btn_mouse_down_color,
     [] (uint32_t width, uint32_t height) { ui::line({ 0, height / 2 }, { width, height / 2 }, 1); },
     icon_width, icon_height, 0x395063ff, 0x395063ff))
-    g_wnd_mgr.minimize_window(handle);
+    _wnd->minimize();
 
   // maximize / restore button
   if (button("tk::ui::title_bar_maximize_restore_button", w - btn_width * 2, 0, btn_width, btn_height, background_color, btn_hovered_color, btn_mouse_down_color,
     [&] (uint32_t width, uint32_t height)
     {
-      if (_window->snap.maximized)
+      if (_wnd->is_maximized())
       {
         auto padding_x = width / 5;
         auto padding_y = width / 5;
@@ -440,8 +401,8 @@ void UIContext::add_title_bar() noexcept
       else
         ui::rectangle({}, { width, height }, 0, 1);
     },
-    icon_width, icon_height, 0x395063ff, 0x395063ff) && !_window->cfg.no_resize)
-      _window->snap.maximized ? g_wnd_mgr.restore_window(handle) : g_wnd_mgr.maximize_window(handle);
+    icon_width, icon_height, 0x395063ff, 0x395063ff) && !_wnd->cfg().no_resize)
+      _wnd->is_maximized() ? _wnd->restore() : _wnd->maximize();
 
   // close button
   if (button("tk::ui::title_bar_close_button", w - btn_width, 0, btn_width, btn_height, background_color, close_btn_hovered_color, close_btn_mouse_down_color,
@@ -450,7 +411,7 @@ void UIContext::add_title_bar() noexcept
       ui::line({}, { width, height }, 1);
       ui::line({ width, 0 }, { 0, height }, 1);
     }, icon_width, icon_height, 0x395063ff, 0xffffffff))
-    _window->is_closed = true;
+    _wnd_ctx->is_closed = true;
 
   ui::add_move_invalid_area({ w - btn_width * 3, 0 }, { w, btn_height });
   draw_title_bar = false;
@@ -458,7 +419,7 @@ void UIContext::add_title_bar() noexcept
 
 auto UIContext::get_id(std::string_view name) const noexcept -> size_t
 {
-  return generic_hash(_window->snap.handle, name);
+  return generic_hash(_wnd_ctx->handle, name);
 }
 
 auto UIContext::generic_id(std::string_view name) noexcept -> size_t
@@ -469,55 +430,55 @@ auto UIContext::generic_id(std::string_view name) noexcept -> size_t
   return id;
 }
 
-auto UIContext::get_lerpolator(size_t id, double duration) noexcept -> Lerpolator*
+auto UIContext::get_tween(size_t id, double duration, Tween::Ease ease) noexcept -> Tween*
 {
-  if (!_lerpolators.contains(id))
-    _lerpolators[id].init(duration);
-  return &_lerpolators[id];
+  if (!_tweens.contains(id))
+    _tweens[id].init(duration, {}, ease);
+  return &_tweens[id];
 }
 
-void UIContext::remove_lerpolator(size_t id) noexcept
+void UIContext::remove_tween(size_t id) noexcept
 {
-  err_if(!_lerpolators.contains(id), "remove an unexist color lerpolator");
-  _lerpolators.erase(id);
+  err_if(!_tweens.contains(id), "remove an unexist color tween");
+  _tweens.erase(id);
 }
 
-void UIContext::reset_lerpolator(size_t id) noexcept
+void UIContext::reset_tween(size_t id) noexcept
 {
-  err_if(!_lerpolators.contains(id), "remove an unexist color lerpolator");
-  _lerpolators[id].reset();
+  err_if(!_tweens.contains(id), "reset an unexist color tween");
+  _tweens[id].reset();
 }
 
-auto UIContext::lerp_ping_pong(bool b, size_t id, double duration) noexcept -> double
+auto UIContext::ping_pong(bool b, size_t id, double duration, Tween::Ease ease) noexcept -> double
 {
-  auto lerpolator = g_ui_ctx.get_lerpolator(id, duration);
+  auto tween = g_ui_ctx.get_tween(id, duration, ease);
 
   if (b)
   {
-    if (!lerpolator->is_finished())
+    if (!tween->is_finished())
     {
-      if (lerpolator->is_reversed())
-        lerpolator->reverse();
-      lerpolator->start();
+      if (tween->is_reversed())
+        tween->reverse();
+      tween->start();
     }
   }
   else
   {
-    if (lerpolator->is_finished())
+    if (tween->is_finished())
     {
-      lerpolator->reverse();
-      lerpolator->start();
+      tween->reverse();
+      tween->start();
     }
-    else if (lerpolator->is_started() && !lerpolator->is_reversed())
-      lerpolator->reverse();
+    else if (tween->is_started() && !tween->is_reversed())
+      tween->reverse();
   }
 
-  lerpolator->update(ui::delta_time());
+  tween->update(ui::delta_time());
 
-  auto value = lerpolator->get();
+  auto value = tween->get();
 
-  if (lerpolator->is_finished() && lerpolator->is_reversed())
-    g_ui_ctx.remove_lerpolator(id);
+  if (tween->is_finished() && tween->is_reversed())
+    g_ui_ctx.remove_tween(id);
 
   return value;
 }
@@ -610,26 +571,26 @@ auto UIContext::get_key(Key key) noexcept -> KeyState
   return ctx.state;
 }
 
-void UIContext::image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha) noexcept
+auto UIContext::image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha) noexcept -> bool
 {
   check_draw();
   check_path_not_draw();
   check_union_not_draw();
 
-  if (g_img_mgr.try_load(path, right_bottom - left_top))
+  if (g_img_mgr.try_load(path))
   {
     auto offset = get_render_pos();
     left_top     += offset;
     right_bottom += offset;
     
-    auto scale = get_scale();
+    auto scale = _wnd->scale();
     left_top     *= scale;
     right_bottom *= scale;
 
-    // cmd()->image(g_img_mgr.handle(path), left_top, right_bottom, alpha);
+    frame_data()->add_image(g_img_mgr.handle(path), left_top, right_bottom, alpha);
+    return true;
   }
-  else
-    warn("image {} is not exist", path);
+  return false;
 }
 
 auto UIContext::text(std::string_view text, glm::vec2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> glm::vec2

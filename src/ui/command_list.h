@@ -9,6 +9,7 @@
 
 namespace tk::ui {
 
+// FIXME: discard
 enum class CommandType : uint16_t
 {
   draw_rectangle,

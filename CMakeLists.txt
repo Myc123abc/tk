@@ -14,7 +14,6 @@ set(FT_DISABLE_BROTLI ON)
 
 add_subdirectory(vendor/DirectX-Headers)
 add_subdirectory(vendor/glm)
-add_subdirectory(vendor/SPSCQueue)
 add_subdirectory(vendor/freetype)
 add_subdirectory(vendor/harfbuzz)
 
@@ -52,7 +51,6 @@ target_link_libraries(tk
     d3d12 dxgi dcomp dxguid dxcompiler shcore
     windowsapp dwmapi d3d11 d2d1
     DirectX-Headers
-    SPSCQueue
     harfbuzz
     libunibreak
 )
