@@ -43,7 +43,7 @@ void ImageManager::destroy_image(ImageHandle handle) noexcept
   _pool.free(handle);
 }
 
-auto ImageManager::extent(std::string_view path) noexcept -> glm::vec2
+auto ImageManager::extent(std::string_view path) noexcept -> vec2
 {
   if (!_image_extents.contains(path.data()))
   {

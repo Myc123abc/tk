@@ -1,40 +1,42 @@
 #pragma once
 
-#include <glm/glm.hpp>
+#include "util/vec.hpp"
 
 namespace tk::renderer {
 
-struct alignas(8) Vertex
+// dx12 vertex is aligment at 8 bytes
+// here use 16 bytes because vec4 is simd which need 16 bytes aligment
+struct alignas(16) Vertex
 {
-  glm::vec2 pos{};
-  glm::vec4 color{};
-  glm::vec2 uv{};
+  vec2 pos{};
+  vec2 uv{};
+  vec4 color{};
 };
 
 struct alignas(16) Constants
 {
-  glm::vec<2, uint32_t> render_target_extent{};
-  glm::vec<2, uint32_t> window_extent{};
+  vec2u    render_target_extent{};
+  vec2u    window_extent{};
 
-  glm::vec2             window_pos{};
-  float                 shadow_thickness{};
-  float                 shadow_radius{};
+  vec2     window_pos{};
+  float    shadow_thickness{};
+  float    shadow_radius{};
 
-  glm::vec3             shadow_color{};
-  float                 shadow_softness{};
+  vec3     shadow_color{};
+  float    shadow_softness{};
 
-  glm::vec4             wireframe_color{};
+  vec4     wireframe_color{};
 
-  uint32_t              draw_wireframe{};
-  float                 image_alpha{};
+  uint32_t draw_wireframe{};
+  float    image_alpha{};
 };
 
 constexpr auto Max_Blur_Widget_Num = 5;
 struct alignas(16) BlurConstants
 {
-  uint32_t  blur_radius{};
-  glm::vec3 padding{};
-  float     widgets[Max_Blur_Widget_Num * 2 + 1]{};
+  uint32_t blur_radius{};
+  vec3     padding{};
+  float    widgets[Max_Blur_Widget_Num * 2 + 1]{};
 };
 
 }

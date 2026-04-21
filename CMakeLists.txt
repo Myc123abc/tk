@@ -13,7 +13,6 @@ set(FT_DISABLE_HARFBUZZ ON)
 set(FT_DISABLE_BROTLI ON)
 
 add_subdirectory(vendor/DirectX-Headers)
-add_subdirectory(vendor/glm)
 add_subdirectory(vendor/freetype)
 add_subdirectory(vendor/harfbuzz)
 
@@ -30,9 +29,10 @@ target_include_directories(libunibreak PUBLIC vendor/libunibreak/src)
 file(GLOB_RECURSE TK_SRC src/*.cpp)
 add_library(tk ${TK_SRC})
 target_compile_definitions(tk
-  PRIVATE
+  PUBLIC
     WIN32_LEAN_AND_MEAN
     NOMINMAX
+  PRIVATE
     UTF_CPP_CPLUSPLUS=202002L
 )
 target_include_directories(tk
@@ -45,8 +45,6 @@ target_include_directories(tk
     vendor/freetype/include
 )
 target_link_libraries(tk
-  PUBLIC
-    glm::glm
   PRIVATE
     d3d12 dxgi dcomp dxguid dxcompiler shcore
     windowsapp dwmapi d3d11 d2d1

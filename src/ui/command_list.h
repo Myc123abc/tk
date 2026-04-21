@@ -45,24 +45,24 @@ struct CommandHeader
 
 struct RectangleInfo
 {
-  glm::vec2 left_top{};
-  glm::vec2 right_bottom{};
+  vec2 left_top{};
+  vec2 right_bottom{};
   Color     color{};
   float     thickness{};
 };
 
 struct TriangleInfo
 {
-  glm::vec2 p0{};
-  glm::vec2 p1{};
-  glm::vec2 p2{};
+  vec2 p0{};
+  vec2 p1{};
+  vec2 p2{};
   Color     color{};
   float     thickness{};
 };
 
 struct CircleInfo
 {
-  glm::vec2 center{};
+  vec2 center{};
   float     radius{};
   Color     color{};
   float     thickness{};
@@ -70,25 +70,25 @@ struct CircleInfo
 
 struct LineInfo
 {
-  glm::vec2 p0{};
-  glm::vec2 p1{};
+  vec2 p0{};
+  vec2 p1{};
   Color     color{};
   float     thickness{};
 };
 
 struct BezierInfo
 {
-  glm::vec2 p0{};
-  glm::vec2 p1{};
-  glm::vec2 p2{};
+  vec2 p0{};
+  vec2 p1{};
+  vec2 p2{};
   Color     color{};
   float     thickness{};
 };
 
 struct DiscardRectangleInfo
 {
-  glm::vec2 left_top{};
-  glm::vec2 right_bottom{};
+  vec2 left_top{};
+  vec2 right_bottom{};
 };
 
 struct EndPathInfo
@@ -105,14 +105,14 @@ struct EndUnionInfo
 
 struct TmpColorInfo
 {
-  glm::vec4 color{};
+  vec4 color{};
 };
 
 struct ImageInfo
 {
   ImageHandle handle{};
-  glm::vec2   left_top{};
-  glm::vec2   right_bottom{};
+  vec2   left_top{};
+  vec2   right_bottom{};
   uint8_t     alpha{}; 
 };
 
@@ -123,17 +123,17 @@ struct ScissorRectInfo
 
 struct WindowPosInfo
 {
-  glm::vec2 pos{};
+  vec2 pos{};
 };
 
 struct WindowShadowInfo
 {
-  glm::vec<2, uint32_t>    window_extent{};
+  vec2u    window_extent{};
   float                    shadow_thickness{};
-  glm::vec3                color{};
+  vec3                color{};
   float                    radius{};
   float                    softness{};
-  std::optional<glm::vec4> wireframe_color{};
+  std::optional<vec4> wireframe_color{};
 };
 
 class CommandList
@@ -200,32 +200,32 @@ public:
 
   void notify() noexcept { _sem.release(); }
 
-  void draw_rectangle(glm::vec2 left_top, glm::vec2 right_bottom, Color color, float thickness) noexcept
+  void draw_rectangle(vec2 left_top, vec2 right_bottom, Color color, float thickness) noexcept
   {
     push(CommandType::draw_rectangle, RectangleInfo{ left_top, right_bottom, color, thickness });
   }
 
-  void draw_triangle(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color, float thickness) noexcept
+  void draw_triangle(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
   {
     push(CommandType::draw_triangle, TriangleInfo{ p0, p1, p2, color, thickness });
   }
 
-  void draw_circle(glm::vec2 center, float radius, Color color, float thickness) noexcept
+  void draw_circle(vec2 center, float radius, Color color, float thickness) noexcept
   {
     push(CommandType::draw_circle, CircleInfo{ center, radius, color, thickness });
   }
 
-  void draw_line(glm::vec2 p0, glm::vec2 p1, Color color, float thickness) noexcept
+  void draw_line(vec2 p0, vec2 p1, Color color, float thickness) noexcept
   {
     push(CommandType::draw_line, LineInfo{ p0, p1, color, thickness });
   }
 
-  void draw_bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color, float thickness) noexcept
+  void draw_bezier(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
   {
     push(CommandType::draw_bezier, BezierInfo{ p0, p1, p2, color, thickness });
   }
 
-  void add_discard_rectangle(glm::vec2 left_top, glm::vec2 right_bottom) noexcept
+  void add_discard_rectangle(vec2 left_top, vec2 right_bottom) noexcept
   {
     push(CommandType::add_discard_rectangle, DiscardRectangleInfo{ left_top, right_bottom });
   }
@@ -250,7 +250,7 @@ public:
     push(CommandType::end_union, EndUnionInfo{ color, thickness });
   }
 
-  void enable_tmp_color(glm::vec4 color) noexcept
+  void enable_tmp_color(vec4 color) noexcept
   {
     push(CommandType::enable_tmp_color, TmpColorInfo{ color });
   }
@@ -260,7 +260,7 @@ public:
     push(CommandType::disable_tmp_color);
   }
 
-  void image(ImageHandle handle, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha) noexcept
+  void image(ImageHandle handle, vec2 left_top, vec2 right_bottom, uint8_t alpha) noexcept
   {
     push(CommandType::image, ImageInfo{ handle, left_top, right_bottom, alpha });
   } 
@@ -270,12 +270,12 @@ public:
     push(CommandType::set_scissor_rect, ScissorRectInfo{ rect });
   }
 
-  void set_window_pos(glm::vec2 pos) noexcept
+  void set_window_pos(vec2 pos) noexcept
   {
     push(CommandType::set_window_pos, WindowPosInfo{ pos });
   }
 
-  void draw_window_shadow(glm::vec<2, uint32_t> window_extent, float shadow_thickness, Color color, float radius, float softness, std::optional<glm::vec4> wireframe_color) noexcept
+  void draw_window_shadow(vec2u window_extent, float shadow_thickness, Color color, float radius, float softness, std::optional<vec4> wireframe_color) noexcept
   {
     push(CommandType::draw_window_shadow, WindowShadowInfo{ window_extent, shadow_thickness, { color.r, color.g, color.b }, radius, softness, wireframe_color });
   }

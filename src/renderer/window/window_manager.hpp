@@ -14,20 +14,20 @@ inline auto get_cursor_pos() noexcept
 {
   auto p = POINT{};
   GetCursorPos(&p);
-  return glm::vec<2, int>{ p.x, p.y };
+  return vec2i{ p.x, p.y };
 }
 
-inline auto point_in(glm::vec<2, int> const& p, glm::vec2 const& left_top, glm::vec2 const& right_bottom) noexcept
+inline auto point_in(vec2i p, vec2 left_top, vec2 right_bottom) noexcept
 {
   return p.x > left_top.x && p.x < right_bottom.x && p.y > left_top.y && p.y < right_bottom.y;
 }
 
-inline auto point_in(glm::vec<2, int> const& p, RECT rect) noexcept
+inline auto point_in(vec2i p, RECT rect) noexcept
 {
   return p.x > rect.left && p.x < rect.right && p.y > rect.top && p.y < rect.bottom;
 }
 
-inline auto point_in_with_bounding(glm::vec<2, int> const& p, RECT rect) noexcept
+inline auto point_in_with_bounding(vec2i p, RECT rect) noexcept
 {
   return p.x >= rect.left && p.x <= rect.right && p.y >= rect.top && p.y <= rect.bottom;
 }
@@ -66,7 +66,7 @@ private:
   void message_process(MSG const& msg) noexcept;
 
   void update() noexcept;
-  void update_monitor(HWND handle, glm::vec2 cursor_pos, glm::vec<2, int>& left_button_down_window_cursor_pos) noexcept;
+  void update_monitor(HWND handle, vec2 cursor_pos, vec2i& left_button_down_window_cursor_pos) noexcept;
   void update_fullscreen_window() noexcept;
 
 public:

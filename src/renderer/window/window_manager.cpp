@@ -123,8 +123,8 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   static auto& wnd_mgr = WindowManager::instance();
   static auto& windows = wnd_mgr._windows;
 
-  static auto last_cursor_pos                    = glm::vec<2, int>{};
-  static auto left_button_down_window_cursor_pos = glm::vec<2, int>{};
+  static auto last_cursor_pos                    = vec2i{};
+  static auto left_button_down_window_cursor_pos = vec2i{};
   static auto last_resize_type                   = ResizeType{};
   static auto left_button_down_resize_type       = ResizeType{};
   static auto left_button_down                   = false;
@@ -399,7 +399,7 @@ void WindowManager::resize_blur_window(HWND handle, RECT rect) noexcept
     _windows[handle].resize_blur_window(rect);
 }
 
-void WindowManager::update_monitor(HWND handle, glm::vec2 cursor_pos, glm::vec<2, int>& left_button_down_window_cusor_pos) noexcept
+void WindowManager::update_monitor(HWND handle, vec2 cursor_pos, vec2i& left_button_down_window_cusor_pos) noexcept
 {
   auto& window  = _windows[handle];
   auto  monitor = Monitor{ handle };

@@ -7,7 +7,7 @@
 #include <unordered_set>
 #include <unordered_map>
 
-#include <glm/glm.hpp>
+#include "util/vec.hpp"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -45,8 +45,8 @@ public:
 
   struct ParseResult
   {
-    glm::vec2 extent{};
-    uint32_t  glyph_atlas_index{};
+    vec2     extent{};
+    uint32_t glyph_atlas_index{};
   };
   auto parse(std::string_view text) noexcept -> ParseResult;
 
@@ -57,7 +57,7 @@ private:
   std::unordered_set<ImageHandle>                  _glyph_atlas;
   std::unordered_map<FontStyle, std::vector<Font>> _fonts;
 
-  std::vector<glm::vec2> _advances;
+  std::vector<vec2> _advances;
 )
 
 }

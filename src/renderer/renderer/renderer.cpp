@@ -300,7 +300,7 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
       .shadow_radius        = window_shadow_info->radius,
       .shadow_color         = window_shadow_info->color,
       .shadow_softness      = window_shadow_info->softness,
-      .wireframe_color      = window_shadow_info->wireframe_color ? window_shadow_info->wireframe_color.value() : glm::vec4{},
+      .wireframe_color      = window_shadow_info->wireframe_color ? window_shadow_info->wireframe_color.value() : vec4{},
       .draw_wireframe       = window_shadow_info->wireframe_color.has_value(),
     });
     g_ctx.set_scissor_rect(window_shadow_info->scissor_rect);
@@ -327,7 +327,7 @@ void Renderer::generate_mipmap() noexcept
   // generate mipmaps of images
   struct MipmapGenerationCostant
   {
-    glm::vec2 texel_size{};
+    vec2 texel_size{};
     uint32_t  mip_level{};
   };
   auto constants = MipmapGenerationCostant{};
@@ -340,7 +340,7 @@ void Renderer::generate_mipmap() noexcept
 
     for (auto i : std::views::iota(0u, img.mipmap_uavs().size()))
     {
-      constants.texel_size = glm::vec2{ 1.0 / src_width, 1.0 / src_height };
+      constants.texel_size = vec2{ 1.0 / src_width, 1.0 / src_height };
       constants.mip_level  = i;
 
       _mipmap_pipeline.set_constants(cmd, "constants", constants);

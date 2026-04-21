@@ -11,7 +11,6 @@ A visual novel engine.
 |--|--|--|
 |DirectX-Headers|MIT|https://github.com/microsoft/DirectX-Headers|
 |freetype|FLT|https://gitlab.freedesktop.org/freetype/freetype|
-|glm|MIT|https://github.com/g-truc/glm|
 |harfbuzz|Old MIT|https://github.com/harfbuzz/harfbuzz|
 |libunibreak|Zlib|https://github.com/adah1972/libunibreak|
 |stb|MIT|https://github.com/nothings/stb|

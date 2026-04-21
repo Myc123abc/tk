@@ -85,7 +85,7 @@ auto CreateBackdropBlurBrush(
 
 auto CreateAcrylicBrush(
   winrt::Windows::UI::Composition::Compositor const& compositor,
-  float opacity, float blur, glm::vec4 tint_color, glm::vec4 luminosity_color)
+  float opacity, float blur, vec4 tint_color, vec4 luminosity_color)
 -> winrt::Windows::UI::Composition::CompositionBrush
 {
   D2D1_COLOR_F tintColor{ tint_color.x, tint_color.y, tint_color.z, tint_color.w };

@@ -1,14 +1,13 @@
 #pragma once
 
 #include "../util/flag.hpp"
+#include "../util/vec.hpp"
 #include "tween.hpp"
 
 #include <windows.h>
 
 #include <string_view>
 #include <optional>
-
-#include <glm/glm.hpp>
 
 namespace tk::ui {
 
@@ -28,13 +27,13 @@ struct Color
     a = static_cast<float>((color      ) & 0xFF) / 255;
   }
 
-  Color(glm::vec4 color) noexcept
-    : r(color.r), g(color.g), b(color.b), a(color.a) {}
+  Color(vec4 color) noexcept
+    : r(color.x), g(color.y), b(color.z), a(color.w) {}
 
   Color(float r, float g, float b, float a) noexcept
     : r(r), g(g), b(b), a(a) {}
 
-  operator glm::vec4() noexcept { return { r, g, b, a }; }
+  operator vec4() noexcept { return { r, g, b, a }; }
 
   float r{}, g{}, b{}, a{};
 };
@@ -46,7 +45,7 @@ struct Color
  * @param v lerp value
  * @return lerp color
  */
-auto lerp(Color x, Color y, float v) noexcept -> glm::vec4;
+auto lerp(Color x, Color y, float v) noexcept -> vec4;
 
 /**
  * get lerp value of two points
@@ -55,7 +54,7 @@ auto lerp(Color x, Color y, float v) noexcept -> glm::vec4;
  * @param v
  * @return lerp value
  */
-auto lerp(glm::vec2 x, glm::vec2 y, float v) noexcept -> glm::vec2;
+auto lerp(vec2 x, vec2 y, float v) noexcept -> vec2;
 
 struct WindowConfig
 {
@@ -80,10 +79,10 @@ struct WindowConfig
       float blur_radius{};
       struct Acrylic
       {
-        float     opacity{};
-        float     blur{};
-        glm::vec4 tint_color{};
-        glm::vec4 luminosity_color{};
+        float opacity{};
+        float blur{};
+        vec4  tint_color{};
+        vec4  luminosity_color{};
       } acrylic;
     };
 
@@ -135,7 +134,7 @@ auto ping_pong(std::string_view name, bool b, double duration, Tween::Ease ease 
  * get cursor position
  * @return cursor position
  */
-auto get_cursor_pos() noexcept -> glm::vec2;
+auto get_cursor_pos() noexcept -> vec2;
 
 /**
  * reset tween
@@ -148,7 +147,7 @@ void reset_tween(std::string_view name) noexcept;
  * @param path
  * @return width and height of image, if not exist, return (0, 0)
  */
-auto image_extent(std::string_view path) noexcept -> glm::vec2;
+auto image_extent(std::string_view path) noexcept -> vec2;
 
 /**
  * display image
@@ -158,7 +157,7 @@ auto image_extent(std::string_view path) noexcept -> glm::vec2;
  * @param alpha
  * @return false if image is unexist, or loading, or load failed
  */
-auto image(std::string_view path, glm::vec2 left_top, glm::vec2 right_bottom, uint8_t alpha = 0xff) noexcept -> bool;
+auto image(std::string_view path, vec2 left_top, vec2 right_bottom, uint8_t alpha = 0xff) noexcept -> bool;
 
 /**
  * load image
@@ -189,7 +188,7 @@ enum class FontStyle
  * @param style regular(default), italic, bold, italic_bold
  * @return extent of text
  */
-auto text(std::string_view text, glm::vec2 pos, float size, Color color, FontStyle style = {}) noexcept -> glm::vec2;
+auto text(std::string_view text, vec2 pos, float size, Color color, FontStyle style = {}) noexcept -> vec2;
 
 /**
  * draw text
@@ -200,7 +199,7 @@ auto text(std::string_view text, glm::vec2 pos, float size, Color color, FontSty
  * @param outer_color alpha not 0 then draw outline
  * @return extent of text
  */
-auto text(std::string_view text, glm::vec2 pos, float size, Color inner_color, Color outer_color) noexcept -> glm::vec2;
+auto text(std::string_view text, vec2 pos, float size, Color inner_color, Color outer_color) noexcept -> vec2;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Window
@@ -231,19 +230,19 @@ void end() noexcept;
  * @param width
  * @param height
  */
-void add_move_invalid_area(glm::vec2 left_top, glm::vec2 right_bottom) noexcept;
+void add_move_invalid_area(vec2 left_top, vec2 right_bottom) noexcept;
 
 /**
  * get window extent in current update function of window
  * @return extent of window
  */
-auto window_extent() noexcept -> glm::vec2;
+auto window_extent() noexcept -> vec2;
 
 /**
  * get window extent in current update function of window
  * @return extent of window without titlebar
  */
-auto window_drawable_extent() noexcept -> glm::vec2;
+auto window_drawable_extent() noexcept -> vec2;
 
 /**
  * whether current window is fullscreen
@@ -266,7 +265,7 @@ void restore_fullscreen_window() noexcept;
  * @param left_top
  * @param right_bottom
  */
-void discard_rectangle(glm::vec2 left_top, glm::vec2 right_bottom) noexcept;
+void discard_rectangle(vec2 left_top, vec2 right_bottom) noexcept;
 
 /// use path draw between lines and beziers
 void begin_path() noexcept;
@@ -299,7 +298,7 @@ void end_union(Color color, float thickness = {}) noexcept;
  * @param color
  * @param thickness
  */
-void rectangle(glm::vec2 left_top, glm::vec2 right_bottom, Color color = {}, float thickness = {}) noexcept;
+void rectangle(vec2 left_top, vec2 right_bottom, Color color = {}, float thickness = {}) noexcept;
 
 /**
  * draw a triangle (clockwise)
@@ -309,7 +308,7 @@ void rectangle(glm::vec2 left_top, glm::vec2 right_bottom, Color color = {}, flo
  * @param color
  * @param thickness
  */
-void triangle(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color = {}, float thickness = {}) noexcept;
+void triangle(vec2 p0, vec2 p1, vec2 p2, Color color = {}, float thickness = {}) noexcept;
 
 /**
  * draw a circle
@@ -318,7 +317,7 @@ void triangle(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color = {}, float 
  * @param color
  * @param thickness
  */
-void circle(glm::vec2 center, float radius, Color color = {}, float thickness = {}) noexcept;
+void circle(vec2 center, float radius, Color color = {}, float thickness = {}) noexcept;
 
 /**
  * draw a line
@@ -327,7 +326,7 @@ void circle(glm::vec2 center, float radius, Color color = {}, float thickness = 
  * @param color
  * @param thickness
  */
-void line(glm::vec2 p0, glm::vec2 p1, Color color = {}, float thickness = 1.f) noexcept;
+void line(vec2 p0, vec2 p1, Color color = {}, float thickness = 1.f) noexcept;
 
 /**
  * draw a quadratic bezier
@@ -337,7 +336,7 @@ void line(glm::vec2 p0, glm::vec2 p1, Color color = {}, float thickness = 1.f) n
  * @param color
  * @param thickness
  */
-void bezier(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color color = {}, float thickness = 1.f) noexcept;
+void bezier(vec2 p0, vec2 p1, vec2 p2, Color color = {}, float thickness = 1.f) noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                               Widget

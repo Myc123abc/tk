@@ -6,7 +6,7 @@
 #include <dxgi1_6.h>
 #include <directx/d3dx12.h>
 
-#include <glm/glm.hpp>
+#include "util/vec.hpp"
 
 namespace tk::renderer {
 
@@ -98,11 +98,11 @@ public:
   void clear(ID3D12GraphicsCommandList1* cmd, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) const noexcept;
   void clear_render_target(ID3D12GraphicsCommandList1* cmd) noexcept;
 
-  auto handle() const noexcept { return _handle.Get();                            }
-  auto format() const noexcept { return static_cast<ImageFormat>(_format);        }
-  auto width()  const noexcept { return _width;                                   }
-  auto height() const noexcept { return _height;                                  }
-  auto extent() const noexcept { return glm::vec<2, uint32_t>{ _width, _height }; }
+  auto handle() const noexcept { return _handle.Get();                     }
+  auto format() const noexcept { return static_cast<ImageFormat>(_format); }
+  auto width()  const noexcept { return _width;                            }
+  auto height() const noexcept { return _height;                           }
+  auto extent() const noexcept { return vec2u{ _width, _height };          }
 
   auto per_pixel_size() const noexcept -> uint32_t;
 
@@ -112,7 +112,7 @@ public:
   auto uav() const noexcept { return _desc.uav; }
   auto rtv() const noexcept { return _desc.rtv; }
   auto dsv() const noexcept { return _desc.dsv; }
-  // auto& mipmap_uavs() const noexcept { return _mipmap_uavs;                    }
+  // auto& mipmap_uavs() const noexcept { return _mipmap_uavs; }
 
   // void release_mipmap_uavs() noexcept;
 
