@@ -50,6 +50,8 @@ public:
   void add_triangle(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept;
   void add_circle(vec2 center, float radius, Color color, float thickness) noexcept;
   void add_line(vec2 p0, vec2 p1, Color color, float thickness) noexcept;
+  void add_bezier_quadratic(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept;
+  void add_bezier_cubic(vec2 p0, vec2 p1, vec2 p2, vec2 p3, Color color, float thickness) noexcept;
   void add_image(ImageHandle handle, vec2 left_top, vec2 right_bottom, uint8_t alpha) noexcept;
 
   void add_scissor_rect(RECT rect) noexcept;
@@ -129,6 +131,9 @@ private:
   void path_arc_to(vec2 center, float radius) noexcept;
 
   void add_poly_line(Color color, float thickness, bool is_closed) noexcept;
+
+  void path_bezier_quadratic_curve_to_casteljau(vec2 p0, vec2 p1, vec2 p2, float tess_tol, int level) noexcept;
+  void path_bezier_cubic_curve_to_casteljau(vec2 p0, vec2 p1, vec2 p2, vec2 p3, float tess_tol, int level) noexcept;
 
 private:
   std::vector<Vertex>   _vertices;

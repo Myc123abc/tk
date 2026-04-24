@@ -53,7 +53,7 @@ public:
     ui::begin_path();
     ui::line(_pts[0], _pts[1]);
     if (change)
-      ui::bezier(_pts[1], _pts[8], _pts[2]);
+      ui::bezier_quadratic(_pts[1], _pts[8], _pts[2]);
     else
       ui::line(_pts[1], _pts[2]);
     ui::line(_pts[2], _pts[3]);
@@ -65,7 +65,7 @@ public:
     ui::line(_pts[5], _pts[6]);
     ui::line(_pts[6], _pts[7]);
     if (change)
-      ui::bezier(_pts[7], _pts[9], _pts[4]);
+      ui::bezier_quadratic(_pts[7], _pts[9], _pts[4]);
     else
       ui::line(_pts[7], _pts[4]);
     ui::end_path();
@@ -234,6 +234,8 @@ int main()
       // circle_draw_test();
       // line_draw_test();
       // ui::circle({ 100, 100 }, 50, 0x00ffffff, 10);
+      // ui::bezier_quadratic({ 100, 100 }, { 200, 200 }, { 50, 300 }, 0xff0000ff, 0);
+      ui::bezier_cubic({ 100, 100 }, { 200, 200 }, { 50, 300 }, { 100, 100 }, 0xff0000ff, 0);
 
       ui::end();
     }

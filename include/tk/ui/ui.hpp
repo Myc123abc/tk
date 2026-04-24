@@ -336,7 +336,18 @@ void line(vec2 p0, vec2 p1, Color color = {}, float thickness = 1.f) noexcept;
  * @param color
  * @param thickness
  */
-void bezier(vec2 p0, vec2 p1, vec2 p2, Color color = {}, float thickness = 1.f) noexcept;
+void bezier_quadratic(vec2 p0, vec2 p1, vec2 p2, Color color = {}, float thickness = 1.f) noexcept;
+
+/**
+ * draw a cubic bezier
+ * @param p0
+ * @param p1
+ * @param p2
+ * @param p3
+ * @param color
+ * @param thickness
+ */
+void bezier_cubic(vec2 p0, vec2 p1, vec2 p2, vec2 p3, Color color = {}, float thickness = 1.f) noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                               Widget

@@ -134,6 +134,60 @@ void FrameData::add_line(vec2 p0, vec2 p1, Color color, float thickness) noexcep
   add_poly_line(color, thickness, false);
 }
 
+void FrameData::add_bezier_quadratic(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
+{
+  if (color.a == 0) return;
+  _points.push_back(p0);
+  path_bezier_quadratic_curve_to_casteljau(p0, p1, p2, 1.25f, 0);
+  add_poly_line(color, thickness, false);
+}
+
+void FrameData::add_bezier_cubic(vec2 p0, vec2 p1, vec2 p2, vec2 p3, Color color, float thickness) noexcept
+{
+  if (color.a == 0) return;
+  _points.push_back(p0);
+  path_bezier_cubic_curve_to_casteljau(p0, p1, p2, p3, 1.25f, 0);
+  add_poly_line(color, thickness, false);
+}
+
+void FrameData::path_bezier_quadratic_curve_to_casteljau(vec2 p0, vec2 p1, vec2 p2, float tess_tol, int level) noexcept
+{
+  auto dp  = p2 - p0;
+  auto det = cross(p1 - p2, dp);
+  if (det * det * 4.f < tess_tol * length_sq(dp))
+    _points.push_back(p2);
+  else if (level < 10)
+  {
+    auto p01  = ( p0 +  p1) * .5f;
+    auto p12  = ( p1 +  p2) * .5f;
+    auto p012 = (p01 + p12) * .5f;
+    path_bezier_quadratic_curve_to_casteljau(p0, p01, p012, tess_tol, level + 1);
+    path_bezier_quadratic_curve_to_casteljau(p012, p12, p2, tess_tol, level + 1);
+  }
+}
+
+void FrameData::path_bezier_cubic_curve_to_casteljau(vec2 p0, vec2 p1, vec2 p2, vec2 p3, float tess_tol, int level) noexcept
+{
+  auto dp = p3 - p0;
+  auto d2 = cross(p1 - p3, dp);
+  auto d3 = cross(p2 - p3, dp);
+  d2 = d2 >= 0 ? d2 : -d2;
+  d3 = d3 >= 0 ? d3 : -d3;
+  if (dot(vec2(d2), vec2(d3)) < tess_tol * length_sq(dp))
+    _points.push_back(p3);
+  else if (level < 10)
+  {
+    auto p01   = (  p0 +   p1) * .5f;
+    auto p12   = (  p1 +   p2) * .5f;
+    auto p23   = (  p2 +   p3) * .5f;
+    auto p012  = ( p01 +  p12) * .5f;
+    auto p123  = ( p12 +  p23) * .5f;
+    auto p0123 = (p012 + p123) * .5f;
+    path_bezier_cubic_curve_to_casteljau(p0, p01, p012, p0123, tess_tol, level + 1);
+    path_bezier_cubic_curve_to_casteljau(p0123, p123, p23, p3, tess_tol, level + 1);
+  }
+}
+
 void FrameData::add_convex_poly_filled(Color color) noexcept
 {
   auto pt_cnt = _points.size();

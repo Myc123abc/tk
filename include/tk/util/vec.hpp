@@ -353,14 +353,34 @@ using vec2u = vec<2, uint32_t>;
 using vec3  = vec<3, float>;
 using vec4  = vec<4, float>;
 
-constexpr auto radians(float deg) noexcept -> float
+constexpr auto radians(float deg) noexcept
 {
-  return deg * (std::numbers::pi_v<float> / 180.0f);
+  return deg * (std::numbers::pi / 180.f);
 }
 
-constexpr auto degrees(float rad) noexcept -> float
+constexpr auto degrees(float rad) noexcept
 {
-  return rad * (180.0f / std::numbers::pi_v<float>);
+  return rad * (180.f / std::numbers::pi);
+}
+
+constexpr auto cross(vec2 a, vec2 b) noexcept
+{
+  return a.x * b.y - a.y * b.x;
+}
+
+constexpr auto cross(vec2 a, vec2 b, vec2 c) noexcept
+{
+  return cross(b - a, c - a);
+}
+
+constexpr auto dot(vec2 a, vec2 b) noexcept
+{
+  return a.x * b.x + a.y * b.y;
+}
+
+constexpr auto length_sq(vec2 p) noexcept
+{
+  return dot(p, p);
 }
 
 }

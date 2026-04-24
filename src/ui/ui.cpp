@@ -267,7 +267,7 @@ void line(vec2 p0, vec2 p1, Color color, float thickness) noexcept
   g_ui_ctx.frame_data()->add_line(p0, p1, color, thickness);
 }
 
-void bezier(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
+void bezier_quadratic(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
 {
   if (thickness < 1) thickness = 1;
 
@@ -284,7 +284,29 @@ void bezier(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
   p2        *= scale;
   thickness *= scale;
 
-  // g_ui_ctx.cmd()->draw_bezier(p0, p1, p2, color, thickness);
+  g_ui_ctx.frame_data()->add_bezier_quadratic(p0, p1, p2, color, thickness);
+}
+
+void bezier_cubic(vec2 p0, vec2 p1, vec2 p2, vec2 p3, Color color, float thickness) noexcept
+{
+  if (thickness < 1) thickness = 1;
+
+	g_ui_ctx.check_draw();
+
+	auto offset = g_ui_ctx.get_render_pos();
+  p0 += offset;
+  p1 += offset;
+  p2 += offset;
+  p3 += offset;
+
+  auto scale = g_ui_ctx.window()->scale();
+  p0        *= scale;
+  p1        *= scale;
+  p2        *= scale;
+  p3        *= scale;
+  thickness *= scale;
+
+  g_ui_ctx.frame_data()->add_bezier_cubic(p0, p1, p2, p3, color, thickness);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
