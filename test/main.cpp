@@ -227,12 +227,13 @@ int main()
 
       if (ui::button("btn1", 0, 0, 100, 100, 0xffffffff, 0xffffffff))
         circle_lerplocator.reverse();
-      if (ui::button("btn2", 50, 50, 100, 100, 0xffffffff, 0xffffffff))
+      if (ui::button("btn2", 50, 50, 100, 100, 0xffff00ff, 0xffffffff))
         wnd2_is_closed = !wnd2_is_closed;
       ui::add_move_invalid_area({}, { 150, 150 });
 
       // circle_draw_test();
-      line_draw_test();
+      // line_draw_test();
+      // ui::circle({ 100, 100 }, 50, 0x00ffffff, 10);
 
       ui::end();
     }

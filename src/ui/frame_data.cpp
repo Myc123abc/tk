@@ -121,7 +121,10 @@ void FrameData::add_circle(vec2 center, float radius, Color color, float thickne
   if (color.a == 0) return;
   path_arc_to(center, radius);
   _points.pop_back();
-  add_convex_poly_filled(color);
+  if (thickness > 0)
+    add_poly_line(color, thickness, true);
+  else
+    add_convex_poly_filled(color);
 }
 
 void FrameData::add_line(vec2 p0, vec2 p1, Color color, float thickness) noexcept
@@ -401,6 +404,7 @@ void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noex
   }
 
   expand_end();
+  _points.clear();
 }
 
 void FrameData::add_draw_call(DrawDataType type, ImageHandle image_handle, uint8_t image_alpha) noexcept
