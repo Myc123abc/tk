@@ -276,8 +276,9 @@ void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noex
 {
   auto pt_cnt = _points.size();
   assert(pt_cnt >= 2);
-  auto const count = is_closed ? pt_cnt : pt_cnt - 1;
-  auto const aa_size = g_ui_ctx.window()->scale();
+
+  auto const count      = is_closed ? pt_cnt : pt_cnt - 1;
+  auto const aa_size    = g_ui_ctx.window()->scale();
   auto const thick_line = thickness > aa_size;
   auto col_trans = Color{ color.r, color.g, color.b, 0 };
 
@@ -291,7 +292,7 @@ void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noex
   _tmp_buf.clear();
   _tmp_buf.resize(pt_cnt * (thick_line ? 5 : 3));
   auto* tmp_normals = _tmp_buf.data();
-  auto* tmp_points = tmp_normals + pt_cnt;
+  auto* tmp_points  = tmp_normals + pt_cnt;
 
   for (auto i1 = 0; i1 < count; ++i1)
   {
@@ -322,13 +323,13 @@ void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noex
     auto idx1 = _vertex_beg;
     for (auto i1 = 0; i1 < count; ++i1)
     {
-      auto const i2 = (i1 + 1) == pt_cnt ? 0 : i1 + 1;
+      auto const i2   = (i1 + 1) == pt_cnt ? 0 : i1 + 1;
       auto const idx2 = ((i1 + 1) == pt_cnt) ? _vertex_beg : (idx1 + 4);
 
       auto dm = (tmp_normals[i1] + tmp_normals[i2]) * .5f;
       dm = fix_normal(dm);
       auto dm_out = dm * (half_inner_thickness + aa_size);
-      auto dm_in = dm * half_inner_thickness;
+      auto dm_in  = dm * half_inner_thickness;
 
       auto* out_vtx = &tmp_points[i2 * 4];
       out_vtx[0] = _points[i2] + dm_out;
@@ -336,12 +337,12 @@ void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noex
       out_vtx[2] = _points[i2] - dm_in;
       out_vtx[3] = _points[i2] - dm_out;
 
-      idx[0] = idx2 + 1; idx[1] = idx1 + 2; idx[2] = idx1 + 1;
-      idx[3] = idx1 + 2; idx[4] = idx2 + 1; idx[5] = idx2 + 2;
-      idx[6] = idx2 + 1; idx[7] = idx1 + 0; idx[8] = idx1 + 1;
-      idx[9] = idx1 + 0; idx[10] = idx2 + 1; idx[11] = idx2 + 0;
-      idx[12] = idx2 + 2; idx[13] = idx1 + 3; idx[14] = idx1 + 2;
-      idx[15] = idx1 + 3; idx[16] = idx2 + 2; idx[17] = idx2 + 3;
+      idx[ 0] = idx2 + 1; idx[ 1] = idx1 + 1; idx[ 2] = idx1 + 2;
+      idx[ 3] = idx1 + 2; idx[ 4] = idx2 + 2; idx[ 5] = idx2 + 1;
+      idx[ 6] = idx2 + 1; idx[ 7] = idx1 + 1; idx[ 8] = idx1 + 0;
+      idx[ 9] = idx1 + 0; idx[10] = idx2 + 0; idx[11] = idx2 + 1;
+      idx[12] = idx2 + 2; idx[13] = idx1 + 2; idx[14] = idx1 + 3;
+      idx[15] = idx1 + 3; idx[16] = idx2 + 3; idx[17] = idx2 + 2;
       idx += 18;
 
       idx1 = idx2;
@@ -370,7 +371,7 @@ void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noex
     auto idx1 = _vertex_beg;
     for (auto i1 = 0; i1 < count; ++i1)
     {
-      auto const i2 = (i1 + 1) == pt_cnt ? 0 : i1 + 1;
+      auto const i2   = (i1 + 1) == pt_cnt ? 0 : i1 + 1;
       auto const idx2 = ((i1 + 1) == pt_cnt) ? _vertex_beg : (idx1 + 3);
 
       auto dm = (tmp_normals[i1] + tmp_normals[i2]) * .5f;
@@ -381,10 +382,10 @@ void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noex
       out_vtx[0] = _points[i2] + dm;
       out_vtx[1] = _points[i2] - dm;
 
-      idx[0] = idx2 + 0; idx[1] = idx1 + 2; idx[2] = idx1 + 0;
-      idx[3] = idx1 + 2; idx[4] = idx2 + 0; idx[5] = idx2 + 2;
-      idx[6] = idx2 + 1; idx[7] = idx1 + 0; idx[8] = idx1 + 1;
-      idx[9] = idx1 + 0; idx[10] = idx2 + 1; idx[11] = idx2 + 0;
+      idx[0] = idx2 + 0; idx[ 1] = idx1 + 0; idx[ 2] = idx1 + 2;
+      idx[3] = idx1 + 2; idx[ 4] = idx2 + 2; idx[ 5] = idx2 + 0;
+      idx[6] = idx2 + 1; idx[ 7] = idx1 + 1; idx[ 8] = idx1 + 0;
+      idx[9] = idx1 + 0; idx[10] = idx2 + 0; idx[11] = idx2 + 1;
       idx += 12;
 
       idx1 = idx2;

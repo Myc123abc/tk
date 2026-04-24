@@ -223,7 +223,7 @@ int main()
       auto extent = ui::window_drawable_extent();
       auto pos = vec2{ extent.x / 2 - 50, extent.y - 50 };
       auto size = ui::window_drawable_extent();
-      ui::triangle({ size.x / 2, size.y * .1f }, size * .9f, { size.y * .1f, size.y * .9 }, 0x00ff0044, 10);
+      // ui::triangle({ size.x / 2, size.y * .1f }, size * .9f, { size.y * .1f, size.y * .9 }, 0x00ff0044, 10);
 
       if (ui::button("btn1", 0, 0, 100, 100, 0xffffffff, 0xffffffff))
         circle_lerplocator.reverse();
@@ -232,7 +232,7 @@ int main()
       ui::add_move_invalid_area({}, { 150, 150 });
 
       // circle_draw_test();
-      // line_draw_test();
+      line_draw_test();
 
       ui::end();
     }

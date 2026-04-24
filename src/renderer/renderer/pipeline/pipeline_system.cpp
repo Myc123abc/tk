@@ -80,6 +80,12 @@ void PipelineSystem::Pipeline::init_graphics(
   stream.VS                    = compile_result.vs;
   stream.PS                    = compile_result.ps;
   stream.RTVFormats            = render_target_formats;
+  
+  // TODO: cull mode none only use 2D render now, 3D need to use back cull
+  auto rasterizer = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+  rasterizer.DepthClipEnable = false;
+  rasterizer.CullMode        = D3D12_CULL_MODE_NONE;
+  stream.RasterizerState     = rasterizer;
     
   auto depth_stencil_desc = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
   depth_stencil_desc.DepthEnable           = false;

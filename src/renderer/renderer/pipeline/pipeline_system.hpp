@@ -12,7 +12,6 @@ enum class PipelineType
 {
   shape,
   image,
-  // TODO: split text render from sdf
   blur_horizontal_pass,
   blur_vertical_pass,
   window_shadow,
