@@ -148,6 +148,29 @@ void circle_draw_test() noexcept
   }
 }
 
+void line_draw_test() noexcept
+{
+  auto [w, h] = ui::window_drawable_extent();
+  auto p0 = vec2{}, p1 = vec2{};
+  auto t = 0.f;
+  while (p1.x < w && p0.y < h)
+  {
+    auto old_t = t;
+    ++t;
+    p1.x += old_t + t + 2;
+    p0.y += old_t + t + 2;
+    ui::line(p0, p1, 0x00ff00ff, t);
+  }
+  while (p1.y < h && p0.x < w)
+  {
+    auto old_t = t;
+    --t;
+    p1.y += old_t + t + 2;
+    p0.x += old_t + t + 2;
+    ui::line(p0, p1, 0x00ff00ff, t);
+  }
+}
+
 int main()
 {
   tk::init();
@@ -183,7 +206,7 @@ int main()
   cfg.display_wireframe_only_active = true;
   cfg.wireframe_color               = 0x7160e8ff;
   auto cfg2 = cfg;
-  cfg.backdrop.default_acrylic();
+  cfg.backdrop.default_blur();
 
   while (!wnd1_is_closed || !wnd2_is_closed)
   {
@@ -200,8 +223,7 @@ int main()
       auto extent = ui::window_drawable_extent();
       auto pos = vec2{ extent.x / 2 - 50, extent.y - 50 };
       auto size = ui::window_drawable_extent();
-      ui::triangle({ size.x / 2, size.y * .1f }, size * .9f, { size.y * .1f, size.y * .9 }, 0xffffffff, 10);
-      ui::triangle({ size.x / 2, size.y * .1f }, size * .9f, { size.y * .1f, size.y * .9 }, 0xffffffff, 10);
+      ui::triangle({ size.x / 2, size.y * .1f }, size * .9f, { size.y * .1f, size.y * .9 }, 0x00ff0044, 10);
 
       if (ui::button("btn1", 0, 0, 100, 100, 0xffffffff, 0xffffffff))
         circle_lerplocator.reverse();
@@ -209,7 +231,8 @@ int main()
         wnd2_is_closed = !wnd2_is_closed;
       ui::add_move_invalid_area({}, { 150, 150 });
 
-      circle_draw_test();
+      // circle_draw_test();
+      // line_draw_test();
 
       ui::end();
     }

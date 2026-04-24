@@ -28,6 +28,7 @@ enum class ImageFormat
   bgra8_unorm = DXGI_FORMAT_B8G8R8A8_UNORM,
   rgba8_unorm = DXGI_FORMAT_R8G8B8A8_UNORM,
   d32         = DXGI_FORMAT_D32_FLOAT,
+  d24_s8      = DXGI_FORMAT_D24_UNORM_S8_UINT,
 };
 
 

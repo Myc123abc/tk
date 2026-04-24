@@ -397,7 +397,8 @@ auto button(
  * @param button_color
  * @param button_hover_color
  * @param mouse_down_color
- * @param icon_update_func the function be called for draw icon by ui draw api
+ * @param icon_update_func the function be called for draw icon by ui draw api,
+ *                         Color is used for icon color lerp changed,
  * @param icon_width
  * @param icon_height
  * @param icon_color
@@ -405,19 +406,19 @@ auto button(
  * @return button state
  */
 auto button(
-  std::string_view                        name,
-  int                                     x,
-  int                                     y,
-  uint32_t                                width,
-  uint32_t                                height,
-  Color                                   button_color,
-  Color                                   button_hover_color,
-  std::optional<Color>                    mouse_down_color,
-  std::function<void(uint32_t, uint32_t)> icon_update_func,
-  uint32_t                                icon_width,
-  uint32_t                                icon_height,
-  Color                                   icon_color,
-  Color                                   icon_hover_color) noexcept-> ButtonState;
+  std::string_view                               name,
+  int                                            x,
+  int                                            y,
+  uint32_t                                       width,
+  uint32_t                                       height,
+  Color                                          button_color,
+  Color                                          button_hover_color,
+  std::optional<Color>                           mouse_down_color,
+  std::function<void(uint32_t, uint32_t, Color)> icon_update_func,
+  uint32_t                                       icon_width,
+  uint32_t                                       icon_height,
+  Color                                          icon_color,
+  Color                                          icon_hover_color) noexcept-> ButtonState;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                               Key

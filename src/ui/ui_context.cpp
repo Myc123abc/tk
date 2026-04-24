@@ -383,34 +383,34 @@ void UIContext::add_title_bar() noexcept
 
   // minimize button
   if (button("tk::ui::title_bar_minimize_button", w - btn_width * 3, 0, btn_width, btn_height, background_color, btn_hovered_color, btn_mouse_down_color,
-    [] (uint32_t width, uint32_t height) { ui::line({ 0, height / 2 }, { width, height / 2 }, 1); },
+    [] (uint32_t width, uint32_t height, Color col) { ui::line({ 0, height / 2 }, { width, height / 2 }, col, 1); },
     icon_width, icon_height, 0x395063ff, 0x395063ff))
     _wnd->minimize();
 
   // maximize / restore button
   if (button("tk::ui::title_bar_maximize_restore_button", w - btn_width * 2, 0, btn_width, btn_height, background_color, btn_hovered_color, btn_mouse_down_color,
-    [&] (uint32_t width, uint32_t height)
+    [&] (uint32_t width, uint32_t height, Color col)
     {
       if (_wnd->is_maximized())
       {
         auto padding_x = width / 5;
         auto padding_y = width / 5;
-        ui::rectangle({ padding_x, 0 }, { width, height - padding_y }, 0, 1);
+        ui::rectangle({ padding_x, 0 }, { width, height - padding_y }, col, 1);
         ui::discard_rectangle({ 0, padding_y }, { width - padding_x, height });
-        ui::rectangle({ 0, padding_y }, { width - padding_x, height }, 0, 1);
+        ui::rectangle({ 0, padding_y }, { width - padding_x, height }, col, 1);
       }
       else
-        ui::rectangle({}, { width, height }, 0, 1);
+        ui::rectangle({}, { width, height }, col, 1);
     },
     icon_width, icon_height, 0x395063ff, 0x395063ff) && !_wnd->cfg().no_resize)
       _wnd->is_maximized() ? _wnd->restore() : _wnd->maximize();
 
   // close button
   if (button("tk::ui::title_bar_close_button", w - btn_width, 0, btn_width, btn_height, background_color, close_btn_hovered_color, close_btn_mouse_down_color,
-    [] (uint32_t width, uint32_t height)
+    [] (uint32_t width, uint32_t height, Color col)
     {
-      ui::line({}, { width, height }, 1);
-      ui::line({ width, 0 }, { 0, height }, 1);
+      ui::line({}, { width, height }, col, 1);
+      ui::line({ width, 0 }, { 0, height }, col, 1);
     }, icon_width, icon_height, 0x395063ff, 0xffffffff))
     _wnd_ctx->is_closed = true;
 

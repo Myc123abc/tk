@@ -39,7 +39,6 @@ public:
     _normals.clear();
     _vertex_beg         = {};
     _index_beg          = {};
-    _index              = {};
     _tmp_vertices_size  = {};
     _tmp_indices_size   = {};
     _draw_index_beg     = {};
@@ -49,7 +48,8 @@ public:
 
   void add_rect(vec2 left_top, vec2 right_bottom, Color color, float thickness) noexcept;
   void add_triangle(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept;
-  void draw_circle(vec2 center, float radius, Color color, float thickness) noexcept;
+  void add_circle(vec2 center, float radius, Color color, float thickness) noexcept;
+  void add_line(vec2 p0, vec2 p1, Color color, float thickness) noexcept;
   void add_image(ImageHandle handle, vec2 left_top, vec2 right_bottom, uint8_t alpha) noexcept;
 
   void add_scissor_rect(RECT rect) noexcept;
@@ -87,7 +87,6 @@ private:
   {
     _vertex_beg += _tmp_vertices_size;
     _index_beg  += _tmp_indices_size;
-    _index      += _tmp_vertices_size;
   }
 
   struct DrawData
@@ -129,12 +128,13 @@ private:
   static auto get_circle_segment_count(float radius) noexcept -> uint32_t;
   void path_arc_to(vec2 center, float radius) noexcept;
 
+  void add_poly_line(Color color, float thickness, bool is_closed) noexcept;
+
 private:
   std::vector<Vertex>   _vertices;
   std::vector<uint16_t> _indices;
   uint32_t              _vertex_beg{};
   uint32_t              _index_beg{};
-  uint16_t              _index{};
 
   uint32_t              _tmp_vertices_size{};
   uint32_t              _tmp_indices_size{};
@@ -149,6 +149,7 @@ private:
 
   std::vector<vec2> _points;
   std::vector<vec2> _normals;
+  std::vector<vec2> _tmp_buf;
 
   inline static auto constexpr arc_table_size = 48;
   inline static auto constexpr arc_sample_max = arc_table_size;

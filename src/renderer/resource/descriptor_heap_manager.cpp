@@ -116,8 +116,7 @@ void DescriptorHeapManager::init() noexcept
   using enum DescriptorHeapType;
   _heaps[cbv_srv_uav].init(cbv_srv_uav, CBV_SRV_UAV_Heap_Size);
   _heaps[rtv].init(rtv, RTV_Heap_Size);
-  if constexpr (Enable_Depth_Test)
-    _heaps[dsv].init(dsv, DSV_Size);
+  _heaps[dsv].init(dsv, DSV_Size);
 }
 
 void DescriptorHeapManager::bind_heaps(ID3D12GraphicsCommandList1* cmd) noexcept

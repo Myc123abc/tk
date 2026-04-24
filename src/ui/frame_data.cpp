@@ -79,18 +79,27 @@ void FrameData::add_rect(vec2 left_top, vec2 right_bottom, Color color, float th
 {
   if (color.a == 0) return;
 
+  if (thickness > 0)
+  {
+    left_top     += .5f;
+    right_bottom -= .5f;
+    set_points({ left_top, { right_bottom.x, left_top.y }, right_bottom, { left_top.x, right_bottom.y }});
+    add_poly_line(color, thickness, true);
+    return;
+  }
+
   auto [vertices, indices] = expand_beg(4, 6);
 
   vertices[0] = { left_top, {}, color };
   vertices[1] = { { right_bottom.x, left_top.y }, {}, color };
   vertices[2] = { right_bottom, {}, color };
   vertices[3] = { { left_top.x, right_bottom.y }, {}, color };
-  indices[0]  = _index + 0;
-  indices[1]  = _index + 1;
-  indices[2]  = _index + 2;
-  indices[3]  = _index + 0;
-  indices[4]  = _index + 2;
-  indices[5]  = _index + 3;
+  indices[0]  = _vertex_beg + 0;
+  indices[1]  = _vertex_beg + 1;
+  indices[2]  = _vertex_beg + 2;
+  indices[3]  = _vertex_beg + 0;
+  indices[4]  = _vertex_beg + 2;
+  indices[5]  = _vertex_beg + 3;
 
   expand_end();
 }
@@ -98,16 +107,28 @@ void FrameData::add_rect(vec2 left_top, vec2 right_bottom, Color color, float th
 void FrameData::add_triangle(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
 {
   if (color.a == 0) return;
+
   set_points({ p0, p1, p2 });
-  add_convex_poly_filled(color);
+
+  if (thickness > 0)
+    add_poly_line(color, thickness, true);
+  else
+    add_convex_poly_filled(color);
 }
 
-void FrameData::draw_circle(vec2 center, float radius, Color color, float thickness) noexcept
+void FrameData::add_circle(vec2 center, float radius, Color color, float thickness) noexcept
 {
   if (color.a == 0) return;
   path_arc_to(center, radius);
   _points.pop_back();
   add_convex_poly_filled(color);
+}
+
+void FrameData::add_line(vec2 p0, vec2 p1, Color color, float thickness) noexcept
+{
+  if (color.a == 0) return;
+  set_points({ p0 + .5f, p1 + .5f });
+  add_poly_line(color, thickness, false);
 }
 
 void FrameData::add_convex_poly_filled(Color color) noexcept
@@ -120,8 +141,8 @@ void FrameData::add_convex_poly_filled(Color color) noexcept
 
   auto [vertices, indices] = expand_beg(pt_cnt * 2, (pt_cnt - 2) * 3 + pt_cnt * 6);
 
-  auto inner_idx = _index;
-  auto outer_idx = _index + 1;
+  auto inner_idx = _vertex_beg;
+  auto outer_idx = _vertex_beg + 1;
   for (auto i : std::views::iota(2u, pt_cnt))
   {
     indices[0] = inner_idx;
@@ -251,6 +272,136 @@ void FrameData::path_arc_to(vec2 center, float radius) noexcept
   assert(_points.data() + _points.size() == out_ptr);
 }
 
+void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noexcept
+{
+  auto pt_cnt = _points.size();
+  assert(pt_cnt >= 2);
+  auto const count = is_closed ? pt_cnt : pt_cnt - 1;
+  auto const aa_size = g_ui_ctx.window()->scale();
+  auto const thick_line = thickness > aa_size;
+  auto col_trans = Color{ color.r, color.g, color.b, 0 };
+
+  thickness = std::max(thickness, 1.f);
+
+  auto const idx_cnt = thick_line ? count * 18 : count * 12;
+  auto const vtx_cnt = thick_line ? pt_cnt * 4 : pt_cnt * 3;
+
+  auto [vtx, idx] = expand_beg(vtx_cnt, idx_cnt);
+
+  _tmp_buf.clear();
+  _tmp_buf.resize(pt_cnt * (thick_line ? 5 : 3));
+  auto* tmp_normals = _tmp_buf.data();
+  auto* tmp_points = tmp_normals + pt_cnt;
+
+  for (auto i1 = 0; i1 < count; ++i1)
+  {
+    auto const i2 = (i1 + 1) == pt_cnt ? 0 : i1 + 1;
+    auto dp = _points[i2] - _points[i1];
+    dp = normalize(dp);
+    tmp_normals[i1] = { dp.y, -dp.x };
+  }
+  if (!is_closed) tmp_normals[pt_cnt - 1] = tmp_normals[pt_cnt - 2];
+
+  if (thick_line)
+  {
+    auto const half_inner_thickness = (thickness - aa_size) * .5f;
+
+    if (!is_closed)
+    {
+      auto const points_last = pt_cnt - 1;
+      tmp_points[0] = _points[0] + tmp_normals[0] * (half_inner_thickness + aa_size);
+      tmp_points[1] = _points[0] + tmp_normals[0] * (half_inner_thickness);
+      tmp_points[2] = _points[0] - tmp_normals[0] * (half_inner_thickness);
+      tmp_points[3] = _points[0] - tmp_normals[0] * (half_inner_thickness + aa_size);
+      tmp_points[points_last * 4 + 0] = _points[points_last] + tmp_normals[points_last] * (half_inner_thickness + aa_size);
+      tmp_points[points_last * 4 + 1] = _points[points_last] + tmp_normals[points_last] * (half_inner_thickness);
+      tmp_points[points_last * 4 + 2] = _points[points_last] - tmp_normals[points_last] * (half_inner_thickness);
+      tmp_points[points_last * 4 + 3] = _points[points_last] - tmp_normals[points_last] * (half_inner_thickness + aa_size);
+    }
+
+    auto idx1 = _vertex_beg;
+    for (auto i1 = 0; i1 < count; ++i1)
+    {
+      auto const i2 = (i1 + 1) == pt_cnt ? 0 : i1 + 1;
+      auto const idx2 = ((i1 + 1) == pt_cnt) ? _vertex_beg : (idx1 + 4);
+
+      auto dm = (tmp_normals[i1] + tmp_normals[i2]) * .5f;
+      dm = fix_normal(dm);
+      auto dm_out = dm * (half_inner_thickness + aa_size);
+      auto dm_in = dm * half_inner_thickness;
+
+      auto* out_vtx = &tmp_points[i2 * 4];
+      out_vtx[0] = _points[i2] + dm_out;
+      out_vtx[1] = _points[i2] + dm_in;
+      out_vtx[2] = _points[i2] - dm_in;
+      out_vtx[3] = _points[i2] - dm_out;
+
+      idx[0] = idx2 + 1; idx[1] = idx1 + 2; idx[2] = idx1 + 1;
+      idx[3] = idx1 + 2; idx[4] = idx2 + 1; idx[5] = idx2 + 2;
+      idx[6] = idx2 + 1; idx[7] = idx1 + 0; idx[8] = idx1 + 1;
+      idx[9] = idx1 + 0; idx[10] = idx2 + 1; idx[11] = idx2 + 0;
+      idx[12] = idx2 + 2; idx[13] = idx1 + 3; idx[14] = idx1 + 2;
+      idx[15] = idx1 + 3; idx[16] = idx2 + 2; idx[17] = idx2 + 3;
+      idx += 18;
+
+      idx1 = idx2;
+    }
+
+    for (auto i = 0; i < pt_cnt; ++i)
+    {
+      vtx[0] = { tmp_points[i * 4], {}, col_trans };
+      vtx[1] = { tmp_points[i * 4 + 1], {}, color };
+      vtx[2] = { tmp_points[i * 4 + 2], {}, color };
+      vtx[3] = { tmp_points[i * 4 + 3], {}, col_trans };
+      vtx += 4;
+    }
+  }
+  else
+  {
+    auto const half_draw_size = aa_size;
+    if (!is_closed)
+    {
+      tmp_points[0] = _points[0] + tmp_normals[0] * half_draw_size;
+      tmp_points[1] = _points[0] - tmp_normals[0] * half_draw_size;
+      tmp_points[(pt_cnt - 1) * 2 + 0] = _points[pt_cnt - 1] + tmp_normals[pt_cnt - 1] * half_draw_size;
+      tmp_points[(pt_cnt - 1) * 2 + 1] = _points[pt_cnt - 1] - tmp_normals[pt_cnt - 1] * half_draw_size;
+    }
+
+    auto idx1 = _vertex_beg;
+    for (auto i1 = 0; i1 < count; ++i1)
+    {
+      auto const i2 = (i1 + 1) == pt_cnt ? 0 : i1 + 1;
+      auto const idx2 = ((i1 + 1) == pt_cnt) ? _vertex_beg : (idx1 + 3);
+
+      auto dm = (tmp_normals[i1] + tmp_normals[i2]) * .5f;
+      dm = fix_normal(dm);
+      dm *= half_draw_size;
+
+      auto* out_vtx = &tmp_points[i2 * 2];
+      out_vtx[0] = _points[i2] + dm;
+      out_vtx[1] = _points[i2] - dm;
+
+      idx[0] = idx2 + 0; idx[1] = idx1 + 2; idx[2] = idx1 + 0;
+      idx[3] = idx1 + 2; idx[4] = idx2 + 0; idx[5] = idx2 + 2;
+      idx[6] = idx2 + 1; idx[7] = idx1 + 0; idx[8] = idx1 + 1;
+      idx[9] = idx1 + 0; idx[10] = idx2 + 1; idx[11] = idx2 + 0;
+      idx += 12;
+
+      idx1 = idx2;
+    }
+
+    for (auto i = 0; i < pt_cnt; ++i)
+    {
+      vtx[0] = { _points[i], {}, color };
+      vtx[1] = { tmp_points[i * 2 + 0], {}, col_trans };
+      vtx[2] = { tmp_points[i * 2 + 1], {}, col_trans };
+      vtx += 3;
+    }
+  }
+
+  expand_end();
+}
+
 void FrameData::add_draw_call(DrawDataType type, ImageHandle image_handle, uint8_t image_alpha) noexcept
 {
   _draw_data_rect_idxs.emplace_back(_draw_datas.size());
@@ -278,12 +429,12 @@ void FrameData::add_image(ImageHandle handle, vec2 left_top, vec2 right_bottom, 
   vertices[1] = { { right_bottom.x, left_top.y }, { 1, 0 }, {} };
   vertices[2] = { right_bottom, { 1, 1 }, {} };
   vertices[3] = { { left_top.x, right_bottom.y }, { 0, 1 }, {} };
-  indices[0]  = _index + 0;
-  indices[1]  = _index + 1;
-  indices[2]  = _index + 2;
-  indices[3]  = _index + 0;
-  indices[4]  = _index + 2;
-  indices[5]  = _index + 3;
+  indices[0]  = _vertex_beg + 0;
+  indices[1]  = _vertex_beg + 1;
+  indices[2]  = _vertex_beg + 2;
+  indices[3]  = _vertex_beg + 0;
+  indices[4]  = _vertex_beg + 2;
+  indices[5]  = _vertex_beg + 3;
   expand_end();
 
   add_draw_call(DrawDataType::image, handle, alpha);

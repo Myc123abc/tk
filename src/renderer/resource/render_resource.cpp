@@ -19,8 +19,7 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
     frame.image.init(width, height, Render_Target_Format, ImageType::rtv);
   
   // create depth test image
-  if (Enable_Depth_Test)
-    _dsv_image.init(width, height, ImageFormat::d32, ImageType::dsv);
+  _dsv_image.init(width, height, ImageFormat::d32, ImageType::dsv);
 
   // create swapchain
   ComPtr<IDXGISwapChain1> swapchain;
@@ -73,8 +72,7 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
 void RenderResource::destroy() noexcept
 {
   CloseHandle(_swapchain_waitable_obj);
-  if (Enable_Depth_Test)
-    _dsv_image.destroy();
+  _dsv_image.destroy();
   for (auto& frame : _frames)
   {
     frame.image.destroy();
@@ -96,8 +94,7 @@ void RenderResource::resize(uint32_t width, uint32_t height) noexcept
     frame.image.destroy();
   }
   _comp_visual->SetContent(nullptr);
-  if (Enable_Depth_Test)
-    _dsv_image.destroy();
+  _dsv_image.destroy();
 
   // resize swapchain
   err_if(_swapchain->ResizeBuffers(Frame_Count, width, height, DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT | DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING),
@@ -115,8 +112,7 @@ void RenderResource::resize(uint32_t width, uint32_t height) noexcept
     frame.swapchain_image.resize(_swapchain.Get(), i);
     frame.image.resize(width, height);
   }
-  if (Enable_Depth_Test)
-    _dsv_image.resize(width, height);
+  _dsv_image.resize(width, height);
 }
 
 void RenderResource::wait_frame_complete() noexcept
@@ -190,24 +186,17 @@ void RenderResource::clear_image() noexcept
   auto& render_target_image = frame.image;
   auto  cmd                 = g_graphics_engine.cmd();
   auto  rtv_handle          = render_target_image.rtv().cpu_handle();
-  auto  dsv_handle          = D3D12_CPU_DESCRIPTOR_HANDLE{};
-  if (Enable_Depth_Test)
-    dsv_handle = _dsv_image.dsv().cpu_handle();
+  auto  dsv_handle          = _dsv_image.dsv().cpu_handle();
 
   // set render target view
-  if (Enable_Depth_Test)
-    cmd->OMSetRenderTargets(1, &rtv_handle, false, &dsv_handle);
-  else
-    cmd->OMSetRenderTargets(1, &rtv_handle, false, nullptr);
+  // cmd->OMSetRenderTargets(1, &rtv_handle, false, &dsv_handle);
+  cmd->OMSetRenderTargets(1, &rtv_handle, false, nullptr);
 
   // clear color
   render_target_image.clear_render_target(cmd);
-  if (Enable_Depth_Test)
-  {
-    cmd->ClearDepthStencilView(dsv_handle, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
-    // set depth range
-    cmd->OMSetDepthBounds(0.f, 1.f);
-  }
+
+  // cmd->ClearDepthStencilView(dsv_handle, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
+  // cmd->OMSetDepthBounds(0.f, 1.f);
 }
 
 void FrameBuffer::init() noexcept

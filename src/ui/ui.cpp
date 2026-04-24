@@ -244,7 +244,7 @@ void circle(vec2 center, float radius, Color color, float thickness) noexcept
   center    *= scale;
   thickness *= scale;
 
-  g_ui_ctx.frame_data()->draw_circle(center, radius, color, thickness);
+  g_ui_ctx.frame_data()->add_circle(center, radius, color, thickness);
 }
 
 void line(vec2 p0, vec2 p1, Color color, float thickness) noexcept
@@ -264,7 +264,7 @@ void line(vec2 p0, vec2 p1, Color color, float thickness) noexcept
   p1        *= scale;
   thickness *= scale;
 
-  // g_ui_ctx.cmd()->draw_line(p0, p1, color, thickness);
+  g_ui_ctx.frame_data()->add_line(p0, p1, color, thickness);
 }
 
 void bezier(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
@@ -378,19 +378,19 @@ auto button(
 }
 
 auto button(
-  std::string_view                        name,
-  int                                     x,
-  int                                     y,
-  uint32_t                                width,
-  uint32_t                                height,
-  Color                                   button_color,
-  Color                                   button_hover_color,
-  std::optional<Color>                    mouse_down_color,
-  std::function<void(uint32_t, uint32_t)> icon_update_func,
-  uint32_t                                icon_width,
-  uint32_t                                icon_height,
-  Color                                   icon_color,
-  Color                                   icon_hover_color) noexcept-> ButtonState
+  std::string_view                               name,
+  int                                            x,
+  int                                            y,
+  uint32_t                                       width,
+  uint32_t                                       height,
+  Color                                          button_color,
+  Color                                          button_hover_color,
+  std::optional<Color>                           mouse_down_color,
+  std::function<void(uint32_t, uint32_t, Color)> icon_update_func,
+  uint32_t                                       icon_width,
+  uint32_t                                       icon_height,
+  Color                                          icon_color,
+  Color                                          icon_hover_color) noexcept-> ButtonState
 {
   auto id    = g_ui_ctx.generic_id(name);
   auto state = button(id, x, y, width, height);
@@ -419,9 +419,7 @@ auto button(
     
     g_ui_ctx.render_on(x + x_offset, y + y_offset, [&]
     {
-      // g_ui_ctx.cmd()->enable_tmp_color(icon_color);
-      icon_update_func(icon_width, icon_height);
-      // g_ui_ctx.cmd()->disable_tmp_color();
+      icon_update_func(icon_width, icon_height, icon_color);
     });
   }
 

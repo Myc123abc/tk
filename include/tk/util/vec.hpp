@@ -1,7 +1,9 @@
 #pragma once
 
+#include <initializer_list>
 #include <numbers>
 #include <immintrin.h>
+#include <assert.h>
 
 namespace tk {
 
@@ -36,13 +38,13 @@ struct vec<2, T>
   constexpr vec(X x, Y y) noexcept
     : x(static_cast<T>(x)), y(static_cast<T>(y)) {}
 
-  template <Numeric... U>
-  requires (sizeof...(U) <= 2)
-  explicit constexpr vec(U... values) noexcept
+  template <Numeric U>
+  constexpr vec(std::initializer_list<U> values) noexcept
   {
-    T arr[] = { static_cast<T>(values)... };
-    if constexpr (sizeof...(U) > 0) x = arr[0];
-    if constexpr (sizeof...(U) > 1) y = arr[1];
+    assert(values.size() <= 2);
+    auto it = values.begin();
+    if (it != values.end()) x = static_cast<T>(*it++);
+    if (it != values.end()) y = static_cast<T>(*it++);
   }
 
   constexpr auto operator+(T v) const noexcept -> self { return { x + v, y + v }; }
@@ -107,14 +109,14 @@ struct vec<3, T>
   constexpr vec(X x, vec<2, U> yz) noexcept
     : x(static_cast<T>(x)), y(static_cast<T>(yz.x)), z(static_cast<T>(yz.y)) {}
 
-  template <Numeric... U>
-  requires (sizeof...(U) <= 3)
-  explicit constexpr vec(U... values) noexcept
+  template <Numeric U>
+  constexpr vec(std::initializer_list<U> values) noexcept
   {
-    T arr[] = { static_cast<T>(values)... };
-    if constexpr (sizeof...(U) > 0) x = arr[0];
-    if constexpr (sizeof...(U) > 1) y = arr[1];
-    if constexpr (sizeof...(U) > 2) z = arr[2];
+    assert(values.size() <= 3);
+    auto it = values.begin();
+    if (it != values.end()) x = static_cast<T>(*it++);
+    if (it != values.end()) y = static_cast<T>(*it++);
+    if (it != values.end()) z = static_cast<T>(*it++);
   }
 
   constexpr auto operator+(T v) const noexcept -> self { return { x + v, y + v, z + v }; }
@@ -195,15 +197,15 @@ struct vec<4, T>
   constexpr vec(X x, Y y, vec<2, U> zw) noexcept
     : x(static_cast<T>(x)), y(static_cast<T>(y)), z(static_cast<T>(zw.x)), w(static_cast<T>(zw.y)) {}
 
-  template <Numeric... U>
-  requires (sizeof...(U) <= 4)
-  explicit constexpr vec(U... values) noexcept
+  template <Numeric U>
+  constexpr vec(std::initializer_list<U> values) noexcept
   {
-    T arr[] = { static_cast<T>(values)... };
-    if constexpr (sizeof...(U) > 0) x = arr[0];
-    if constexpr (sizeof...(U) > 1) y = arr[1];
-    if constexpr (sizeof...(U) > 2) z = arr[2];
-    if constexpr (sizeof...(U) > 3) w = arr[3];
+    assert(values.size() <= 4);
+    auto it = values.begin();
+    if (it != values.end()) x = static_cast<T>(*it++);
+    if (it != values.end()) y = static_cast<T>(*it++);
+    if (it != values.end()) z = static_cast<T>(*it++);
+    if (it != values.end()) w = static_cast<T>(*it++);
   }
 
   constexpr auto operator+(T v) const noexcept -> self { return { x + v, y + v, z + v, w + v }; }
@@ -246,9 +248,19 @@ struct alignas(16) vec<4, float>
 
   union
   {
-    struct { float x, y, z, w; };
+    struct { float x{}, y{}, z{}, w{}; };
     __m128 simd;
   };
+
+  constexpr vec(std::initializer_list<float> values) noexcept
+  {
+    assert(values.size() <= 4);
+    auto it = values.begin();
+    if (it != values.end()) x = *it++;
+    if (it != values.end()) y = *it++;
+    if (it != values.end()) z = *it++;
+    if (it != values.end()) w = *it++;
+  }
 
   vec() noexcept : simd(_mm_setzero_ps()) {}
 
