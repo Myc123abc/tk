@@ -50,9 +50,15 @@ public:
   void add_triangle(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept;
   void add_circle(vec2 center, float radius, Color color, float thickness) noexcept;
   void add_line(vec2 p0, vec2 p1, Color color, float thickness) noexcept;
-  void add_bezier_quadratic(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept;
+  void add_bezier_quad(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept;
   void add_bezier_cubic(vec2 p0, vec2 p1, vec2 p2, vec2 p3, Color color, float thickness) noexcept;
   void add_image(ImageHandle handle, vec2 left_top, vec2 right_bottom, uint8_t alpha) noexcept;
+
+  void path_line_to(vec2 p) noexcept { _points.emplace_back(p); }
+  void path_arc_to(vec2 center, float radius, float min, float max) noexcept;
+  void path_bezier_quad_to(vec2 p1, vec2 p2) noexcept;
+  void path_bezier_cubic_to(vec2 p1, vec2 p2, vec2 p3) noexcept;
+  void path_end(Color color, float thickness, bool is_closed) noexcept;
 
   void add_scissor_rect(RECT rect) noexcept;
 
@@ -124,15 +130,17 @@ public:
 private:
   void add_draw_call(DrawDataType type, ImageHandle image_handle = {}, uint8_t image_alpha = {}) noexcept;
 
-  void set_points(std::vector<vec2>&& points) noexcept { _points = std::move(points); }
   void add_convex_poly_filled(Color color) noexcept;
+  void add_concave_poly_filled(Color color) noexcept;
 
+  static auto calc_circle_segment_count(float radius) noexcept -> float;
   static auto get_circle_segment_count(float radius) noexcept -> uint32_t;
-  void path_arc_to(vec2 center, float radius) noexcept;
 
   void add_poly_line(Color color, float thickness, bool is_closed) noexcept;
+  void _path_arc_to(vec2 center, float radius, int min, int max) noexcept;
+  void _path_arc_to(vec2 center, float radius, int min, int max, int segment_cnt) noexcept;
 
-  void path_bezier_quadratic_curve_to_casteljau(vec2 p0, vec2 p1, vec2 p2, float tess_tol, int level) noexcept;
+  void path_bezier_quad_curve_to_casteljau(vec2 p0, vec2 p1, vec2 p2, float tess_tol, int level) noexcept;
   void path_bezier_cubic_curve_to_casteljau(vec2 p0, vec2 p1, vec2 p2, vec2 p3, float tess_tol, int level) noexcept;
 
 private:
@@ -156,9 +164,12 @@ private:
   std::vector<vec2> _normals;
   std::vector<vec2> _tmp_buf;
 
-  inline static auto constexpr arc_table_size = 48;
-  inline static auto constexpr arc_sample_max = arc_table_size;
-  inline static std::array<int, 64> _circle_segment_counts;
+  inline static auto constexpr arc_table_size         = 48;
+  inline static auto constexpr arc_sample_max         = arc_table_size;
+  inline static auto constexpr curve_tessellation_tol = 1.25f;
+  inline static auto constexpr tessellation_max_error = 0.3f;
+  inline static auto           arc_radius_cutoff      = 0.f;
+  inline static std::array<int, 64>              _circle_segment_counts;
   inline static std::array<vec2, arc_table_size> _arc_vertices;
 };
 

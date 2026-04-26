@@ -46,29 +46,20 @@ public:
     for (auto const& pt : _lerp_pts)
       _pts.emplace_back(ui::lerp(pt.p0, pt.p1, v));
 
-    auto change = _pts[1].x != _pts[8].x;
-
     ui::begin_union();
 
-    ui::begin_path();
-    ui::line(_pts[0], _pts[1]);
-    if (change)
-      ui::bezier_quadratic(_pts[1], _pts[8], _pts[2]);
-    else
-      ui::line(_pts[1], _pts[2]);
-    ui::line(_pts[2], _pts[3]);
-    ui::line(_pts[3], _pts[0]);
-    ui::end_path();
+    ui::path_line_to(_pts[0]);
+    ui::path_line_to(_pts[1]);
+    ui::path_bezier_quad_to(_pts[8], _pts[2]);
+    ui::path_line_to(_pts[3]);
+    ui::path_end(color, thickness, true);
 
-    ui::begin_path();
-    ui::line(_pts[4], _pts[5]);
-    ui::line(_pts[5], _pts[6]);
-    ui::line(_pts[6], _pts[7]);
-    if (change)
-      ui::bezier_quadratic(_pts[7], _pts[9], _pts[4]);
-    else
-      ui::line(_pts[7], _pts[4]);
-    ui::end_path();
+    ui::path_line_to(_pts[7]);
+    ui::path_bezier_quad_to(_pts[9], _pts[4]);
+    ui::path_line_to(_pts[5]);
+    if (_pts[6] != _pts[5])
+      ui::path_line_to(_pts[6]);
+    ui::path_end(color, thickness, true);
 
     ui::end_union(color, thickness);
 
@@ -171,6 +162,97 @@ void line_draw_test() noexcept
   }
 }
 
+void test_path_draw() noexcept
+{
+  auto pos = vec2{ 10, 10 };
+  ui::path_line_to({ pos.x, pos.y });
+  ui::path_line_to({ pos.x + 100, pos.y + 100 });
+  ui::path_line_to({ pos.x + 50, pos.y + 75 });
+  ui::path_end(0xff0000ff);
+
+  pos.x += 110;
+  ui::path_line_to({ pos.x, pos.y });
+  ui::path_line_to({ pos.x + 100, pos.y + 100 });
+  ui::path_line_to({ pos.x + 50, pos.y + 75 });
+  ui::path_end(0xff0000ff, 1, true);
+
+  pos.x += 110;
+  ui::path_line_to({ pos.x, pos.y });
+  ui::path_line_to({ pos.x + 100, pos.y + 100 });
+  ui::path_line_to({ pos.x + 50, pos.y + 75 });
+  ui::path_end(0xff0000ff, 1, false);
+
+  pos = vec2{ 10, 10 };
+  pos.y += 110;
+  ui::path_arc_to({ pos.x + 50, pos.y + 50 }, 25, - std::numbers::pi * 0.5, std::numbers::pi);
+  ui::path_end(0xff0000ff);
+
+  pos.x += 110;
+  ui::path_arc_to({ pos.x + 50, pos.y + 50 }, 25, - std::numbers::pi * 0.5, std::numbers::pi);
+  ui::path_end(0xff0000ff, 3);
+
+  pos.x += 110;
+  ui::path_arc_to({ pos.x + 50, pos.y + 50 }, 25, - std::numbers::pi * 0.5, std::numbers::pi);
+  ui::path_end(0xff0000ff, 3, false);
+
+  pos = vec2{ 10, 10 };
+  pos.y += 110 * 2;
+  ui::path_line_to(pos);
+  ui::path_bezier_quad_to({ pos.x, pos.y + 100 }, { pos.x + 100, pos.y + 50 });
+  ui::path_end(0xff0000ff);
+
+  pos.x += 110;
+  ui::path_line_to(pos);
+  ui::path_bezier_quad_to({ pos.x, pos.y + 100 }, { pos.x + 100, pos.y + 50 });
+  ui::path_end(0xff0000ff, 3, true);
+
+  pos.x += 110;
+  ui::path_line_to(pos);
+  ui::path_bezier_quad_to({ pos.x, pos.y + 100 }, { pos.x + 100, pos.y + 50 });
+  ui::path_end(0xff0000ff, 3, false);
+
+  pos = vec2{ 10, 10 };
+  pos.y += 110 * 3;
+  ui::path_line_to(pos);
+  ui::path_line_to({ pos.x + 100, pos.y });
+  ui::path_line_to({ pos.x + 50, pos.y + 40 });
+  ui::path_line_to({ pos.x + 100, pos.y + 100 });
+  ui::path_line_to({ pos.x, pos.y + 100 });
+  ui::path_end(0xff0000ff);
+
+  pos.x += 110;
+  ui::path_line_to(pos);
+  ui::path_line_to({ pos.x + 100, pos.y });
+  ui::path_line_to({ pos.x + 50, pos.y + 40 });
+  ui::path_line_to({ pos.x + 100, pos.y + 100 });
+  ui::path_line_to({ pos.x, pos.y + 100 });
+  ui::path_end(0xff0000ff, 3, true);
+
+  pos.x += 110;
+  ui::path_line_to(pos);
+  ui::path_line_to({ pos.x + 100, pos.y });
+  ui::path_line_to({ pos.x + 50, pos.y + 40 });
+  ui::path_line_to({ pos.x + 100, pos.y + 100 });
+  ui::path_line_to({ pos.x, pos.y + 100 });
+  ui::path_end(0xff0000ff, 3, false);
+
+  pos = vec2{ 10, 10 };
+  pos.y += 110 * 4;
+  ui::path_line_to(pos);
+  ui::path_bezier_cubic_to({ pos.x + 50, pos.y }, { pos.x + 100, pos.y + 100 }, { pos.x + 50, pos.y + 100 });
+  ui::path_end(0xff0000ff);
+
+  pos.x += 110;
+  ui::path_line_to(pos);
+  ui::path_bezier_cubic_to({ pos.x + 50, pos.y }, { pos.x + 100, pos.y + 100 }, { pos.x + 50, pos.y + 100 });
+  ui::path_end(0xff0000ff, 3, true);
+
+  pos.x += 110;
+  ui::path_line_to(pos);
+  ui::path_bezier_cubic_to({ pos.x + 50, pos.y }, { pos.x + 100, pos.y + 100 }, { pos.x + 50, pos.y + 100 });
+  ui::path_end(0xff0000ff, 3, false);
+}
+
 int main()
 {
   tk::init();
@@ -234,8 +316,9 @@ int main()
       // circle_draw_test();
       // line_draw_test();
       // ui::circle({ 100, 100 }, 50, 0x00ffffff, 10);
-      // ui::bezier_quadratic({ 100, 100 }, { 200, 200 }, { 50, 300 }, 0xff0000ff, 0);
-      ui::bezier_cubic({ 100, 100 }, { 200, 200 }, { 50, 300 }, { 100, 100 }, 0xff0000ff, 0);
+      // ui::bezier_quad({ 100, 100 }, { 200, 200 }, { 50, 300 }, 0xff0000ff, 0);
+      // ui::bezier_cubic({ 100, 100 }, { 200, 200 }, { 50, 300 }, { 100, 100 }, 0xff0000ff, 0);
+      // test_path_draw();
 
       ui::end();
     }
@@ -302,7 +385,7 @@ int main()
 
       auto text_pos = p2 + vec2{ 0, 10 };
       auto text_ext = ui::text("Hello, World!", text_pos, 32, 0xffff00ff);
-      ui::rectangle(text_pos, text_ext, 0x00ff00ff, 1);
+      // ui::rectangle(text_pos, text_ext, 0x00ff00ff, 1);
 
       if (ui::button("blur onoff", 50, 50, 50, 50, 0x0000ffff, 0x00ff00ff))
       {

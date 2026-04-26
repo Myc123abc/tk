@@ -267,16 +267,6 @@ void restore_fullscreen_window() noexcept;
  */
 void discard_rectangle(vec2 left_top, vec2 right_bottom) noexcept;
 
-/// use path draw between lines and beziers
-void begin_path() noexcept;
-
-/**
- * end the path draw
- * @param color
- * @param thickness
- */
-void end_path(Color color = {}, float thickness = {}) noexcept;
-
 /// use union operator between shapes
 void begin_union() noexcept;
 
@@ -329,14 +319,14 @@ void circle(vec2 center, float radius, Color color = {}, float thickness = {}) n
 void line(vec2 p0, vec2 p1, Color color = {}, float thickness = 1.f) noexcept;
 
 /**
- * draw a quadratic bezier
+ * draw a quad bezier
  * @param p0
  * @param p1
  * @param p2
  * @param color
  * @param thickness
  */
-void bezier_quadratic(vec2 p0, vec2 p1, vec2 p2, Color color = {}, float thickness = 1.f) noexcept;
+void bezier_quad(vec2 p0, vec2 p1, vec2 p2, Color color = {}, float thickness = 1.f) noexcept;
 
 /**
  * draw a cubic bezier
@@ -348,6 +338,48 @@ void bezier_quadratic(vec2 p0, vec2 p1, vec2 p2, Color color = {}, float thickne
  * @param thickness
  */
 void bezier_cubic(vec2 p0, vec2 p1, vec2 p2, vec2 p3, Color color = {}, float thickness = 1.f) noexcept;
+
+////////////////////////////////////////////////////////////////////////////////
+///                             Path
+////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * path line to point
+ * @param p
+ */
+void path_line_to(vec2 p) noexcept;
+
+/**
+ * path arc to center with min to max
+ * @param center
+ * @param radius
+ * @param min
+ * @param max
+ */
+void path_arc_to(vec2 center, float radius, float min, float max) noexcept;
+
+/**
+ * path bezier quad draw
+ * @param p1
+ * @param p2
+ */
+void path_bezier_quad_to(vec2 p1, vec2 p2) noexcept;
+
+/**
+ * path bezier cubic draw
+ * @param p1
+ * @param p2
+ * @param p3
+ */
+void path_bezier_cubic_to(vec2 p1, vec2 p2, vec2 p3) noexcept;
+
+/**
+ * path draw end
+ * @param color
+ * @param thickness
+ * @param is_closed
+ */
+void path_end(Color color, float thickness = 0.f, bool is_closed = true) noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                               Widget

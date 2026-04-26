@@ -267,7 +267,7 @@ void line(vec2 p0, vec2 p1, Color color, float thickness) noexcept
   g_ui_ctx.frame_data()->add_line(p0, p1, color, thickness);
 }
 
-void bezier_quadratic(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
+void bezier_quad(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
 {
   if (thickness < 1) thickness = 1;
 
@@ -284,7 +284,7 @@ void bezier_quadratic(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) n
   p2        *= scale;
   thickness *= scale;
 
-  g_ui_ctx.frame_data()->add_bezier_quadratic(p0, p1, p2, color, thickness);
+  g_ui_ctx.frame_data()->add_bezier_quad(p0, p1, p2, color, thickness);
 }
 
 void bezier_cubic(vec2 p0, vec2 p1, vec2 p2, vec2 p3, Color color, float thickness) noexcept
@@ -307,6 +307,77 @@ void bezier_cubic(vec2 p0, vec2 p1, vec2 p2, vec2 p3, Color color, float thickne
   thickness *= scale;
 
   g_ui_ctx.frame_data()->add_bezier_cubic(p0, p1, p2, p3, color, thickness);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///                               Path
+////////////////////////////////////////////////////////////////////////////////
+
+void path_line_to(vec2 p) noexcept
+{
+	g_ui_ctx.check_draw();
+
+	auto offset = g_ui_ctx.get_render_pos();
+  p += offset;
+
+  auto scale = g_ui_ctx.window()->scale();
+  p *= scale;
+
+  g_ui_ctx.frame_data()->path_line_to(p);
+}
+
+void path_arc_to(vec2 center, float radius, float min, float max) noexcept
+{
+  g_ui_ctx.check_draw();
+
+	auto offset = g_ui_ctx.get_render_pos();
+  center += offset;
+
+  auto scale = g_ui_ctx.window()->scale();
+  center *= scale;
+  radius *= scale;
+
+  g_ui_ctx.frame_data()->path_arc_to(center, radius, min, max);
+}
+
+void path_bezier_quad_to(vec2 p1, vec2 p2) noexcept
+{
+  g_ui_ctx.check_draw();
+
+  auto offset = g_ui_ctx.get_render_pos();
+  p1 += offset;
+  p2 += offset;
+
+  auto scale = g_ui_ctx.window()->scale();
+  p1 *= scale;
+  p2 *= scale;
+
+  g_ui_ctx.frame_data()->path_bezier_quad_to(p1, p2);
+}
+
+void path_bezier_cubic_to(vec2 p1, vec2 p2, vec2 p3) noexcept
+{
+	g_ui_ctx.check_draw();
+
+	auto offset = g_ui_ctx.get_render_pos();
+  p1 += offset;
+  p2 += offset;
+  p3 += offset;
+
+  auto scale = g_ui_ctx.window()->scale();
+  p1 *= scale;
+  p2 *= scale;
+  p3 *= scale;
+
+  g_ui_ctx.frame_data()->path_bezier_cubic_to(p1, p2, p3);
+}
+
+void path_end(Color color, float thickness, bool is_closed) noexcept
+{
+	g_ui_ctx.check_draw();
+  auto scale = g_ui_ctx.window()->scale();
+  thickness *= scale;
+  g_ui_ctx.frame_data()->path_end(color, thickness, is_closed);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
