@@ -158,7 +158,7 @@ void Image::create_descriptor(bool use_mipmap) noexcept
   auto create_depth_stencil_view = [&]
   {
     auto dsv_desc = D3D12_DEPTH_STENCIL_VIEW_DESC{};
-    dsv_desc.Format        = DXGI_FORMAT_D32_FLOAT;
+    dsv_desc.Format        = DXGI_FORMAT_D24_UNORM_S8_UINT;
     dsv_desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
     device->CreateDepthStencilView(_handle.Get(), &dsv_desc, _desc.dsv.cpu_handle());
   };

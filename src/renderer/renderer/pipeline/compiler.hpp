@@ -66,7 +66,7 @@ public:
 
     void get_vertex_input_layout(ID3D12ShaderReflection* shader_reflection) noexcept;
 
-    void get_root_parameters(ID3D12ShaderReflection* shader_reflection, bool is_compute_shader, std::unordered_set<std::string> const& volatile_descs) noexcept;
+    void get_root_parameters(ID3D12ShaderReflection* shader_reflection, bool is_compute_shader, std::unordered_set<std::string_view> const& volatile_descs) noexcept;
  
   private:
     Microsoft::WRL::ComPtr<IDxcBlob>      _vs_cso;
@@ -101,19 +101,19 @@ public:
   };
 
   auto compile(
-    std::string_view                       shader,
-    std::string_view                       vertex_shader_entry_point,
-    std::string_view                       pixel_shader_entry_point,
-    std::vector<std::string_view> const&   includes       = {},
-    std::optional<RootSignatureResult>     res            = {},
-    std::unordered_set<std::string> const& volatile_descs = {}) noexcept -> CompileResult;
+    std::string_view                            shader,
+    std::string_view                            vertex_shader_entry_point,
+    std::string_view                            pixel_shader_entry_point,
+    std::vector<std::string_view> const&        includes       = {},
+    std::optional<RootSignatureResult>          res            = {},
+    std::unordered_set<std::string_view> const& volatile_descs = {}) noexcept -> CompileResult;
 
   auto compile(
-    std::string_view                       shader,
-    std::string_view                       compute_shader_entry_point,
-    std::vector<std::string_view> const&   includes       = {},
-    std::optional<RootSignatureResult>     res            = {},
-    std::unordered_set<std::string> const& volatile_descs = {}) noexcept -> CompileResult;
+    std::string_view                            shader,
+    std::string_view                            compute_shader_entry_point,
+    std::vector<std::string_view> const&        includes       = {},
+    std::optional<RootSignatureResult>          res            = {},
+    std::unordered_set<std::string_view> const& volatile_descs = {}) noexcept -> CompileResult;
 
 private:
   auto compile(std::string_view shader_path, std::vector<std::string_view> const& includes, std::wstring_view profile, std::string_view entry_point) noexcept -> std::pair<Microsoft::WRL::ComPtr<IDxcResult>, Microsoft::WRL::ComPtr<IDxcBlob>>;

@@ -19,7 +19,7 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
     frame.image.init(width, height, Render_Target_Format, ImageType::rtv);
   
   // create depth test image
-  _dsv_image.init(width, height, ImageFormat::d32, ImageType::dsv);
+  _dsv_image.init(width, height, ImageFormat::d24_s8, ImageType::dsv);
 
   // create swapchain
   ComPtr<IDXGISwapChain1> swapchain;

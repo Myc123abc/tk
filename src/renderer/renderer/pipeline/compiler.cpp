@@ -273,12 +273,12 @@ auto Compiler::compile(std::string_view shader_path, std::vector<std::string_vie
 }
 
 auto Compiler::compile(
-  std::string_view                       shader,
-  std::string_view                       vertex_shader_entry_point,
-  std::string_view                       pixel_shader_entry_point,
-  std::vector<std::string_view> const&   includes,
-  std::optional<RootSignatureResult>     res,
-  std::unordered_set<std::string> const& volatile_descs) noexcept -> CompileResult
+  std::string_view                            shader,
+  std::string_view                            vertex_shader_entry_point,
+  std::string_view                            pixel_shader_entry_point,
+  std::vector<std::string_view> const&        includes,
+  std::optional<RootSignatureResult>          res,
+  std::unordered_set<std::string_view> const& volatile_descs) noexcept -> CompileResult
 {
   // compile shaders
   auto [vs_res, vs_cso] = compile(shader, includes, L"vs_6_0", vertex_shader_entry_point);
@@ -313,11 +313,11 @@ auto Compiler::compile(
 }
 
 auto Compiler::compile(
-  std::string_view                       shader,
-  std::string_view                       compute_shader_entry_point,
-  std::vector<std::string_view> const&   includes,
-  std::optional<RootSignatureResult>     res,
-  std::unordered_set<std::string> const& volatile_descs) noexcept -> CompileResult
+  std::string_view                            shader,
+  std::string_view                            compute_shader_entry_point,
+  std::vector<std::string_view> const&        includes,
+  std::optional<RootSignatureResult>          res,
+  std::unordered_set<std::string_view> const& volatile_descs) noexcept -> CompileResult
 {
   auto [comp_res, cso] = compile(shader, includes, L"cs_6_0", compute_shader_entry_point);
 
@@ -394,7 +394,7 @@ void Compiler::CompileResult::get_vertex_input_layout(ID3D12ShaderReflection* sh
     input_layout_desc = D3D12_INPUT_LAYOUT_DESC{ _input_element_descs.data(), static_cast<uint32_t>(_input_element_descs.size()) };
 }
 
-void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader_reflection, bool is_compute_shader, std::unordered_set<std::string> const& volatile_descs) noexcept
+void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader_reflection, bool is_compute_shader, std::unordered_set<std::string_view> const& volatile_descs) noexcept
 {
   auto desc = D3D12_SHADER_DESC{};
   shader_reflection->GetDesc(&desc);

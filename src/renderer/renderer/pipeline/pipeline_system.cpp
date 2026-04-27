@@ -14,12 +14,41 @@ void PipelineSystem::init() noexcept
 
   auto res = generate_root_signature(
   {
-    { constants,   "constants", 0, 0, false, sizeof(Constants) },
-    { texture,     "image",     0, 0                           },
+    { constants, "constants", 0, 0, false, sizeof(Constants) },
+    { texture,   "image",     0, 0                           },
   }, true, true);
-  _pipes.emplace(PipelineType::shape, Pipeline{ "assets/shader/ui/shape.hlsl", "vs", "ps", { "assets/shader/ui" }, RenderResource::Render_Target_Format, true, false, res });
-  _pipes.emplace(PipelineType::image, Pipeline{ "assets/shader/ui/image.hlsl", "vs", "ps", { "assets/shader/ui" }, RenderResource::Render_Target_Format, true, false, res });
-  _pipes.emplace(PipelineType::window_shadow, Pipeline{ "assets/shader/ui/window_shadow.hlsl", "vs", "ps", { "assets/shader/ui" }, RenderResource::Render_Target_Format, true, false, res });
+
+  auto info = PipelineCreateInfo{};
+  info.shader                  = "assets/shader/ui/shape.hlsl";
+  info.graphics.vs             = "vs";
+  info.graphics.ps             = "ps";
+  info.includes                = { "assets/shader/ui" };
+  info.graphics.rtv_format     = RenderResource::Render_Target_Format;
+  info.graphics.use_blend      = true;
+  info.graphics.use_depth_test = false;
+  info.graphics.stencil        = {};
+  info.root_signature_result   = res;
+  _pipes.emplace(PipelineType::shape, info);
+
+  auto stencil = StencilState{};
+  stencil.op = StencilOp::replace;
+  info.graphics.stencil   = stencil;
+  info.graphics.use_blend = false;
+  _pipes.emplace(PipelineType::stencil_write, info);
+
+  stencil.op            = StencilOp::keep;
+  stencil.comp          = CompFunc::equal;
+  stencil.write_color   = true;
+  info.graphics.stencil = stencil;
+  _pipes.emplace(PipelineType::stencil_test, info);
+
+  info.shader             = "assets/shader/ui/image.hlsl";
+  info.graphics.stencil   = {};
+  info.graphics.use_blend = true;
+  _pipes.emplace(PipelineType::image, info);
+
+  info.shader = "assets/shader/ui/window_shadow.hlsl";
+  _pipes.emplace(PipelineType::window_shadow, info);
 
   // res = generate_root_signature(
   // {
@@ -48,19 +77,9 @@ auto PipelineSystem::find_root_param(std::span<CD3DX12_ROOT_PARAMETER1> params) 
   return it->first.Get();
 }
 
-void PipelineSystem::Pipeline::init_graphics(
-    std::string_view                       shader,
-    std::string_view                       vs,
-    std::string_view                       ps,
-    std::vector<std::string_view> const&   includes,
-    ImageFormat                            rtv_format,
-    bool                                   use_blend,
-    bool                                   use_depth_test,
-    std::optional<RootSignatureResult>     res,
-    std::unordered_set<std::string> const& volatile_descs
-  ) noexcept
+void PipelineSystem::Pipeline::init_graphics(PipelineCreateInfo const& info) noexcept
 {
-  auto compile_result = g_compiler.compile(shader, vs, ps, includes, res, volatile_descs);
+  auto compile_result = g_compiler.compile(info.shader, info.graphics.vs, info.graphics.ps, info.includes, info.root_signature_result, info.volatile_descs);
   
   if (auto res = g_pipe_sys.find_root_param(compile_result.root_params))
     root_signature = res;
@@ -72,7 +91,7 @@ void PipelineSystem::Pipeline::init_graphics(
   
   auto render_target_formats = D3D12_RT_FORMAT_ARRAY{};
   render_target_formats.NumRenderTargets = 1;
-  render_target_formats.RTFormats[0]     = static_cast<DXGI_FORMAT>(rtv_format);
+  render_target_formats.RTFormats[0]     = static_cast<DXGI_FORMAT>(info.graphics.rtv_format);
   
   stream.pRootSignature        = root_signature;
   stream.InputLayout           = compile_result.input_layout_desc;
@@ -86,33 +105,47 @@ void PipelineSystem::Pipeline::init_graphics(
   rasterizer.DepthClipEnable = false;
   rasterizer.CullMode        = D3D12_CULL_MODE_NONE;
   stream.RasterizerState     = rasterizer;
-    
+
+  // depth and stencil setting  
   auto depth_stencil_desc = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
   depth_stencil_desc.DepthEnable           = false;
   depth_stencil_desc.DepthBoundsTestEnable = false;
-  if (use_depth_test)
+  if (info.graphics.use_depth_test)
   {
+    depth_stencil_desc.DepthEnable = true;
+
     // check feature support
     auto options = D3D12_FEATURE_DATA_D3D12_OPTIONS2{};
     err_if(g_core.device()->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS2, &options, sizeof(options)),
             "failed to get feature options");
     err_if(!options.DepthBoundsTestSupported, "unsupport depth bounds test");
-
     depth_stencil_desc.DepthBoundsTestEnable = true;
-    stream.DSVFormat                         = DXGI_FORMAT_D32_FLOAT;
   }
+  if (info.graphics.stencil)
+  {
+    auto stencil = info.graphics.stencil.value();
+    depth_stencil_desc.StencilEnable = true;
+    depth_stencil_desc.FrontFace.StencilPassOp = static_cast<D3D12_STENCIL_OP>(stencil.op);
+    depth_stencil_desc.FrontFace.StencilFunc   = static_cast<D3D12_COMPARISON_FUNC>(stencil.comp);
+    depth_stencil_desc.BackFace = depth_stencil_desc.FrontFace;
+  }
+  if (info.graphics.use_depth_test || info.graphics.stencil)
+    stream.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
   stream.DepthStencilState = depth_stencil_desc;
   
   auto  blend_state = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
   auto& rt          = blend_state.RenderTarget[0];
-  rt.BlendEnable           = use_blend;
-  rt.SrcBlend              = D3D12_BLEND_SRC_ALPHA;
-  rt.DestBlend             = D3D12_BLEND_INV_SRC_ALPHA;
-  rt.BlendOp               = D3D12_BLEND_OP_ADD;
-  rt.SrcBlendAlpha         = D3D12_BLEND_ONE;
-  rt.DestBlendAlpha        = D3D12_BLEND_INV_SRC_ALPHA;
-  rt.BlendOpAlpha          = D3D12_BLEND_OP_ADD;
-  rt.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+  rt.BlendEnable    = info.graphics.use_blend;
+  rt.SrcBlend       = D3D12_BLEND_SRC_ALPHA;
+  rt.DestBlend      = D3D12_BLEND_INV_SRC_ALPHA;
+  rt.BlendOp        = D3D12_BLEND_OP_ADD;
+  rt.SrcBlendAlpha  = D3D12_BLEND_ONE;
+  rt.DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
+  rt.BlendOpAlpha   = D3D12_BLEND_OP_ADD;
+  if (info.graphics.stencil)
+    rt.RenderTargetWriteMask = info.graphics.stencil->write_color ? D3D12_COLOR_WRITE_ENABLE_ALL : 0;
+  else
+    rt.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
   stream.BlendState = blend_state;
   
   auto pipeline_state_stream_desc = D3D12_PIPELINE_STATE_STREAM_DESC{ sizeof(stream), &stream };
@@ -120,10 +153,9 @@ void PipelineSystem::Pipeline::init_graphics(
           "failed to create pipeline state");
 }
 
-void PipelineSystem::Pipeline::init_compute(std::string_view shader, std::string_view cs, std::vector<std::string_view> const& includes,
-  std::optional<RootSignatureResult> res, std::unordered_set<std::string> const& volatile_descs) noexcept
+void PipelineSystem::Pipeline::init_compute(PipelineCreateInfo const& info) noexcept
 {
-  auto compile_result = g_compiler.compile(shader, cs, includes, res, volatile_descs);
+  auto compile_result = g_compiler.compile(info.shader, info.compute.cs, info.includes, info.root_signature_result, info.volatile_descs);
   if (auto res = g_pipe_sys.find_root_param(compile_result.root_params))
     root_signature = res;
   else
