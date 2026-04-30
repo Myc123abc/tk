@@ -58,6 +58,7 @@ public:
   void present(bool vsync) const noexcept;
 
   void clear_image() noexcept;
+  void clear_depth_stencil() noexcept;
 
   auto& current_frame() noexcept { return _frames[_frame_index]; }
 

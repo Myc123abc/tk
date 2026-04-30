@@ -154,21 +154,14 @@ void restore_fullscreen_window() noexcept
 ///                            Shape Operator
 ////////////////////////////////////////////////////////////////////////////////
 
-void discard_rectangle(vec2 left_top, vec2 right_bottom) noexcept
+void discard_beg(std::function<void()> func) noexcept
 {
-  g_ui_ctx.check_draw();  
-  g_ui_ctx.check_path_not_draw();
-  g_ui_ctx.check_union_not_draw();
+  g_ui_ctx.frame_data()->discard_beg(func);
+}
 
-  auto offset = g_ui_ctx.get_render_pos();
-  left_top     += offset;
-  right_bottom += offset;
-
-  auto scale = g_ui_ctx.window()->scale();
-  left_top     *= scale;
-  right_bottom *= scale;
-
-  // g_ui_ctx.cmd()->add_discard_rectangle(left_top, right_bottom);
+void discard_end() noexcept
+{
+  g_ui_ctx.frame_data()->discard_end();
 }
 
 void begin_path() noexcept

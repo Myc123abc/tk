@@ -17,6 +17,41 @@ struct WindowShadowInfo
   std::optional<vec4> wireframe_color;
 };
 
+inline ImageHandle Write_Image_Handle = {};
+
+struct DrawData
+{
+  enum class Type
+  {
+    ui,
+    stencil_replace_write,
+    stencil_equal_test,
+    stencil_not_equal_test,
+  };
+
+  DrawData(Type type, uint32_t index_beg, uint32_t indices_size, ImageHandle image_handle = {}, uint32_t stencil_value = {}, bool clear_stencil_image = {}) noexcept
+    : type(type), index_beg(index_beg), indices_size(indices_size), stencil_value(stencil_value), clear_stencil_image(clear_stencil_image)
+  {
+    if (image_handle)
+      this->image_handle = image_handle;
+    else
+      this->image_handle = Write_Image_Handle;
+  }
+
+  Type type{};
+
+  RECT     scissor_rect{};
+  uint32_t index_beg{};
+  uint32_t indices_size{};
+
+  ImageHandle image_handle{};
+
+  uint32_t stencil_value{};
+  bool     clear_stencil_image{};
+};
+
+using DrawDataType = DrawData::Type;
+
 class FrameData
 {
 public:
@@ -62,6 +97,9 @@ public:
 
   void add_scissor_rect(RECT rect) noexcept;
 
+  void discard_beg(std::function<void()> func) noexcept;
+  void discard_end() noexcept;
+
   void set_window_pos(vec2 pos) noexcept { _window_pos = pos; }
   auto window_pos() const noexcept { return _window_pos; }
 
@@ -97,38 +135,8 @@ private:
     _index_beg  += _tmp_indices_size;
   }
 
-  struct DrawData
-  {
-    enum class Type
-    {
-      shape,
-      image,
-    };
-
-    DrawData(Type type, uint32_t index_beg, uint32_t indices_size, ImageHandle image_handle = {}, uint8_t image_alpha = {})
-      : type(type), index_beg(index_beg), indices_size(indices_size)
-    {
-      if (image_alpha)
-      {
-        this->image_handle = image_handle;
-        this->image_alpha  = static_cast<float>(image_alpha) / 255;
-      }
-    }
-
-    Type type{};
-
-    RECT     scissor_rect{};
-    uint32_t index_beg{};
-    uint32_t indices_size{};
-
-    ImageHandle image_handle{};
-    float       image_alpha{};
-  };
-
-public:
-  using DrawDataType = DrawData::Type;
 private:
-  void add_draw_call(DrawDataType type, ImageHandle image_handle = {}, uint8_t image_alpha = {}) noexcept;
+  void add_draw_call(DrawDataType type, ImageHandle image_handle = {}, uint32_t stencil_value = {}, bool clear_stencil_image = {}) noexcept;
 
   void add_convex_poly_filled(Color color) noexcept;
   void add_concave_poly_filled(Color color) noexcept;
@@ -164,6 +172,8 @@ private:
   std::vector<vec2> _normals;
   std::vector<vec2> _tmp_buf;
 
+  bool _use_discard{};
+
   inline static auto constexpr arc_table_size         = 48;
   inline static auto constexpr arc_sample_max         = arc_table_size;
   inline static auto constexpr curve_tessellation_tol = 1.25f;
@@ -172,7 +182,5 @@ private:
   inline static std::array<int, 64>              _circle_segment_counts;
   inline static std::array<vec2, arc_table_size> _arc_vertices;
 };
-
-using DrawDataType = FrameData::DrawDataType;
 
 }

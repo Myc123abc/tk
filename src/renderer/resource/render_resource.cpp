@@ -182,21 +182,22 @@ void RenderResource::present(bool vsync) const noexcept
 
 void RenderResource::clear_image() noexcept
 {
-  auto& frame               = current_frame();
-  auto& render_target_image = frame.image;
-  auto  cmd                 = g_graphics_engine.cmd();
-  auto  rtv_handle          = render_target_image.rtv().cpu_handle();
-  auto  dsv_handle          = _dsv_image.dsv().cpu_handle();
+  auto cmd = g_graphics_engine.cmd();
+  auto img = &current_frame().image;
+  auto rtv = img->rtv().cpu_handle();
+  auto dsv = _dsv_image.dsv().cpu_handle();
 
   // set render target view
-  // cmd->OMSetRenderTargets(1, &rtv_handle, false, &dsv_handle);
-  cmd->OMSetRenderTargets(1, &rtv_handle, false, nullptr);
+  cmd->OMSetRenderTargets(1, &rtv, false, &dsv);
 
-  // clear color
-  render_target_image.clear_render_target(cmd);
-
-  // cmd->ClearDepthStencilView(dsv_handle, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
+  // clear img
+  img->clear_render_target(cmd);
   // cmd->OMSetDepthBounds(0.f, 1.f);
+}
+
+void RenderResource::clear_depth_stencil() noexcept
+{
+  _dsv_image.clear_depth_stencil(g_graphics_engine.cmd());
 }
 
 void FrameBuffer::init() noexcept

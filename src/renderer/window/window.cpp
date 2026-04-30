@@ -8,16 +8,6 @@
 
 using namespace tk::ui;
 
-namespace
-{
-
-auto in_range(float v, float min, float max) noexcept
-{
-  return v >= min && v <= max;
-}
-
-}
-
 namespace tk::renderer {
 
 void Window::init(int x, int y, uint32_t width, uint32_t height, ui::Backdrop const& backdrop) noexcept
@@ -131,10 +121,10 @@ auto Window::real_cursor_pos() const noexcept -> vec2i
 auto Window::cursor_valid_area() const noexcept -> RECT
 {
   auto rect = _rect;
-  rect.left   -= Window_Resize_Thickness;
-  rect.top    -= Window_Resize_Thickness;
-  rect.right  += Window_Resize_Thickness;
-  rect.bottom += Window_Resize_Thickness;
+  rect.left   -= resize_thickness();
+  rect.top    -= resize_thickness();
+  rect.right  += resize_thickness();
+  rect.bottom += resize_thickness();
   return rect;
 }
 
@@ -521,10 +511,19 @@ auto Window::get_resize_type(vec2i p) const noexcept -> ResizeType
 
   if (_maximized) return none;
 
-  auto left_side   = in_range(p.x, -Window_Resize_Thickness, 0);
-  auto right_side  = in_range(p.x, _width, _width + Window_Resize_Thickness);
-  auto top_side    = in_range(p.y, -Window_Resize_Thickness, 0);
-  auto bottom_side = in_range(p.y, _height, _height + Window_Resize_Thickness);
+  auto in_l = [](auto v, auto min, auto max) noexcept
+  {
+    return v >= min && v < max;
+  };
+  auto in_r = [](auto v, auto min, auto max) noexcept
+  {
+    return v > min && v <= max;
+  };
+
+  auto left_side   = in_l(p.x, -resize_thickness(), 0);
+  auto right_side  = in_r(p.x, _width, _width + resize_thickness());
+  auto top_side    = in_l(p.y, -resize_thickness(), 0);
+  auto bottom_side = in_r(p.y, _height, _height + resize_thickness());
 
   if (top_side)
   {

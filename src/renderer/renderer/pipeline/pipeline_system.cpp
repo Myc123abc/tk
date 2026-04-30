@@ -19,7 +19,7 @@ void PipelineSystem::init() noexcept
   }, true, true);
 
   auto info = PipelineCreateInfo{};
-  info.shader                  = "assets/shader/ui/shape.hlsl";
+  info.shader                  = "assets/shader/ui/ui.hlsl";
   info.graphics.vs             = "vs";
   info.graphics.ps             = "ps";
   info.includes                = { "assets/shader/ui" };
@@ -28,25 +28,26 @@ void PipelineSystem::init() noexcept
   info.graphics.use_depth_test = false;
   info.graphics.stencil        = {};
   info.root_signature_result   = res;
-  _pipes.emplace(PipelineType::shape, info);
+  _pipes.emplace(PipelineType::ui, info);
 
   auto stencil = StencilState{};
   stencil.op = StencilOp::replace;
   info.graphics.stencil   = stencil;
   info.graphics.use_blend = false;
-  _pipes.emplace(PipelineType::stencil_write, info);
+  _pipes.emplace(PipelineType::stencil_replace_write, info);
 
-  stencil.op            = StencilOp::keep;
-  stencil.comp          = CompFunc::equal;
-  stencil.write_color   = true;
-  info.graphics.stencil = stencil;
-  _pipes.emplace(PipelineType::stencil_test, info);
-
-  info.shader             = "assets/shader/ui/image.hlsl";
-  info.graphics.stencil   = {};
+  stencil.op              = StencilOp::keep;
+  stencil.comp            = CompFunc::equal;
+  stencil.write_color     = true;
+  info.graphics.stencil   = stencil;
   info.graphics.use_blend = true;
-  _pipes.emplace(PipelineType::image, info);
+  _pipes.emplace(PipelineType::stencil_equal_test, info);
 
+  stencil.comp          = CompFunc::not_equal;
+  info.graphics.stencil = stencil;
+  _pipes.emplace(PipelineType::stencil_not_equal_test, info);
+
+  info.graphics.stencil = {};
   info.shader = "assets/shader/ui/window_shadow.hlsl";
   _pipes.emplace(PipelineType::window_shadow, info);
 

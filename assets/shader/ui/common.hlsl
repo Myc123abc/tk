@@ -12,8 +12,7 @@ struct Constants
 
   float4 wireframe_color;
 
-  uint   draw_wireframe;
-  float  image_alpha;
+  uint draw_wireframe;
 };
 
 ConstantBuffer<Constants> constants : register(b0);

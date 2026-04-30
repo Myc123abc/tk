@@ -51,6 +51,7 @@ public:
   void destroy() const noexcept;
   
   auto shadow_thickness() const noexcept -> LONG { return Window_Shadow_Thickness * _scale; }
+  auto resize_thickness() const noexcept { return Window_Resize_Thickness * _scale; }
   auto real_x()      const noexcept -> int      { return _x      - shadow_thickness();     }
   auto real_y()      const noexcept -> int      { return _y      - shadow_thickness();     }
   auto real_width()  const noexcept -> uint32_t { return _width  + shadow_thickness() * 2; }

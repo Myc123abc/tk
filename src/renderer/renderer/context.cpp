@@ -13,6 +13,7 @@ void Context::set_cmd(ID3D12GraphicsCommandList1* cmd) noexcept
   _compute_constants_root_param_idx  = {};
   _primitive_topology                = {};
   _scissor_rect                      = {};
+  _stencil_value                     = {};
   _graphics_descriptors.clear();
   _compute_descriptors.clear();
   _graphics_constants.clear();
@@ -64,15 +65,13 @@ void Context::set_scissor_rect(RECT rect) noexcept
   }
 }
 
-void Context::set_render_target(Image& img) const noexcept
+void Context::set_stencil_value(uint32_t value) noexcept
 {
-  img.set_state(_cmd, ImageState::render_target);
-
-  auto handle = img.rtv().cpu_handle();
-  _cmd->OMSetRenderTargets(1, &handle, false, nullptr);
-
-  auto viewport = CD3DX12_VIEWPORT{ 0.f, 0.f, static_cast<float>(img.width()), static_cast<float>(img.height()) };
-  _cmd->RSSetViewports(1, &viewport);
+  if (!_stencil_value || _stencil_value.value() != value)
+  {
+    _stencil_value = value;
+    _cmd->OMSetStencilRef(value);
+  }
 }
 
 void Context::draw(uint32_t count) const noexcept

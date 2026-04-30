@@ -1,7 +1,12 @@
 #pragma once
 
 #include "../../util/singleton.hpp"
-#include "../resource/image.hpp"
+#include "../../ui/frame_data.hpp"
+#include "pipeline/pipeline_system.hpp"
+
+#include <d3d12.h>
+#include <unordered_map>
+#include <optional>
 
 namespace tk::renderer {
 
@@ -15,7 +20,7 @@ public:
   void set_compute_descriptor(uint32_t root_param_idx, D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept;
   void set_primitive_topology(D3D_PRIMITIVE_TOPOLOGY primitive_topology) noexcept;
   void set_scissor_rect(RECT rect) noexcept;
-  void set_render_target(Image& img) const noexcept;
+  void set_stencil_value(uint32_t value) noexcept;
   void draw(uint32_t count) const noexcept;
   void draw(uint32_t start_idx, uint32_t size) const noexcept;
   void dispatch(uint32_t x, uint32_t y, uint32_t z) const noexcept;
@@ -27,6 +32,21 @@ public:
   template <typename T>
   requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
   void set_compute_constants(uint32_t root_param_idx, T const& constants);
+
+  struct DescriptorInfo
+  {
+    std::string_view        name;
+    DescriptorHandle const& handle;
+  };
+
+  template <typename T>
+  requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
+  void graphics_pipe_set(PipelineType type, RECT scissor_rect, std::string_view constants_name, T const& constants, std::initializer_list<DescriptorInfo> descs = {}) noexcept;
+
+  template <typename T>
+  requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
+  void graphics_draw(PipelineType type, ui::DrawData const& data,
+    std::string_view constants_name, T const& constants, std::initializer_list<DescriptorInfo> descs = {}) noexcept;
 
 private:
   using DescMapType = std::unordered_map<uint32_t, D3D12_GPU_DESCRIPTOR_HANDLE>;
@@ -43,6 +63,7 @@ private:
   std::vector<uint8_t>        _compute_constants;
   D3D_PRIMITIVE_TOPOLOGY      _primitive_topology{};
   RECT                        _scissor_rect{};
+  std::optional<uint32_t>     _stencil_value{};
 )
 
 template <typename T>
@@ -75,6 +96,29 @@ void Context::set_compute_constants(uint32_t root_param_idx, T const& constants)
     memcpy(_compute_constants.data(), &constants, size);
     _cmd->SetComputeRoot32BitConstants(root_param_idx, _compute_constants.size() / 4, _compute_constants.data(), 0);
   }
+}
+
+template <typename T>
+requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
+void Context::graphics_pipe_set(PipelineType type, RECT scissor_rect, std::string_view constants_name, T const& constants, std::initializer_list<DescriptorInfo> descs) noexcept
+{
+  auto pipe = g_pipe_sys.pipe(type);
+  set_pipe(pipe->pipe_state.Get());
+  set_graphics_root_signature(pipe->root_signature);
+  set_primitive_topology(pipe->primive_topology);
+  set_graphics_constants(pipe->root_param_idx(constants_name), constants);
+  for (auto const& [name, handle] : descs)
+    set_graphics_descriptor(pipe->root_param_idx(name), handle.gpu_handle());
+  set_scissor_rect(scissor_rect);
+}
+
+template <typename T>
+requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
+void Context::graphics_draw(PipelineType type, ui::DrawData const& data,
+  std::string_view constants_name, T const& constants, std::initializer_list<DescriptorInfo> descs) noexcept
+{
+  graphics_pipe_set(type, data.scissor_rect, constants_name, constants, descs);
+  draw(data.index_beg, data.indices_size);
 }
 
 }

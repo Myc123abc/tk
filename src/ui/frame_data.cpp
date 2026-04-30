@@ -115,7 +115,7 @@ auto FrameData::calc_circle_segment_count(float radius) noexcept -> float
 
 void FrameData::add_rect(vec2 left_top, vec2 right_bottom, Color color, float thickness) noexcept
 {
-  if (color.a == 0) return;
+  if (color.a == 0 && _use_discard) return;
 
   if (thickness > 0)
   {
@@ -148,7 +148,7 @@ void FrameData::add_rect(vec2 left_top, vec2 right_bottom, Color color, float th
 
 void FrameData::add_triangle(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
 {
-  if (color.a == 0) return;
+  if (color.a == 0 && _use_discard) return;
 
   assert(_points.empty());
   _points.emplace_back(p0);
@@ -163,7 +163,7 @@ void FrameData::add_triangle(vec2 p0, vec2 p1, vec2 p2, Color color, float thick
 
 void FrameData::add_circle(vec2 center, float radius, Color color, float thickness) noexcept
 {
-  if (color.a == 0) return;
+  if (color.a == 0 && _use_discard) return;
   assert(_points.empty());
   _path_arc_to(center, radius - .5f, 0, arc_sample_max);
   _points.pop_back();
@@ -175,16 +175,16 @@ void FrameData::add_circle(vec2 center, float radius, Color color, float thickne
 
 void FrameData::add_line(vec2 p0, vec2 p1, Color color, float thickness) noexcept
 {
-  if (color.a == 0) return;
+  if (color.a == 0 && _use_discard) return;
   assert(_points.empty());
-  _points.emplace_back(p0 + .5f);
-  _points.emplace_back(p1 + .5f);
+  _points.emplace_back(p0);
+  _points.emplace_back(p1);
   add_poly_line(color, thickness, false);
 }
 
 void FrameData::add_bezier_quad(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
 {
-  if (color.a == 0) return;
+  if (color.a == 0 && _use_discard) return;
   assert(_points.empty());
   _points.emplace_back(p0);
   path_bezier_quad_curve_to_casteljau(p0, p1, p2, curve_tessellation_tol, 0);
@@ -193,7 +193,7 @@ void FrameData::add_bezier_quad(vec2 p0, vec2 p1, vec2 p2, Color color, float th
 
 void FrameData::add_bezier_cubic(vec2 p0, vec2 p1, vec2 p2, vec2 p3, Color color, float thickness) noexcept
 {
-  if (color.a == 0) return;
+  if (color.a == 0 && _use_discard) return;
   assert(_points.empty());
   _points.emplace_back(p0);
   path_bezier_cubic_curve_to_casteljau(p0, p1, p2, p3, curve_tessellation_tol, 0);
@@ -202,7 +202,7 @@ void FrameData::add_bezier_cubic(vec2 p0, vec2 p1, vec2 p2, vec2 p3, Color color
 
 void FrameData::path_end(Color color, float thickness, bool is_closed) noexcept
 {
-  if (color.a == 0)
+  if (color.a == 0 && _use_discard)
   {
     _points.clear();
     return;
@@ -262,7 +262,7 @@ void FrameData::add_convex_poly_filled(Color color) noexcept
   auto pt_cnt = _points.size();
   assert(pt_cnt > 2);
 
-  if (color.a == 0)
+  if (color.a == 0 && _use_discard)
   {
     _points.clear();
     return;
@@ -315,7 +315,7 @@ void FrameData::add_concave_poly_filled(Color color) noexcept
   auto pt_cnt = _points.size();
   assert(pt_cnt > 2);
 
-  if (color.a == 0)
+  if (color.a == 0 && _use_discard)
   {
     _points.clear();
     return;
@@ -665,16 +665,19 @@ void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noex
   _points.clear();
 }
 
-void FrameData::add_draw_call(DrawDataType type, ImageHandle image_handle, uint8_t image_alpha) noexcept
+void FrameData::add_draw_call(DrawDataType type, ImageHandle image_handle, uint32_t stencil_value, bool clear_stencil_image) noexcept
 {
-  _draw_data_rect_idxs.emplace_back(_draw_datas.size());
-  _draw_datas.emplace_back(type, _draw_index_beg, _indices.size() - _draw_index_beg, image_handle, image_alpha);
-  _draw_index_beg = _indices.size();
+  if (auto res = _indices.size() - _draw_index_beg)
+  {
+    _draw_data_rect_idxs.emplace_back(_draw_datas.size());
+    _draw_datas.emplace_back(type, _draw_index_beg, res, image_handle, stencil_value, clear_stencil_image);
+    _draw_index_beg = _indices.size();
+  }
 }
 
 void FrameData::add_scissor_rect(RECT rect) noexcept
 {
-  add_draw_call(DrawDataType::shape);
+  add_draw_call(DrawDataType::ui);
 
   for (auto idx : _draw_data_rect_idxs)
     _draw_datas[idx].scissor_rect = rect;
@@ -683,15 +686,16 @@ void FrameData::add_scissor_rect(RECT rect) noexcept
 
 void FrameData::add_image(ImageHandle handle, vec2 left_top, vec2 right_bottom, uint8_t alpha) noexcept
 {
-  // push exist shape draw call
-  if (_draw_index_beg != _indices.size())
-    add_draw_call(DrawDataType::shape);
+  auto type = _use_discard ? DrawDataType::stencil_equal_test : DrawDataType::ui;
+  add_draw_call(type);
+
+  auto col = Color{ 1, 1, 1, static_cast<float>(alpha) / 255 };
 
   auto [vertices, indices] = expand_beg(4, 6);
-  vertices[0] = { left_top, {}, {} };
-  vertices[1] = { { right_bottom.x, left_top.y }, { 1, 0 }, {} };
-  vertices[2] = { right_bottom, { 1, 1 }, {} };
-  vertices[3] = { { left_top.x, right_bottom.y }, { 0, 1 }, {} };
+  vertices[0] = { left_top, {}, col };
+  vertices[1] = { { right_bottom.x, left_top.y }, { 1, 0 }, col };
+  vertices[2] = { right_bottom, { 1, 1 }, col };
+  vertices[3] = { { left_top.x, right_bottom.y }, { 0, 1 }, col };
   indices[0]  = _vertex_beg + 0;
   indices[1]  = _vertex_beg + 1;
   indices[2]  = _vertex_beg + 2;
@@ -700,7 +704,27 @@ void FrameData::add_image(ImageHandle handle, vec2 left_top, vec2 right_bottom, 
   indices[5]  = _vertex_beg + 3;
   expand_end();
 
-  add_draw_call(DrawDataType::image, handle, alpha);
+  add_draw_call(type, handle);
+}
+
+void FrameData::discard_beg(std::function<void()> func) noexcept
+{
+  assert(!_use_discard);
+  
+  add_draw_call(DrawDataType::ui);
+
+  func();
+
+  add_draw_call(DrawDataType::stencil_replace_write, {}, 1, true);
+
+  _use_discard = true;
+}
+
+void FrameData::discard_end() noexcept
+{
+  assert(_use_discard);
+  _use_discard = false;
+  add_draw_call(DrawDataType::stencil_equal_test);
 }
 
 }

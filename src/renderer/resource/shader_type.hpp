@@ -28,7 +28,6 @@ struct alignas(16) Constants
   vec4     wireframe_color{};
 
   uint32_t draw_wireframe{};
-  float    image_alpha{};
 };
 
 constexpr auto Max_Blur_Widget_Num = 5;

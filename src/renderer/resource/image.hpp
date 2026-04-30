@@ -42,6 +42,7 @@ enum class ImageState
   pixel         = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
   non_pixel     = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
   read          = D3D12_RESOURCE_STATE_GENERIC_READ,
+  depth_write   = D3D12_RESOURCE_STATE_DEPTH_WRITE,
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -97,6 +98,7 @@ public:
 
   void clear(ID3D12GraphicsCommandList1* cmd, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) const noexcept;
   void clear_render_target(ID3D12GraphicsCommandList1* cmd) noexcept;
+  void clear_depth_stencil(ID3D12GraphicsCommandList1* cmd) noexcept;
 
   auto handle() const noexcept { return _handle.Get();                     }
   auto format() const noexcept { return static_cast<ImageFormat>(_format); }

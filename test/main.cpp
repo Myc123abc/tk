@@ -253,12 +253,57 @@ void test_path_draw() noexcept
   ui::path_end(0xff0000ff, 3, false);
 }
 
+inline auto img1 = "assets/image/test.jpg";
+inline auto img2 = "assets/image/test.png";
+
+void test_discard(uint32_t fmt) noexcept
+{
+  ui::discard_beg([]{ ui::circle({ 50, 50 }, 25); });
+  auto r = fmt % 7;
+  switch (r)
+  {
+  case 0:
+    ui::rectangle({}, { 100, 100 }, 0xffffffff);
+    break;
+  
+  case 1:
+    ui::image(img1, {}, { 100, 100 }, 0x44);
+    break;
+  
+  case 2:
+    ui::image(img1, {}, { 50, 50 });
+    ui::image(img1, { 50, 50 }, { 100, 100 });
+    break;
+  
+  case 3:
+    ui::rectangle({}, { 50, 50 }, 0xffffffff);
+    ui::image(img1, { 50, 50 }, { 100, 100 });
+    break;
+  
+  case 4:
+    ui::image(img1, {}, { 50, 50 });
+    ui::rectangle({ 50, 50 }, {}, 0xffffffff);
+    break;
+  
+  case 5:
+    ui::rectangle({}, { 50, 50 }, 0xffff00ff);
+    ui::image(img1, { 25, 25 }, { 70, 75 });
+    ui::rectangle({ 50, 50 }, {}, 0xffffffff);
+    break;
+  
+  case 6:
+    ui::image(img1, {}, { 50, 50 });
+    ui::rectangle({ 25, 25 }, { 70, 75 }, 0xffff00ff);
+    ui::image(img1, { 50, 50 }, { 100, 100 });
+    break;
+  }
+  ui::discard_end();
+}
+
 int main()
 {
   tk::init();
 
-  auto img1 = "assets/image/test.jpg";
-  auto img2 = "assets/image/test.png";
   ui::load_image(img1);
   ui::load_image(img2);
 
@@ -307,8 +352,10 @@ int main()
       auto size = ui::window_drawable_extent();
       // ui::triangle({ size.x / 2, size.y * .1f }, size * .9f, { size.y * .1f, size.y * .9 }, 0x00ff0044, 10);
 
-      if (ui::button("btn1", 0, 0, 100, 100, 0xffffffff, 0xffffffff))
-        circle_lerplocator.reverse();
+      static auto fmt = 0;
+
+      if (ui::button("btn1", 0, 0, 100, 100))
+        ++fmt;
       if (ui::button("btn2", 50, 50, 100, 100, 0xffff00ff, 0xffffffff))
         wnd2_is_closed = !wnd2_is_closed;
       ui::add_move_invalid_area({}, { 150, 150 });
@@ -319,6 +366,7 @@ int main()
       // ui::bezier_quad({ 100, 100 }, { 200, 200 }, { 50, 300 }, 0xff0000ff, 0);
       // ui::bezier_cubic({ 100, 100 }, { 200, 200 }, { 50, 300 }, { 100, 100 }, 0xff0000ff, 0);
       // test_path_draw();
+      test_discard(fmt);
 
       ui::end();
     }

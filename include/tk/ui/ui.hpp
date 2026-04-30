@@ -261,11 +261,13 @@ void restore_fullscreen_window() noexcept;
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
- * discard the pixel of specific rectangle for last draw shape
- * @param left_top
- * @param right_bottom
+ * discard the pixel of specific shapes
+ * @param func function of discard shapes
  */
-void discard_rectangle(vec2 left_top, vec2 right_bottom) noexcept;
+void discard_beg(std::function<void()> func) noexcept;
+
+/// discard operation over
+void discard_end() noexcept;
 
 /// use union operator between shapes
 void begin_union() noexcept;

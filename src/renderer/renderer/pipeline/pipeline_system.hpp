@@ -10,13 +10,13 @@ namespace tk::renderer {
 
 enum class PipelineType
 {
-  shape,
-  image,
+  ui,
   blur_horizontal_pass,
   blur_vertical_pass,
   window_shadow,
-  stencil_write,
-  stencil_test,
+  stencil_replace_write,
+  stencil_equal_test,
+  stencil_not_equal_test,
 };
 
 enum class StencilOp

@@ -25,6 +25,17 @@ void Renderer::init() noexcept
   g_graphics_engine.init();
   g_comp_engine.init();
   g_copy_engine.init(); 
+
+  ui::Write_Image_Handle = ui::g_img_mgr.create_image(1, 1, ImageFormat::bgra8_unorm);
+
+  auto white = 0xffffffff;
+  auto bitmap = Bitmap{};
+  bitmap.init(1, 1, 4, &white);
+  
+  g_copy_engine.acquire_slot();
+  g_copy_engine.copy({ bitmap }, { &_images[ui::Write_Image_Handle] });
+  auto fence_value = g_copy_engine.submit_slot();
+  g_graphics_engine.wait(g_copy_engine, fence_value);
 }
 
 void Renderer::render() noexcept
@@ -252,46 +263,53 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
 
   for (auto const& data : frame_data->draw_datas())
   {
-    if (data.type == ui::DrawDataType::shape)
+    auto draw = [&](PipelineType type) noexcept
     {
-      auto pipe = g_pipe_sys.pipe(PipelineType::shape);
-      g_ctx.set_pipe(pipe->pipe_state.Get());
-      g_ctx.set_graphics_root_signature(pipe->root_signature);
-      g_ctx.set_primitive_topology(pipe->primive_topology);
-      g_ctx.set_graphics_constants(pipe->root_param_idx("constants"), Constants
+      g_ctx.graphics_draw(type, data, "constants", Constants
       {
         .render_target_extent = frame.image.extent(),
         .window_pos           = frame_data->window_pos(),
-      });
-      g_ctx.set_scissor_rect(data.scissor_rect);
-      g_ctx.draw(data.index_beg, data.indices_size);
-    }
-    else if (data.type == ui::DrawDataType::image)
-    {
-      auto pipe = g_pipe_sys.pipe(PipelineType::image);
-      g_ctx.set_pipe(pipe->pipe_state.Get());
-      g_ctx.set_graphics_root_signature(pipe->root_signature);
-      g_ctx.set_primitive_topology(pipe->primive_topology);
-      g_ctx.set_graphics_constants(pipe->root_param_idx("constants"), Constants
+      },
       {
-        .render_target_extent = frame.image.extent(),
-        .window_pos           = frame_data->window_pos(),
-        .image_alpha          = data.image_alpha,
+        { "image", _images[data.image_handle].srv() },
       });
-      g_ctx.set_graphics_descriptor(pipe->root_param_idx("image"), _images[data.image_handle].srv().gpu_handle());
-      g_ctx.set_scissor_rect(data.scissor_rect);
-      g_ctx.draw(data.index_beg, data.indices_size);
+    };
+
+    using enum ui::DrawDataType;
+    switch (data.type)
+    {
+      case ui::DrawDataType::ui:
+        draw(PipelineType::ui);
+        break;
+
+      case stencil_replace_write:
+      {
+        if (data.clear_stencil_image) res.clear_depth_stencil();
+        g_ctx.set_stencil_value(data.stencil_value);
+        draw(PipelineType::stencil_replace_write);
+      }
+      break;
+
+      case stencil_equal_test:
+      {
+        g_ctx.set_stencil_value(data.stencil_value);
+        draw(PipelineType::stencil_equal_test);
+      }
+      break;
+
+      case stencil_not_equal_test:
+      {
+        g_ctx.set_stencil_value(data.stencil_value);
+        draw(PipelineType::stencil_not_equal_test);
+      }
+      break;
     }
   }
 
   auto const& window_shadow_info = frame_data->window_shadow_info();
   if (window_shadow_info)
   {
-    auto pipe = g_pipe_sys.pipe(PipelineType::window_shadow);
-    g_ctx.set_pipe(pipe->pipe_state.Get());
-    g_ctx.set_graphics_root_signature(pipe->root_signature);
-    g_ctx.set_primitive_topology(pipe->primive_topology);
-    g_ctx.set_graphics_constants(pipe->root_param_idx("constants"), Constants
+    g_ctx.graphics_pipe_set(PipelineType::window_shadow, window_shadow_info->scissor_rect, "constants", Constants
     {
       .render_target_extent = frame.image.extent(),
       .window_extent        = window_shadow_info->window_extent,
@@ -303,7 +321,6 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
       .wireframe_color      = window_shadow_info->wireframe_color ? window_shadow_info->wireframe_color.value() : vec4{},
       .draw_wireframe       = window_shadow_info->wireframe_color.has_value(),
     });
-    g_ctx.set_scissor_rect(window_shadow_info->scissor_rect);
     g_ctx.draw(2);
   }
 }

@@ -50,6 +50,16 @@ constexpr auto dx12_resource_flags(ImageType type) noexcept
   return flags;
 }
 
+constexpr auto dx12_resource_states(ImageType type) noexcept
+{
+  using enum ImageType;
+  auto states = D3D12_RESOURCE_STATE_COMMON;
+  if (has_flag(type, uav)) states |= dx12_traits<uav>::state;
+  if (has_flag(type, rtv)) states |= dx12_traits<rtv>::state;
+  if (has_flag(type, dsv)) states |= dx12_traits<dsv>::state;
+  return states;
+}
+
 }
 
 namespace tk::renderer {
@@ -71,6 +81,7 @@ void Image::init(uint32_t width , uint32_t height, ImageFormat format, ImageType
   _height = height;
   _format = static_cast<DXGI_FORMAT>(format);
   _type   = type;
+  _state  = dx12_resource_states(type);
 
   // create image
   auto texture_desc = D3D12_RESOURCE_DESC{};
@@ -231,6 +242,13 @@ void Image::clear_render_target(ID3D12GraphicsCommandList1* cmd) noexcept
   set_state(cmd, ImageState::render_target);
   float constexpr clear_color[4]{};
   cmd->ClearRenderTargetView(_desc.rtv.cpu_handle(), clear_color, 0, nullptr);
+}
+
+void Image::clear_depth_stencil(ID3D12GraphicsCommandList1* cmd) noexcept
+{
+  err_if(!has_flag(_type, ImageType::dsv), "clear depth stencil only use on dsv");
+  set_state(cmd, ImageState::depth_write);
+  cmd->ClearDepthStencilView(dsv().cpu_handle(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.f, 0, 0, nullptr);
 }
 
 auto Image::per_pixel_size() const noexcept -> uint32_t

@@ -395,8 +395,9 @@ void UIContext::add_title_bar() noexcept
       {
         auto padding_x = width / 5;
         auto padding_y = width / 5;
+        ui::discard_beg([=] { ui::rectangle({ 0, padding_y }, { width - padding_x, height }); });
         ui::rectangle({ padding_x, 0 }, { width, height - padding_y }, col, 1);
-        ui::discard_rectangle({ 0, padding_y }, { width - padding_x, height });
+        ui::discard_end();
         ui::rectangle({ 0, padding_y }, { width - padding_x, height }, col, 1);
       }
       else
@@ -409,8 +410,8 @@ void UIContext::add_title_bar() noexcept
   if (button("tk::ui::title_bar_close_button", w - btn_width, 0, btn_width, btn_height, background_color, close_btn_hovered_color, close_btn_mouse_down_color,
     [] (uint32_t width, uint32_t height, Color col)
     {
-      ui::line({}, { width, height }, col, 1);
-      ui::line({ width, 0 }, { 0, height }, col, 1);
+      ui::line({}, { width, height }, col);
+      ui::line({ width, 0 }, { 0, height }, col);
     }, icon_width, icon_height, 0x395063ff, 0xffffffff))
     _wnd_ctx->is_closed = true;
 
