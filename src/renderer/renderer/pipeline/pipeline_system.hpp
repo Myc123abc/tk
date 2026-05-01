@@ -11,9 +11,11 @@ namespace tk::renderer {
 enum class PipelineType
 {
   ui,
+  discard_draw,
   blur_horizontal_pass,
   blur_vertical_pass,
   window_shadow,
+  mask_write,
   stencil_replace_write,
   stencil_equal_test,
   stencil_not_equal_test,
@@ -51,6 +53,75 @@ struct StencilState
   bool      write_color = false;
 };
 
+enum class Blend
+{
+  zero             = D3D12_BLEND_ZERO,
+  one              = D3D12_BLEND_ONE,
+  src_color        = D3D12_BLEND_SRC_COLOR,
+  inv_src_color    = D3D12_BLEND_INV_SRC_COLOR,
+  src_alpha        = D3D12_BLEND_SRC_ALPHA,
+  inv_src_alpha    = D3D12_BLEND_INV_SRC_ALPHA,
+  dest_alpha       = D3D12_BLEND_DEST_ALPHA,
+  inv_dest_alpha   = D3D12_BLEND_INV_DEST_ALPHA,
+  dest_color       = D3D12_BLEND_DEST_COLOR,
+  inv_dest_color   = D3D12_BLEND_INV_DEST_COLOR,
+  src_alpha_sat    = D3D12_BLEND_SRC_ALPHA_SAT,
+  blend_factor     = D3D12_BLEND_BLEND_FACTOR,
+  inv_blend_factor = D3D12_BLEND_INV_BLEND_FACTOR,
+  src1_color       = D3D12_BLEND_SRC1_COLOR,
+  inv_src1_color   = D3D12_BLEND_INV_SRC1_COLOR,
+  alpha_factor     = D3D12_BLEND_ALPHA_FACTOR,
+  inv_alpha_factor = D3D12_BLEND_INV_ALPHA_FACTOR,
+};
+
+enum class BlendOp
+{
+  add          = D3D12_BLEND_OP_ADD,
+  subtract     = D3D12_BLEND_OP_SUBTRACT,
+  rev_subtract = D3D12_BLEND_OP_REV_SUBTRACT,
+  min          = D3D12_BLEND_OP_MIN,
+  max          = D3D12_BLEND_OP_MAX,
+};
+
+struct BlendState
+{
+  Blend   src;
+  Blend   dst;
+  BlendOp op;
+  Blend   src_alpha;
+  Blend   dst_alpha;
+  BlendOp op_alpha;
+
+  static auto Default() noexcept -> BlendState { return { Blend::src_alpha, Blend::inv_src_alpha, BlendOp::add, Blend::one, Blend::inv_src_alpha, BlendOp::add }; }
+  static auto Max() noexcept -> BlendState { return { Blend::one, Blend::one, BlendOp::max, Blend::one, Blend::one, BlendOp::max }; }
+};
+
+struct PipelineCreateInfo
+{
+  std::string_view                     shader;
+  std::vector<std::string_view>        includes;
+  std::optional<RootSignatureResult>   root_signature_result;
+  std::unordered_set<std::string_view> volatile_descs;
+
+  union
+  {
+    struct
+    {
+      std::string_view            vs;
+      std::string_view            ps;
+      ImageFormat                 rtv_format;
+      bool                        use_depth_test{};
+      std::optional<BlendState>   blend{};
+      std::optional<StencilState> stencil{};
+    } graphics;
+
+    struct
+    {
+      std::string_view cs;
+    } compute;
+  };
+};
+
 Singleton(PipelineSystem, g_pipe_sys,
 public:
   void init() noexcept;
@@ -59,32 +130,6 @@ public:
 
 private:
   auto find_root_param(std::span<CD3DX12_ROOT_PARAMETER1> params) const noexcept -> ID3D12RootSignature*;
-
-  struct PipelineCreateInfo
-  {
-    std::string_view                     shader;
-    std::vector<std::string_view>        includes;
-    std::optional<RootSignatureResult>   root_signature_result;
-    std::unordered_set<std::string_view> volatile_descs;
-
-    union
-    {
-      struct
-      {
-        std::string_view            vs;
-        std::string_view            ps;
-        ImageFormat                 rtv_format;
-        bool                        use_blend{};
-        bool                        use_depth_test{};
-        std::optional<StencilState> stencil{};
-      } graphics;
-
-      struct
-      {
-        std::string_view cs;
-      } compute;
-    };
-  };
 
   struct Pipeline
   {

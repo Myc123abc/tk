@@ -21,6 +21,7 @@ public:
   void set_primitive_topology(D3D_PRIMITIVE_TOPOLOGY primitive_topology) noexcept;
   void set_scissor_rect(RECT rect) noexcept;
   void set_stencil_value(uint32_t value) noexcept;
+  void set_render_target(Image* render_tareget_image, Image* depth_stencil_image) noexcept;
   void draw(uint32_t count) const noexcept;
   void draw(uint32_t start_idx, uint32_t size) const noexcept;
   void dispatch(uint32_t x, uint32_t y, uint32_t z) const noexcept;
@@ -45,7 +46,7 @@ public:
 
   template <typename T>
   requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
-  void graphics_draw(PipelineType type, ui::DrawData const& data,
+  void graphics_draw(PipelineType type, Image* render_target, Image* depth_stencil, ui::DrawData const& data,
     std::string_view constants_name, T const& constants, std::initializer_list<DescriptorInfo> descs = {}) noexcept;
 
 private:
@@ -64,6 +65,8 @@ private:
   D3D_PRIMITIVE_TOPOLOGY      _primitive_topology{};
   RECT                        _scissor_rect{};
   std::optional<uint32_t>     _stencil_value{};
+  D3D12_CPU_DESCRIPTOR_HANDLE _render_target{};
+  D3D12_CPU_DESCRIPTOR_HANDLE _depth_stencil{};
 )
 
 template <typename T>
@@ -114,9 +117,10 @@ void Context::graphics_pipe_set(PipelineType type, RECT scissor_rect, std::strin
 
 template <typename T>
 requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
-void Context::graphics_draw(PipelineType type, ui::DrawData const& data,
+void Context::graphics_draw(PipelineType type, Image* render_targe, Image* depth_stencil, ui::DrawData const& data,
   std::string_view constants_name, T const& constants, std::initializer_list<DescriptorInfo> descs) noexcept
 {
+  set_render_target(render_targe, depth_stencil);
   graphics_pipe_set(type, data.scissor_rect, constants_name, constants, descs);
   draw(data.index_beg, data.indices_size);
 }

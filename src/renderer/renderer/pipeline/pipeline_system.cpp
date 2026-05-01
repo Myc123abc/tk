@@ -14,8 +14,9 @@ void PipelineSystem::init() noexcept
 
   auto res = generate_root_signature(
   {
-    { constants, "constants", 0, 0, false, sizeof(Constants) },
-    { texture,   "image",     0, 0                           },
+    { constants, "constants",  0, 0, false, sizeof(Constants) },
+    { texture,   "image",      0, 0                           },
+    { texture,   "mask_image", 0, 1, true                     },
   }, true, true);
 
   auto info = PipelineCreateInfo{};
@@ -24,7 +25,7 @@ void PipelineSystem::init() noexcept
   info.graphics.ps             = "ps";
   info.includes                = { "assets/shader/ui" };
   info.graphics.rtv_format     = RenderResource::Render_Target_Format;
-  info.graphics.use_blend      = true;
+  info.graphics.blend          = BlendState::Default();
   info.graphics.use_depth_test = false;
   info.graphics.stencil        = {};
   info.root_signature_result   = res;
@@ -32,15 +33,15 @@ void PipelineSystem::init() noexcept
 
   auto stencil = StencilState{};
   stencil.op = StencilOp::replace;
-  info.graphics.stencil   = stencil;
-  info.graphics.use_blend = false;
+  info.graphics.stencil = stencil;
+  info.graphics.blend   = {};
   _pipes.emplace(PipelineType::stencil_replace_write, info);
 
-  stencil.op              = StencilOp::keep;
-  stencil.comp            = CompFunc::equal;
-  stencil.write_color     = true;
-  info.graphics.stencil   = stencil;
-  info.graphics.use_blend = true;
+  stencil.op            = StencilOp::keep;
+  stencil.comp          = CompFunc::equal;
+  stencil.write_color   = true;
+  info.graphics.stencil = stencil;
+  info.graphics.blend   = BlendState::Default();
   _pipes.emplace(PipelineType::stencil_equal_test, info);
 
   stencil.comp          = CompFunc::not_equal;
@@ -50,6 +51,14 @@ void PipelineSystem::init() noexcept
   info.graphics.stencil = {};
   info.shader = "assets/shader/ui/window_shadow.hlsl";
   _pipes.emplace(PipelineType::window_shadow, info);
+
+  info.shader = "assets/shader/ui/discard_draw.hlsl";
+  _pipes.emplace(PipelineType::discard_draw, info);
+
+  info.shader = "assets/shader/ui/mask_write.hlsl";
+  info.graphics.rtv_format = ImageFormat::r8_unorm;
+  info.graphics.blend      = BlendState::Max();
+  _pipes.emplace(PipelineType::mask_write, info);
 
   // res = generate_root_signature(
   // {
@@ -136,13 +145,16 @@ void PipelineSystem::Pipeline::init_graphics(PipelineCreateInfo const& info) noe
   
   auto  blend_state = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
   auto& rt          = blend_state.RenderTarget[0];
-  rt.BlendEnable    = info.graphics.use_blend;
-  rt.SrcBlend       = D3D12_BLEND_SRC_ALPHA;
-  rt.DestBlend      = D3D12_BLEND_INV_SRC_ALPHA;
-  rt.BlendOp        = D3D12_BLEND_OP_ADD;
-  rt.SrcBlendAlpha  = D3D12_BLEND_ONE;
-  rt.DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
-  rt.BlendOpAlpha   = D3D12_BLEND_OP_ADD;
+  if (rt.BlendEnable = info.graphics.blend.has_value(); rt.BlendEnable)
+  {
+    auto blend = info.graphics.blend.value();
+    rt.SrcBlend       = static_cast<D3D12_BLEND>(blend.src);
+    rt.DestBlend      = static_cast<D3D12_BLEND>(blend.dst);
+    rt.BlendOp        = static_cast<D3D12_BLEND_OP>(blend.op);
+    rt.SrcBlendAlpha  = static_cast<D3D12_BLEND>(blend.src_alpha);
+    rt.DestBlendAlpha = static_cast<D3D12_BLEND>(blend.dst_alpha);
+    rt.BlendOpAlpha   = static_cast<D3D12_BLEND_OP>(blend.op_alpha);
+  }
   if (info.graphics.stencil)
     rt.RenderTargetWriteMask = info.graphics.stencil->write_color ? D3D12_COLOR_WRITE_ENABLE_ALL : 0;
   else

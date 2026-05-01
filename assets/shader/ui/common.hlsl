@@ -15,9 +15,10 @@ struct Constants
   uint draw_wireframe;
 };
 
-ConstantBuffer<Constants> constants : register(b0);
-SamplerState              g_sampler : register(s0);
-Texture2D                 image     : register(t0);
+ConstantBuffer<Constants> constants  : register(b0);
+SamplerState              g_sampler  : register(s0);
+Texture2D                 image      : register(t0);
+Texture2D                 mask_image : register(t0, space1);
 
 struct VS_Param
 {

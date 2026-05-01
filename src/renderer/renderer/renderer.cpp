@@ -254,22 +254,23 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
 
   assert(frame_data->check());
 
-  auto  cmd   = g_graphics_engine.cmd();
-  auto& frame = res.current_frame();
+  auto cmd = g_graphics_engine.cmd();
 
   g_ctx.set_cmd(cmd);
 
-  frame.buffer.clear().upload(cmd, frame_data);
+  res.current_frame().buffer.clear().upload(cmd, frame_data);
+
+  auto constants = Constants
+  {
+    .render_target_extent = res.render_target()->extent(),
+    .window_pos           = frame_data->window_pos(),
+  };
 
   for (auto const& data : frame_data->draw_datas())
   {
     auto draw = [&](PipelineType type) noexcept
     {
-      g_ctx.graphics_draw(type, data, "constants", Constants
-      {
-        .render_target_extent = frame.image.extent(),
-        .window_pos           = frame_data->window_pos(),
-      },
+      g_ctx.graphics_draw(type, res.render_target(), res.depth_stencil(), data, "constants", constants,
       {
         { "image", _images[data.image_handle].srv() },
       });
@@ -282,9 +283,23 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
         draw(PipelineType::ui);
         break;
 
+      case mask_write:
+        if (data.clear_render_target) res.mask_image()->clear_render_target(g_graphics_engine.cmd());
+        g_ctx.graphics_draw(PipelineType::mask_write, res.mask_image(), {}, data, "constants", constants);
+        break;
+
+      case discard_draw:
+        res.mask_image()->set_state(cmd, ImageState::pixel);
+        g_ctx.graphics_draw(PipelineType::discard_draw, res.render_target(), {}, data, "constants", constants,
+        {
+          { "image",      _images[data.image_handle].srv() },
+          { "mask_image", res.mask_image()->srv()          },
+        });
+        break;
+
       case stencil_replace_write:
       {
-        if (data.clear_stencil_image) res.clear_depth_stencil();
+        if (data.clear_depth_stencil) res.clear_depth_stencil();
         g_ctx.set_stencil_value(data.stencil_value);
         draw(PipelineType::stencil_replace_write);
       }
@@ -311,7 +326,7 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
   {
     g_ctx.graphics_pipe_set(PipelineType::window_shadow, window_shadow_info->scissor_rect, "constants", Constants
     {
-      .render_target_extent = frame.image.extent(),
+      .render_target_extent = constants.render_target_extent,
       .window_extent        = window_shadow_info->window_extent,
       .window_pos           = frame_data->window_pos(),
       .shadow_thickness     = window_shadow_info->shadow_thickness,

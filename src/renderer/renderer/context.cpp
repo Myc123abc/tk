@@ -14,6 +14,8 @@ void Context::set_cmd(ID3D12GraphicsCommandList1* cmd) noexcept
   _primitive_topology                = {};
   _scissor_rect                      = {};
   _stencil_value                     = {};
+  _render_target                     = {};
+  _depth_stencil                     = {};
   _graphics_descriptors.clear();
   _compute_descriptors.clear();
   _graphics_constants.clear();
@@ -114,6 +116,24 @@ void Context::set_compute_descriptor(uint32_t root_param_idx, D3D12_GPU_DESCRIPT
   {
     _compute_descriptors[root_param_idx] = handle;
     _cmd->SetComputeRootDescriptorTable(root_param_idx, handle);
+  }
+}
+
+void Context::set_render_target(Image* render_tareget_image, Image* depth_stencil_image) noexcept
+{
+  assert(render_tareget_image);
+  render_tareget_image->set_state(_cmd, ImageState::render_target);
+  auto rtv = render_tareget_image->rtv().cpu_handle();
+  auto dsv = depth_stencil_image ? depth_stencil_image->dsv().cpu_handle() : D3D12_CPU_DESCRIPTOR_HANDLE{};
+  assert(rtv.ptr);
+  if (rtv.ptr != _render_target.ptr || dsv.ptr != _depth_stencil.ptr)
+  {
+    if (dsv.ptr)
+      _cmd->OMSetRenderTargets(1, &rtv, false, &dsv);
+    else
+      _cmd->OMSetRenderTargets(1, &rtv, false, nullptr);
+    _render_target = rtv;
+    _depth_stencil = dsv;
   }
 }
 

@@ -21,6 +21,8 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
   // create depth test image
   _dsv_image.init(width, height, ImageFormat::d24_s8, ImageType::dsv);
 
+  _mask_image.init(width, height, ImageFormat::r8_unorm, ImageType::rtv | ImageType::srv);
+
   // create swapchain
   ComPtr<IDXGISwapChain1> swapchain;
   DXGI_SWAP_CHAIN_DESC1 swapchain_desc{};
@@ -72,6 +74,7 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
 void RenderResource::destroy() noexcept
 {
   CloseHandle(_swapchain_waitable_obj);
+  _mask_image.destroy();
   _dsv_image.destroy();
   for (auto& frame : _frames)
   {
@@ -113,6 +116,7 @@ void RenderResource::resize(uint32_t width, uint32_t height) noexcept
     frame.image.resize(width, height);
   }
   _dsv_image.resize(width, height);
+  _mask_image.resize(width, height);
 }
 
 void RenderResource::wait_frame_complete() noexcept
@@ -140,7 +144,9 @@ void RenderResource::render_begin() noexcept
   g_desc_heap_mgr.bind_heaps(cmd);
 
   // set render target image clear render target images
-  clear_image();
+  set_render_target();
+  clear_render_target();
+  clear_depth_stencil();
 
   // set viewport
   auto viewport = CD3DX12_VIEWPORT{ 0.f, 0.f, static_cast<float>(frame.image.width()), static_cast<float>(frame.image.height()) };
@@ -180,24 +186,21 @@ void RenderResource::present(bool vsync) const noexcept
   }
 }
 
-void RenderResource::clear_image() noexcept
+void RenderResource::set_render_target() noexcept
 {
-  auto cmd = g_graphics_engine.cmd();
-  auto img = &current_frame().image;
-  auto rtv = img->rtv().cpu_handle();
-  auto dsv = _dsv_image.dsv().cpu_handle();
+  auto rtv = render_target()->rtv().cpu_handle();
+  auto dsv = depth_stencil()->dsv().cpu_handle();
+  g_graphics_engine.cmd()->OMSetRenderTargets(1, &rtv, false, &dsv);
+}
 
-  // set render target view
-  cmd->OMSetRenderTargets(1, &rtv, false, &dsv);
-
-  // clear img
-  img->clear_render_target(cmd);
-  // cmd->OMSetDepthBounds(0.f, 1.f);
+void RenderResource::clear_render_target() noexcept
+{
+  render_target()->clear_render_target(g_graphics_engine.cmd());
 }
 
 void RenderResource::clear_depth_stencil() noexcept
 {
-  _dsv_image.clear_depth_stencil(g_graphics_engine.cmd());
+  depth_stencil()->clear_depth_stencil(g_graphics_engine.cmd());
 }
 
 void FrameBuffer::init() noexcept

@@ -24,13 +24,24 @@ struct DrawData
   enum class Type
   {
     ui,
+    discard_draw,
+    mask_write,
     stencil_replace_write,
     stencil_equal_test,
     stencil_not_equal_test,
   };
 
-  DrawData(Type type, uint32_t index_beg, uint32_t indices_size, ImageHandle image_handle = {}, uint32_t stencil_value = {}, bool clear_stencil_image = {}) noexcept
-    : type(type), index_beg(index_beg), indices_size(indices_size), stencil_value(stencil_value), clear_stencil_image(clear_stencil_image)
+  DrawData(
+    Type        type,
+    uint32_t    index_beg,
+    uint32_t    indices_size,
+    ImageHandle image_handle        = {},
+    uint32_t    stencil_value       = {},
+    bool        clear_depth_stencil = {},
+    bool        clear_render_target = {}) noexcept
+    : type(type), index_beg(index_beg), indices_size(indices_size), 
+      stencil_value(stencil_value), clear_depth_stencil(clear_depth_stencil),
+      clear_render_target(clear_render_target)
   {
     if (image_handle)
       this->image_handle = image_handle;
@@ -47,7 +58,8 @@ struct DrawData
   ImageHandle image_handle{};
 
   uint32_t stencil_value{};
-  bool     clear_stencil_image{};
+  bool     clear_depth_stencil{};
+  bool     clear_render_target{};
 };
 
 using DrawDataType = DrawData::Type;
@@ -136,7 +148,7 @@ private:
   }
 
 private:
-  void add_draw_call(DrawDataType type, ImageHandle image_handle = {}, uint32_t stencil_value = {}, bool clear_stencil_image = {}) noexcept;
+  void add_draw_call(DrawDataType type, ImageHandle image_handle = {}, uint32_t stencil_value = {}, bool clear_depth_stencil = {}, bool clear_render_target = {}) noexcept;
 
   void add_convex_poly_filled(Color color) noexcept;
   void add_concave_poly_filled(Color color) noexcept;
@@ -172,6 +184,7 @@ private:
   std::vector<vec2> _normals;
   std::vector<vec2> _tmp_buf;
 
+  bool _using_discard_shapes{};
   bool _use_discard{};
 
   inline static auto constexpr arc_table_size         = 48;
