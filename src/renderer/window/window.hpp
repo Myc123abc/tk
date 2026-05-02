@@ -140,6 +140,8 @@ private:
   void keep_blur_window_behind_resize() const noexcept;
   void resize_blur_window(RECT rect) const noexcept;
   void remove_blur_window() noexcept;
+  void resize_window() const noexcept;
+  void move_window() const noexcept;
 public:
   void show_blur_window() const noexcept;
 

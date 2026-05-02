@@ -157,21 +157,13 @@ auto Window::move_from_maximize() noexcept -> vec2i
   if (pos.y < limit)
   {
     _y -= limit;
-    y   = limit;
+    y = limit;
   }
 
   update_rect();
   g_renderer.resize_window_resource(_handle, real_width(), real_height());
 
-  if (_blur_window)
-  {
-    auto info = BeginDeferWindowPos(2);
-    info = DeferWindowPos(info, _handle, nullptr, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
-    info = DeferWindowPos(info, _blur_window, _handle, _x, _y, _width, _height, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
-    EndDeferWindowPos(info);
-  }
-  else
-    SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
+  resize_window();
 
   return { cursor_pos().x, y };
 }
@@ -182,7 +174,11 @@ void Window::move_with_pos(int x, int y) noexcept
   _y = y;
   _moving = true;
   update_rect();
+  move_window();
+}
 
+void Window::move_window() const noexcept
+{
   if (_blur_window)
   {
     auto info = BeginDeferWindowPos(2);
@@ -191,7 +187,7 @@ void Window::move_with_pos(int x, int y) noexcept
     EndDeferWindowPos(info);
   }
   else
-  SetWindowPos(_handle, 0, real_x(), real_y(), 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    SetWindowPos(_handle, nullptr, real_x(), real_y(), 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 void Window::move_end() noexcept
@@ -335,8 +331,20 @@ void Window::resize_end() noexcept
   g_ui_ctx.clear_fullscreen_window();
   g_renderer.resize_window_resource(_handle, real_width(), real_height());
   g_renderer.clear_blur_resize_data();
-  SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
-  keep_blur_window_behind_resize();
+  resize_window();
+}
+
+void Window::resize_window() const noexcept
+{
+  if (_blur_window)
+  {
+    auto info = BeginDeferWindowPos(2);
+    info = DeferWindowPos(info, _handle, nullptr, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
+    info = DeferWindowPos(info, _blur_window, _handle, _x, _y, _width, _height, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+    EndDeferWindowPos(info);
+  }
+  else
+    SetWindowPos(_handle, nullptr, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 void Window::resize_by_scale(float scale, float ratio, vec2 cursor_pos, vec2 left_button_down_window_cusor_pos) noexcept
