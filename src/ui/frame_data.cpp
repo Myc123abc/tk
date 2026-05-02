@@ -699,31 +699,46 @@ auto FrameData::get_rect(uint32_t vtx_beg, uint32_t vtx_cnt) const noexcept -> R
   return rc;
 }
 
-void FrameData::add_draw_call(DrawDataType type, ImageHandle image_handle, uint32_t stencil_value, bool clear_depth_stencil, bool clear_render_target) noexcept
+void FrameData::push_draw_cmd(DrawCmdType type, ImageHandle image_handle) noexcept
 {
   if (auto res = _indices.size() - _draw_index_beg)
   {
-    _draw_data_rect_idxs.emplace_back(_draw_datas.size());
-    _draw_datas.emplace_back(type, _draw_index_beg, res, image_handle, stencil_value, clear_depth_stencil, clear_render_target);
+    _draw_cmd_rect_idxs.emplace_back(_draw_cmds.size());
+    
+    auto cmd = DrawCmd{};
+    cmd.type = type;
+    cmd.ui.idx_beg      = _draw_index_beg;
+    cmd.ui.idx_size     = res;
+    cmd.ui.image_handle = image_handle;
+    _draw_cmds.emplace_back(std::move(cmd));
+
     _draw_index_beg = _indices.size();
   }
 }
 
+void FrameData::push_draw_cmd_clear_rect(DrawCmdType type, std::optional<RECT> rect) noexcept
+{
+  auto cmd = DrawCmd{};
+  cmd.type       = type;
+  cmd.clear_rect = rect;
+  _draw_cmds.emplace_back(std::move(cmd));
+}
+
 void FrameData::add_scissor_rect(RECT rect) noexcept
 {
-  add_draw_call(DrawDataType::ui);
+  push_draw_cmd(DrawCmdType::ui);
 
-  for (auto idx : _draw_data_rect_idxs)
-    _draw_datas[idx].scissor_rect = rect;
-  _draw_data_rect_idxs.clear();
+  for (auto idx : _draw_cmd_rect_idxs)
+    _draw_cmds[idx].ui.scissor_rect = rect;
+  _draw_cmd_rect_idxs.clear();
 }
 
 void FrameData::add_image(ImageHandle handle, vec2 left_top, vec2 right_bottom, uint8_t alpha) noexcept
 {
   assert(!_using_discard_shapes);
 
-  auto type = _use_discard ? DrawDataType::discard_draw_tmp : DrawDataType::ui;
-  add_draw_call(type);
+  auto type = _use_discard ? DrawCmdType::discard_draw_tmp : DrawCmdType::ui;
+  push_draw_cmd(type);
 
   auto col = Color{ 1, 1, 1, static_cast<float>(alpha) / 255 };
 
@@ -740,22 +755,24 @@ void FrameData::add_image(ImageHandle handle, vec2 left_top, vec2 right_bottom, 
   indices[5]  = _vertex_beg + 3;
   expand_end();
 
-  add_draw_call(type, handle);
+  push_draw_cmd(type, handle);
 }
 
 void FrameData::discard_beg(std::function<void()> func) noexcept
 {
   assert(!_use_discard);
   
-  add_draw_call(DrawDataType::ui);
+  push_draw_cmd(DrawCmdType::ui);
+
+  auto vtx_beg = _vertex_beg;
 
   _using_discard_shapes = true;
   func();
   _using_discard_shapes = false;
 
-  // TODO: use it as clear rect
-  auto mask_rect = get_rect(_discard_vtx_beg, _vertices.size() - _discard_vtx_beg);
-  add_draw_call(DrawDataType::mask_write, {}, {}, {}, true);
+  push_draw_cmd_clear_rect(DrawCmdType::clear_mask_image);
+  push_draw_cmd_clear_rect(DrawCmdType::clear_tmp_image);
+  push_draw_cmd(DrawCmdType::mask_write);
 
   _use_discard     = true;
   _discard_vtx_beg = _vertex_beg;
@@ -767,11 +784,10 @@ void FrameData::discard_end() noexcept
 
   _use_discard = false;
 
-  add_draw_call(DrawDataType::discard_draw_tmp);
-
   auto rc = get_rect(_discard_vtx_beg, _vertices.size() - _discard_vtx_beg);
-  add_rect({ rc.left, rc.top }, { rc.right, rc.bottom }, {});
-  add_draw_call(DrawDataType::composite_tmp);
+  push_draw_cmd(DrawCmdType::discard_draw_tmp);
+  add_rect({ rc.left, rc.top }, { rc.right, rc.bottom });
+  push_draw_cmd(DrawCmdType::composite_tmp);
 }
 
 }

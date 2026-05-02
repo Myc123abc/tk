@@ -145,10 +145,9 @@ void RenderResource::render_begin() noexcept
   // bind heaps
   g_desc_heap_mgr.bind_heaps(cmd);
 
-  // set render target image clear render target images
+  // set render target image clear render target image
   set_render_target();
   clear_render_target();
-  clear_depth_stencil();
 
   // set viewport
   auto viewport = CD3DX12_VIEWPORT{ 0.f, 0.f, static_cast<float>(frame.image.width()), static_cast<float>(frame.image.height()) };
@@ -191,8 +190,7 @@ void RenderResource::present(bool vsync) const noexcept
 void RenderResource::set_render_target() noexcept
 {
   auto rtv = render_target()->rtv().cpu_handle();
-  auto dsv = depth_stencil()->dsv().cpu_handle();
-  g_graphics_engine.cmd()->OMSetRenderTargets(1, &rtv, false, &dsv);
+  g_graphics_engine.cmd()->OMSetRenderTargets(1, &rtv, false, nullptr);
 }
 
 void RenderResource::clear_render_target() noexcept

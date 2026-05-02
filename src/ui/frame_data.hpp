@@ -19,52 +19,33 @@ struct WindowShadowInfo
 
 inline ImageHandle Write_Image_Handle = {};
 
-struct DrawData
+enum class DrawCmdType
 {
-  enum class Type
-  {
-    ui,
-    mask_write,
-    discard_draw_tmp,
-    composite_tmp,
-    stencil_replace_write,
-    stencil_equal_test,
-    stencil_not_equal_test,
-  };
-
-  DrawData(
-    Type        type,
-    uint32_t    index_beg,
-    uint32_t    indices_size,
-    ImageHandle image_handle        = {},
-    uint32_t    stencil_value       = {},
-    bool        clear_depth_stencil = {},
-    bool        clear_render_target = {}) noexcept
-    : type(type), index_beg(index_beg), indices_size(indices_size), 
-      stencil_value(stencil_value), clear_depth_stencil(clear_depth_stencil),
-      clear_render_target(clear_render_target)
-  {
-    if (image_handle)
-      this->image_handle = image_handle;
-    else
-      this->image_handle = Write_Image_Handle;
-  }
-
-  Type type{};
-
-  RECT     scissor_rect{};
-  uint32_t index_beg{};
-  uint32_t indices_size{};
-
-  ImageHandle image_handle{};
-
-  uint32_t            stencil_value{};
-  bool                clear_depth_stencil{};
-  bool                clear_render_target{};
-  std::optional<RECT> clear_render_target_rect{};
+  ui,
+  clear_mask_image,
+  clear_tmp_image,
+  mask_write,
+  discard_draw_tmp,
+  composite_tmp,
 };
 
-using DrawDataType = DrawData::Type;
+struct DrawCmd
+{
+  DrawCmdType type;
+
+  union
+  {
+    struct
+    {
+      uint32_t    idx_beg{};
+      uint32_t    idx_size{};
+      RECT        scissor_rect{};
+      ImageHandle image_handle;
+    } ui;
+
+    std::optional<RECT> clear_rect{};
+  };
+};
 
 class FrameData
 {
@@ -82,8 +63,8 @@ public:
   {
     _vertices.clear();
     _indices.clear();
-    _draw_datas.clear();
-    _draw_data_rect_idxs.clear();
+    _draw_cmds.clear();
+    _draw_cmd_rect_idxs.clear();
     _points.clear();
     _normals.clear();
     _vertex_beg           = {};
@@ -126,11 +107,11 @@ public:
   }
   auto& window_shadow_info() const noexcept { return _window_shadow_info; }
 
-  auto& vertices()   const noexcept { return _vertices;   }
-  auto& indices()    const noexcept { return _indices;    }
-  auto& draw_datas() const noexcept { return _draw_datas; }
+  auto& vertices()  const noexcept { return _vertices;  }
+  auto& indices()   const noexcept { return _indices;   }
+  auto& draw_cmds() const noexcept { return _draw_cmds; }
 
-  auto check() const noexcept { return _draw_data_rect_idxs.empty(); }
+  auto check() const noexcept { return _draw_cmd_rect_idxs.empty(); }
 
 private:
   using Vertex = renderer::Vertex;
@@ -154,9 +135,10 @@ private:
 
 private:
   auto get_rect(uint32_t vtx_beg, uint32_t vtx_cnt) const noexcept -> RECT;
-  void add_rect(vec2 left_top, vec2 right_bottom, Color color) noexcept;
+  void add_rect(vec2 left_top, vec2 right_bottom, Color color = {}) noexcept;
 
-  void add_draw_call(DrawDataType type, ImageHandle image_handle = {}, uint32_t stencil_value = {}, bool clear_depth_stencil = {}, bool clear_render_target = {}) noexcept;
+  void push_draw_cmd(DrawCmdType type, ImageHandle image_handle = Write_Image_Handle) noexcept;
+  void push_draw_cmd_clear_rect(DrawCmdType type, std::optional<RECT> rect = {}) noexcept;
 
   void add_convex_poly_filled(Color color) noexcept;
   void add_concave_poly_filled(Color color) noexcept;
@@ -180,8 +162,8 @@ private:
   uint32_t              _tmp_vertices_size{};
   uint32_t              _tmp_indices_size{};
 
-  std::vector<DrawData> _draw_datas;
-  std::vector<uint32_t> _draw_data_rect_idxs;
+  std::vector<DrawCmd>  _draw_cmds;
+  std::vector<uint32_t> _draw_cmd_rect_idxs;
   uint32_t              _draw_index_beg{};
 
   vec2                  _window_pos{};

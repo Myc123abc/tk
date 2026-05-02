@@ -266,70 +266,46 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
     .window_pos           = frame_data->window_pos(),
   };
 
-  for (auto const& data : frame_data->draw_datas())
+  for (auto const& draw_cmd : frame_data->draw_cmds())
   {
-    auto draw = [&](PipelineType type) noexcept
+    using Type = ui::DrawCmdType;
+    switch (draw_cmd.type)
     {
-      g_ctx.graphics_draw(type, res.render_target(), res.depth_stencil(), data, "constants", constants,
-      {
-        { "image", _images[data.image_handle].srv() },
-      });
-    };
-
-    using enum ui::DrawDataType;
-    switch (data.type)
-    {
-      case ui::DrawDataType::ui:
-        draw(PipelineType::ui);
-        break;
-
-      case mask_write:
-        if (data.clear_render_target)
+      case Type::ui:
+        g_ctx.graphics_draw(PipelineType::ui, res.render_target(), {}, draw_cmd, "constants", constants,
         {
-          res.mask_image()->clear_render_target(g_graphics_engine.cmd(), data.clear_render_target_rect);
-          res.tmp_image()->clear_render_target(g_graphics_engine.cmd()); // TODO: should only clear in first discard_draw_tmp with composite_rect
-        }
-        g_ctx.graphics_draw(PipelineType::mask_write, res.mask_image(), {}, data, "constants", constants);
-        break;
-
-      case discard_draw_tmp:
-        g_ctx.graphics_draw(PipelineType::ui, res.tmp_image(), {}, data, "constants", constants,
-        {
-          { "image", _images[data.image_handle].srv() },
+          { "image", _images[draw_cmd.ui.image_handle].srv() },
         });
         break;
 
-      case composite_tmp:
+      case Type::clear_mask_image:
+        res.mask_image()->clear_render_target(g_graphics_engine.cmd(), draw_cmd.clear_rect);
+        break;
+
+      case Type::clear_tmp_image:
+        res.tmp_image()->clear_render_target(g_graphics_engine.cmd(), draw_cmd.clear_rect);
+        break;
+
+      case Type::mask_write:
+        g_ctx.graphics_draw(PipelineType::mask_write, res.mask_image(), {}, draw_cmd, "constants", constants);
+        break;
+
+      case Type::discard_draw_tmp:
+        g_ctx.graphics_draw(PipelineType::ui, res.tmp_image(), {}, draw_cmd, "constants", constants,
+        {
+          { "image", _images[draw_cmd.ui.image_handle].srv() },
+        });
+        break;
+
+      case Type::composite_tmp:
         res.mask_image()->set_state(cmd, ImageState::pixel);
         res.tmp_image()->set_state(cmd, ImageState::pixel);
-        g_ctx.graphics_draw(PipelineType::discard_draw, res.render_target(), {}, data, "constants", constants,
+        g_ctx.graphics_draw(PipelineType::discard_draw, res.render_target(), {}, draw_cmd, "constants", constants,
         {
           { "image",      res.tmp_image()->srv()  },
           { "mask_image", res.mask_image()->srv() },
         });
         break;
-
-      case stencil_replace_write:
-      {
-        if (data.clear_depth_stencil) res.clear_depth_stencil();
-        g_ctx.set_stencil_value(data.stencil_value);
-        draw(PipelineType::stencil_replace_write);
-      }
-      break;
-
-      case stencil_equal_test:
-      {
-        g_ctx.set_stencil_value(data.stencil_value);
-        draw(PipelineType::stencil_equal_test);
-      }
-      break;
-
-      case stencil_not_equal_test:
-      {
-        g_ctx.set_stencil_value(data.stencil_value);
-        draw(PipelineType::stencil_not_equal_test);
-      }
-      break;
     }
   }
 

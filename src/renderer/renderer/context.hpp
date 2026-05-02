@@ -46,7 +46,7 @@ public:
 
   template <typename T>
   requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
-  void graphics_draw(PipelineType type, Image* render_target, Image* depth_stencil, ui::DrawData const& data,
+  void graphics_draw(PipelineType type, Image* render_target, Image* depth_stencil, ui::DrawCmd const& cmd,
     std::string_view constants_name, T const& constants, std::initializer_list<DescriptorInfo> descs = {}) noexcept;
 
 private:
@@ -117,12 +117,12 @@ void Context::graphics_pipe_set(PipelineType type, RECT scissor_rect, std::strin
 
 template <typename T>
 requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
-void Context::graphics_draw(PipelineType type, Image* render_targe, Image* depth_stencil, ui::DrawData const& data,
+void Context::graphics_draw(PipelineType type, Image* render_targe, Image* depth_stencil, ui::DrawCmd const& cmd,
   std::string_view constants_name, T const& constants, std::initializer_list<DescriptorInfo> descs) noexcept
 {
   set_render_target(render_targe, depth_stencil);
-  graphics_pipe_set(type, data.scissor_rect, constants_name, constants, descs);
-  draw(data.index_beg, data.indices_size);
+  graphics_pipe_set(type, cmd.ui.scissor_rect, constants_name, constants, descs);
+  draw(cmd.ui.idx_beg, cmd.ui.idx_size);
 }
 
 }
