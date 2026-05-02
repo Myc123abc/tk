@@ -131,6 +131,11 @@ void FrameData::add_rect(vec2 left_top, vec2 right_bottom, Color color, float th
     return;
   }
 
+  add_rect(left_top, right_bottom, color);
+}
+
+void FrameData::add_rect(vec2 left_top, vec2 right_bottom, Color color) noexcept
+{
   auto [vertices, indices] = expand_beg(4, 6);
 
   vertices[0] = { left_top, {}, color };
@@ -676,6 +681,24 @@ void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noex
   _points.clear();
 }
 
+auto FrameData::get_rect(uint32_t vtx_beg, uint32_t vtx_cnt) const noexcept -> RECT
+{
+  assert(vtx_beg + vtx_cnt <= _vertices.size());
+
+  auto rc = RECT{ LONG_MAX, LONG_MAX, LONG_MIN, LONG_MIN };
+
+  for (auto i : std::views::iota(0u, vtx_cnt))
+  {
+    auto const& vtx = _vertices[vtx_beg + i];
+    rc.left   = std::min(rc.left,   static_cast<LONG>(std::floor(vtx.pos.x)));
+    rc.top    = std::min(rc.top,    static_cast<LONG>(std::floor(vtx.pos.y)));
+    rc.right  = std::max(rc.right,  static_cast<LONG>(std::ceil(vtx.pos.x)));
+    rc.bottom = std::max(rc.bottom, static_cast<LONG>(std::ceil(vtx.pos.y)));
+  }
+
+  return rc;
+}
+
 void FrameData::add_draw_call(DrawDataType type, ImageHandle image_handle, uint32_t stencil_value, bool clear_depth_stencil, bool clear_render_target) noexcept
 {
   if (auto res = _indices.size() - _draw_index_beg)
@@ -699,7 +722,7 @@ void FrameData::add_image(ImageHandle handle, vec2 left_top, vec2 right_bottom, 
 {
   assert(!_using_discard_shapes);
 
-  auto type = _use_discard ? DrawDataType::discard_draw : DrawDataType::ui;
+  auto type = _use_discard ? DrawDataType::discard_draw_tmp : DrawDataType::ui;
   add_draw_call(type);
 
   auto col = Color{ 1, 1, 1, static_cast<float>(alpha) / 255 };
@@ -730,16 +753,25 @@ void FrameData::discard_beg(std::function<void()> func) noexcept
   func();
   _using_discard_shapes = false;
 
+  // TODO: use it as clear rect
+  auto mask_rect = get_rect(_discard_vtx_beg, _vertices.size() - _discard_vtx_beg);
   add_draw_call(DrawDataType::mask_write, {}, {}, {}, true);
 
-  _use_discard = true;
+  _use_discard     = true;
+  _discard_vtx_beg = _vertex_beg;
 }
 
 void FrameData::discard_end() noexcept
 {
-  assert(_use_discard);
+  assert(_use_discard && _vertices.size() > _discard_vtx_beg);
+
   _use_discard = false;
-  add_draw_call(DrawDataType::discard_draw);
+
+  add_draw_call(DrawDataType::discard_draw_tmp);
+
+  auto rc = get_rect(_discard_vtx_beg, _vertices.size() - _discard_vtx_beg);
+  add_rect({ rc.left, rc.top }, { rc.right, rc.bottom }, {});
+  add_draw_call(DrawDataType::composite_tmp);
 }
 
 }

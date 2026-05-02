@@ -65,6 +65,7 @@ public:
   auto  render_target() noexcept { return &current_frame().image; }
   auto  depth_stencil() noexcept { return &_dsv_image;            }
   auto  mask_image()    noexcept { return &_mask_image;           }
+  auto  tmp_image()     noexcept { return &_tmp_image;            }
 
 private:
   struct Frame
@@ -79,6 +80,7 @@ private:
   std::array<Frame, Frame_Count>              _frames;
   Image                                       _dsv_image;
   Image                                       _mask_image;
+  Image                                       _tmp_image;
 
   Microsoft::WRL::ComPtr<IDXGISwapChain4>     _swapchain;
   HANDLE                                      _swapchain_waitable_obj;

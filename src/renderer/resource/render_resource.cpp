@@ -20,8 +20,8 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
   
   // create depth test image
   _dsv_image.init(width, height, ImageFormat::d24_s8, ImageType::dsv);
-
   _mask_image.init(width, height, ImageFormat::r8_unorm, ImageType::rtv | ImageType::srv);
+  _tmp_image.init(width, height, Render_Target_Format, ImageType::rtv | ImageType::srv);
 
   // create swapchain
   ComPtr<IDXGISwapChain1> swapchain;
@@ -74,6 +74,7 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
 void RenderResource::destroy() noexcept
 {
   CloseHandle(_swapchain_waitable_obj);
+  _tmp_image.destroy();
   _mask_image.destroy();
   _dsv_image.destroy();
   for (auto& frame : _frames)
@@ -117,6 +118,7 @@ void RenderResource::resize(uint32_t width, uint32_t height) noexcept
   }
   _dsv_image.resize(width, height);
   _mask_image.resize(width, height);
+  _tmp_image.resize(width, height);
 }
 
 void RenderResource::wait_frame_complete() noexcept

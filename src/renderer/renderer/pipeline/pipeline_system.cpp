@@ -15,7 +15,7 @@ void PipelineSystem::init() noexcept
   auto res = generate_root_signature(
   {
     { constants, "constants",  0, 0, false, sizeof(Constants) },
-    { texture,   "image",      0, 0                           },
+    { texture,   "image",      0, 0, true                     },
     { texture,   "mask_image", 0, 1, true                     },
   }, true, true);
 

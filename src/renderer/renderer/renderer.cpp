@@ -284,16 +284,28 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
         break;
 
       case mask_write:
-        if (data.clear_render_target) res.mask_image()->clear_render_target(g_graphics_engine.cmd());
+        if (data.clear_render_target)
+        {
+          res.mask_image()->clear_render_target(g_graphics_engine.cmd(), data.clear_render_target_rect);
+          res.tmp_image()->clear_render_target(g_graphics_engine.cmd()); // TODO: should only clear in first discard_draw_tmp with composite_rect
+        }
         g_ctx.graphics_draw(PipelineType::mask_write, res.mask_image(), {}, data, "constants", constants);
         break;
 
-      case discard_draw:
+      case discard_draw_tmp:
+        g_ctx.graphics_draw(PipelineType::ui, res.tmp_image(), {}, data, "constants", constants,
+        {
+          { "image", _images[data.image_handle].srv() },
+        });
+        break;
+
+      case composite_tmp:
         res.mask_image()->set_state(cmd, ImageState::pixel);
+        res.tmp_image()->set_state(cmd, ImageState::pixel);
         g_ctx.graphics_draw(PipelineType::discard_draw, res.render_target(), {}, data, "constants", constants,
         {
-          { "image",      _images[data.image_handle].srv() },
-          { "mask_image", res.mask_image()->srv()          },
+          { "image",      res.tmp_image()->srv()  },
+          { "mask_image", res.mask_image()->srv() },
         });
         break;
 

@@ -2,11 +2,12 @@
 
 #include "descriptor_heap_manager.hpp"
 #include "util/flag.hpp"
+#include "util/vec.hpp"
 
 #include <dxgi1_6.h>
 #include <directx/d3dx12.h>
 
-#include "util/vec.hpp"
+#include <optional>
 
 namespace tk::renderer {
 
@@ -97,7 +98,7 @@ public:
   void resize(IDXGISwapChain1* swapchain, uint32_t index) noexcept { init(swapchain, index); }
 
   void clear(ID3D12GraphicsCommandList1* cmd, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) const noexcept;
-  void clear_render_target(ID3D12GraphicsCommandList1* cmd) noexcept;
+  void clear_render_target(ID3D12GraphicsCommandList1* cmd, std::optional<RECT> rect = {}) noexcept;
   void clear_depth_stencil(ID3D12GraphicsCommandList1* cmd) noexcept;
 
   auto handle() const noexcept { return _handle.Get();                     }

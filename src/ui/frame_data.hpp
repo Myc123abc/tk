@@ -24,8 +24,9 @@ struct DrawData
   enum class Type
   {
     ui,
-    discard_draw,
     mask_write,
+    discard_draw_tmp,
+    composite_tmp,
     stencil_replace_write,
     stencil_equal_test,
     stencil_not_equal_test,
@@ -57,9 +58,10 @@ struct DrawData
 
   ImageHandle image_handle{};
 
-  uint32_t stencil_value{};
-  bool     clear_depth_stencil{};
-  bool     clear_render_target{};
+  uint32_t            stencil_value{};
+  bool                clear_depth_stencil{};
+  bool                clear_render_target{};
+  std::optional<RECT> clear_render_target_rect{};
 };
 
 using DrawDataType = DrawData::Type;
@@ -84,13 +86,16 @@ public:
     _draw_data_rect_idxs.clear();
     _points.clear();
     _normals.clear();
-    _vertex_beg         = {};
-    _index_beg          = {};
-    _tmp_vertices_size  = {};
-    _tmp_indices_size   = {};
-    _draw_index_beg     = {};
-    _window_pos         = {};
-    _window_shadow_info = {};
+    _vertex_beg           = {};
+    _index_beg            = {};
+    _tmp_vertices_size    = {};
+    _tmp_indices_size     = {};
+    _draw_index_beg       = {};
+    _window_pos           = {};
+    _window_shadow_info   = {};
+    _use_discard          = {};
+    _using_discard_shapes = {};
+    _discard_vtx_beg      = {};
   }
 
   void add_rect(vec2 left_top, vec2 right_bottom, Color color, float thickness) noexcept;
@@ -148,6 +153,9 @@ private:
   }
 
 private:
+  auto get_rect(uint32_t vtx_beg, uint32_t vtx_cnt) const noexcept -> RECT;
+  void add_rect(vec2 left_top, vec2 right_bottom, Color color) noexcept;
+
   void add_draw_call(DrawDataType type, ImageHandle image_handle = {}, uint32_t stencil_value = {}, bool clear_depth_stencil = {}, bool clear_render_target = {}) noexcept;
 
   void add_convex_poly_filled(Color color) noexcept;
@@ -184,8 +192,9 @@ private:
   std::vector<vec2> _normals;
   std::vector<vec2> _tmp_buf;
 
-  bool _using_discard_shapes{};
-  bool _use_discard{};
+  bool     _using_discard_shapes{};
+  bool     _use_discard{};
+  uint32_t _discard_vtx_beg{};
 
   inline static auto constexpr arc_table_size         = 48;
   inline static auto constexpr arc_sample_max         = arc_table_size;

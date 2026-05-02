@@ -236,12 +236,15 @@ void Image::clear(ID3D12GraphicsCommandList1* cmd, D3D12_CPU_DESCRIPTOR_HANDLE c
   cmd->ClearUnorderedAccessViewFloat(gpu_handle, cpu_handle, _handle.Get(), values, 1, &rect);
 }
 
-void Image::clear_render_target(ID3D12GraphicsCommandList1* cmd) noexcept
+void Image::clear_render_target(ID3D12GraphicsCommandList1* cmd, std::optional<RECT> rect) noexcept
 {
   err_if(!has_flag(_type, ImageType::rtv), "clear render target only use on rtv");
   set_state(cmd, ImageState::render_target);
   float constexpr clear_color[4]{};
-  cmd->ClearRenderTargetView(_desc.rtv.cpu_handle(), clear_color, 0, nullptr);
+  if (rect)
+    cmd->ClearRenderTargetView(_desc.rtv.cpu_handle(), clear_color, 1, &rect.value());
+  else
+    cmd->ClearRenderTargetView(_desc.rtv.cpu_handle(), clear_color, 0, nullptr);
 }
 
 void Image::clear_depth_stencil(ID3D12GraphicsCommandList1* cmd) noexcept
