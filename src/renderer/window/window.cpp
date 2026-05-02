@@ -137,7 +137,7 @@ auto Window::is_mouse_pass_through_area() const noexcept -> bool
 
 auto Window::contains_point(vec2i p) const noexcept -> bool
 {
-  return point_in(p, _rect);
+  return point_in(p, resize_rect());
 }
 
 auto Window::move_from_maximize() noexcept -> vec2i

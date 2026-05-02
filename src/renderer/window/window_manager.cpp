@@ -23,7 +23,7 @@ auto to_32_bits(uint64_t x) noexcept -> std::pair<uint32_t, uint32_t>
   return { static_cast<uint32_t>(x >> 32), static_cast<uint32_t>(x & 0xffffffff) };
 }
 
-void set_cursor(HWND handle, ResizeType type) noexcept
+void set_cursor(ResizeType type) noexcept
 {
   using enum ResizeType;
   auto cursor = IDC_ARROW;
@@ -48,7 +48,7 @@ void set_cursor(HWND handle, ResizeType type) noexcept
   case none:
     break;
   }
-  SetClassLongPtrA(handle, GCLP_HCURSOR, reinterpret_cast<LONG_PTR>(LoadCursorA(nullptr, cursor)));
+  SetCursor(LoadCursorA(nullptr, cursor));
 }
 
 }
@@ -86,8 +86,8 @@ void WindowManager::message_process() noexcept
     TranslateMessage(&msg);
     DispatchMessageW(&msg);
     message_process(msg);
-    update();
   }
+  update();
 }
 
 void WindowManager::destroy() noexcept
@@ -125,7 +125,6 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
 
   static auto last_cursor_pos                    = vec2i{};
   static auto left_button_down_window_cursor_pos = vec2i{};
-  static auto last_resize_type                   = ResizeType{};
   static auto left_button_down_resize_type       = ResizeType{};
   static auto left_button_down                   = false;
 
@@ -221,13 +220,6 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     auto  cursor_pos = window.cursor_pos();
     auto const& cfg  = window._cfg;
 
-    // update cursor
-    if (auto type = window.get_resize_type(cursor_pos); !cfg.no_resize && type != last_resize_type && !window.is_fullscreen())
-    {
-      last_resize_type = type;
-      set_cursor(handle, type);
-    }
-
     // update window mode for mouse pass through
     if (!window.is_resizing() && !window.is_moving() &&
         !wnd_mgr._using_mouse_pass_through_windows.contains(handle) &&
@@ -293,6 +285,8 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
       g_ui_ctx.clear_state();
     }
     break;
+
+  case WM_SETCURSOR: return true;
   }
 
   }
@@ -302,94 +296,16 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
 
 void WindowManager::update() noexcept
 {
-  if (_update_monitors)
+  update_cursor();
+}
+
+void WindowManager::update_cursor() noexcept
+{
+  if (g_ui_ctx.cursor_on_window = get_cursor_on_window(); g_ui_ctx.cursor_on_window)
   {
-    _update_monitors = false;
-
-    // update windows
-    for (auto& [handle, window] : _windows)
-    {
-      auto rect            = RECT{};
-      auto monitor         = Monitor{ handle };
-      auto is_same_monitor = window.monitor() == monitor.name();
-
-      // minimize window process
-      if (IsIconic(handle))
-      {
-        ShowWindow(handle, SW_SHOWNOACTIVATE);
-        GetWindowRect(handle, &rect);
-        window.cancel_fullscreen_maximize(rect, monitor.scale());
-        window.minimize();
-        window.set_monitor(monitor.name());
-        continue;
-      }
-
-      GetWindowRect(handle, &rect);
-
-      // maximize window process
-      if (window.is_maximized())
-      {
-        if (is_same_monitor)
-        {
-          // because some device OS get rect not really the monitor's rcWork,
-          // so I need to get it manually
-          window.update_by_rect(Monitor{ rect }.work_rect(), monitor.scale());
-          continue;
-        }
-      }
-
-      // fullscreen window process
-      if (window.is_fullscreen())
-      {
-        if (is_same_monitor)
-        {
-          window.update_by_rect(Monitor{ rect }.rect(), monitor.scale());
-          continue;
-        }
-      }
-      
-      // check whether the monitor of the window is removed
-      if (!is_same_monitor)
-      {
-        if (window.is_maximized())
-          window.cancel_maximize(rect, monitor.scale());
-        else if (window.is_fullscreen())
-          window.cancel_fullscreen(rect, monitor.scale());
-        else
-          window.update_by_real_rect(rect, monitor.scale());
-
-        // update monitor
-        window.set_monitor(monitor.name());
-        continue;
-      }
-
-      // resize window if scale or rect changed
-      if (monitor.scale() != window.scale() || window.real_rect() != rect)
-        window.update_by_real_rect(rect, monitor.scale());
-    }
-    update_fullscreen_window();
-  }
-
-  // reset window position avoid OS move window
-  if (!_window_change_size.empty())
-  {
-    for (auto [handle, rect] : _window_change_size)
-    {
-      if (!_windows.contains(handle)) continue;
-      auto& window = _windows[handle];
-      if (window.real_rect() != rect)
-      {
-        // the suck Windows operate system in some device have wrong monitor change process
-        // when monitor change, the rcWork and rcMonitor is not same at first time
-        // so I must recheck the right rcWork to promise my maximize window is correct
-        auto mi = Monitor{ handle };
-        if (window.is_maximized() && window._rect == mi.rect() && mi.rect() != mi.work_rect())
-          window.update_by_rect(mi.work_rect(), mi.scale());
-        else
-          window.reset_pos_size();
-      }
-    }
-    _window_change_size.clear();
+    auto const& cursor_on_window = _windows[g_ui_ctx.cursor_on_window];
+    _cursor_type = cursor_on_window.get_resize_type(cursor_on_window.cursor_pos());
+    set_cursor(_cursor_type);
   }
 }
 
@@ -527,8 +443,99 @@ void WindowManager::message_process(MSG const& msg) noexcept
     }
   }
 
-  // send update message to ui context
-  g_ui_ctx.cursor_on_window = get_cursor_on_window();
+  update_monitors();
+
+  // reset window position avoid OS move window
+  if (!_window_change_size.empty())
+  {
+    for (auto [handle, rect] : _window_change_size)
+    {
+      if (!_windows.contains(handle)) continue;
+      auto& window = _windows[handle];
+      if (window.real_rect() != rect)
+      {
+        // the suck Windows operate system in some device have wrong monitor change process
+        // when monitor change, the rcWork and rcMonitor is not same at first time
+        // so I must recheck the right rcWork to promise my maximize window is correct
+        auto mi = Monitor{ handle };
+        if (window.is_maximized() && window._rect == mi.rect() && mi.rect() != mi.work_rect())
+          window.update_by_rect(mi.work_rect(), mi.scale());
+        else
+          window.reset_pos_size();
+      }
+    }
+    _window_change_size.clear();
+  }
+}
+
+void WindowManager::update_monitors() noexcept
+{
+  if (!_update_monitors) return;
+
+  _update_monitors = false;
+
+  // update windows
+  for (auto& [handle, window] : _windows)
+  {
+    auto rect            = RECT{};
+    auto monitor         = Monitor{ handle };
+    auto is_same_monitor = window.monitor() == monitor.name();
+
+    // minimize window process
+    if (IsIconic(handle))
+    {
+      ShowWindow(handle, SW_SHOWNOACTIVATE);
+      GetWindowRect(handle, &rect);
+      window.cancel_fullscreen_maximize(rect, monitor.scale());
+      window.minimize();
+      window.set_monitor(monitor.name());
+      continue;
+    }
+
+    GetWindowRect(handle, &rect);
+
+    // maximize window process
+    if (window.is_maximized())
+    {
+      if (is_same_monitor)
+      {
+        // because some device OS get rect not really the monitor's rcWork,
+        // so I need to get it manually
+        window.update_by_rect(Monitor{ rect }.work_rect(), monitor.scale());
+        continue;
+      }
+    }
+
+    // fullscreen window process
+    if (window.is_fullscreen())
+    {
+      if (is_same_monitor)
+      {
+        window.update_by_rect(Monitor{ rect }.rect(), monitor.scale());
+        continue;
+      }
+    }
+    
+    // check whether the monitor of the window is removed
+    if (!is_same_monitor)
+    {
+      if (window.is_maximized())
+        window.cancel_maximize(rect, monitor.scale());
+      else if (window.is_fullscreen())
+        window.cancel_fullscreen(rect, monitor.scale());
+      else
+        window.update_by_real_rect(rect, monitor.scale());
+
+      // update monitor
+      window.set_monitor(monitor.name());
+      continue;
+    }
+
+    // resize window if scale or rect changed
+    if (monitor.scale() != window.scale() || window.real_rect() != rect)
+      window.update_by_real_rect(rect, monitor.scale());
+  }
+  update_fullscreen_window();
 }
 
 auto WindowManager::get_window_z_orders() const noexcept -> std::vector<HWND>

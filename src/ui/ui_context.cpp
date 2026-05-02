@@ -122,16 +122,6 @@ void UIContext::check_draw() const noexcept
   err_if(!_call_begin, "not called begin to draw something");
 }
 
-void UIContext::check_path_draw() const noexcept
-{
-  err_if(!_path_begin, "not called path begin to draw path");
-}
-
-void UIContext::check_path_not_draw() const noexcept
-{
-  err_if(_path_begin, "calling path begin to draw path, cannot be used in non-path draw");
-}
-
 void UIContext::check_union_draw() const noexcept
 {
   err_if(!_union_begin, "not called union begin");
@@ -485,26 +475,9 @@ auto UIContext::ping_pong(bool b, size_t id, double duration, Tween::Ease ease) 
   return value;
 }
 
-void UIContext::begin_path() noexcept
-{
-  check_draw();
-  check_path_not_draw();
-  _path_begin = true;
-  // cmd()->begin_path();
-}
-
-void UIContext::end_path(Color color, float thickness) noexcept
-{
-  check_draw();
-  check_path_draw();
-  _path_begin = false;
-  // cmd()->end_path(color, thickness);
-}
-
 void UIContext::begin_union() noexcept
 {
   check_draw();
-  check_path_not_draw();
   check_union_not_draw();
   _union_begin = true;
   // cmd()->begin_union();
@@ -513,7 +486,6 @@ void UIContext::begin_union() noexcept
 void UIContext::end_union(Color color, float thickness) noexcept
 {
   check_draw();
-  check_path_not_draw();
   check_union_draw();
   _union_begin = false;
   // cmd()->end_union(color, thickness);
@@ -576,7 +548,6 @@ auto UIContext::get_key(Key key) noexcept -> KeyState
 auto UIContext::image(std::string_view path, vec2 left_top, vec2 right_bottom, uint8_t alpha) noexcept -> bool
 {
   check_draw();
-  check_path_not_draw();
   check_union_not_draw();
 
   if (g_img_mgr.try_load(path))
@@ -600,7 +571,6 @@ auto UIContext::text(std::string_view text, vec2 pos, float size, Color inner_co
   if (text.empty()) return {};
 
   check_draw();
-  check_path_not_draw();
   check_union_not_draw();
 
   auto res = g_text_engine.parse(text);

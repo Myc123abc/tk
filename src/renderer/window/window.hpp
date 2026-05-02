@@ -13,15 +13,6 @@
 
 namespace tk::renderer {
 
-enum class CursorType
-{
-  arrow,
-  up_down,
-  left_rigtht,
-  diagonal,
-  anti_diagonal
-};
-
 enum class ResizeType
 {
   none,
@@ -51,7 +42,7 @@ public:
   void destroy() const noexcept;
   
   auto shadow_thickness() const noexcept -> LONG { return Window_Shadow_Thickness * _scale; }
-  auto resize_thickness() const noexcept { return Window_Resize_Thickness * _scale; }
+  auto resize_thickness() const noexcept -> LONG { return Window_Resize_Thickness * _scale; }
   auto real_x()      const noexcept -> int      { return _x      - shadow_thickness();     }
   auto real_y()      const noexcept -> int      { return _y      - shadow_thickness();     }
   auto real_width()  const noexcept -> uint32_t { return _width  + shadow_thickness() * 2; }
@@ -61,6 +52,10 @@ public:
                                                    _rect.right  + shadow_thickness(),
                                                    _rect.bottom + shadow_thickness() }; }
   auto rect() const noexcept { return _rect; }
+  auto resize_rect()   const noexcept { return RECT{ _rect.left   - resize_thickness(),
+                                                     _rect.top    - resize_thickness(),
+                                                     _rect.right  + resize_thickness(),
+                                                     _rect.bottom + resize_thickness() }; }
   
   auto content_rect() const noexcept { return RECT{ shadow_thickness(),
                                                     shadow_thickness(),

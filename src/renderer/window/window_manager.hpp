@@ -62,12 +62,16 @@ public:
   auto get_window_z_orders() const noexcept -> std::vector<HWND>;
   auto get_cursor_on_window() noexcept -> HWND;
 
+  auto is_normal_cursor() const noexcept { return _cursor_type == ResizeType::none; }
+
 private:
   void message_process(MSG const& msg) noexcept;
 
   void update() noexcept;
   void update_monitor(HWND handle, vec2 cursor_pos, vec2i& left_button_down_window_cursor_pos) noexcept;
+  void update_monitors() noexcept;
   void update_fullscreen_window() noexcept;
+  void update_cursor() noexcept;
 
 public:
   static constexpr wchar_t Auxiliary_Class[] = L"vn::window::WindowManager::AuxiliaryWindow";
@@ -82,6 +86,7 @@ private:
   bool                             _update_monitors{};
   std::unordered_map<HWND, RECT>   _window_change_size{};
   std::unordered_map<HWND, HWND>   _blur_windows;
+  ResizeType                       _cursor_type{};
 )
 
 }

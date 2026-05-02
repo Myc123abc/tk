@@ -47,15 +47,11 @@ public:
   void end() noexcept;
 
   void check_draw() const noexcept;
-  void check_path_draw() const noexcept;
-  void check_path_not_draw() const noexcept;
   void check_union_draw() const noexcept;
   void check_union_not_draw() const noexcept;
 
   void render() noexcept;
 
-  void begin_path() noexcept;
-  void end_path(Color color, float thickness) noexcept;
   void begin_union() noexcept;
   void end_union(Color color, float thickness) noexcept;
 
@@ -112,7 +108,6 @@ private:
   bool              _fullscreen_window_need_clear{};
 
   bool   _call_begin{};
-  bool   _path_begin{};
   bool   _union_begin{};
   double _delta_time{};
 

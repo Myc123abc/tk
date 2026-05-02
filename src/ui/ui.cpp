@@ -164,16 +164,6 @@ void discard_end() noexcept
   g_ui_ctx.frame_data()->discard_end();
 }
 
-void begin_path() noexcept
-{
-  g_ui_ctx.begin_path();
-}
-
-void end_path(Color color, float thickness) noexcept
-{
-  g_ui_ctx.end_path(color, thickness * g_ui_ctx.window()->scale());
-}
-
 void begin_union() noexcept
 {
   g_ui_ctx.begin_union();
@@ -191,7 +181,6 @@ void end_union(Color color, float thickness) noexcept
 void rectangle(vec2 left_top, vec2 right_bottom, Color color, float thickness) noexcept
 {
 	g_ui_ctx.check_draw();
-	g_ui_ctx.check_path_not_draw();
 
 	auto offset = g_ui_ctx.get_render_pos();
 	left_top     += offset;
@@ -208,7 +197,6 @@ void rectangle(vec2 left_top, vec2 right_bottom, Color color, float thickness) n
 void triangle(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
 {
 	g_ui_ctx.check_draw();
-	g_ui_ctx.check_path_not_draw();
 
 	auto offset = g_ui_ctx.get_render_pos();
 	p0 += offset;
@@ -227,7 +215,6 @@ void triangle(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
 void circle(vec2 center, float radius, Color color, float thickness) noexcept
 {
 	g_ui_ctx.check_draw();
-	g_ui_ctx.check_path_not_draw();
 
 	auto offset = g_ui_ctx.get_render_pos();
   center += offset;
@@ -413,7 +400,6 @@ void reset_tween(std::string_view name) noexcept
 auto button(size_t id, int x, int y, uint32_t width, uint32_t height) noexcept-> ButtonState
 {
   g_ui_ctx.check_draw();
-  g_ui_ctx.check_path_not_draw();
   g_ui_ctx.check_union_not_draw();
 
   // what is a button
@@ -431,7 +417,7 @@ auto button(size_t id, int x, int y, uint32_t width, uint32_t height) noexcept->
   right_bottom *= scale;
 
   // when cursor hover on it, it will change color to hovered color
-  auto is_hovered  = g_ui_ctx.is_hover_on(id, left_top, right_bottom);
+  auto is_hovered  = g_ui_ctx.is_hover_on(id, left_top, right_bottom) && g_wnd_mgr.is_normal_cursor();
   auto is_move_out = g_ui_ctx.is_cursor_move_out(id);
   if (is_hovered && g_ui_ctx.mouse_down_pos)
   {
