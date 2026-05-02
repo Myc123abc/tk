@@ -97,6 +97,8 @@ public:
 
   void discard_beg(std::function<void()> func) noexcept;
   void discard_end() noexcept;
+  void union_beg() noexcept;
+  void union_end() noexcept;
 
   void set_window_pos(vec2 pos) noexcept { _window_pos = pos; }
   auto window_pos() const noexcept { return _window_pos; }

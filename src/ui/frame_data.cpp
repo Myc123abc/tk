@@ -764,8 +764,6 @@ void FrameData::discard_beg(std::function<void()> func) noexcept
   
   push_draw_cmd(DrawCmdType::ui);
 
-  auto vtx_beg = _vertex_beg;
-
   _using_discard_shapes = true;
   func();
   _using_discard_shapes = false;
@@ -788,6 +786,18 @@ void FrameData::discard_end() noexcept
   push_draw_cmd(DrawCmdType::discard_draw_tmp);
   add_rect({ rc.left, rc.top }, { rc.right, rc.bottom });
   push_draw_cmd(DrawCmdType::composite_tmp);
+}
+
+void FrameData::union_beg() noexcept
+{
+  push_draw_cmd(DrawCmdType::ui);
+  push_draw_cmd_clear_rect(DrawCmdType::clear_mask_image);
+  push_draw_cmd_clear_rect(DrawCmdType::clear_tmp_image);
+}
+
+void FrameData::union_end() noexcept
+{
+  push_draw_cmd(DrawCmdType::mask_write);
 }
 
 }

@@ -47,13 +47,8 @@ public:
   void end() noexcept;
 
   void check_draw() const noexcept;
-  void check_union_draw() const noexcept;
-  void check_union_not_draw() const noexcept;
 
   void render() noexcept;
-
-  void begin_union() noexcept;
-  void end_union(Color color, float thickness) noexcept;
 
   auto is_hover_on(size_t id, vec2 left_top, vec2 right_bottom) noexcept -> bool;
 
@@ -108,7 +103,6 @@ private:
   bool              _fullscreen_window_need_clear{};
 
   bool   _call_begin{};
-  bool   _union_begin{};
   double _delta_time{};
 
 public:

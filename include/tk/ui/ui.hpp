@@ -269,15 +269,11 @@ void discard_beg(std::function<void()> func) noexcept;
 /// discard operation over
 void discard_end() noexcept;
 
-/// use union operator between shapes
-void begin_union() noexcept;
+/// union operation begin
+void union_beg() noexcept;
 
-/**
- * end the union operator
- * @param color
- * @param thickness
- */
-void end_union(Color color, float thickness = {}) noexcept;
+/// union operation end
+void union_end() noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                            Geometry

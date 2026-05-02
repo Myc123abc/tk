@@ -164,14 +164,14 @@ void discard_end() noexcept
   g_ui_ctx.frame_data()->discard_end();
 }
 
-void begin_union() noexcept
+void union_beg() noexcept
 {
-  g_ui_ctx.begin_union();
+  g_ui_ctx.frame_data()->union_beg();
 }
 
-void end_union(Color color, float thickness) noexcept
+void union_end() noexcept
 {
-  g_ui_ctx.end_union(color, thickness * g_ui_ctx.window()->scale());
+  g_ui_ctx.frame_data()->union_end();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -400,7 +400,6 @@ void reset_tween(std::string_view name) noexcept
 auto button(size_t id, int x, int y, uint32_t width, uint32_t height) noexcept-> ButtonState
 {
   g_ui_ctx.check_draw();
-  g_ui_ctx.check_union_not_draw();
 
   // what is a button
   // button is a rectangle with width and height in specific position

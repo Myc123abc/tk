@@ -46,7 +46,7 @@ public:
     for (auto const& pt : _lerp_pts)
       _pts.emplace_back(ui::lerp(pt.p0, pt.p1, v));
 
-    ui::begin_union();
+    // ui::begin_union();
 
     ui::path_line_to(_pts[0]);
     ui::path_line_to(_pts[1]);
@@ -61,7 +61,7 @@ public:
       ui::path_line_to(_pts[6]);
     ui::path_end(color, thickness, true);
 
-    ui::end_union(color, thickness);
+    // ui::end_union(color, thickness);
 
     return clicked;
   }
@@ -300,6 +300,16 @@ void test_discard(uint32_t fmt) noexcept
   ui::discard_end();
 }
 
+void test_union() noexcept
+{
+  ui::union_beg();
+  auto pos = vec2{ 10, 10 };
+  ui::triangle( pos, pos + vec2{ 30, 30 }, pos + vec2{ 0, 60 }, 0xff0000ff, 1);
+  pos.x += 50;
+  ui::triangle( pos, pos + vec2{ -30, 30 }, pos + vec2{ 0, 60 }, 0xff0000ff, 1);
+  ui::union_end();
+}
+
 int main()
 {
   tk::init();
@@ -366,7 +376,8 @@ int main()
       // ui::bezier_quad({ 100, 100 }, { 200, 200 }, { 50, 300 }, 0xff0000ff, 0);
       // ui::bezier_cubic({ 100, 100 }, { 200, 200 }, { 50, 300 }, { 100, 100 }, 0xff0000ff, 0);
       // test_path_draw();
-      test_discard(fmt);
+      // test_discard(fmt);
+      test_union();
 
       ui::end();
     }
