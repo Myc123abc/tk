@@ -378,9 +378,15 @@ constexpr auto dot(vec2 a, vec2 b) noexcept
   return a.x * b.x + a.y * b.y;
 }
 
-constexpr auto length_sq(vec2 p) noexcept
+constexpr auto length(vec2 p) noexcept
 {
   return dot(p, p);
+}
+
+constexpr auto normalize(vec2 v) noexcept -> vec2
+{
+  auto len = length(v);
+  return len > 0.f ? vec2{ v.x / len, v.y / len } : vec2{};
 }
 
 }

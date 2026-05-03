@@ -1,803 +1,480 @@
 #include "frame_data.hpp"
-#include "ui_context.hpp"
-#include "triangulator.hpp"
-
-#include <ranges>
-#include <numbers>
 
 using namespace tk;
 
 namespace {
 
-auto sqrt(float x) noexcept
+constexpr float Pi = 3.14159265358979323846f;
+constexpr float Tau = Pi * 2.0f;
+
+auto normalize_angle(float a) noexcept -> float
 {
-  return _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss(x)));
+  a = std::fmod(a, Tau);
+  if (a < 0.0f)
+    a += Tau;
+  return a;
 }
 
-auto normalize(vec2 p) noexcept
+auto angle_in_arc(float a, float start, float end, bool ccw) noexcept -> bool
 {
-  auto d2 = dot(p, p);
-  if (d2 > .0f)
+  a     = normalize_angle(a);
+  start = normalize_angle(start);
+  end   = normalize_angle(end);
+
+  if (ccw)
   {
-    auto inv_len = sqrt(d2);
-    return p * inv_len;
+    if (start <= end)
+      return a >= start && a <= end;
+    return a >= start || a <= end;
   }
-  return vec2{};
-}
-
-auto fix_normal(vec2 p) noexcept
-{
-  auto d2 = dot(p, p);
-  if (d2 > 0.000001f)
+  else
   {
-    auto inv_len2 = 1.f / d2;
-    auto const max = 100.f;
-    if (inv_len2 > max)
-      inv_len2 = max;
-    return p * inv_len2;
+    if (end <= start)
+      return a <= start && a >= end;
+    return a <= start || a >= end;
   }
-  return vec2{};
 }
 
-auto round_up_to_even(int x) noexcept
+auto rect_min_dist_sq(Rect r, vec2 p) noexcept -> float
 {
-  return ((x + 1) / 2) * 2;
+  float dx = 0.0f;
+  if (p.x < r.left)
+    dx = r.left - p.x;
+  else if (p.x > r.right)
+    dx = p.x - r.right;
+
+  float dy = 0.0f;
+  if (p.y < r.top)
+    dy = r.top - p.y;
+  else if (p.y > r.bottom)
+    dy = p.y - r.bottom;
+
+  return dx * dx + dy * dy;
 }
 
-auto calc_circle_radius(float cnt, float max_error) noexcept
+auto rect_max_dist_sq(Rect r, vec2 p) noexcept -> float
 {
-  return max_error / (1 - std::cos(std::numbers::pi_v<float> / std::max(cnt, std::numbers::pi_v<float>)));
+  float dx = std::max(std::abs(p.x - r.left), std::abs(p.x - r.right));
+  float dy = std::max(std::abs(p.y - r.top),  std::abs(p.y - r.bottom));
+
+  return dx * dx + dy * dy;
 }
 
-auto is_convex(std::span<vec2> p) noexcept
+auto rect_angle_hit(Rect r, vec2 center, float start, float end, bool ccw) noexcept -> bool
 {
-  auto const n = p.size();
-  if (n < 3)
-    return false;
-
-  auto sign = 0.0f;
-
-  for (auto i = 0; i < n; ++i)
+  vec2 corners[4] =
   {
-    auto const a = p[i];
-    auto const b = p[(i + 1) % n];
-    auto const c = p[(i + 2) % n];
+    { r.left,  r.top    },
+    { r.right, r.top    },
+    { r.right, r.bottom },
+    { r.left,  r.bottom }
+  };
 
-    auto ab = b - a;
-    auto bc = c - b;
-
-    auto cross = ab.x * bc.y - ab.y * bc.x;
-
-    if (std::abs(cross) < 1e-6f)
-      continue;
-
-    if (sign == .0f)
-      sign = cross;
-    else if ((cross > 0.0f) != (sign > 0.0f))
-      return false;
+  for (auto p : corners)
+  {
+    float a = std::atan2(p.y - center.y, p.x - center.x);
+    if (angle_in_arc(a, start, end, ccw))
+      return true;
   }
 
-  return true;
+  // Also test if arc start/end ray points are inside tile directionally.
+  // This avoids missing tiles when the arc passes through a tile but no corner angle is inside.
+  return false;
+}
+
+auto bezier_quad_point(vec2 p0, vec2 p1, vec2 p2, float t) noexcept -> vec2
+{
+  auto u = 1.f - t;
+  return p0 * (u * u) + p1 * (2.f * u * t) + p2 * (t * t);
+}
+
+auto bezier_cubic_point(vec2 p0, vec2 p1, vec2 p2, vec2 p3, float t) noexcept -> vec2
+{
+  auto u  = 1.f - t;
+  auto uu = u * u;
+  auto tt = t * t;
+
+  return
+    p0 * (uu * u) +
+    p1 * (3.f * uu * t) +
+    p2 * (3.f * u * tt) +
+    p3 * (tt * t);
 }
 
 }
 
 namespace tk::ui {
 
-void FrameData::init() noexcept
+void FrameData::clear() noexcept
 {
-  // cache circle segment counts
-  _circle_segment_counts[0] = arc_sample_max;
-  for (auto i : std::views::iota(1u, _circle_segment_counts.size()))
-    _circle_segment_counts[i] = calc_circle_segment_count(i);
-
-  // calculate arc vertices
-  for (auto i : std::views::iota(0u, _arc_vertices.size()))
-  {
-    auto const a = i * 2 * std::numbers::pi / _arc_vertices.size();
-    _arc_vertices[i] = { std::cos(a), std::sin(a) };
-  }
-
-  arc_radius_cutoff = calc_circle_radius(arc_sample_max, tessellation_max_error);
+  _tile_size  = {};
+  _tile_count = {};
+  _tiles.clear();
 }
 
-auto FrameData::calc_circle_segment_count(float radius) noexcept -> float
+void FrameData::init(uint width, uint height, vec2u tile_size) noexcept
 {
-  auto constexpr segment_min = 4;
-  auto constexpr segment_max = 512;
-  return std::clamp(
-    round_up_to_even(std::ceil(
-      std::numbers::pi /
-      std::acos(1 - std::min(tessellation_max_error, radius) / radius)
-    )),
-    segment_min, segment_max);
+  clear();
+
+  _tile_size  = tile_size;
+  _tile_count = (vec2{ width, height } + tile_size - 1) / tile_size;
+  _tiles.resize(_tile_count.x + _tile_count.y);
 }
 
-void FrameData::add_rect(vec2 left_top, vec2 right_bottom, Color color, float thickness) noexcept
-{
-  if (_using_discard_shapes) color.a = 1.f;
-  else if (color.a == 0) return;
+////////////////////////////////////////////////////////////////////////////////
+///                            Add Commands
+////////////////////////////////////////////////////////////////////////////////
 
-  if (thickness > 0)
+void FrameData::add_command(uint cmd_idx, vec2 p0, vec2 p1, float thickness) noexcept
+{
+  assert(thickness > 0.f);
+
+  auto w = std::abs(p1.x - p0.x);
+  auto h = std::abs(p1.y - p0.y);
+
+  if (w <= _tile_size.x * 2.f && h <= _tile_size.y * 2.f)
   {
-    left_top     += .5f;
-    right_bottom -= .5f;
-    assert(_points.empty());
-    _points.emplace_back(left_top);
-    _points.emplace_back(right_bottom.x, left_top.y);
-    _points.emplace_back(right_bottom);
-    _points.emplace_back(left_top.x, right_bottom.y);
-    add_poly_line(color, thickness, true);
+    auto r = thickness * .5f + 2.f;
+    add_command(cmd_idx, { std::min(p0.x, p1.x) - r, std::min(p0.y, p1.y) - r, std::max(p0.x, p1.x) + r, std::max(p0.y, p1.y) + r });
     return;
   }
 
-  add_rect(left_top, right_bottom, color);
+  // convert to tile space
+  float inv_w = 1.0f / _tile_size.x;
+  float inv_h = 1.0f / _tile_size.y;
+
+  float tx0f = p0.x * inv_w;
+  float ty0f = p0.y * inv_h;
+  float tx1f = p1.x * inv_w;
+  float ty1f = p1.y * inv_h;
+
+  int x0 = (int)std::floor(tx0f);
+  int y0 = (int)std::floor(ty0f);
+  int x1 = (int)std::floor(tx1f);
+  int y1 = (int)std::floor(ty1f);
+
+  int dx = std::abs(x1 - x0);
+  int dy = std::abs(y1 - y0);
+
+  int sx = (x0 < x1) ? 1 : -1;
+  int sy = (y0 < y1) ? 1 : -1;
+
+  int err = dx - dy;
+
+  // thickness in tile units
+  float half_t = thickness * 0.5f;
+  int rx = (int)std::ceil(half_t * inv_w) + 1;
+  int ry = (int)std::ceil(half_t * inv_h) + 1;
+
+  int x = x0;
+  int y = y0;
+
+  while (true)
+  {
+    // expand for thickness (fast square expansion)
+    for (int oy = -ry; oy <= ry; ++oy)
+    {
+      int ty = y + oy;
+      if (ty < 0 || ty >= (int)_tile_count.y)
+        continue;
+
+      for (int ox = -rx; ox <= rx; ++ox)
+      {
+        int tx = x + ox;
+        if (tx < 0 || tx >= (int)_tile_count.x)
+          continue;
+
+        uint32_t idx = ty * _tile_count.x + tx;
+        Tile& tile = _tiles[idx];
+
+        // dedup per frame
+        auto& idxs = tile.cmd_idxs;
+        if (idxs.empty() || idxs.back() != cmd_idx)
+          tile.cmd_idxs.push_back(cmd_idx);
+      }
+    }
+
+    if (x == x1 && y == y1)
+      break;
+
+    int e2 = err << 1;
+
+    if (e2 > -dy)
+    {
+      err -= dy;
+      x += sx;
+    }
+
+    if (e2 < dx)
+    {
+      err += dx;
+      y += sy;
+    }
+  }
 }
 
-void FrameData::add_rect(vec2 left_top, vec2 right_bottom, Color color) noexcept
+void FrameData::add_command(uint cmd_idx, Rect rect) noexcept
 {
-  auto [vertices, indices] = expand_beg(4, 6);
+  assert(rect.left <= rect.right && rect.top <= rect.bottom);
 
-  vertices[0] = { left_top, {}, color };
-  vertices[1] = { { right_bottom.x, left_top.y }, {}, color };
-  vertices[2] = { right_bottom, {}, color };
-  vertices[3] = { { left_top.x, right_bottom.y }, {}, color };
-  indices[0]  = _vertex_beg + 0;
-  indices[1]  = _vertex_beg + 1;
-  indices[2]  = _vertex_beg + 2;
-  indices[3]  = _vertex_beg + 0;
-  indices[4]  = _vertex_beg + 2;
-  indices[5]  = _vertex_beg + 3;
+  auto constexpr eps = 0.001f;
 
-  expand_end();
+  auto min_x = static_cast<int>(std::floor(rect.left / _tile_size.x));
+  auto min_y = static_cast<int>(std::floor(rect.top  / _tile_size.y));
+  auto max_x = static_cast<int>(std::floor((rect.right - eps) / _tile_size.x));
+  auto max_y = static_cast<int>(std::floor((rect.bottom - eps)  / _tile_size.y));
+
+  min_x = std::clamp(min_x, 0, static_cast<int>(_tile_count.x - 1));
+  min_y = std::clamp(min_y, 0, static_cast<int>(_tile_count.y - 1));
+  max_x = std::clamp(max_x, 0, static_cast<int>(_tile_count.x - 1));
+  max_y = std::clamp(max_y, 0, static_cast<int>(_tile_count.y - 1));
+
+  for (auto y = min_y; y <= max_y; ++y)
+    for (auto x = min_x; x <= max_x; ++x)
+    {
+      auto& idxs = _tiles[y * _tile_count.x + x].cmd_idxs;
+      if (idxs.empty() || idxs.back() != cmd_idx)
+        idxs.emplace_back(cmd_idx);
+    }
+}
+
+void FrameData::add_command(uint cmd_idx, vec2 center, float radius, float start_angle, float end_angle, bool ccw, float thickness) noexcept
+{
+  assert(thickness > 0);
+  float sweep = end_angle - start_angle;
+
+  if (ccw && sweep < 0.0f)
+    sweep += Tau;
+  if (!ccw && sweep > 0.0f)
+    sweep -= Tau;
+
+  int segments = std::max(1, (int)std::ceil(std::abs(sweep) * radius / 16.0f));
+
+  vec2 prev
+  {
+    center.x + std::cos(start_angle) * radius,
+    center.y + std::sin(start_angle) * radius
+  };
+
+  for (int i = 1; i <= segments; ++i)
+  {
+    float t = (float)i / (float)segments;
+    float a = start_angle + sweep * t;
+
+    vec2 p
+    {
+      center.x + std::cos(a) * radius,
+      center.y + std::sin(a) * radius
+    };
+
+    add_command(cmd_idx, prev, p, thickness);
+    prev = p;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///                             Commands
+////////////////////////////////////////////////////////////////////////////////
+
+void FrameData::add_rect(vec2 left_top, vec2 right_bottom, Color color, float thickness) noexcept
+{
+  if (left_top.x >= right_bottom.x || left_top.y >= right_bottom.y)
+    return;
+
+  auto cmd_idx = _cmds.size();
+
+  auto& cmd = _cmds.emplace_back(Command{});
+  cmd.type      = Command::Type::add_rect;
+  cmd.color     = color;
+  cmd.thickness = thickness;
+  cmd.rect      = { left_top, right_bottom };
+
+  if (thickness > 0.f)
+  {
+    add_command(cmd_idx, left_top, { right_bottom.x, left_top.y }, thickness);
+    add_command(cmd_idx, { right_bottom.x, left_top.y }, right_bottom, thickness);
+    add_command(cmd_idx, right_bottom, { left_top.x, right_bottom.y }, thickness);
+    add_command(cmd_idx, { left_top.x, right_bottom.y }, left_top, thickness);
+  }
+  else
+    add_command(cmd_idx, { left_top, right_bottom });
 }
 
 void FrameData::add_triangle(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
 {
-  if (_using_discard_shapes) color.a = 1.f;
-  else if (color.a == 0) return;
+  // reject degenerate triangle
+  auto area2 = (p1.x - p0.x) * (p2.y - p0.y) - (p1.y - p0.y) * (p2.x - p0.x);
+  if (std::abs(area2) <= 1e-6f)
+      return;
 
-  assert(_points.empty());
-  _points.emplace_back(p0);
-  _points.emplace_back(p1);
-  _points.emplace_back(p2);
+  auto cmd_idx = _cmds.size();
 
-  if (thickness > 0)
-    add_poly_line(color, thickness, true);
+  auto& cmd = _cmds.emplace_back(Command{});
+  cmd.type      = Command::Type::add_triangle;
+  cmd.color     = color;
+  cmd.thickness = thickness;
+  cmd.triangle  = { p0, p1, p2 };
+
+  if (thickness > 0.f)
+  {
+    add_command(cmd_idx, p0, p1, thickness);
+    add_command(cmd_idx, p1, p2, thickness);
+    add_command(cmd_idx, p2, p0, thickness);
+  }
   else
-    add_convex_poly_filled(color);
+  {
+    auto left   = std::min({ p0.x, p1.x, p2.x });
+    auto right  = std::max({ p0.x, p1.x, p2.x });
+    auto top    = std::min({ p0.y, p1.y, p2.y });
+    auto bottom = std::max({ p0.y, p1.y, p2.y });
+
+    add_command(cmd_idx, { left, top, right, bottom });
+  }
 }
 
 void FrameData::add_circle(vec2 center, float radius, Color color, float thickness) noexcept
 {
-  if (_using_discard_shapes) color.a = 1.f;
-  else if (color.a == 0) return;
+  if (radius <= 0.f) return;
 
-  assert(_points.empty());
-  _path_arc_to(center, radius - .5f, 0, arc_sample_max);
-  _points.pop_back();
-  if (thickness > 0)
-    add_poly_line(color, thickness, true);
+  radius = std::max(radius - 1.f, 1.f);
+
+  auto cmd_idx = _cmds.size();
+
+  auto& cmd = _cmds.emplace_back(Command{});
+  cmd.type      = Command::Type::add_circle;
+  cmd.color     = color;
+  cmd.thickness = thickness;
+  cmd.circle    = { center, radius };
+
+  if (thickness > 0.f)
+  {
+    if (radius < _tile_size.x * 2.f || thickness >= radius * 0.5f)
+    {
+      float r = radius + thickness * .5f + 2.f;
+      add_command(cmd_idx, Rect{ center.x - r, center.y - r, center.x + r, center.y + r });
+    }
+    else
+      add_command(cmd_idx, center, radius, 0, Tau, true, thickness);
+  }
   else
-    add_convex_poly_filled(color);
+  {
+    float r = radius + 2.f;
+    add_command(cmd_idx, Rect{ center.x - r, center.y - r, center.x + r, center.y + r });
+  }
 }
 
 void FrameData::add_line(vec2 p0, vec2 p1, Color color, float thickness) noexcept
 {
-  if (_using_discard_shapes) color.a = 1.f;
-  else if (color.a == 0) return;
+  auto cmd_idx = _cmds.size();
 
-  assert(_points.empty());
-  _points.emplace_back(p0);
-  _points.emplace_back(p1);
-  add_poly_line(color, thickness, false);
+  auto& cmd = _cmds.emplace_back(Command{});
+  cmd.type      = Command::Type::add_line;
+  cmd.color     = color;
+  cmd.thickness = thickness;
+  cmd.line      = { p0, p1 };
+
+  add_command(cmd_idx, p0, p1, thickness);
 }
 
 void FrameData::add_bezier_quad(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
 {
-  if (_using_discard_shapes) color.a = 1.f;
-  else if (color.a == 0) return;
+  if (p0 == p1 && p1 == p2) return;
 
-  assert(_points.empty());
-  _points.emplace_back(p0);
-  path_bezier_quad_curve_to_casteljau(p0, p1, p2, curve_tessellation_tol, 0);
-  add_poly_line(color, thickness, false);
+  auto cmd_idx = _cmds.size();
+
+  auto& cmd = _cmds.emplace_back(Command{});
+  cmd.type        = Command::Type::add_bezier_quad;
+  cmd.color       = color;
+  cmd.thickness   = thickness;
+  cmd.bezier_quad = { p0, p1, p2 };
+
+  auto chord = length(p2 - p0);
+  auto ctrl  = length(p1 - p0) + length(p2 - p1);
+
+  auto curve_len = std::max(chord, ctrl);
+
+  auto segments = std::clamp(static_cast<int>(std::ceil(curve_len / 16.f)), 4, 64);
+
+  if (thickness > 0.f)
+  {
+    auto prev = p0;
+
+    for (int i = 1; i <= segments; ++i)
+    {
+      auto t = static_cast<float>(i) / static_cast<float>(segments);
+      auto p = bezier_quad_point(p0, p1, p2, t);
+
+      add_command(cmd_idx, prev, p, thickness);
+      prev = p;
+    }
+  }
+  else
+  {
+    auto left   = std::min({ p0.x, p1.x, p2.x });
+    auto right  = std::max({ p0.x, p1.x, p2.x });
+    auto top    = std::min({ p0.y, p1.y, p2.y });
+    auto bottom = std::max({ p0.y, p1.y, p2.y });
+
+    add_command(cmd_idx, Rect{ left, top, right, bottom });
+  }
 }
 
 void FrameData::add_bezier_cubic(vec2 p0, vec2 p1, vec2 p2, vec2 p3, Color color, float thickness) noexcept
 {
-  if (_using_discard_shapes) color.a = 1.f;
-  else if (color.a == 0) return;
-
-  assert(_points.empty());
-  _points.emplace_back(p0);
-  path_bezier_cubic_curve_to_casteljau(p0, p1, p2, p3, curve_tessellation_tol, 0);
-  add_poly_line(color, thickness, false);
-}
-
-void FrameData::path_end(Color color, float thickness, bool is_closed) noexcept
-{
-  if (_using_discard_shapes) color.a = 1.f;
-  else if (color.a == 0)
-  {
-    _points.clear();
+  if (p0 == p1 && p1 == p2 && p2 == p3)
     return;
-  }
 
-  if (thickness > 0)
-    add_poly_line(color, thickness, is_closed);
-  else
+  auto cmd_idx = _cmds.size();
+
+  auto& cmd = _cmds.emplace_back(Command{});
+  cmd.type         = Command::Type::add_bezier_cubic;
+  cmd.color        = color;
+  cmd.thickness    = thickness;
+  cmd.bezier_cubic = { p0, p1, p2, p3 };
+
+  auto ctrl_len  = length(p1 - p0) + length(p2 - p1) + length(p3 - p2);
+  auto chord_len = length(p3 - p0);
+  auto curve_len = std::max(ctrl_len, chord_len);
+
+  auto segments = std::clamp(static_cast<int>(std::ceil(curve_len / 16.f)), 4, 96);
+
+  if (thickness > 0.f)
   {
-    if (is_convex(_points))
-      add_convex_poly_filled(color);
-    else
-      add_concave_poly_filled(color);
-  }
-}
+    auto prev = p0;
 
-void FrameData::path_bezier_quad_curve_to_casteljau(vec2 p0, vec2 p1, vec2 p2, float tess_tol, int level) noexcept
-{
-  auto dp  = p2 - p0;
-  auto det = cross(p1 - p2, dp);
-  if (det * det * 4.f < tess_tol * length_sq(dp))
-    _points.emplace_back(p2);
-  else if (level < 10)
-  {
-    auto p01  = ( p0 +  p1) * .5f;
-    auto p12  = ( p1 +  p2) * .5f;
-    auto p012 = (p01 + p12) * .5f;
-    path_bezier_quad_curve_to_casteljau(p0, p01, p012, tess_tol, level + 1);
-    path_bezier_quad_curve_to_casteljau(p012, p12, p2, tess_tol, level + 1);
-  }
-}
-
-void FrameData::path_bezier_cubic_curve_to_casteljau(vec2 p0, vec2 p1, vec2 p2, vec2 p3, float tess_tol, int level) noexcept
-{
-  auto dp = p3 - p0;
-  auto d2 = cross(p1 - p3, dp);
-  auto d3 = cross(p2 - p3, dp);
-  d2 = d2 >= 0 ? d2 : -d2;
-  d3 = d3 >= 0 ? d3 : -d3;
-  if (dot(vec2(d2), vec2(d3)) < tess_tol * length_sq(dp))
-    _points.emplace_back(p3);
-  else if (level < 10)
-  {
-    auto p01   = (  p0 +   p1) * .5f;
-    auto p12   = (  p1 +   p2) * .5f;
-    auto p23   = (  p2 +   p3) * .5f;
-    auto p012  = ( p01 +  p12) * .5f;
-    auto p123  = ( p12 +  p23) * .5f;
-    auto p0123 = (p012 + p123) * .5f;
-    path_bezier_cubic_curve_to_casteljau(p0, p01, p012, p0123, tess_tol, level + 1);
-    path_bezier_cubic_curve_to_casteljau(p0123, p123, p23, p3, tess_tol, level + 1);
-  }
-}
-
-void FrameData::add_convex_poly_filled(Color color) noexcept
-{
-  auto pt_cnt = _points.size();
-  assert(pt_cnt > 2);
-
-  if (color.a == 0)
-  {
-    _points.clear();
-    return;
-  }
-
-  auto aa_width = g_ui_ctx.window()->scale();
-  auto aa_col   = Color{ color.r, color.g, color.b, 0.f };
-
-  auto [vertices, indices] = expand_beg(pt_cnt * 2, (pt_cnt - 2) * 3 + pt_cnt * 6);
-
-  auto inner_idx = _vertex_beg;
-  auto outer_idx = _vertex_beg + 1;
-  for (auto i : std::views::iota(2u, pt_cnt))
-  {
-    indices[0] = inner_idx;
-    indices[1] = inner_idx + ((i - 1) << 1);
-    indices[2] = inner_idx + (i << 1);
-    indices += 3;
-  }
-
-  _normals.resize(pt_cnt);
-  for (uint32_t i0 = pt_cnt - 1, i1 = 0; i1 < pt_cnt; i0 = i1++)
-  {
-    auto dp = normalize(_points[i1] - _points[i0]);
-    _normals[i0] = { dp.y, -dp.x };
-  }
-
-  for (uint32_t i0 = pt_cnt - 1, i1 = 0; i1 < pt_cnt; i0 = i1++)
-  {
-    auto dmp = fix_normal((_normals[i0] + _normals[i1]) * .5f) * aa_width * .5f;
-    vertices[0] = { _points[i1] - dmp, {}, color  };
-    vertices[1] = { _points[i1] + dmp, {}, aa_col };
-    vertices += 2;
-
-    indices[0] = inner_idx + (i1 << 1);
-    indices[1] = inner_idx + (i0 << 1);
-    indices[2] = outer_idx + (i0 << 1);
-    indices[3] = outer_idx + (i0 << 1);
-    indices[4] = outer_idx + (i1 << 1);
-    indices[5] = inner_idx + (i1 << 1);
-    indices += 6;
-  }
-
-  expand_end();
-  _points.clear();
-}
-
-void FrameData::add_concave_poly_filled(Color color) noexcept
-{
-  auto pt_cnt = _points.size();
-  assert(pt_cnt > 2);
-
-  if (color.a == 0)
-  {
-    _points.clear();
-    return;
-  }
-
-  uint32_t triangle[3]{};
-
-  auto const aa_size = g_ui_ctx.window()->scale();
-
-  auto col_trans = Color{ color.r, color.g, color.b, 0 };
-
-  auto const idx_cnt = (pt_cnt - 2) * 3 + pt_cnt * 6;
-  auto const vtx_cnt = pt_cnt * 2;
-
-  auto [vtx, idx] = expand_beg(vtx_cnt, idx_cnt);
-
-  auto vtx_inner_idx = _vertex_beg;
-  auto vtx_outer_idx = _vertex_beg + 1;
-
-  _tmp_buf.resize((Triangulator::estimate_buf_size(pt_cnt) + sizeof(vec2)) / sizeof(vec2));
-  auto triangulator = Triangulator{};
-  triangulator.init(_points, _tmp_buf.data());
-  while (triangulator.triangle_left() > 0)
-  {
-    triangulator.get_next_triangle(triangle);
-    idx[0] = vtx_inner_idx + (triangle[0] << 1);
-    idx[1] = vtx_inner_idx + (triangle[1] << 1);
-    idx[2] = vtx_inner_idx + (triangle[2] << 1);
-    idx += 3;
-  }
-
-  _tmp_buf.resize(pt_cnt);
-  auto tmp_normals = _tmp_buf.data();
-  for (int i0 = pt_cnt - 1, i1 = 0; i1 < pt_cnt; i0 = i1++)
-  {
-    auto const p0 = _points[i0];
-    auto const p1 = _points[i1];
-    auto dp = p1 - p0;
-    dp = normalize(dp);
-    tmp_normals[i0] = { dp.y, -dp.x };
-  }
-
-  for (int i0 = pt_cnt - 1, i1 = 0; i1 < pt_cnt; i0 = i1++)
-  {
-    auto p0 = tmp_normals[i0];
-    auto p1 = tmp_normals[i1];
-    auto dm = (p0 + p1) * .5f;
-    dm = fix_normal(dm);
-    dm *= aa_size * .5f;
-
-    vtx[0] = { _points[i1] - dm, {}, color     };
-    vtx[1] = { _points[i1] + dm, {}, col_trans };
-    vtx += 2;
-
-    idx[0] = vtx_inner_idx + (i1 << 1);
-    idx[1] = vtx_inner_idx + (i0 << 1);
-    idx[2] = vtx_outer_idx + (i0 << 1);
-    idx[3] = vtx_outer_idx + (i0 << 1);
-    idx[4] = vtx_outer_idx + (i1 << 1);
-    idx[5] = vtx_inner_idx + (i1 << 1);
-    idx += 6;
-  }
-
-  expand_end();
-  _points.clear();
-}
-
-auto FrameData::get_circle_segment_count(float radius) noexcept -> uint32_t
-{
-  int const idx = radius + 0.999999f;
-  if (idx >= 0 && idx < _circle_segment_counts.size())
-    return _circle_segment_counts[idx];
-  return calc_circle_segment_count(radius);
-}
-
-void FrameData::path_arc_to(vec2 center, float radius, float min, float max) noexcept
-{
-  if (radius < .5f)
-  {
-    _points.emplace_back(center);
-    return;
-  }
-
-  if (radius < arc_radius_cutoff)
-  {
-    auto const is_reverse = max < min;
-    auto const min_sample_f = arc_sample_max * min / (std::numbers::pi * 2.f);
-    auto const max_sample_f = arc_sample_max * max / (std::numbers::pi * 2.f);
-    auto const min_sample = is_reverse ? std::floor(min_sample_f) : std::ceil(min_sample_f);
-    auto const max_sample = is_reverse ? std::ceil(max_sample_f) : std::floor(max_sample_f);
-    auto const mid_samples = is_reverse ? std::max(min_sample - max_sample, 0.0) : std::max(max_sample - min_sample, 0.0);
-    auto const min_segment_angle = min_sample * std::numbers::pi * 2.f / arc_sample_max;
-    auto const max_segment_angle = max_sample * std::numbers::pi * 2.f / arc_sample_max;
-    auto const emit_start = std::abs(min_segment_angle - min) >= 1e-5f;
-    auto const emit_end = std::abs(max - max_segment_angle) >= 1e-5f;
-
-    _points.reserve(_points.size() + mid_samples + 1 + emit_start + emit_end);
-    if (emit_start) _points.emplace_back(center.x + std::cos(min) * radius, center.y + sin(min) * radius);
-    if (mid_samples > 0) _path_arc_to(center, radius, min_sample, max_sample);
-    if (emit_end) _points.emplace_back(center.x + std::cos(max) * radius, center.y + sin(max) * radius);
-  }
-  else
-  {
-    auto const arc_len = std::abs(max - min);
-    auto const circle_segement_cnt = calc_circle_segment_count(radius);
-    auto const arc_segment_cnt     = std::max(std::ceil(circle_segement_cnt * arc_len / (std::numbers::pi * 2.f)), 1.0);
-    _path_arc_to(center, radius, min, max, arc_segment_cnt);
-  }
-}
-
-void FrameData::_path_arc_to(vec2 center, float radius, int min, int max) noexcept
-{
-  auto step = std::clamp(arc_sample_max / static_cast<int>(get_circle_segment_count(radius)),
-    1, arc_table_size / 4);
-  
-  auto const sample_range = max - min;
-  auto const next_step    = step;
-
-  auto samples          = sample_range + 1;
-  auto extra_max_sample = false;
-  if (step > 1)
-  {
-    samples             = sample_range / step + 1;
-    auto const overstep = sample_range % step;
-    if (overstep > 0)
+    for (auto i = 1; i <= segments; ++i)
     {
-      extra_max_sample = true;
-      ++samples;
+      auto t = static_cast<float>(i) / static_cast<float>(segments);
+      auto p = bezier_cubic_point(p0, p1, p2, p3, t);
 
-      if (sample_range > 0)
-        step -= (step - overstep) / 2;
-    }
-  }
-
-  assert(_points.empty());
-  _points.resize(samples);
-  auto out_ptr = _points.data() + (_points.size() - samples);
-
-  auto sample_index = min;
-  if (sample_index < 0 || sample_index >= arc_sample_max)
-  {
-    sample_index %= arc_sample_max;
-    if (sample_index < 0)
-      sample_index += arc_sample_max;
-  }
-
-  if (max >= min)
-  {
-    for (auto a = min; a <= max; a += step, sample_index += step, step = next_step)
-    {
-      if (sample_index >= arc_sample_max)
-        sample_index -= arc_sample_max;
-
-      auto const s = _arc_vertices[sample_index];
-      out_ptr->x = center.x + s.x * radius;
-      out_ptr->y = center.y + s.y * radius;
-      ++out_ptr;
+      add_command(cmd_idx, prev, p, thickness);
+      prev = p;
     }
   }
   else
   {
-    for (auto a = min; a >= max; a -= step, sample_index -= step, step = next_step)
-    {
-      if (sample_index < 0)
-        sample_index += arc_sample_max;
+    auto left   = std::min({ p0.x, p1.x, p2.x, p3.x });
+    auto right  = std::max({ p0.x, p1.x, p2.x, p3.x });
+    auto top    = std::min({ p0.y, p1.y, p2.y, p3.y });
+    auto bottom = std::max({ p0.y, p1.y, p2.y, p3.y });
 
-      auto const s = _arc_vertices[sample_index];
-      out_ptr->x = center.x + s.x * radius;
-      out_ptr->y = center.y + s.y * radius;
-      ++out_ptr;
-    }
+    add_command(cmd_idx, Rect{ left, top, right, bottom });
   }
-
-  if (extra_max_sample)
-  {
-    auto normalized_max = max % arc_sample_max;
-    if (normalized_max < 0)
-      normalized_max += arc_sample_max;
-
-    auto const s = _arc_vertices[normalized_max];
-    out_ptr->x = center.x + s.x * radius;
-    out_ptr->y = center.y + s.y * radius;
-    ++out_ptr;
-  }
-
-  assert(_points.data() + _points.size() == out_ptr);
-}
-
-void FrameData::_path_arc_to(vec2 center, float radius, int min, int max, int segment_cnt) noexcept
-{
-  if (radius < .5f)
-  {
-    _points.emplace_back(center);
-    return;
-  }
-
-  _points.reserve(_points.size() + segment_cnt + 1);
-  auto m = max - min;
-  for (auto i = 0; i <= segment_cnt; ++i)
-  {
-    auto const a = min + (static_cast<float>(i) / segment_cnt) * m;
-    _points.emplace_back(center.x + std::cos(a) * radius, center.y + std::sin(a) * radius);
-  }
-}
-
-void FrameData::path_bezier_quad_to(vec2 p1, vec2 p2) noexcept
-{
-  assert(!_points.empty());
-  path_bezier_quad_curve_to_casteljau(_points.back(), p1, p2, curve_tessellation_tol, 0);
-}
-
-void FrameData::path_bezier_cubic_to(vec2 p1, vec2 p2, vec2 p3) noexcept
-{
-  assert(!_points.empty());
-  path_bezier_cubic_curve_to_casteljau(_points.back(), p1, p2, p3, curve_tessellation_tol, 0);
-}
-
-void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noexcept
-{
-  auto pt_cnt = _points.size();
-  assert(pt_cnt >= 2);
-
-  auto const count      = is_closed ? pt_cnt : pt_cnt - 1;
-  auto const aa_size    = g_ui_ctx.window()->scale();
-  auto const thick_line = thickness > aa_size;
-  auto col_trans = Color{ color.r, color.g, color.b, 0 };
-
-  thickness = std::max(thickness, 1.f);
-
-  auto const idx_cnt = thick_line ? count * 18 : count * 12;
-  auto const vtx_cnt = thick_line ? pt_cnt * 4 : pt_cnt * 3;
-
-  auto [vtx, idx] = expand_beg(vtx_cnt, idx_cnt);
-
-  _tmp_buf.clear();
-  _tmp_buf.resize(pt_cnt * (thick_line ? 5 : 3));
-  auto* tmp_normals = _tmp_buf.data();
-  auto* tmp_points  = tmp_normals + pt_cnt;
-
-  for (auto i1 = 0; i1 < count; ++i1)
-  {
-    auto const i2 = (i1 + 1) == pt_cnt ? 0 : i1 + 1;
-    auto dp = _points[i2] - _points[i1];
-    dp = normalize(dp);
-    tmp_normals[i1] = { dp.y, -dp.x };
-  }
-  if (!is_closed) tmp_normals[pt_cnt - 1] = tmp_normals[pt_cnt - 2];
-
-  if (thick_line)
-  {
-    auto const half_inner_thickness = (thickness - aa_size) * .5f;
-
-    if (!is_closed)
-    {
-      auto const points_last = pt_cnt - 1;
-      tmp_points[0] = _points[0] + tmp_normals[0] * (half_inner_thickness + aa_size);
-      tmp_points[1] = _points[0] + tmp_normals[0] * (half_inner_thickness);
-      tmp_points[2] = _points[0] - tmp_normals[0] * (half_inner_thickness);
-      tmp_points[3] = _points[0] - tmp_normals[0] * (half_inner_thickness + aa_size);
-      tmp_points[points_last * 4 + 0] = _points[points_last] + tmp_normals[points_last] * (half_inner_thickness + aa_size);
-      tmp_points[points_last * 4 + 1] = _points[points_last] + tmp_normals[points_last] * (half_inner_thickness);
-      tmp_points[points_last * 4 + 2] = _points[points_last] - tmp_normals[points_last] * (half_inner_thickness);
-      tmp_points[points_last * 4 + 3] = _points[points_last] - tmp_normals[points_last] * (half_inner_thickness + aa_size);
-    }
-
-    auto idx1 = _vertex_beg;
-    for (auto i1 = 0; i1 < count; ++i1)
-    {
-      auto const i2   = (i1 + 1) == pt_cnt ? 0 : i1 + 1;
-      auto const idx2 = ((i1 + 1) == pt_cnt) ? _vertex_beg : (idx1 + 4);
-
-      auto dm = (tmp_normals[i1] + tmp_normals[i2]) * .5f;
-      dm = fix_normal(dm);
-      auto dm_out = dm * (half_inner_thickness + aa_size);
-      auto dm_in  = dm * half_inner_thickness;
-
-      auto* out_vtx = &tmp_points[i2 * 4];
-      out_vtx[0] = _points[i2] + dm_out;
-      out_vtx[1] = _points[i2] + dm_in;
-      out_vtx[2] = _points[i2] - dm_in;
-      out_vtx[3] = _points[i2] - dm_out;
-
-      idx[ 0] = idx2 + 1; idx[ 1] = idx1 + 1; idx[ 2] = idx1 + 2;
-      idx[ 3] = idx1 + 2; idx[ 4] = idx2 + 2; idx[ 5] = idx2 + 1;
-      idx[ 6] = idx2 + 1; idx[ 7] = idx1 + 1; idx[ 8] = idx1 + 0;
-      idx[ 9] = idx1 + 0; idx[10] = idx2 + 0; idx[11] = idx2 + 1;
-      idx[12] = idx2 + 2; idx[13] = idx1 + 2; idx[14] = idx1 + 3;
-      idx[15] = idx1 + 3; idx[16] = idx2 + 3; idx[17] = idx2 + 2;
-      idx += 18;
-
-      idx1 = idx2;
-    }
-
-    for (auto i = 0; i < pt_cnt; ++i)
-    {
-      vtx[0] = { tmp_points[i * 4], {}, col_trans };
-      vtx[1] = { tmp_points[i * 4 + 1], {}, color };
-      vtx[2] = { tmp_points[i * 4 + 2], {}, color };
-      vtx[3] = { tmp_points[i * 4 + 3], {}, col_trans };
-      vtx += 4;
-    }
-  }
-  else
-  {
-    auto const half_draw_size = aa_size;
-    if (!is_closed)
-    {
-      tmp_points[0] = _points[0] + tmp_normals[0] * half_draw_size;
-      tmp_points[1] = _points[0] - tmp_normals[0] * half_draw_size;
-      tmp_points[(pt_cnt - 1) * 2 + 0] = _points[pt_cnt - 1] + tmp_normals[pt_cnt - 1] * half_draw_size;
-      tmp_points[(pt_cnt - 1) * 2 + 1] = _points[pt_cnt - 1] - tmp_normals[pt_cnt - 1] * half_draw_size;
-    }
-
-    auto idx1 = _vertex_beg;
-    for (auto i1 = 0; i1 < count; ++i1)
-    {
-      auto const i2   = (i1 + 1) == pt_cnt ? 0 : i1 + 1;
-      auto const idx2 = ((i1 + 1) == pt_cnt) ? _vertex_beg : (idx1 + 3);
-
-      auto dm = (tmp_normals[i1] + tmp_normals[i2]) * .5f;
-      dm = fix_normal(dm);
-      dm *= half_draw_size;
-
-      auto* out_vtx = &tmp_points[i2 * 2];
-      out_vtx[0] = _points[i2] + dm;
-      out_vtx[1] = _points[i2] - dm;
-
-      idx[0] = idx2 + 0; idx[ 1] = idx1 + 0; idx[ 2] = idx1 + 2;
-      idx[3] = idx1 + 2; idx[ 4] = idx2 + 2; idx[ 5] = idx2 + 0;
-      idx[6] = idx2 + 1; idx[ 7] = idx1 + 1; idx[ 8] = idx1 + 0;
-      idx[9] = idx1 + 0; idx[10] = idx2 + 0; idx[11] = idx2 + 1;
-      idx += 12;
-
-      idx1 = idx2;
-    }
-
-    for (auto i = 0; i < pt_cnt; ++i)
-    {
-      vtx[0] = { _points[i], {}, color };
-      vtx[1] = { tmp_points[i * 2 + 0], {}, col_trans };
-      vtx[2] = { tmp_points[i * 2 + 1], {}, col_trans };
-      vtx += 3;
-    }
-  }
-
-  expand_end();
-  _points.clear();
-}
-
-auto FrameData::get_rect(uint32_t vtx_beg, uint32_t vtx_cnt) const noexcept -> RECT
-{
-  assert(vtx_beg + vtx_cnt <= _vertices.size());
-
-  auto rc = RECT{ LONG_MAX, LONG_MAX, LONG_MIN, LONG_MIN };
-
-  for (auto i : std::views::iota(0u, vtx_cnt))
-  {
-    auto const& vtx = _vertices[vtx_beg + i];
-    rc.left   = std::min(rc.left,   static_cast<LONG>(std::floor(vtx.pos.x)));
-    rc.top    = std::min(rc.top,    static_cast<LONG>(std::floor(vtx.pos.y)));
-    rc.right  = std::max(rc.right,  static_cast<LONG>(std::ceil(vtx.pos.x)));
-    rc.bottom = std::max(rc.bottom, static_cast<LONG>(std::ceil(vtx.pos.y)));
-  }
-
-  return rc;
-}
-
-void FrameData::push_draw_cmd(DrawCmdType type, ImageHandle image_handle) noexcept
-{
-  if (auto res = _indices.size() - _draw_index_beg)
-  {
-    _draw_cmd_rect_idxs.emplace_back(_draw_cmds.size());
-    
-    auto cmd = DrawCmd{};
-    cmd.type = type;
-    cmd.ui.idx_beg      = _draw_index_beg;
-    cmd.ui.idx_size     = res;
-    cmd.ui.image_handle = image_handle;
-    _draw_cmds.emplace_back(std::move(cmd));
-
-    _draw_index_beg = _indices.size();
-  }
-}
-
-void FrameData::push_draw_cmd_clear_rect(DrawCmdType type, std::optional<RECT> rect) noexcept
-{
-  auto cmd = DrawCmd{};
-  cmd.type       = type;
-  cmd.clear_rect = rect;
-  _draw_cmds.emplace_back(std::move(cmd));
-}
-
-void FrameData::add_scissor_rect(RECT rect) noexcept
-{
-  push_draw_cmd(DrawCmdType::ui);
-
-  for (auto idx : _draw_cmd_rect_idxs)
-    _draw_cmds[idx].ui.scissor_rect = rect;
-  _draw_cmd_rect_idxs.clear();
 }
 
 void FrameData::add_image(ImageHandle handle, vec2 left_top, vec2 right_bottom, uint8_t alpha) noexcept
 {
-  assert(!_using_discard_shapes);
+  if (alpha == 0 || left_top.x >= right_bottom.x || left_top.y >= right_bottom.y)
+    return;
 
-  auto type = _use_discard ? DrawCmdType::discard_draw_tmp : DrawCmdType::ui;
-  push_draw_cmd(type);
+  auto cmd_idx = _cmds.size();
 
-  auto col = Color{ 1, 1, 1, static_cast<float>(alpha) / 255 };
+  auto& cmd = _cmds.emplace_back(Command{});
+  cmd.type  = Command::Type::add_rect;
+  cmd.color = { 1, 1, 1, static_cast<float>(alpha) / 255};
+  cmd.image = { handle, left_top, right_bottom };
 
-  auto [vertices, indices] = expand_beg(4, 6);
-  vertices[0] = { left_top, {}, col };
-  vertices[1] = { { right_bottom.x, left_top.y }, { 1, 0 }, col };
-  vertices[2] = { right_bottom, { 1, 1 }, col };
-  vertices[3] = { { left_top.x, right_bottom.y }, { 0, 1 }, col };
-  indices[0]  = _vertex_beg + 0;
-  indices[1]  = _vertex_beg + 1;
-  indices[2]  = _vertex_beg + 2;
-  indices[3]  = _vertex_beg + 0;
-  indices[4]  = _vertex_beg + 2;
-  indices[5]  = _vertex_beg + 3;
-  expand_end();
-
-  push_draw_cmd(type, handle);
-}
-
-void FrameData::discard_beg(std::function<void()> func) noexcept
-{
-  assert(!_use_discard);
-  
-  push_draw_cmd(DrawCmdType::ui);
-
-  _using_discard_shapes = true;
-  func();
-  _using_discard_shapes = false;
-
-  push_draw_cmd_clear_rect(DrawCmdType::clear_mask_image);
-  push_draw_cmd_clear_rect(DrawCmdType::clear_tmp_image);
-  push_draw_cmd(DrawCmdType::mask_write);
-
-  _use_discard     = true;
-  _discard_vtx_beg = _vertex_beg;
-}
-
-void FrameData::discard_end() noexcept
-{
-  assert(_use_discard && _vertices.size() > _discard_vtx_beg);
-
-  _use_discard = false;
-
-  auto rc = get_rect(_discard_vtx_beg, _vertices.size() - _discard_vtx_beg);
-  push_draw_cmd(DrawCmdType::discard_draw_tmp);
-  add_rect({ rc.left, rc.top }, { rc.right, rc.bottom });
-  push_draw_cmd(DrawCmdType::composite_tmp);
-}
-
-void FrameData::union_beg() noexcept
-{
-  push_draw_cmd(DrawCmdType::ui);
-  push_draw_cmd_clear_rect(DrawCmdType::clear_mask_image);
-  push_draw_cmd_clear_rect(DrawCmdType::clear_tmp_image);
-}
-
-void FrameData::union_end() noexcept
-{
-  push_draw_cmd(DrawCmdType::mask_write);
+  add_command(cmd_idx, { left_top, right_bottom });
 }
 
 }
