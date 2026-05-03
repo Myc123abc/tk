@@ -1,15 +1,13 @@
 #pragma once
 
-#include "common.hpp"
-
 #include <initializer_list>
 #include <numbers>
 #include <immintrin.h>
 #include <assert.h>
 
-// TODO: change vec2 to float2, vec2u to uint2, etc.
-
 namespace tk {
+
+using uint = uint32_t;
 
 template <typename T>
 concept Numeric = std::integral<T> || std::floating_point<T>;
@@ -18,7 +16,7 @@ template <size_t N, Numeric T>
 struct vec;
 
 ////////////////////////////////////////////////////////////////////////////////
-///                               vec2
+///                               float2
 ////////////////////////////////////////////////////////////////////////////////
 
 template <Numeric T>
@@ -81,7 +79,7 @@ template <Numeric T>
 inline constexpr auto dot(vec<2, T> lhs, vec<2, T> rhs) noexcept -> T { return lhs.x * rhs.x + lhs.y * rhs.y; }
 
 ////////////////////////////////////////////////////////////////////////////////
-///                               vec3
+///                               float3
 ////////////////////////////////////////////////////////////////////////////////
 
 template <Numeric T>
@@ -153,7 +151,7 @@ template <Numeric T>
 inline constexpr auto dot(vec<3, T> lhs, vec<3, T> rhs) noexcept -> T { return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z; }
 
 ////////////////////////////////////////////////////////////////////////////////
-///                               vec4
+///                               float4
 ////////////////////////////////////////////////////////////////////////////////
 
 template <Numeric T>
@@ -242,7 +240,7 @@ template <Numeric T>
 inline constexpr auto dot(vec<4, T> lhs, vec<4, T> rhs) noexcept -> T { return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z + lhs.w * rhs.w; }
 
 ////////////////////////////////////////////////////////////////////////////////
-///                               vec4 simd
+///                               float4 simd
 ////////////////////////////////////////////////////////////////////////////////
 
 template <>
@@ -351,11 +349,15 @@ inline auto dot(vec<4, float> a, vec<4, float> b) noexcept -> float
 ///                               misc
 ////////////////////////////////////////////////////////////////////////////////
 
-using vec2  = vec<2, float>;
-using vec2i = vec<2, int>;
-using vec2u = vec<2, uint>;
-using vec3  = vec<3, float>;
-using vec4  = vec<4, float>;
+using float2 = vec<2, float>;
+using float3 = vec<3, float>;
+using float4 = vec<4, float>;
+using int2   = vec<2, int>;
+using int3   = vec<3, int>;
+using int4   = vec<4, int>;
+using uint2  = vec<2, uint>;
+using uint3  = vec<3, uint>;
+using uint4  = vec<4, uint>;
 
 constexpr auto radians(float deg) noexcept
 {
@@ -367,30 +369,30 @@ constexpr auto degrees(float rad) noexcept
   return rad * (180.f / std::numbers::pi);
 }
 
-constexpr auto cross(vec2 a, vec2 b) noexcept
+constexpr auto cross(float2 a, float2 b) noexcept
 {
   return a.x * b.y - a.y * b.x;
 }
 
-constexpr auto cross(vec2 a, vec2 b, vec2 c) noexcept
+constexpr auto cross(float2 a, float2 b, float2 c) noexcept
 {
   return cross(b - a, c - a);
 }
 
-constexpr auto dot(vec2 a, vec2 b) noexcept
+constexpr auto dot(float2 a, float2 b) noexcept
 {
   return a.x * b.x + a.y * b.y;
 }
 
-constexpr auto length(vec2 p) noexcept
+constexpr auto length(float2 p) noexcept
 {
   return dot(p, p);
 }
 
-constexpr auto normalize(vec2 v) noexcept -> vec2
+constexpr auto normalize(float2 v) noexcept -> float2
 {
   auto len = length(v);
-  return len > 0.f ? vec2{ v.x / len, v.y / len } : vec2{};
+  return len > 0.f ? float2{ v.x / len, v.y / len } : float2{};
 }
 
 }

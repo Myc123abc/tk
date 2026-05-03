@@ -14,7 +14,7 @@ public:
   FrameData& operator=(FrameData const&) = delete;
   FrameData& operator=(FrameData&&)      = delete;
 
-  void init(uint width, uint height, vec2u tile_size = { 128, 128 }) noexcept;
+  void init(uint width, uint height, uint2 tile_size = { 128, 128 }) noexcept;
   
 private:
   struct Command
@@ -38,49 +38,49 @@ private:
     {
       struct
       {
-        vec2 left_top;
-        vec2 right_bottom;
+        float2 left_top;
+        float2 right_bottom;
       } rect;
 
       struct
       {
-        vec2 p0;
-        vec2 p1;
-        vec2 p2;
+        float2 p0;
+        float2 p1;
+        float2 p2;
       } triangle;
 
       struct
       {
-        vec2  center;
+        float2 center;
         float radius;
       } circle;
 
       struct
       {
-        vec2 p0;
-        vec2 p1;
+        float2 p0;
+        float2 p1;
       } line;
 
       struct
       {
-        vec2 p0;
-        vec2 p1;
-        vec2 p2;
+        float2 p0;
+        float2 p1;
+        float2 p2;
       } bezier_quad;
 
       struct
       {
-        vec2 p0;
-        vec2 p1;
-        vec2 p2;
-        vec2 p3;
+        float2 p0;
+        float2 p1;
+        float2 p2;
+        float2 p3;
       } bezier_cubic;
 
       struct
       {
         ImageHandle handle;
-        vec2        left_top;
-        vec2        right_bottom;
+        float2      left_top;
+        float2      right_bottom;
       } image;
     };
   };
@@ -95,24 +95,24 @@ public:
   //
   // Commands
   //
-  void add_rect(vec2 left_top, vec2 right_bottom, Color color, float thickness) noexcept;
-  void add_triangle(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept;
-  void add_circle(vec2 center, float radius, Color color, float thickness) noexcept;
-  void add_line(vec2 p0, vec2 p1, Color color, float thickness) noexcept;
-  void add_bezier_quad(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept;
-  void add_bezier_cubic(vec2 p0, vec2 p1, vec2 p2, vec2 p3, Color color, float thickness) noexcept;
-  void add_image(ImageHandle handle, vec2 left_top, vec2 right_bottom, uint8_t alpha) noexcept;
+  void add_rect(float2 left_top, float2 right_bottom, Color color, float thickness) noexcept;
+  void add_triangle(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
+  void add_circle(float2 center, float radius, Color color, float thickness) noexcept;
+  void add_line(float2 p0, float2 p1, Color color, float thickness) noexcept;
+  void add_bezier_quad(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
+  void add_bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept;
+  void add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept;
 
 private:
   void clear() noexcept;
   
   void add_command(uint cmd_idx, Rect rect) noexcept;
-  void add_command(uint cmd_idx, vec2 p0, vec2 p1, float thickness) noexcept;
-  void add_command(uint cmd_idx, vec2 center, float radius, float start_angle, float end_angle, bool ccw, float thickness) noexcept;
+  void add_command(uint cmd_idx, float2 p0, float2 p1, float thickness) noexcept;
+  void add_command(uint cmd_idx, float2 center, float radius, float start_angle, float end_angle, bool ccw, float thickness) noexcept;
 
 private:
-  vec2u                _tile_size;
-  vec2u                _tile_count;
+  uint2             _tile_size;
+  uint2             _tile_count;
   std::vector<Tile>    _tiles;
   std::vector<Command> _cmds;
 };

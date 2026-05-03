@@ -4,7 +4,7 @@
 #include "compositor.hpp"
 #include "ui/ui.hpp"
 
-#include "util/vec.hpp"
+#include "util/base.hpp"
 
 #include <windows.h>
 
@@ -64,15 +64,15 @@ public:
   auto shadow_rect() const noexcept { return RECT{ 0, 0,
     static_cast<LONG>(_width + shadow_thickness() * 2), static_cast<LONG>(_height + shadow_thickness()) * 2 }; }
 
-  auto contains_point(vec2i p) const noexcept -> bool;
+  auto contains_point(int2 p) const noexcept -> bool;
 
   auto handle() const noexcept { return _handle; }
-  auto pos() const noexcept { return vec2i{ _x, _y }; }
-  auto real_pos() const noexcept { return vec2 { _x - shadow_thickness(), _y - shadow_thickness() }; }
-  auto cursor_pos() const noexcept -> vec2i;
-  auto real_cursor_pos() const noexcept -> vec2i;
+  auto pos() const noexcept { return int2{ _x, _y }; }
+  auto real_pos() const noexcept { return float2 { _x - shadow_thickness(), _y - shadow_thickness() }; }
+  auto cursor_pos() const noexcept -> int2;
+  auto real_cursor_pos() const noexcept -> int2;
 
-  auto real_extent() const noexcept { return vec2u{ _width + shadow_thickness() * 2, _height + shadow_thickness() * 2 }; }
+  auto real_extent() const noexcept { return uint2{ _width + shadow_thickness() * 2, _height + shadow_thickness() * 2 }; }
 
   auto is_active() const noexcept { return GetForegroundWindow() == _handle; }
   auto is_mouse_pass_through_area() const noexcept -> bool;
@@ -90,12 +90,12 @@ public:
   auto is_moving_or_resizing() const noexcept { return _moving || _resizing; }
   auto is_move_from_maximize() const noexcept { return _move_from_maximize; }
   void move_with_pos(int x, int y) noexcept;
-  auto move_from_maximize() noexcept -> vec2i;
+  auto move_from_maximize() noexcept -> int2;
   void move_end() noexcept;
-  void adjust_offset(ResizeType type, vec2i point, int& dx, int& dy) const noexcept;
+  void adjust_offset(ResizeType type, int2 point, int& dx, int& dy) const noexcept;
   void resize(ResizeType type, int dx, int dy) noexcept;
   void resize_end() noexcept;
-  void resize_by_scale(float scale, float ratio, vec2 cursor_pos, vec2 left_button_down_window_cusor_pos) noexcept;
+  void resize_by_scale(float scale, float ratio, float2 cursor_pos, float2 left_button_down_window_cusor_pos) noexcept;
   void reset_pos_size() noexcept;
   void update_by_real_rect(RECT rect, float scale) noexcept;
   void update_by_rect(RECT rect, float scale) noexcept;
@@ -109,7 +109,7 @@ public:
   void cancel_fullscreen(RECT rect, float scale) noexcept;
   void cancel_fullscreen_maximize(RECT rect, float scale) noexcept;
 
-  auto get_resize_type(vec2i p) const noexcept -> ResizeType;
+  auto get_resize_type(int2 p) const noexcept -> ResizeType;
 
   auto monitor() const noexcept { return _monitor; }
   auto set_monitor(std::string monitor) noexcept { _monitor = monitor; }

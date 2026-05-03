@@ -107,15 +107,15 @@ void Window::destroy() const noexcept
   g_renderer.destroy_window_resource(_handle, _blur_window);
 }
 
-auto Window::cursor_pos() const noexcept -> vec2i
+auto Window::cursor_pos() const noexcept -> int2
 {
   auto pos = get_cursor_pos();
   return { pos.x - _x, pos.y - _y };
 }
 
-auto Window::real_cursor_pos() const noexcept -> vec2i
+auto Window::real_cursor_pos() const noexcept -> int2
 {
-  return cursor_pos() + vec2i{ Window_Shadow_Thickness };
+  return cursor_pos() + int2{ Window_Shadow_Thickness };
 }
 
 auto Window::cursor_valid_area() const noexcept -> RECT
@@ -135,12 +135,12 @@ auto Window::is_mouse_pass_through_area() const noexcept -> bool
   return !point_in(pos, rect);
 }
 
-auto Window::contains_point(vec2i p) const noexcept -> bool
+auto Window::contains_point(int2 p) const noexcept -> bool
 {
   return point_in(p, resize_rect());
 }
 
-auto Window::move_from_maximize() noexcept -> vec2i
+auto Window::move_from_maximize() noexcept -> int2
 {
   auto y       = 0;
   auto pos     = cursor_pos();
@@ -226,7 +226,7 @@ void Window::update_by_real_rect(RECT rect, float scale) noexcept
   keep_blur_window_behind_resize();
 }
 
-void Window::adjust_offset(ResizeType type, vec2i point, int& dx, int& dy) const noexcept
+void Window::adjust_offset(ResizeType type, int2 point, int& dx, int& dy) const noexcept
 {
   using enum ResizeType;
   switch (type)
@@ -347,7 +347,7 @@ void Window::resize_window() const noexcept
     SetWindowPos(_handle, nullptr, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
-void Window::resize_by_scale(float scale, float ratio, vec2 cursor_pos, vec2 left_button_down_window_cusor_pos) noexcept
+void Window::resize_by_scale(float scale, float ratio, float2 cursor_pos, float2 left_button_down_window_cusor_pos) noexcept
 {
   _x       = cursor_pos.x - left_button_down_window_cusor_pos.x;
   _y       = cursor_pos.y - left_button_down_window_cusor_pos.y;
@@ -513,7 +513,7 @@ void Window::restore_fullscreen() noexcept
   keep_blur_window_behind_resize();
 }
 
-auto Window::get_resize_type(vec2i p) const noexcept -> ResizeType
+auto Window::get_resize_type(int2 p) const noexcept -> ResizeType
 {
   using enum ResizeType;
 

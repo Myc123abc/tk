@@ -15,7 +15,7 @@
 
 namespace tk::ui {
 
-auto is_hover_on(vec2 left_top, vec2 right_bottom) noexcept -> bool;
+auto is_hover_on(float2 left_top, float2 right_bottom) noexcept -> bool;
 auto is_caps_locked() noexcept -> bool;
 
 struct WindowContext
@@ -27,7 +27,7 @@ struct WindowContext
   bool      is_called{};
   bool      can_be_closed{};
   bool      is_closed{};
-  vec2      render_pos{};
+  float2    render_pos{};
   bool      need_clear{};
   FrameData frame_data;
   bool      set_fullscreen{};
@@ -50,7 +50,7 @@ public:
 
   void render() noexcept;
 
-  auto is_hover_on(size_t id, vec2 left_top, vec2 right_bottom) noexcept -> bool;
+  auto is_hover_on(size_t id, float2 left_top, float2 right_bottom) noexcept -> bool;
 
   void set_render_pos(int x, int y) noexcept { _wnd_ctx->render_pos = { x + renderer::Window_Shadow_Thickness, y + renderer::Window_Shadow_Thickness }; }
   auto get_render_pos() const noexcept { return _wnd_ctx->render_pos; }
@@ -67,8 +67,8 @@ public:
   void reset_tween(size_t id) noexcept;
   auto ping_pong(bool b, size_t id, double duration, Tween::Ease ease = {}) noexcept -> double;
 
-  auto image(std::string_view path, vec2 left_top, vec2 right_bottom, uint8_t alpha) noexcept -> bool;
-  auto text(std::string_view text, vec2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> vec2;
+  auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept -> bool;
+  auto text(std::string_view text, float2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> float2;
 
   void fullscreen_window() noexcept;
   void restore_fullscreen_window() noexcept;
@@ -122,8 +122,8 @@ public:
   HWND                 cursor_on_window{};
   HWND                 mouse_down_window{};
   HWND                 mouse_up_window{};
-  std::optional<vec2i> mouse_down_pos;
-  std::optional<vec2i> mouse_up_pos;
+  std::optional<int2>   mouse_down_pos;
+  std::optional<int2>   mouse_up_pos;
   bool                 is_move_from_maximize{};
   bool                 draw_title_bar{};
 
@@ -134,13 +134,13 @@ private:
   struct ButtonState
   {
     size_t id{};
-    vec2   left_top{};
-    vec2   right_bottom{};
+    float2 left_top{};
+    float2 right_bottom{};
     bool   move_out{};
   } _btn_state;
   bool _interrupte{};
 public:
-  void add_mouse_left_button_state(size_t id, vec2 left_top, vec2 right_bottom) noexcept;
+  void add_mouse_left_button_state(size_t id, float2 left_top, float2 right_bottom) noexcept;
   auto is_cursor_move_out(size_t id) noexcept -> bool;
 
   //

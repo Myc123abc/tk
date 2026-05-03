@@ -23,7 +23,7 @@ private:
     uint32_t height{};
     bool     has_mipmap{};
 
-    auto extent() const noexcept -> vec2 { return { width, height }; }
+    auto extent() const noexcept -> float2 { return { width, height }; }
 
     ImageInfo() noexcept = default;
     ImageInfo(uint32_t width, uint32_t height, bool has_mipmap) noexcept
@@ -40,10 +40,10 @@ public:
   auto try_load(std::string_view path) noexcept -> bool;
   void unload(std::string_view path) noexcept;
 
-  void try_generate_mipmap(vec2 extent) const noexcept;
+  void try_generate_mipmap(float2 extent) const noexcept;
 
   auto contains(std::string_view path) const noexcept { return _loaded_images.contains(path.data());   }
-  auto extent(std::string_view path) noexcept -> vec2;
+  auto extent(std::string_view path) noexcept -> float2;
   auto handle(std::string_view path) noexcept { return _loaded_images[path.data()]; }
 
   void update() noexcept;
@@ -55,7 +55,7 @@ private:
   PoolType                                     _pool;
   std::unordered_map<std::string, ImageHandle> _loaded_images;
   std::unordered_set<ImageHandle>              _images;
-  std::unordered_map<std::string, vec2>        _image_extents;
+  std::unordered_map<std::string, float2>        _image_extents;
 
   struct LoadResult
   {

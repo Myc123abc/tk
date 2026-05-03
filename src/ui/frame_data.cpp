@@ -35,7 +35,7 @@ auto angle_in_arc(float a, float start, float end, bool ccw) noexcept -> bool
   }
 }
 
-auto rect_min_dist_sq(Rect r, vec2 p) noexcept -> float
+auto rect_min_dist_sq(Rect r, float2 p) noexcept -> float
 {
   float dx = 0.0f;
   if (p.x < r.left)
@@ -52,7 +52,7 @@ auto rect_min_dist_sq(Rect r, vec2 p) noexcept -> float
   return dx * dx + dy * dy;
 }
 
-auto rect_max_dist_sq(Rect r, vec2 p) noexcept -> float
+auto rect_max_dist_sq(Rect r, float2 p) noexcept -> float
 {
   float dx = std::max(std::abs(p.x - r.left), std::abs(p.x - r.right));
   float dy = std::max(std::abs(p.y - r.top),  std::abs(p.y - r.bottom));
@@ -60,9 +60,9 @@ auto rect_max_dist_sq(Rect r, vec2 p) noexcept -> float
   return dx * dx + dy * dy;
 }
 
-auto rect_angle_hit(Rect r, vec2 center, float start, float end, bool ccw) noexcept -> bool
+auto rect_angle_hit(Rect r, float2 center, float start, float end, bool ccw) noexcept -> bool
 {
-  vec2 corners[4] =
+  float2 corners[4] =
   {
     { r.left,  r.top    },
     { r.right, r.top    },
@@ -82,13 +82,13 @@ auto rect_angle_hit(Rect r, vec2 center, float start, float end, bool ccw) noexc
   return false;
 }
 
-auto bezier_quad_point(vec2 p0, vec2 p1, vec2 p2, float t) noexcept -> vec2
+auto bezier_quad_point(float2 p0, float2 p1, float2 p2, float t) noexcept -> float2
 {
   auto u = 1.f - t;
   return p0 * (u * u) + p1 * (2.f * u * t) + p2 * (t * t);
 }
 
-auto bezier_cubic_point(vec2 p0, vec2 p1, vec2 p2, vec2 p3, float t) noexcept -> vec2
+auto bezier_cubic_point(float2 p0, float2 p1, float2 p2, float2 p3, float t) noexcept -> float2
 {
   auto u  = 1.f - t;
   auto uu = u * u;
@@ -112,12 +112,12 @@ void FrameData::clear() noexcept
   _tiles.clear();
 }
 
-void FrameData::init(uint width, uint height, vec2u tile_size) noexcept
+void FrameData::init(uint width, uint height, uint2 tile_size) noexcept
 {
   clear();
 
   _tile_size  = tile_size;
-  _tile_count = (vec2{ width, height } + tile_size - 1) / tile_size;
+  _tile_count = (float2{ width, height } + tile_size - 1) / tile_size;
   _tiles.resize(_tile_count.x + _tile_count.y);
 }
 
@@ -125,7 +125,7 @@ void FrameData::init(uint width, uint height, vec2u tile_size) noexcept
 ///                            Add Commands
 ////////////////////////////////////////////////////////////////////////////////
 
-void FrameData::add_command(uint cmd_idx, vec2 p0, vec2 p1, float thickness) noexcept
+void FrameData::add_command(uint cmd_idx, float2 p0, float2 p1, float thickness) noexcept
 {
   assert(thickness > 0.f);
 
@@ -238,7 +238,7 @@ void FrameData::add_command(uint cmd_idx, Rect rect) noexcept
     }
 }
 
-void FrameData::add_command(uint cmd_idx, vec2 center, float radius, float start_angle, float end_angle, bool ccw, float thickness) noexcept
+void FrameData::add_command(uint cmd_idx, float2 center, float radius, float start_angle, float end_angle, bool ccw, float thickness) noexcept
 {
   assert(thickness > 0);
   float sweep = end_angle - start_angle;
@@ -250,7 +250,7 @@ void FrameData::add_command(uint cmd_idx, vec2 center, float radius, float start
 
   int segments = std::max(1, (int)std::ceil(std::abs(sweep) * radius / 16.0f));
 
-  vec2 prev
+  float2 prev
   {
     center.x + std::cos(start_angle) * radius,
     center.y + std::sin(start_angle) * radius
@@ -261,7 +261,7 @@ void FrameData::add_command(uint cmd_idx, vec2 center, float radius, float start
     float t = (float)i / (float)segments;
     float a = start_angle + sweep * t;
 
-    vec2 p
+    float2 p
     {
       center.x + std::cos(a) * radius,
       center.y + std::sin(a) * radius
@@ -276,7 +276,7 @@ void FrameData::add_command(uint cmd_idx, vec2 center, float radius, float start
 ///                             Commands
 ////////////////////////////////////////////////////////////////////////////////
 
-void FrameData::add_rect(vec2 left_top, vec2 right_bottom, Color color, float thickness) noexcept
+void FrameData::add_rect(float2 left_top, float2 right_bottom, Color color, float thickness) noexcept
 {
   if (left_top.x >= right_bottom.x || left_top.y >= right_bottom.y)
     return;
@@ -300,7 +300,7 @@ void FrameData::add_rect(vec2 left_top, vec2 right_bottom, Color color, float th
     add_command(cmd_idx, { left_top, right_bottom });
 }
 
-void FrameData::add_triangle(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
+void FrameData::add_triangle(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept
 {
   // reject degenerate triangle
   auto area2 = (p1.x - p0.x) * (p2.y - p0.y) - (p1.y - p0.y) * (p2.x - p0.x);
@@ -332,7 +332,7 @@ void FrameData::add_triangle(vec2 p0, vec2 p1, vec2 p2, Color color, float thick
   }
 }
 
-void FrameData::add_circle(vec2 center, float radius, Color color, float thickness) noexcept
+void FrameData::add_circle(float2 center, float radius, Color color, float thickness) noexcept
 {
   if (radius <= 0.f) return;
 
@@ -363,7 +363,7 @@ void FrameData::add_circle(vec2 center, float radius, Color color, float thickne
   }
 }
 
-void FrameData::add_line(vec2 p0, vec2 p1, Color color, float thickness) noexcept
+void FrameData::add_line(float2 p0, float2 p1, Color color, float thickness) noexcept
 {
   auto cmd_idx = _cmds.size();
 
@@ -376,7 +376,7 @@ void FrameData::add_line(vec2 p0, vec2 p1, Color color, float thickness) noexcep
   add_command(cmd_idx, p0, p1, thickness);
 }
 
-void FrameData::add_bezier_quad(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
+void FrameData::add_bezier_quad(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept
 {
   if (p0 == p1 && p1 == p2) return;
 
@@ -419,7 +419,7 @@ void FrameData::add_bezier_quad(vec2 p0, vec2 p1, vec2 p2, Color color, float th
   }
 }
 
-void FrameData::add_bezier_cubic(vec2 p0, vec2 p1, vec2 p2, vec2 p3, Color color, float thickness) noexcept
+void FrameData::add_bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept
 {
   if (p0 == p1 && p1 == p2 && p2 == p3)
     return;
@@ -462,7 +462,7 @@ void FrameData::add_bezier_cubic(vec2 p0, vec2 p1, vec2 p2, vec2 p3, Color color
   }
 }
 
-void FrameData::add_image(ImageHandle handle, vec2 left_top, vec2 right_bottom, uint8_t alpha) noexcept
+void FrameData::add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept
 {
   if (alpha == 0 || left_top.x >= right_bottom.x || left_top.y >= right_bottom.y)
     return;

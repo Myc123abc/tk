@@ -25,7 +25,7 @@ namespace tk::ui {
 ///                              Misc
 ////////////////////////////////////////////////////////////////////////////////
 
-auto lerp(Color x, Color y, float v) noexcept -> vec4
+auto lerp(Color x, Color y, float v) noexcept -> float4
 {
   return
   {
@@ -36,7 +36,7 @@ auto lerp(Color x, Color y, float v) noexcept -> vec4
   };
 }
 
-auto lerp(vec2 x, vec2 y, float v) noexcept -> vec2
+auto lerp(float2 x, float2 y, float v) noexcept -> float2
 {
   return { std::lerp(x.x, y.x, v), std::lerp(x.y, y.y, v) };
 }
@@ -46,12 +46,12 @@ auto delta_time() noexcept -> double
   return g_ui_ctx.delta_time();
 }
 
-auto image_extent(std::string_view path) noexcept -> vec2
+auto image_extent(std::string_view path) noexcept -> float2
 {
   return g_img_mgr.extent(path);
 }
 
-auto image(std::string_view path, vec2 left_top, vec2 right_bottom, uint8_t alpha) noexcept -> bool
+auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept -> bool
 {
   return g_ui_ctx.image(path, left_top, right_bottom, alpha);
 }
@@ -66,17 +66,17 @@ void load_font(std::string_view path) noexcept
   g_text_engine.load_font(path);
 }
 
-auto text(std::string_view text, vec2 pos, float size, Color color, FontStyle style) noexcept -> vec2
+auto text(std::string_view text, float2 pos, float size, Color color, FontStyle style) noexcept -> float2
 {
   return g_ui_ctx.text(text, pos, size, color, style, {});
 }
 
-auto text(std::string_view text, vec2 pos, float size, Color inner_color, Color outer_color) noexcept -> vec2
+auto text(std::string_view text, float2 pos, float size, Color inner_color, Color outer_color) noexcept -> float2
 {
   return g_ui_ctx.text(text, pos, size, inner_color, {}, outer_color);
 }
 
-auto get_cursor_pos() noexcept -> vec2
+auto get_cursor_pos() noexcept -> float2
 {
   return renderer::get_cursor_pos();
 }
@@ -95,7 +95,7 @@ void end() noexcept
 	g_ui_ctx.end();
 }
 
-void add_move_invalid_area(vec2 left_top, vec2 right_bottom) noexcept
+void add_move_invalid_area(float2 left_top, float2 right_bottom) noexcept
 {
   g_ui_ctx.check_draw();
   if (g_ui_ctx.is_use_title_bar_now() && !g_ui_ctx.draw_title_bar)
@@ -115,13 +115,13 @@ void add_move_invalid_area(vec2 left_top, vec2 right_bottom) noexcept
     g_ui_ctx.window()->add_move_invalid_area(rect.value());
 }
 
-auto window_extent() noexcept -> vec2
+auto window_extent() noexcept -> float2
 {
   g_ui_ctx.check_draw();
-  return vec2{ g_ui_ctx.window()->width(), g_ui_ctx.window()->height() } / g_ui_ctx.window()->scale();
+  return float2{ g_ui_ctx.window()->width(), g_ui_ctx.window()->height() } / g_ui_ctx.window()->scale();
 }
 
-auto window_drawable_extent() noexcept -> vec2
+auto window_drawable_extent() noexcept -> float2
 {
   auto extent = window_extent();
   if (g_ui_ctx.is_use_title_bar_now())
@@ -178,7 +178,7 @@ void union_end() noexcept
 ///                            Geometry
 ////////////////////////////////////////////////////////////////////////////////
 
-void rectangle(vec2 left_top, vec2 right_bottom, Color color, float thickness) noexcept
+void rectangle(float2 left_top, float2 right_bottom, Color color, float thickness) noexcept
 {
 	g_ui_ctx.check_draw();
 
@@ -194,7 +194,7 @@ void rectangle(vec2 left_top, vec2 right_bottom, Color color, float thickness) n
   g_ui_ctx.frame_data()->add_rect(left_top, right_bottom, color, thickness);
 }
 
-void triangle(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
+void triangle(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept
 {
 	g_ui_ctx.check_draw();
 
@@ -212,7 +212,7 @@ void triangle(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
 	g_ui_ctx.frame_data()->add_triangle(p0, p1, p2, color, thickness);
 }
 
-void circle(vec2 center, float radius, Color color, float thickness) noexcept
+void circle(float2 center, float radius, Color color, float thickness) noexcept
 {
 	g_ui_ctx.check_draw();
 
@@ -227,7 +227,7 @@ void circle(vec2 center, float radius, Color color, float thickness) noexcept
   g_ui_ctx.frame_data()->add_circle(center, radius, color, thickness);
 }
 
-void line(vec2 p0, vec2 p1, Color color, float thickness) noexcept
+void line(float2 p0, float2 p1, Color color, float thickness) noexcept
 {
   if (p0 == p1) return;
 
@@ -247,7 +247,7 @@ void line(vec2 p0, vec2 p1, Color color, float thickness) noexcept
   g_ui_ctx.frame_data()->add_line(p0, p1, color, thickness);
 }
 
-void bezier_quad(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
+void bezier_quad(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept
 {
   if (thickness < 1) thickness = 1;
 
@@ -267,7 +267,7 @@ void bezier_quad(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexce
   g_ui_ctx.frame_data()->add_bezier_quad(p0, p1, p2, color, thickness);
 }
 
-void bezier_cubic(vec2 p0, vec2 p1, vec2 p2, vec2 p3, Color color, float thickness) noexcept
+void bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept
 {
   if (thickness < 1) thickness = 1;
 
@@ -293,7 +293,7 @@ void bezier_cubic(vec2 p0, vec2 p1, vec2 p2, vec2 p3, Color color, float thickne
 ///                               Path
 ////////////////////////////////////////////////////////////////////////////////
 
-void path_line_to(vec2 p) noexcept
+void path_line_to(float2 p) noexcept
 {
 	g_ui_ctx.check_draw();
 
@@ -306,7 +306,7 @@ void path_line_to(vec2 p) noexcept
   g_ui_ctx.frame_data()->path_line_to(p);
 }
 
-void path_arc_to(vec2 center, float radius, float min, float max) noexcept
+void path_arc_to(float2 center, float radius, float min, float max) noexcept
 {
   g_ui_ctx.check_draw();
 
@@ -320,7 +320,7 @@ void path_arc_to(vec2 center, float radius, float min, float max) noexcept
   g_ui_ctx.frame_data()->path_arc_to(center, radius, min, max);
 }
 
-void path_bezier_quad_to(vec2 p1, vec2 p2) noexcept
+void path_bezier_quad_to(float2 p1, float2 p2) noexcept
 {
   g_ui_ctx.check_draw();
 
@@ -335,7 +335,7 @@ void path_bezier_quad_to(vec2 p1, vec2 p2) noexcept
   g_ui_ctx.frame_data()->path_bezier_quad_to(p1, p2);
 }
 
-void path_bezier_cubic_to(vec2 p1, vec2 p2, vec2 p3) noexcept
+void path_bezier_cubic_to(float2 p1, float2 p2, float2 p3) noexcept
 {
 	g_ui_ctx.check_draw();
 
@@ -364,7 +364,7 @@ void path_end(Color color, float thickness, bool is_closed) noexcept
 ///                               Widget
 ////////////////////////////////////////////////////////////////////////////////
 
-auto is_hover_on(vec2 left_top, vec2 right_bottom) noexcept -> bool
+auto is_hover_on(float2 left_top, float2 right_bottom) noexcept -> bool
 {
   g_ui_ctx.check_draw();
   auto p = g_ui_ctx.window()->cursor_pos();
@@ -373,7 +373,7 @@ auto is_hover_on(vec2 left_top, vec2 right_bottom) noexcept -> bool
          point_in(p, left_top, right_bottom);
 }
 
-auto is_click_on(vec2 left_top, vec2 right_bottom) noexcept -> bool
+auto is_click_on(float2 left_top, float2 right_bottom) noexcept -> bool
 {
   g_ui_ctx.check_draw();
   auto window = g_ui_ctx.window();
@@ -403,8 +403,8 @@ auto button(size_t id, int x, int y, uint32_t width, uint32_t height) noexcept->
 
   // what is a button
   // button is a rectangle with width and height in specific position
-  auto left_top     = vec2{ x, y };
-  auto right_bottom = vec2{ x + width, y + height };
+  auto left_top     = float2{ x, y };
+  auto right_bottom = float2{ x + width, y + height };
   if (g_ui_ctx.is_use_title_bar_now() && !g_ui_ctx.draw_title_bar)
   {
     left_top.y     += Title_Bar_Height;

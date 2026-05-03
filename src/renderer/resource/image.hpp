@@ -2,7 +2,7 @@
 
 #include "descriptor_heap_manager.hpp"
 #include "util/flag.hpp"
-#include "util/vec.hpp"
+#include "util/base.hpp"
 
 #include <dxgi1_6.h>
 #include <directx/d3dx12.h>
@@ -105,7 +105,7 @@ public:
   auto format() const noexcept { return static_cast<ImageFormat>(_format); }
   auto width()  const noexcept { return _width;                            }
   auto height() const noexcept { return _height;                           }
-  auto extent() const noexcept { return vec2u{ _width, _height };          }
+  auto extent() const noexcept { return uint2{ _width, _height };          }
 
   auto per_pixel_size() const noexcept -> uint32_t;
 

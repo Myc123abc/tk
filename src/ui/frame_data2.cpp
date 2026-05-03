@@ -14,7 +14,7 @@ auto sqrt(float x) noexcept
   return _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss(x)));
 }
 
-auto normalize(vec2 p) noexcept
+auto normalize(float2 p) noexcept
 {
   auto d2 = dot(p, p);
   if (d2 > .0f)
@@ -22,10 +22,10 @@ auto normalize(vec2 p) noexcept
     auto inv_len = sqrt(d2);
     return p * inv_len;
   }
-  return vec2{};
+  return float2{};
 }
 
-auto fix_normal(vec2 p) noexcept
+auto fix_normal(float2 p) noexcept
 {
   auto d2 = dot(p, p);
   if (d2 > 0.000001f)
@@ -36,7 +36,7 @@ auto fix_normal(vec2 p) noexcept
       inv_len2 = max;
     return p * inv_len2;
   }
-  return vec2{};
+  return float2{};
 }
 
 auto round_up_to_even(int x) noexcept
@@ -49,7 +49,7 @@ auto calc_circle_radius(float cnt, float max_error) noexcept
   return max_error / (1 - std::cos(std::numbers::pi_v<float> / std::max(cnt, std::numbers::pi_v<float>)));
 }
 
-auto is_convex(std::span<vec2> p) noexcept
+auto is_convex(std::span<float2> p) noexcept
 {
   auto const n = p.size();
   if (n < 3)
@@ -113,7 +113,7 @@ auto FrameData::calc_circle_segment_count(float radius) noexcept -> float
     segment_min, segment_max);
 }
 
-void FrameData::add_rect(vec2 left_top, vec2 right_bottom, Color color, float thickness) noexcept
+void FrameData::add_rect(float2 left_top, float2 right_bottom, Color color, float thickness) noexcept
 {
   if (_using_discard_shapes) color.a = 1.f;
   else if (color.a == 0) return;
@@ -134,7 +134,7 @@ void FrameData::add_rect(vec2 left_top, vec2 right_bottom, Color color, float th
   add_rect(left_top, right_bottom, color);
 }
 
-void FrameData::add_rect(vec2 left_top, vec2 right_bottom, Color color) noexcept
+void FrameData::add_rect(float2 left_top, float2 right_bottom, Color color) noexcept
 {
   auto [vertices, indices] = expand_beg(4, 6);
 
@@ -152,7 +152,7 @@ void FrameData::add_rect(vec2 left_top, vec2 right_bottom, Color color) noexcept
   expand_end();
 }
 
-void FrameData::add_triangle(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
+void FrameData::add_triangle(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept
 {
   if (_using_discard_shapes) color.a = 1.f;
   else if (color.a == 0) return;
@@ -168,7 +168,7 @@ void FrameData::add_triangle(vec2 p0, vec2 p1, vec2 p2, Color color, float thick
     add_convex_poly_filled(color);
 }
 
-void FrameData::add_circle(vec2 center, float radius, Color color, float thickness) noexcept
+void FrameData::add_circle(float2 center, float radius, Color color, float thickness) noexcept
 {
   if (_using_discard_shapes) color.a = 1.f;
   else if (color.a == 0) return;
@@ -182,7 +182,7 @@ void FrameData::add_circle(vec2 center, float radius, Color color, float thickne
     add_convex_poly_filled(color);
 }
 
-void FrameData::add_line(vec2 p0, vec2 p1, Color color, float thickness) noexcept
+void FrameData::add_line(float2 p0, float2 p1, Color color, float thickness) noexcept
 {
   if (_using_discard_shapes) color.a = 1.f;
   else if (color.a == 0) return;
@@ -193,7 +193,7 @@ void FrameData::add_line(vec2 p0, vec2 p1, Color color, float thickness) noexcep
   add_poly_line(color, thickness, false);
 }
 
-void FrameData::add_bezier_quad(vec2 p0, vec2 p1, vec2 p2, Color color, float thickness) noexcept
+void FrameData::add_bezier_quad(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept
 {
   if (_using_discard_shapes) color.a = 1.f;
   else if (color.a == 0) return;
@@ -204,7 +204,7 @@ void FrameData::add_bezier_quad(vec2 p0, vec2 p1, vec2 p2, Color color, float th
   add_poly_line(color, thickness, false);
 }
 
-void FrameData::add_bezier_cubic(vec2 p0, vec2 p1, vec2 p2, vec2 p3, Color color, float thickness) noexcept
+void FrameData::add_bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept
 {
   if (_using_discard_shapes) color.a = 1.f;
   else if (color.a == 0) return;
@@ -235,7 +235,7 @@ void FrameData::path_end(Color color, float thickness, bool is_closed) noexcept
   }
 }
 
-void FrameData::path_bezier_quad_curve_to_casteljau(vec2 p0, vec2 p1, vec2 p2, float tess_tol, int level) noexcept
+void FrameData::path_bezier_quad_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float tess_tol, int level) noexcept
 {
   auto dp  = p2 - p0;
   auto det = cross(p1 - p2, dp);
@@ -251,14 +251,14 @@ void FrameData::path_bezier_quad_curve_to_casteljau(vec2 p0, vec2 p1, vec2 p2, f
   }
 }
 
-void FrameData::path_bezier_cubic_curve_to_casteljau(vec2 p0, vec2 p1, vec2 p2, vec2 p3, float tess_tol, int level) noexcept
+void FrameData::path_bezier_cubic_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float2 p3, float tess_tol, int level) noexcept
 {
   auto dp = p3 - p0;
   auto d2 = cross(p1 - p3, dp);
   auto d3 = cross(p2 - p3, dp);
   d2 = d2 >= 0 ? d2 : -d2;
   d3 = d3 >= 0 ? d3 : -d3;
-  if (dot(vec2(d2), vec2(d3)) < tess_tol * length_sq(dp))
+  if (dot(float2(d2), float2(d3)) < tess_tol * length_sq(dp))
     _points.emplace_back(p3);
   else if (level < 10)
   {
@@ -351,7 +351,7 @@ void FrameData::add_concave_poly_filled(Color color) noexcept
   auto vtx_inner_idx = _vertex_beg;
   auto vtx_outer_idx = _vertex_beg + 1;
 
-  _tmp_buf.resize((Triangulator::estimate_buf_size(pt_cnt) + sizeof(vec2)) / sizeof(vec2));
+  _tmp_buf.resize((Triangulator::estimate_buf_size(pt_cnt) + sizeof(float2)) / sizeof(float2));
   auto triangulator = Triangulator{};
   triangulator.init(_points, _tmp_buf.data());
   while (triangulator.triangle_left() > 0)
@@ -407,7 +407,7 @@ auto FrameData::get_circle_segment_count(float radius) noexcept -> uint32_t
   return calc_circle_segment_count(radius);
 }
 
-void FrameData::path_arc_to(vec2 center, float radius, float min, float max) noexcept
+void FrameData::path_arc_to(float2 center, float radius, float min, float max) noexcept
 {
   if (radius < .5f)
   {
@@ -442,7 +442,7 @@ void FrameData::path_arc_to(vec2 center, float radius, float min, float max) noe
   }
 }
 
-void FrameData::_path_arc_to(vec2 center, float radius, int min, int max) noexcept
+void FrameData::_path_arc_to(float2 center, float radius, int min, int max) noexcept
 {
   auto step = std::clamp(arc_sample_max / static_cast<int>(get_circle_segment_count(radius)),
     1, arc_table_size / 4);
@@ -520,7 +520,7 @@ void FrameData::_path_arc_to(vec2 center, float radius, int min, int max) noexce
   assert(_points.data() + _points.size() == out_ptr);
 }
 
-void FrameData::_path_arc_to(vec2 center, float radius, int min, int max, int segment_cnt) noexcept
+void FrameData::_path_arc_to(float2 center, float radius, int min, int max, int segment_cnt) noexcept
 {
   if (radius < .5f)
   {
@@ -537,13 +537,13 @@ void FrameData::_path_arc_to(vec2 center, float radius, int min, int max, int se
   }
 }
 
-void FrameData::path_bezier_quad_to(vec2 p1, vec2 p2) noexcept
+void FrameData::path_bezier_quad_to(float2 p1, float2 p2) noexcept
 {
   assert(!_points.empty());
   path_bezier_quad_curve_to_casteljau(_points.back(), p1, p2, curve_tessellation_tol, 0);
 }
 
-void FrameData::path_bezier_cubic_to(vec2 p1, vec2 p2, vec2 p3) noexcept
+void FrameData::path_bezier_cubic_to(float2 p1, float2 p2, float2 p3) noexcept
 {
   assert(!_points.empty());
   path_bezier_cubic_curve_to_casteljau(_points.back(), p1, p2, p3, curve_tessellation_tol, 0);
@@ -733,7 +733,7 @@ void FrameData::add_scissor_rect(RECT rect) noexcept
   _draw_cmd_rect_idxs.clear();
 }
 
-void FrameData::add_image(ImageHandle handle, vec2 left_top, vec2 right_bottom, uint8_t alpha) noexcept
+void FrameData::add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept
 {
   assert(!_using_discard_shapes);
 

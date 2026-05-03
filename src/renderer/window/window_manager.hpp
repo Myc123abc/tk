@@ -14,20 +14,20 @@ inline auto get_cursor_pos() noexcept
 {
   auto p = POINT{};
   GetCursorPos(&p);
-  return vec2i{ p.x, p.y };
+  return int2{ p.x, p.y };
 }
 
-inline auto point_in(vec2i p, vec2 left_top, vec2 right_bottom) noexcept
+inline auto point_in(int2 p, float2 left_top, float2 right_bottom) noexcept
 {
   return p.x > left_top.x && p.x < right_bottom.x && p.y > left_top.y && p.y < right_bottom.y;
 }
 
-inline auto point_in(vec2i p, RECT rect) noexcept
+inline auto point_in(int2 p, RECT rect) noexcept
 {
   return p.x > rect.left && p.x < rect.right && p.y > rect.top && p.y < rect.bottom;
 }
 
-inline auto point_in_with_bounding(vec2i p, RECT rect) noexcept
+inline auto point_in_with_bounding(int2 p, RECT rect) noexcept
 {
   return p.x >= rect.left && p.x <= rect.right && p.y >= rect.top && p.y <= rect.bottom;
 }
@@ -68,7 +68,7 @@ private:
   void message_process(MSG const& msg) noexcept;
 
   void update() noexcept;
-  void update_monitor(HWND handle, vec2 cursor_pos, vec2i& left_button_down_window_cursor_pos) noexcept;
+  void update_monitor(HWND handle, float2 cursor_pos, int2& left_button_down_window_cursor_pos) noexcept;
   void update_monitors() noexcept;
   void update_fullscreen_window() noexcept;
   void update_cursor() noexcept;

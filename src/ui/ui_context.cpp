@@ -269,9 +269,9 @@ void UIContext::window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer
     return;
 
   auto data = &wnd_ctx.frame_data;
-  auto col  = vec4{};
+  auto col  = float4{};
 
-  auto get_wireframe_color = [&] -> std::optional<vec4>
+  auto get_wireframe_color = [&] -> std::optional<float4>
   {
     if (cfg.wireframe_color)
     {
@@ -295,7 +295,7 @@ void UIContext::window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer
   data->set_window_shadow(scissor_rect, wnd.real_extent(), wnd.shadow_thickness(), {}, cfg.display_window_shadow ? 5 : 0, 15, get_wireframe_color());
 }
 
-void UIContext::add_mouse_left_button_state(size_t id, vec2 left_top, vec2 right_bottom) noexcept
+void UIContext::add_mouse_left_button_state(size_t id, float2 left_top, float2 right_bottom) noexcept
 {
   check_draw();
   if (!_btn_state.id)
@@ -321,7 +321,7 @@ void UIContext::render_on(int x, int y, std::move_only_function<void()>&& func) 
   g_ui_ctx.set_render_pos(org_pos.x - Window_Shadow_Thickness, org_pos.y - Window_Shadow_Thickness);
 }
 
-auto UIContext::is_hover_on(size_t id, vec2 left_top, vec2 right_bottom) noexcept -> bool
+auto UIContext::is_hover_on(size_t id, float2 left_top, float2 right_bottom) noexcept -> bool
 {
   if (ui::is_hover_on(left_top, right_bottom))
   {
@@ -519,7 +519,7 @@ auto UIContext::get_key(Key key) noexcept -> KeyState
   return ctx.state;
 }
 
-auto UIContext::image(std::string_view path, vec2 left_top, vec2 right_bottom, uint8_t alpha) noexcept -> bool
+auto UIContext::image(std::string_view path, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept -> bool
 {
   check_draw();
 
@@ -539,7 +539,7 @@ auto UIContext::image(std::string_view path, vec2 left_top, vec2 right_bottom, u
   return false;
 }
 
-auto UIContext::text(std::string_view text, vec2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> vec2
+auto UIContext::text(std::string_view text, float2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> float2
 {
   if (text.empty()) return {};
 
