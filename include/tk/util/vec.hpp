@@ -1,9 +1,13 @@
 #pragma once
 
+#include "common.hpp"
+
 #include <initializer_list>
 #include <numbers>
 #include <immintrin.h>
 #include <assert.h>
+
+// TODO: change vec2 to float2, vec2u to uint2, etc.
 
 namespace tk {
 
@@ -349,7 +353,7 @@ inline auto dot(vec<4, float> a, vec<4, float> b) noexcept -> float
 
 using vec2  = vec<2, float>;
 using vec2i = vec<2, int>;
-using vec2u = vec<2, uint32_t>;
+using vec2u = vec<2, uint>;
 using vec3  = vec<3, float>;
 using vec4  = vec<4, float>;
 

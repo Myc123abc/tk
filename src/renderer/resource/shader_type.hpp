@@ -15,19 +15,22 @@ struct alignas(16) Vertex
 
 struct alignas(16) Constants
 {
-  vec2u    render_target_extent{};
-  vec2u    window_extent{};
+  vec2u render_target_extent;
+  vec2u window_extent;
 
-  vec2     window_pos{};
-  float    shadow_thickness{};
-  float    shadow_radius{};
+  vec2  window_pos;
+  float shadow_thickness{};
+  float shadow_radius{};
 
-  vec3     shadow_color{};
-  float    shadow_softness{};
+  vec3  shadow_color;
+  float shadow_softness{};
 
-  vec4     wireframe_color{};
+  vec4  wireframe_color;
 
-  uint32_t draw_wireframe{};
+  vec2u tile_size;
+  vec2u tile_count;
+
+  uint  draw_wireframe{};
 };
 
 constexpr auto Max_Blur_Widget_Num = 5;
