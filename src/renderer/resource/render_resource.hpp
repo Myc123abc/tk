@@ -18,19 +18,29 @@ public:
 
   void destroy() noexcept
   {
-    _vertices_indices_buffer.destroy();
+    _cmds.destroy();
+    _cmd_idxs.destroy();
+    _tiles.destroy();
   }
 
   auto clear() noexcept -> FrameBuffer&
   {
-    _vertices_indices_buffer.clear();
+    _cmds.clear();
+    _cmd_idxs.clear();
+    _tiles.clear();
     return *this;
   }
 
   void upload(ID3D12GraphicsCommandList1* cmd, ui::FrameData const* data) noexcept;
 
+  auto cmds_gpu_handle()     const noexcept { return _cmds.gpu_handle();     }
+  auto cmd_idxs_gpu_handle() const noexcept { return _cmd_idxs.gpu_handle(); }
+  auto tiles_gpu_handle()    const noexcept { return _tiles.gpu_handle();    }
+
 private:
-  Buffer _vertices_indices_buffer;
+  Buffer _cmds;
+  Buffer _cmd_idxs;
+  Buffer _tiles;
 };
 
 class RenderResource
@@ -64,8 +74,6 @@ public:
   auto& current_frame() noexcept { return _frames[_frame_index];  }
   auto  render_target() noexcept { return &current_frame().image; }
   auto  depth_stencil() noexcept { return &_dsv_image;            }
-  auto  mask_image()    noexcept { return &_mask_image;           }
-  auto  tmp_image()     noexcept { return &_tmp_image;            }
 
 private:
   struct Frame
@@ -79,8 +87,6 @@ private:
 
   std::array<Frame, Frame_Count>              _frames;
   Image                                       _dsv_image;
-  Image                                       _mask_image;
-  Image                                       _tmp_image;
 
   Microsoft::WRL::ComPtr<IDXGISwapChain4>     _swapchain;
   HANDLE                                      _swapchain_waitable_obj;

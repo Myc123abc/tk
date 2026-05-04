@@ -2,7 +2,7 @@
 
 using namespace tk;
 
-auto point_in_circle(vec2 center, float radius, float theta) noexcept -> vec2
+auto point_in_circle(float2 center, float radius, float theta) noexcept -> float2
 {
   auto a = radians(theta);
   return { center.x + radius * std::cos(a), center.y + radius * std::sin(a) };
@@ -17,7 +17,7 @@ public:
     _lerp_name = std::string(name) + "lerp value";
   }
 
-  auto operator()(vec2 p0, vec2 p1, vec2 p2, ui::Color color, ui::Color hovered_color, float thickness) noexcept -> bool
+  auto operator()(float2 p0, float2 p1, float2 p2, ui::Color color, ui::Color hovered_color, float thickness) noexcept -> bool
   {
     auto width  = p1.x - p0.x;
     auto height = p2.y - p0.y;
@@ -31,14 +31,14 @@ public:
     {
       //         playback button                    pause button
       { p0,                                p0,                              },
-      { p0 + vec2(width / 2,  height / 4), p0 + vec2( width / 3, 0)         },
-      { p2 + vec2(width / 2, -height / 4), p2 + vec2( width / 3, 0)         },
+      { p0 + float2(width / 2,  height / 4), p0 + float2( width / 3, 0)         },
+      { p2 + float2(width / 2, -height / 4), p2 + float2( width / 3, 0)         },
       { p2,                                p2,                              },
-      { p0 + vec2(width / 2,  height / 4), { p1.x - width / 3, p0.y },      },
+      { p0 + float2(width / 2,  height / 4), { p1.x - width / 3, p0.y },      },
       { p1,                                { p1.x, p0.y },                  },
       { p1,                                { p1.x, p2.y },                  },
-      { p2 + vec2(width / 2, -height / 4), { p1.x - width / 3, p2.y },      },
-      { p1,                                p0 + vec2(width / 3, height / 2) },
+      { p2 + float2(width / 2, -height / 4), { p1.x - width / 3, p2.y },      },
+      { p1,                                p0 + float2(width / 3, height / 2) },
       { { p0.x, p1.y },                    { p1.x - width / 3, p1.y },      },
     };
 
@@ -80,14 +80,14 @@ public:
 private:
   struct LerpPoint
   {
-    vec2 p0{};
-    vec2 p1{};
+    float2 p0{};
+    float2 p1{};
   };
 
   std::string            _name;
   std::string            _lerp_name;
   std::vector<LerpPoint> _lerp_pts;
-  std::vector<vec2>      _pts{};
+  std::vector<float2>      _pts{};
   bool                   _paused{ true };
 };
 
@@ -127,7 +127,7 @@ struct FrameRate
 void circle_draw_test() noexcept
 {
   auto [w, h] = ui::window_drawable_extent();
-  auto center = vec2{ 3, h - 3 };
+  auto center = float2{ 3, h - 3 };
   auto radius = 1.f;
   while (center.x + radius + 2 < w)
   {
@@ -142,7 +142,7 @@ void circle_draw_test() noexcept
 void line_draw_test() noexcept
 {
   auto [w, h] = ui::window_drawable_extent();
-  auto p0 = vec2{}, p1 = vec2{};
+  auto p0 = float2{}, p1 = float2{};
   auto t = 0.f;
   while (p1.x < w && p0.y < h)
   {
@@ -164,7 +164,7 @@ void line_draw_test() noexcept
 
 void test_path_draw() noexcept
 {
-  auto pos = vec2{ 10, 10 };
+  auto pos = float2{ 10, 10 };
   ui::path_line_to({ pos.x, pos.y });
   ui::path_line_to({ pos.x + 100, pos.y + 100 });
   ui::path_line_to({ pos.x + 50, pos.y + 75 });
@@ -182,7 +182,7 @@ void test_path_draw() noexcept
   ui::path_line_to({ pos.x + 50, pos.y + 75 });
   ui::path_end(0xff0000ff, 1, false);
 
-  pos = vec2{ 10, 10 };
+  pos = float2{ 10, 10 };
   pos.y += 110;
   ui::path_arc_to({ pos.x + 50, pos.y + 50 }, 25, - std::numbers::pi * 0.5, std::numbers::pi);
   ui::path_end(0xff0000ff);
@@ -195,7 +195,7 @@ void test_path_draw() noexcept
   ui::path_arc_to({ pos.x + 50, pos.y + 50 }, 25, - std::numbers::pi * 0.5, std::numbers::pi);
   ui::path_end(0xff0000ff, 3, false);
 
-  pos = vec2{ 10, 10 };
+  pos = float2{ 10, 10 };
   pos.y += 110 * 2;
   ui::path_line_to(pos);
   ui::path_bezier_quad_to({ pos.x, pos.y + 100 }, { pos.x + 100, pos.y + 50 });
@@ -211,7 +211,7 @@ void test_path_draw() noexcept
   ui::path_bezier_quad_to({ pos.x, pos.y + 100 }, { pos.x + 100, pos.y + 50 });
   ui::path_end(0xff0000ff, 3, false);
 
-  pos = vec2{ 10, 10 };
+  pos = float2{ 10, 10 };
   pos.y += 110 * 3;
   ui::path_line_to(pos);
   ui::path_line_to({ pos.x + 100, pos.y });
@@ -236,7 +236,7 @@ void test_path_draw() noexcept
   ui::path_line_to({ pos.x, pos.y + 100 });
   ui::path_end(0xff0000ff, 3, false);
 
-  pos = vec2{ 10, 10 };
+  pos = float2{ 10, 10 };
   pos.y += 110 * 4;
   ui::path_line_to(pos);
   ui::path_bezier_cubic_to({ pos.x + 50, pos.y }, { pos.x + 100, pos.y + 100 }, { pos.x + 50, pos.y + 100 });
@@ -303,10 +303,10 @@ void test_discard(uint32_t fmt) noexcept
 void test_union() noexcept
 {
   ui::union_beg();
-  auto pos = vec2{ 10, 10 };
-  ui::triangle( pos, pos + vec2{ 30, 30 }, pos + vec2{ 0, 60 }, 0xff0000ff, 1);
+  auto pos = float2{ 10, 10 };
+  ui::triangle( pos, pos + float2{ 30, 30 }, pos + float2{ 0, 60 }, 0xff0000ff, 1);
   pos.x += 50;
-  ui::triangle( pos, pos + vec2{ -30, 30 }, pos + vec2{ 0, 60 }, 0xff0000ff, 1);
+  ui::triangle( pos, pos + float2{ -30, 30 }, pos + float2{ 0, 60 }, 0xff0000ff, 1);
   ui::union_end();
 }
 
@@ -358,7 +358,7 @@ int main()
           ui::fullscreen_window();
       }
       auto extent = ui::window_drawable_extent();
-      auto pos = vec2{ extent.x / 2 - 50, extent.y - 50 };
+      auto pos = float2{ extent.x / 2 - 50, extent.y - 50 };
       auto size = ui::window_drawable_extent();
       // ui::triangle({ size.x / 2, size.y * .1f }, size * .9f, { size.y * .1f, size.y * .9 }, 0x00ff0044, 10);
 
@@ -392,9 +392,9 @@ int main()
       if (ui::get_key(ui::Key::Q)) wnd2_is_closed = true;
 
       // playback button
-      auto p0 = vec2{ 5, 5 };
-      auto p1 = p0 + vec2{ 12.5 * 1.414, 12.5 };
-      auto p2 = p0 + vec2{ 0, 25 };
+      auto p0 = float2{ 5, 5 };
+      auto p1 = p0 + float2{ 12.5 * 1.414, 12.5 };
+      auto p2 = p0 + float2{ 0, 25 };
       if (playback_btn(p0, p1, p2, 0xffffffff, 0xdcdcdcff, 1))
         if (progress_tween.is_not_started()) progress_tween.start();
 
@@ -417,10 +417,10 @@ int main()
       }
 
       // progress bar
-      auto p = p1 + vec2{ 5, 0 };
+      auto p = p1 + float2{ 5, 0 };
       auto progress = progress_tween.get() * 100;
-      ui::rectangle(p, p + vec2{ 100,      3 }, 0x808080ff);
-      ui::rectangle(p, p + vec2{ progress, 3 }, 0x0000ffff);
+      ui::rectangle(p, p + float2{ 100,      3 }, 0x808080ff);
+      ui::rectangle(p, p + float2{ progress, 3 }, 0x0000ffff);
 
       // image
       if (loop_trigger)
@@ -442,7 +442,7 @@ int main()
       ui::circle(point_in_circle({ size.x - 30, size.y - 30}, 20, circle_lerplocator.get() * 360), 3, 0xffffffff);
       circle_lerplocator.update();
 
-      auto text_pos = p2 + vec2{ 0, 10 };
+      auto text_pos = p2 + float2{ 0, 10 };
       auto text_ext = ui::text("Hello, World!", text_pos, 32, 0xffff00ff);
       // ui::rectangle(text_pos, text_ext, 0x00ff00ff, 1);
 

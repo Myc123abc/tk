@@ -17,26 +17,6 @@ inline auto get_cursor_pos() noexcept
   return int2{ p.x, p.y };
 }
 
-inline auto point_in(int2 p, float2 left_top, float2 right_bottom) noexcept
-{
-  return p.x > left_top.x && p.x < right_bottom.x && p.y > left_top.y && p.y < right_bottom.y;
-}
-
-inline auto point_in(int2 p, RECT rect) noexcept
-{
-  return p.x > rect.left && p.x < rect.right && p.y > rect.top && p.y < rect.bottom;
-}
-
-inline auto point_in_with_bounding(int2 p, RECT rect) noexcept
-{
-  return p.x >= rect.left && p.x <= rect.right && p.y >= rect.top && p.y <= rect.bottom;
-}
-
-inline auto operator==(RECT lhs, RECT rhs) -> bool
-{
-  return EqualRect(&lhs, &rhs);
-}
-
 Singleton(WindowManager, g_wnd_mgr,
 public:
   void init() noexcept;
@@ -57,7 +37,7 @@ public:
   void init_blur_window(HWND handle, ui::Backdrop const& backdrop) noexcept;
   void update_blur_window(HWND handle, ui::Backdrop const& backdrop) noexcept;
   void remove_blur_window(HWND handle) noexcept;
-  void resize_blur_window(HWND handle, RECT rect) noexcept;
+  void resize_blur_window(HWND handle, Rect rect) noexcept;
 
   auto get_window_z_orders() const noexcept -> std::vector<HWND>;
   auto get_cursor_on_window() noexcept -> HWND;
@@ -84,7 +64,7 @@ private:
   std::unordered_set<HWND>         _using_mouse_pass_through_windows;
   UINT_PTR                         _timer_mouse_pass_through{};
   bool                             _update_monitors{};
-  std::unordered_map<HWND, RECT>   _window_change_size{};
+  std::unordered_map<HWND, Rect>   _window_change_size{};
   std::unordered_map<HWND, HWND>   _blur_windows;
   ResizeType                       _cursor_type{};
 )

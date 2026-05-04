@@ -1,8 +1,103 @@
+#pragma once
+
 #include "ui/ui.hpp"
 #include "util/rect.hpp"
 #include "image_manager.hpp"
 
 namespace tk::ui {
+
+enum class RenderCallType
+{
+  ui,
+  window_shadow,
+};
+
+struct RenderCall
+{
+  RenderCallType type;
+  Rect           scissor_rect;
+
+  union
+  {
+    struct
+    {
+      uint2                 window_extent{};
+      float                 shadow_thickness{};
+      float3                color{};
+      float                 radius{};
+      float                 softness{};
+      std::optional<float4> wireframe_color;
+    } window_shadow;
+  };
+};
+
+enum class DrawCmdType
+{
+  add_rect,
+  add_triangle,
+  add_circle,
+  add_line,
+  add_bezier_quad,
+  add_bezier_cubic,
+  add_image,
+};
+
+struct DrawCmd
+{
+  DrawCmdType type;
+  Color       color;
+  float       thickness{};
+
+  union
+  {
+    struct
+    {
+      float2 left_top;
+      float2 right_bottom;
+    } rect;
+
+    struct
+    {
+      float2 p0;
+      float2 p1;
+      float2 p2;
+    } triangle;
+
+    struct
+    {
+      float2 center;
+      float radius;
+    } circle;
+
+    struct
+    {
+      float2 p0;
+      float2 p1;
+    } line;
+
+    struct
+    {
+      float2 p0;
+      float2 p1;
+      float2 p2;
+    } bezier_quad;
+
+    struct
+    {
+      float2 p0;
+      float2 p1;
+      float2 p2;
+      float2 p3;
+    } bezier_cubic;
+
+    struct
+    {
+      float2 left_top;
+      float2 right_bottom;
+      uint   idx;
+    } image;
+  };
+};
 
 class FrameData
 {
@@ -15,82 +110,7 @@ public:
   FrameData& operator=(FrameData&&)      = delete;
 
   void init(uint width, uint height, uint2 tile_size = { 128, 128 }) noexcept;
-  
-private:
-  struct Command
-  {
-    enum class Type
-    {
-      add_rect,
-      add_triangle,
-      add_circle,
-      add_line,
-      add_bezier_quad,
-      add_bezier_cubic,
-      add_image,
-    };
-
-    Type  type;
-    Color color;
-    float thickness{};
-
-    union
-    {
-      struct
-      {
-        float2 left_top;
-        float2 right_bottom;
-      } rect;
-
-      struct
-      {
-        float2 p0;
-        float2 p1;
-        float2 p2;
-      } triangle;
-
-      struct
-      {
-        float2 center;
-        float radius;
-      } circle;
-
-      struct
-      {
-        float2 p0;
-        float2 p1;
-      } line;
-
-      struct
-      {
-        float2 p0;
-        float2 p1;
-        float2 p2;
-      } bezier_quad;
-
-      struct
-      {
-        float2 p0;
-        float2 p1;
-        float2 p2;
-        float2 p3;
-      } bezier_cubic;
-
-      struct
-      {
-        ImageHandle handle;
-        float2      left_top;
-        float2      right_bottom;
-      } image;
-    };
-  };
-
-  struct Tile
-  {
-    std::vector<uint> cmd_idxs;
-  };
-
-public:
+  void clear() noexcept;
 
   //
   // Commands
@@ -103,18 +123,44 @@ public:
   void add_bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept;
   void add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept;
 
+  void build_ui_render_call(Rect rect) noexcept;
+  void build_window_shadow_render_call(Rect scissor_rect, uint2 window_extent, float shadow_thickness, Color color, float radius, float softness, std::optional<float4> wireframe_color) noexcept;
+
+  void set_window_pos(float2 pos) noexcept { _window_pos = pos; }
+  auto window_pos() const noexcept { return _window_pos; }
+
+  auto& render_calls() const noexcept { return _calls; }
+  auto& cmds() const noexcept { return _cmds; }
+  auto& cmd_idxs() const noexcept { return _cmd_idxs; }
+  auto& gpu_tiles() const noexcept { return _gpu_tiles; }
+
 private:
-  void clear() noexcept;
-  
   void add_command(uint cmd_idx, Rect rect) noexcept;
   void add_command(uint cmd_idx, float2 p0, float2 p1, float thickness) noexcept;
   void add_command(uint cmd_idx, float2 center, float radius, float start_angle, float end_angle, bool ccw, float thickness) noexcept;
 
 private:
-  uint2             _tile_size;
-  uint2             _tile_count;
-  std::vector<Tile>    _tiles;
-  std::vector<Command> _cmds;
+  struct Tile
+  {
+    std::vector<uint> cmd_idxs;
+  };
+
+  uint2                   _tile_size;
+  uint2                   _tile_count;
+  std::vector<Tile>       _tiles;
+  std::vector<DrawCmd>    _cmds;
+  std::vector<uint>       _cmd_idxs;
+
+  struct GPUTile
+  {
+    uint beg;
+    uint count;
+  };
+  std::vector<GPUTile>    _gpu_tiles;
+
+  float2                  _window_pos;
+
+  std::vector<RenderCall> _calls;
 };
 
 }

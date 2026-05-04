@@ -91,7 +91,7 @@ private:
 
   void add_title_bar() noexcept;
   void fullscreen_process() noexcept;
-  void window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer::Window const& wnd, RECT scissor_rect) noexcept;
+  void window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer::Window const& wnd, Rect scissor_rect) noexcept;
 
 private:
   std::unordered_map<std::string, WindowContext> _wnd_ctxs;
@@ -119,13 +119,13 @@ public:
   // mouse state
   //
 public:
-  HWND                 cursor_on_window{};
-  HWND                 mouse_down_window{};
-  HWND                 mouse_up_window{};
-  std::optional<int2>   mouse_down_pos;
-  std::optional<int2>   mouse_up_pos;
-  bool                 is_move_from_maximize{};
-  bool                 draw_title_bar{};
+  HWND                cursor_on_window{};
+  HWND                mouse_down_window{};
+  HWND                mouse_up_window{};
+  std::optional<int2> mouse_down_pos;
+  std::optional<int2> mouse_up_pos;
+  bool                is_move_from_maximize{};
+  bool                draw_title_bar{};
 
   //
   // button state

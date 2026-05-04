@@ -1,5 +1,7 @@
 #pragma once
 
+#include "util/rect.hpp"
+
 #include <Windows.h>
 #include <ShellScalingApi.h>
 
@@ -16,9 +18,9 @@ public:
     set_info(MonitorFromWindow(handle, MONITOR_DEFAULTTOPRIMARY));
   }
 
-  Monitor(RECT rect) noexcept
+  Monitor(Rect rect) noexcept
   {
-    set_info(MonitorFromRect(&rect, MONITOR_DEFAULTTOPRIMARY));
+    set_info(MonitorFromRect(rect.RECT_ptr(), MONITOR_DEFAULTTOPRIMARY));
   }
 
   Monitor(POINT point) noexcept
@@ -48,14 +50,14 @@ private:
 
 private:
   std::string _name;
-  RECT        _rect{};
-  RECT        _work_rect{}; // rect exclude taskbar
+  Rect        _rect{};
+  Rect        _work_rect{}; // rect exclude taskbar
   float       _scale{};
 };
 
 inline auto get_virtual_screen_rect() noexcept
 {
-  auto rect = RECT{};
+  auto rect = Rect{};
   rect.left   = GetSystemMetrics(SM_XVIRTUALSCREEN);
   rect.top    = GetSystemMetrics(SM_YVIRTUALSCREEN);
   rect.right  = rect.left + GetSystemMetrics(SM_CXVIRTUALSCREEN);

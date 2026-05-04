@@ -156,22 +156,22 @@ void restore_fullscreen_window() noexcept
 
 void discard_beg(std::function<void()> func) noexcept
 {
-  g_ui_ctx.frame_data()->discard_beg(func);
+  // g_ui_ctx.frame_data()->discard_beg(func);
 }
 
 void discard_end() noexcept
 {
-  g_ui_ctx.frame_data()->discard_end();
+  // g_ui_ctx.frame_data()->discard_end();
 }
 
 void union_beg() noexcept
 {
-  g_ui_ctx.frame_data()->union_beg();
+  // g_ui_ctx.frame_data()->union_beg();
 }
 
 void union_end() noexcept
 {
-  g_ui_ctx.frame_data()->union_end();
+  // g_ui_ctx.frame_data()->union_end();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -303,7 +303,7 @@ void path_line_to(float2 p) noexcept
   auto scale = g_ui_ctx.window()->scale();
   p *= scale;
 
-  g_ui_ctx.frame_data()->path_line_to(p);
+  // g_ui_ctx.frame_data()->path_line_to(p);
 }
 
 void path_arc_to(float2 center, float radius, float min, float max) noexcept
@@ -317,7 +317,7 @@ void path_arc_to(float2 center, float radius, float min, float max) noexcept
   center *= scale;
   radius *= scale;
 
-  g_ui_ctx.frame_data()->path_arc_to(center, radius, min, max);
+  // g_ui_ctx.frame_data()->path_arc_to(center, radius, min, max);
 }
 
 void path_bezier_quad_to(float2 p1, float2 p2) noexcept
@@ -332,7 +332,7 @@ void path_bezier_quad_to(float2 p1, float2 p2) noexcept
   p1 *= scale;
   p2 *= scale;
 
-  g_ui_ctx.frame_data()->path_bezier_quad_to(p1, p2);
+  // g_ui_ctx.frame_data()->path_bezier_quad_to(p1, p2);
 }
 
 void path_bezier_cubic_to(float2 p1, float2 p2, float2 p3) noexcept
@@ -349,7 +349,7 @@ void path_bezier_cubic_to(float2 p1, float2 p2, float2 p3) noexcept
   p2 *= scale;
   p3 *= scale;
 
-  g_ui_ctx.frame_data()->path_bezier_cubic_to(p1, p2, p3);
+  // g_ui_ctx.frame_data()->path_bezier_cubic_to(p1, p2, p3);
 }
 
 void path_end(Color color, float thickness, bool is_closed) noexcept
@@ -357,7 +357,7 @@ void path_end(Color color, float thickness, bool is_closed) noexcept
 	g_ui_ctx.check_draw();
   auto scale = g_ui_ctx.window()->scale();
   thickness *= scale;
-  g_ui_ctx.frame_data()->path_end(color, thickness, is_closed);
+  // g_ui_ctx.frame_data()->path_end(color, thickness, is_closed);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -370,7 +370,7 @@ auto is_hover_on(float2 left_top, float2 right_bottom) noexcept -> bool
   auto p = g_ui_ctx.window()->cursor_pos();
   return g_ui_ctx.cursor_on_window == g_ui_ctx.window()->handle() &&
          !g_ui_ctx.window()->is_move_from_maximize()              &&
-         point_in(p, left_top, right_bottom);
+         Rect{ left_top, right_bottom }.contains(p);
 }
 
 auto is_click_on(float2 left_top, float2 right_bottom) noexcept -> bool
@@ -382,9 +382,10 @@ auto is_click_on(float2 left_top, float2 right_bottom) noexcept -> bool
       !g_ui_ctx.mouse_down_pos         ||
       !g_ui_ctx.mouse_up_pos           ||
        g_ui_ctx.mouse_down_window != g_ui_ctx.mouse_up_window) return false;
-  return !g_ui_ctx.is_move_from_maximize                                   &&
-         point_in(g_ui_ctx.mouse_down_pos.value(), left_top, right_bottom) &&
-         point_in(g_ui_ctx.mouse_up_pos.value(),   left_top, right_bottom);
+  auto rc = Rect{ left_top, right_bottom };
+  return !g_ui_ctx.is_move_from_maximize               &&
+          rc.contains(g_ui_ctx.mouse_down_pos.value()) &&
+          rc.contains(g_ui_ctx.mouse_up_pos.value());
 }
 
 auto ping_pong(std::string_view name, bool b, double duration, Tween::Ease ease) noexcept -> double
@@ -421,9 +422,9 @@ auto button(size_t id, int x, int y, uint32_t width, uint32_t height) noexcept->
   if (is_hovered && g_ui_ctx.mouse_down_pos)
   {
     g_ui_ctx.add_mouse_left_button_state(id, left_top, right_bottom);
-    is_hovered = !is_move_out                                                      &&
-                 point_in(g_ui_ctx.mouse_down_pos.value(), left_top, right_bottom) &&
-                 g_ui_ctx.mouse_down_window == g_ui_ctx.window()->handle();
+    is_hovered = !is_move_out                                                              &&
+                  Rect{ left_top, right_bottom }.contains(g_ui_ctx.mouse_down_pos.value()) &&
+                  g_ui_ctx.mouse_down_window == g_ui_ctx.window()->handle();
   }
 
   return { is_hovered && ui::is_click_on(left_top, right_bottom), is_hovered, is_move_out };

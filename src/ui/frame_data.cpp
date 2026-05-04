@@ -1,4 +1,5 @@
 #include "frame_data.hpp"
+#include "../renderer/renderer/renderer.hpp"
 
 using namespace tk;
 
@@ -107,18 +108,17 @@ namespace tk::ui {
 
 void FrameData::clear() noexcept
 {
-  _tile_size  = {};
-  _tile_count = {};
-  _tiles.clear();
+  _cmds.clear();
+  _window_pos = {};
 }
 
 void FrameData::init(uint width, uint height, uint2 tile_size) noexcept
 {
-  clear();
-
   _tile_size  = tile_size;
   _tile_count = (float2{ width, height } + tile_size - 1) / tile_size;
+  _tiles.clear();
   _tiles.resize(_tile_count.x + _tile_count.y);
+  _gpu_tiles.resize(_tiles.size());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -283,8 +283,8 @@ void FrameData::add_rect(float2 left_top, float2 right_bottom, Color color, floa
 
   auto cmd_idx = _cmds.size();
 
-  auto& cmd = _cmds.emplace_back(Command{});
-  cmd.type      = Command::Type::add_rect;
+  auto& cmd = _cmds.emplace_back(DrawCmd{});
+  cmd.type      = DrawCmdType::add_rect;
   cmd.color     = color;
   cmd.thickness = thickness;
   cmd.rect      = { left_top, right_bottom };
@@ -309,8 +309,8 @@ void FrameData::add_triangle(float2 p0, float2 p1, float2 p2, Color color, float
 
   auto cmd_idx = _cmds.size();
 
-  auto& cmd = _cmds.emplace_back(Command{});
-  cmd.type      = Command::Type::add_triangle;
+  auto& cmd = _cmds.emplace_back(DrawCmd{});
+  cmd.type      = DrawCmdType::add_triangle;
   cmd.color     = color;
   cmd.thickness = thickness;
   cmd.triangle  = { p0, p1, p2 };
@@ -340,8 +340,8 @@ void FrameData::add_circle(float2 center, float radius, Color color, float thick
 
   auto cmd_idx = _cmds.size();
 
-  auto& cmd = _cmds.emplace_back(Command{});
-  cmd.type      = Command::Type::add_circle;
+  auto& cmd = _cmds.emplace_back(DrawCmd{});
+  cmd.type      = DrawCmdType::add_circle;
   cmd.color     = color;
   cmd.thickness = thickness;
   cmd.circle    = { center, radius };
@@ -367,8 +367,8 @@ void FrameData::add_line(float2 p0, float2 p1, Color color, float thickness) noe
 {
   auto cmd_idx = _cmds.size();
 
-  auto& cmd = _cmds.emplace_back(Command{});
-  cmd.type      = Command::Type::add_line;
+  auto& cmd = _cmds.emplace_back(DrawCmd{});
+  cmd.type      = DrawCmdType::add_line;
   cmd.color     = color;
   cmd.thickness = thickness;
   cmd.line      = { p0, p1 };
@@ -382,8 +382,8 @@ void FrameData::add_bezier_quad(float2 p0, float2 p1, float2 p2, Color color, fl
 
   auto cmd_idx = _cmds.size();
 
-  auto& cmd = _cmds.emplace_back(Command{});
-  cmd.type        = Command::Type::add_bezier_quad;
+  auto& cmd = _cmds.emplace_back(DrawCmd{});
+  cmd.type        = DrawCmdType::add_bezier_quad;
   cmd.color       = color;
   cmd.thickness   = thickness;
   cmd.bezier_quad = { p0, p1, p2 };
@@ -426,8 +426,8 @@ void FrameData::add_bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3, Col
 
   auto cmd_idx = _cmds.size();
 
-  auto& cmd = _cmds.emplace_back(Command{});
-  cmd.type         = Command::Type::add_bezier_cubic;
+  auto& cmd = _cmds.emplace_back(DrawCmd{});
+  cmd.type         = DrawCmdType::add_bezier_cubic;
   cmd.color        = color;
   cmd.thickness    = thickness;
   cmd.bezier_cubic = { p0, p1, p2, p3 };
@@ -469,12 +469,42 @@ void FrameData::add_image(ImageHandle handle, float2 left_top, float2 right_bott
 
   auto cmd_idx = _cmds.size();
 
-  auto& cmd = _cmds.emplace_back(Command{});
-  cmd.type  = Command::Type::add_rect;
+  auto& cmd = _cmds.emplace_back(DrawCmd{});
+  cmd.type  = DrawCmdType::add_rect;
   cmd.color = { 1, 1, 1, static_cast<float>(alpha) / 255};
-  cmd.image = { handle, left_top, right_bottom };
+  cmd.image = { left_top, right_bottom, renderer::g_renderer.descriptor_idx(handle) };
 
   add_command(cmd_idx, { left_top, right_bottom });
+}
+
+void FrameData::build_ui_render_call(Rect rect) noexcept
+{
+  auto& call = _calls.emplace_back(RenderCall{});
+  call.type         = RenderCallType::ui;
+  call.scissor_rect = rect;
+
+  // copy cmd_idxs
+  auto size = uint{};
+  for (auto const& tile : _tiles) size += tile.cmd_idxs.size();
+  _cmd_idxs.resize(size);
+  auto beg = 0;
+  for (auto const& tile : _tiles)
+  {
+    auto cnt = tile.cmd_idxs.size();
+    memcpy(_cmd_idxs.data() + beg, tile.cmd_idxs.data(), sizeof(uint) * cnt);
+
+    // build gpu tiles
+    _gpu_tiles.emplace_back(beg, cnt);
+    beg += cnt;
+  }
+}
+
+void FrameData::build_window_shadow_render_call(Rect scissor_rect, uint2 window_extent, float shadow_thickness, Color color, float radius, float softness, std::optional<float4> wireframe_color) noexcept
+{
+  auto& call = _calls.emplace_back(RenderCall{});
+  call.type = RenderCallType::window_shadow;
+  call.scissor_rect = scissor_rect;
+  call.window_shadow = { window_extent, shadow_thickness, { color.r, color.g, color.b }, radius, softness, wireframe_color };
 }
 
 }

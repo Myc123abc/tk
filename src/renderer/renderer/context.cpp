@@ -58,12 +58,12 @@ void Context::set_primitive_topology(D3D_PRIMITIVE_TOPOLOGY primitive_topology) 
   }
 }
 
-void Context::set_scissor_rect(RECT rect) noexcept
+void Context::set_scissor_rect(Rect rect) noexcept
 {
-  if (!EqualRect(&rect, &_scissor_rect))
+  if (rect != _scissor_rect)
   {
     _scissor_rect = rect;
-    _cmd->RSSetScissorRects(1, &_scissor_rect);
+    _cmd->RSSetScissorRects(1, _scissor_rect.RECT_ptr());
   }
 }
 

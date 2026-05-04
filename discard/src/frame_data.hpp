@@ -1,4 +1,5 @@
 #pragma once
+#if 0
 
 #include "ui/ui.hpp"
 #include "../renderer/resource/shader_type.hpp"
@@ -190,3 +191,4 @@ private:
 };
 
 }
+#endif

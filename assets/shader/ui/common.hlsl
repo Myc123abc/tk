@@ -29,53 +29,16 @@ enum : uint
   add_image,
 };
 
-struct Command
+struct DrawCmd
 {
   uint   type;
   float4 color;
   float  thickness;
-
-  union
-  {
-    struct
-    {
-      float2 left_top;
-      float2 right_bottom;
-    } rect;
-
-    struct
-    {
-      float2 p0;
-      float2 p1;
-      float2 p2;
-    } triangle;
-
-    struct
-    {
-      float2 center;
-      float  radius;
-    } circle;
-
-    struct
-    {
-      float2 p0;
-      float2 p1;
-    } line;
-
-    struct
-    {
-      float2 p0;
-      float2 p1;
-      float2 p2;
-    } bezier_quad;
-
-    struct
-    {
-      float2 left_top;
-      float2 right_bottom;
-      uint   idx;
-    } image;
-  };
+  float2 p0;
+  float2 p1;
+  float2 p2;
+  float2 p3;
+  uint   idx;
 };
 
 struct Tile
@@ -86,7 +49,7 @@ struct Tile
 
 ConstantBuffer<Constants> constants : register(b0);
 SamplerState              g_sampler : register(s0);
-StructuredBuffer<Command> cmds      : register(t0);
+StructuredBuffer<DrawCmd> cmds      : register(t0);
 StructuredBuffer<uint>    cmd_idxs  : register(t0, space1);
 StructuredBuffer<Tile>    tiles     : register(t0, space2);
-Texture2                  images[]  : register(t1);
+Texture2D                 images[]  : register(t1);

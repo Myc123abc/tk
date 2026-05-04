@@ -2,6 +2,7 @@
 
 #include "../../../util/hash.hpp"
 #include "../../../util/singleton.hpp"
+#include "util/base.hpp"
 
 #include <directx/d3dx12.h>
 #include <dxcapi.h>
@@ -30,16 +31,16 @@ struct DescriptorInfo
 
   Type        type{};
   std::string name;
-  uint32_t    bind_point{};
-  uint32_t    space{};
+  uint        bind_point{};
+  uint        space{};
   bool        is_volatile{};
-  uint32_t    constants_size{};
+  uint        constants_size{};
 };
 
 struct RootSignatureResult
 {
   Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature;
-  std::unordered_map<std::string, uint32_t>   root_param_indices;
+  std::unordered_map<std::string, uint>       root_param_indices;
   std::vector<CD3DX12_ROOT_PARAMETER1>        root_params;
 };
 
@@ -55,7 +56,7 @@ public:
     D3D12_SHADER_BYTECODE                       ps;
     D3D12_SHADER_BYTECODE                       cs;
     D3D12_INPUT_LAYOUT_DESC                     input_layout_desc;
-    std::unordered_map<std::string, uint32_t>   root_param_indices;
+    std::unordered_map<std::string, uint>       root_param_indices;
     Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature;
     std::vector<CD3DX12_ROOT_PARAMETER1>        root_params;
 
@@ -80,8 +81,8 @@ public:
     struct ResourceKey
     {
       D3D_SHADER_INPUT_TYPE type;
-      uint32_t              bind_point{};
-      uint32_t              space{};
+      uint                  bind_point{};
+      uint                  space{};
 
       bool operator==(ResourceKey const& x) const noexcept
       {

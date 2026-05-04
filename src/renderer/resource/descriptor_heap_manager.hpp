@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../util/singleton.hpp"
+#include "util/base.hpp"
 
 #include <d3d12.h>
 #include <wrl/client.h>
@@ -31,14 +32,15 @@ public:
 
   void release() noexcept;
 
-  auto is_valid() const noexcept { return _index >= 0; }
+  auto is_valid() const noexcept { return _valid; }
 
   auto index() const noexcept { return _index; }
 
   void set(std::function<void()> func) noexcept { _recreate_descriptor_func = func; }
 
 private:
-  int                   _index{ -1 };
+  bool                  _valid{};
+  uint                  _index{};
   DescriptorHeapType    _type{};
   std::function<void()> _recreate_descriptor_func;
 };

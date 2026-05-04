@@ -20,8 +20,6 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
   
   // create depth test image
   _dsv_image.init(width, height, ImageFormat::d24_s8, ImageType::dsv);
-  _mask_image.init(width, height, ImageFormat::r8_unorm, ImageType::rtv | ImageType::srv);
-  _tmp_image.init(width, height, Render_Target_Format, ImageType::rtv | ImageType::srv);
 
   // create swapchain
   ComPtr<IDXGISwapChain1> swapchain;
@@ -74,8 +72,6 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
 void RenderResource::destroy() noexcept
 {
   CloseHandle(_swapchain_waitable_obj);
-  _tmp_image.destroy();
-  _mask_image.destroy();
   _dsv_image.destroy();
   for (auto& frame : _frames)
   {
@@ -117,8 +113,6 @@ void RenderResource::resize(uint32_t width, uint32_t height) noexcept
     frame.image.resize(width, height);
   }
   _dsv_image.resize(width, height);
-  _mask_image.resize(width, height);
-  _tmp_image.resize(width, height);
 }
 
 void RenderResource::wait_frame_complete() noexcept
@@ -205,11 +199,17 @@ void RenderResource::clear_depth_stencil() noexcept
 
 void FrameBuffer::init() noexcept
 {
-  _vertices_indices_buffer.init(Vertices_Indices_Buffer_Size, false);
+  _cmds.init(Buffer_Init_Size, true);
+  _cmd_idxs.init(Buffer_Init_Size, true);
+  _tiles.init(Buffer_Init_Size, true);
 }
 
 void FrameBuffer::upload(ID3D12GraphicsCommandList1* cmd, ui::FrameData const* data) noexcept
 {
+  _cmds.append_range(data->cmds());
+  _cmd_idxs.append_range(data->cmd_idxs());
+  _tiles.append_range(data->gpu_tiles());
+#if 0
   auto vertices_offset = _vertices_indices_buffer.append_range(data->vertices());
   auto indices_offset  = _vertices_indices_buffer.append_range(data->indices());
 
@@ -232,6 +232,7 @@ void FrameBuffer::upload(ID3D12GraphicsCommandList1* cmd, ui::FrameData const* d
   index_buffer_view.SizeInBytes    = indices_offset;
   index_buffer_view.Format         = DXGI_FORMAT_R16_UINT;
   cmd->IASetIndexBuffer(&index_buffer_view);
+#endif
 }
 
 }

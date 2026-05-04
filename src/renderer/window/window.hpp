@@ -5,6 +5,7 @@
 #include "ui/ui.hpp"
 
 #include "util/base.hpp"
+#include "util/rect.hpp"
 
 #include <windows.h>
 
@@ -47,22 +48,21 @@ public:
   auto real_y()      const noexcept -> int      { return _y      - shadow_thickness();     }
   auto real_width()  const noexcept -> uint32_t { return _width  + shadow_thickness() * 2; }
   auto real_height() const noexcept -> uint32_t { return _height + shadow_thickness() * 2; }
-  auto real_rect()   const noexcept { return RECT{ _rect.left   - shadow_thickness(),
+  auto real_rect()   const noexcept { return Rect{ _rect.left   - shadow_thickness(),
                                                    _rect.top    - shadow_thickness(),
                                                    _rect.right  + shadow_thickness(),
                                                    _rect.bottom + shadow_thickness() }; }
   auto rect() const noexcept { return _rect; }
-  auto resize_rect()   const noexcept { return RECT{ _rect.left   - resize_thickness(),
+  auto resize_rect()   const noexcept { return Rect{ _rect.left   - resize_thickness(),
                                                      _rect.top    - resize_thickness(),
                                                      _rect.right  + resize_thickness(),
                                                      _rect.bottom + resize_thickness() }; }
   
-  auto content_rect() const noexcept { return RECT{ shadow_thickness(),
+  auto content_rect() const noexcept { return Rect{ shadow_thickness(),
                                                     shadow_thickness(),
-                                                    static_cast<LONG>(_width  + shadow_thickness()),
-                                                    static_cast<LONG>(_height + shadow_thickness()) }; }
-  auto shadow_rect() const noexcept { return RECT{ 0, 0,
-    static_cast<LONG>(_width + shadow_thickness() * 2), static_cast<LONG>(_height + shadow_thickness()) * 2 }; }
+                                                    _width  + shadow_thickness(),
+                                                    _height + shadow_thickness() }; }
+  auto shadow_rect() const noexcept { return Rect{ 0, 0, _width + shadow_thickness() * 2, _height + shadow_thickness() * 2 }; }
 
   auto contains_point(int2 p) const noexcept -> bool;
 
@@ -97,24 +97,24 @@ public:
   void resize_end() noexcept;
   void resize_by_scale(float scale, float ratio, float2 cursor_pos, float2 left_button_down_window_cusor_pos) noexcept;
   void reset_pos_size() noexcept;
-  void update_by_real_rect(RECT rect, float scale) noexcept;
-  void update_by_rect(RECT rect, float scale) noexcept;
+  void update_by_real_rect(Rect rect, float scale) noexcept;
+  void update_by_rect(Rect rect, float scale) noexcept;
 
   void maximize() noexcept;
   void minimize() noexcept;
-  void cancel_maximize(RECT rect, float scale) noexcept;
+  void cancel_maximize(Rect rect, float scale) noexcept;
   void restore() noexcept;
   void fullscreen() noexcept;
   void restore_fullscreen() noexcept;
-  void cancel_fullscreen(RECT rect, float scale) noexcept;
-  void cancel_fullscreen_maximize(RECT rect, float scale) noexcept;
+  void cancel_fullscreen(Rect rect, float scale) noexcept;
+  void cancel_fullscreen_maximize(Rect rect, float scale) noexcept;
 
   auto get_resize_type(int2 p) const noexcept -> ResizeType;
 
   auto monitor() const noexcept { return _monitor; }
   auto set_monitor(std::string monitor) noexcept { _monitor = monitor; }
 
-  void add_move_invalid_area(RECT rect) noexcept { _move_invalid_areas.emplace_back(rect); }
+  void add_move_invalid_area(Rect rect) noexcept { _move_invalid_areas.emplace_back(rect); }
   void clear_move_invalid_areas() noexcept { _move_invalid_areas.clear(); }
 
   auto& cfg() noexcept { return _cfg; }
@@ -123,7 +123,7 @@ public:
 private:
   void update_by_rect() noexcept;
   void update_rect() noexcept;
-  auto cursor_valid_area()  const noexcept -> RECT;
+  auto cursor_valid_area()  const noexcept -> Rect;
 
   void left_offset(int dx)   noexcept;
   void top_offset(int dy)    noexcept;
@@ -138,7 +138,7 @@ private:
   void keep_blur_window_behind() const noexcept;
   void keep_blur_window_behind_move() const noexcept;
   void keep_blur_window_behind_resize() const noexcept;
-  void resize_blur_window(RECT rect) const noexcept;
+  void resize_blur_window(Rect rect) const noexcept;
   void remove_blur_window() noexcept;
   void resize_window() const noexcept;
   void move_window() const noexcept;
@@ -157,10 +157,10 @@ private:
   bool                 _moving{};
   bool                 _move_from_maximize{};
   bool                 _resizing{};
-  RECT                 _rect{};
-  RECT                 _backup_rect{};
+  Rect                 _rect{};
+  Rect                 _backup_rect{};
   std::string          _monitor{};
-  std::vector<RECT>    _move_invalid_areas;
+  std::vector<Rect>    _move_invalid_areas;
   HWND                 _blur_window{};
   Compositor::Resource _blur_res{};
   ui::WindowConfig     _cfg{};

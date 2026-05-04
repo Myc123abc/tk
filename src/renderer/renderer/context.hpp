@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../../util/singleton.hpp"
-#include "../../ui/frame_data.hpp"
 #include "pipeline/pipeline_system.hpp"
 
 #include <d3d12.h>
@@ -19,7 +18,7 @@ public:
   void set_graphics_descriptor(uint32_t root_param_idx, D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept;
   void set_compute_descriptor(uint32_t root_param_idx, D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept;
   void set_primitive_topology(D3D_PRIMITIVE_TOPOLOGY primitive_topology) noexcept;
-  void set_scissor_rect(RECT rect) noexcept;
+  void set_scissor_rect(Rect rect) noexcept;
   void set_stencil_value(uint32_t value) noexcept;
   void set_render_target(Image* render_tareget_image, Image* depth_stencil_image) noexcept;
   void draw(uint32_t count) const noexcept;
@@ -36,18 +35,13 @@ public:
 
   struct DescriptorInfo
   {
-    std::string_view        name;
-    DescriptorHandle const& handle;
+    std::string_view            name;
+    D3D12_GPU_DESCRIPTOR_HANDLE handle;
   };
 
   template <typename T>
   requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
-  void graphics_pipe_set(PipelineType type, RECT scissor_rect, std::string_view constants_name, T const& constants, std::initializer_list<DescriptorInfo> descs = {}) noexcept;
-
-  template <typename T>
-  requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
-  void graphics_draw(PipelineType type, Image* render_target, Image* depth_stencil, ui::DrawCmd const& cmd,
-    std::string_view constants_name, T const& constants, std::initializer_list<DescriptorInfo> descs = {}) noexcept;
+  void graphics_pipe_set(PipelineType type, Rect scissor_rect, std::string_view constants_name, T const& constants, std::initializer_list<DescriptorInfo> descs = {}) noexcept;
 
 private:
   using DescMapType = std::unordered_map<uint32_t, D3D12_GPU_DESCRIPTOR_HANDLE>;
@@ -63,7 +57,7 @@ private:
   uint32_t                    _compute_constants_root_param_idx{};
   std::vector<uint8_t>        _compute_constants;
   D3D_PRIMITIVE_TOPOLOGY      _primitive_topology{};
-  RECT                        _scissor_rect{};
+  Rect                        _scissor_rect{};
   std::optional<uint32_t>     _stencil_value{};
   D3D12_CPU_DESCRIPTOR_HANDLE _render_target{};
   D3D12_CPU_DESCRIPTOR_HANDLE _depth_stencil{};
@@ -103,7 +97,7 @@ void Context::set_compute_constants(uint32_t root_param_idx, T const& constants)
 
 template <typename T>
 requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
-void Context::graphics_pipe_set(PipelineType type, RECT scissor_rect, std::string_view constants_name, T const& constants, std::initializer_list<DescriptorInfo> descs) noexcept
+void Context::graphics_pipe_set(PipelineType type, Rect scissor_rect, std::string_view constants_name, T const& constants, std::initializer_list<DescriptorInfo> descs) noexcept
 {
   auto pipe = g_pipe_sys.pipe(type);
   set_pipe(pipe->pipe_state.Get());
@@ -111,18 +105,8 @@ void Context::graphics_pipe_set(PipelineType type, RECT scissor_rect, std::strin
   set_primitive_topology(pipe->primive_topology);
   set_graphics_constants(pipe->root_param_idx(constants_name), constants);
   for (auto const& [name, handle] : descs)
-    set_graphics_descriptor(pipe->root_param_idx(name), handle.gpu_handle());
+    set_graphics_descriptor(pipe->root_param_idx(name), handle);
   set_scissor_rect(scissor_rect);
-}
-
-template <typename T>
-requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
-void Context::graphics_draw(PipelineType type, Image* render_targe, Image* depth_stencil, ui::DrawCmd const& cmd,
-  std::string_view constants_name, T const& constants, std::initializer_list<DescriptorInfo> descs) noexcept
-{
-  set_render_target(render_targe, depth_stencil);
-  graphics_pipe_set(type, cmd.ui.scissor_rect, constants_name, constants, descs);
-  draw(cmd.ui.idx_beg, cmd.ui.idx_size);
 }
 
 }

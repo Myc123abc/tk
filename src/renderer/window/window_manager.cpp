@@ -206,7 +206,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
 
     // only moving in cursor valid areas
     if (!window._move_from_maximize &&
-      std::ranges::any_of(window._move_invalid_areas, [](auto rect) { return point_in_with_bounding(left_button_down_window_cursor_pos, rect); }))
+      std::ranges::any_of(window._move_invalid_areas, [](auto rect) { return rect.contains_bounding(left_button_down_window_cursor_pos); }))
       break;
 
     left_button_down_resize_type = window.get_resize_type(left_button_down_window_cursor_pos);
@@ -237,7 +237,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     {
       // limit cursor move area
       auto rect = get_virtual_workarea_rect();
-      ClipCursor(&rect);
+      ClipCursor(rect.RECT_ptr());
 
       // moving
       if (left_button_down_resize_type == ResizeType::none)
@@ -309,7 +309,7 @@ void WindowManager::update_cursor() noexcept
   }
 }
 
-void WindowManager::resize_blur_window(HWND handle, RECT rect) noexcept
+void WindowManager::resize_blur_window(HWND handle, Rect rect) noexcept
 {
   if (_windows.contains(handle))
     _windows[handle].resize_blur_window(rect);

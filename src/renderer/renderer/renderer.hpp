@@ -25,7 +25,7 @@ public:
     HWND           handle{};
     ui::FrameData* frame_data{};
     HWND           blur_host_window{};
-    RECT           blur_window_rect{};
+    Rect           blur_window_rect{};
   };
   void submit(RenderInfo const& info) noexcept { _render_infos.emplace_back(info); }
 
@@ -39,6 +39,8 @@ public:
   void upload_image(ui::ImageHandle handle, uint32_t width, uint32_t height, Bitmap const& bitmap, bool use_mipmap = false) noexcept;
 
   void clear_blur_resize_data() noexcept { _blur_host_window = {}; _blur_window_rect = {}; }
+
+  auto descriptor_idx(ui::ImageHandle handle) noexcept { return _images[handle].srv().index(); }
 
 private:
   void preprocess_render()  noexcept;
@@ -60,13 +62,12 @@ private:
 
   std::unordered_map<HWND, HWND> _show_blur_wnds;
   HWND                           _blur_host_window{};
-  RECT                           _blur_window_rect{};
+  Rect                           _blur_window_rect{};
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                           Image
 ////////////////////////////////////////////////////////////////////////////////
 
-private:
   std::unordered_map<ui::ImageHandle, Image>  _images;
   std::unordered_map<ui::ImageHandle, Bitmap> _bitmaps;
   std::unordered_map<ui::ImageHandle, Image>  _upload_images;

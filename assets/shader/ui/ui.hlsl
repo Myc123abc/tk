@@ -51,7 +51,7 @@ float4 get_color(float4 color, float w, float d, float t)
 
 float4 ps(float4 pos4 : SV_POSITION) : SV_TARGET
 {
-  float2 pos = pos.xy;
+  float2 pos = pos4.xy;
 
   uint2 tile_idxs = (pos - constants.window_pos) / constants.tile_size;
   uint  tile_idx  = tile_idxs.y * constants.tile_count.x + tile_idxs.x;
@@ -63,13 +63,13 @@ float4 ps(float4 pos4 : SV_POSITION) : SV_TARGET
 
   for (uint i = 0; i < tile.count; ++i)
   {
-    Command cmd = cmds[cmd_idxs[tile.beg + i]];
+    DrawCmd cmd = cmds[cmd_idxs[tile.beg + i]];
     switch (cmd.type)
     {
     case add_rect:
     {
-      float2 extent_div2 = (cmd.rect.right_bottom - cmd.rect.left_top) * 0.5;
-      float2 center = cmd.rect.left_top + extent_div2;
+      float2 extent_div2 = (cmd.p1 - cmd.p0) * 0.5;
+      float2 center = cmd.p0 + extent_div2;
       float d = sdBox(pos - center, extent_div2);
       color = blend(color, get_color(cmd.color, w, d, cmd.thickness));
     }
@@ -77,38 +77,43 @@ float4 ps(float4 pos4 : SV_POSITION) : SV_TARGET
 
     case add_triangle:
     {
-      float d = sdTriangle(pos, cmd.triangle.p0, cmd.triangle.p1, cmd.triangle.p2);
+      float d = sdTriangle(pos, cmd.p0, cmd.p1, cmd.p2);
       color = blend(color, get_color(cmd.color, w, d, cmd.thickness));
     }
     break;
 
     case add_circle:
     {
-      float d = sdCircle(pos - cmd.circle.center, cmd.circle.radius);
+      float2 center = cmd.p0;
+      float radius = cmd.p1.x;
+      float d = sdCircle(pos - center, radius);
       color = blend(color, get_color(cmd.color, w, d, cmd.thickness));
     }
     break;
 
     case add_line:
     {
-      float d = sdSegment(pos, cmd.line.p0, cmd.line.p1);
+      float d = sdSegment(pos, cmd.p0, cmd.p1);
       color = blend(color, get_color(cmd.color, w, d, cmd.thickness));
     }
     break;
 
     case add_bezier_quad:
     {
-      float d = sdBezier(pos, cmd.bezier_quad.p0, cmd.bezier_quad.p1, cmd.bezier_quad.p2);
+      float d = sdBezier(pos, cmd.p0, cmd.p1, cmd.p2);
       color = blend(color, get_color(cmd.color, w, d, cmd.thickness));
     }
     break;
 
     case add_image:
     {
-      float2 size = cmd.image.right_bottom - cmd.image.left_top;
-      float2 uv   = (pos - cmd.image.left_top) / size;
-      if (uv.x < 0 || uv.y > 1 || uv.y < 0 || uv.y > 1) break;
-      float4 texel = images[NonUniformResourceIndex(cmd.image.idx)].Sample(g_sampler, uv);
+      float2 size = cmd.p1 - cmd.p0;
+      float2 uv = (pos - cmd.p0) / size;
+
+      if (uv.x < 0 || uv.x > 1 || uv.y < 0 || uv.y > 1)
+        break;
+
+      float4 texel = images[NonUniformResourceIndex(cmd.idx)].Sample(g_sampler, uv);
       texel *= cmd.color;
       color = blend(color, texel);
     }

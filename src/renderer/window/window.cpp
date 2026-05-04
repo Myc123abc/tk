@@ -28,7 +28,7 @@ void Window::init(int x, int y, uint32_t width, uint32_t height, ui::Backdrop co
 
   // move window to primary monitor if it's not on any display monitors
   auto work_area = monitor.work_rect();
-  if (!point_in({ x, y }, work_area))
+  if (!Rect(work_area).contains(int2{x, y}))
   {
     _x = work_area.left;
     _y = work_area.top;
@@ -96,7 +96,7 @@ void Window::update_by_rect() noexcept
 
 void Window::update_rect() noexcept
 {
-  _rect = { _x, _y, static_cast<LONG>(_x + _width), static_cast<LONG>(_y + _height) };
+  _rect = Rect{ _x, _y, _x + _width, _y + _height };
 }
 
 void Window::destroy() const noexcept
@@ -118,7 +118,7 @@ auto Window::real_cursor_pos() const noexcept -> int2
   return cursor_pos() + int2{ Window_Shadow_Thickness };
 }
 
-auto Window::cursor_valid_area() const noexcept -> RECT
+auto Window::cursor_valid_area() const noexcept -> Rect
 {
   auto rect = _rect;
   rect.left   -= resize_thickness();
@@ -132,12 +132,12 @@ auto Window::is_mouse_pass_through_area() const noexcept -> bool
 {
   auto rect = cursor_valid_area();
   auto pos  = get_cursor_pos();
-  return !point_in(pos, rect);
+  return !rect.contains(pos);
 }
 
 auto Window::contains_point(int2 p) const noexcept -> bool
 {
-  return point_in(p, resize_rect());
+  return resize_rect().contains(p);
 }
 
 auto Window::move_from_maximize() noexcept -> int2
@@ -203,7 +203,7 @@ void Window::reset_pos_size() noexcept
   keep_blur_window_behind_resize();
 }
 
-void Window::update_by_rect(RECT rect, float scale) noexcept
+void Window::update_by_rect(Rect rect, float scale) noexcept
 {
   _rect  = rect;
   _scale = scale;
@@ -213,7 +213,7 @@ void Window::update_by_rect(RECT rect, float scale) noexcept
   keep_blur_window_behind_resize();
 }
 
-void Window::update_by_real_rect(RECT rect, float scale) noexcept
+void Window::update_by_real_rect(Rect rect, float scale) noexcept
 {
   _scale  = scale;
   _x      = rect.left + shadow_thickness();
@@ -321,7 +321,9 @@ void Window::resize(ResizeType type, int dx, int dy) noexcept
   if (!_resizing)
   {
     _resizing = true;
-    g_ui_ctx.get_window_context(_handle)->need_clear = true;
+    auto ctx = g_ui_ctx.get_window_context(_handle);
+    ctx->need_clear = true;
+    ctx->frame_data.init(_width, _height);
   }
 }
 
@@ -455,23 +457,23 @@ void Window::minimize() noexcept
   ShowWindow(_handle, SW_MINIMIZE);
 }
 
-void Window::cancel_maximize(RECT rect, float scale) noexcept
+void Window::cancel_maximize(Rect rect, float scale) noexcept
 {
   _maximized = false;
   update_by_real_rect(rect, scale);
   keep_blur_window_behind_resize();
 }
 
-void Window::cancel_fullscreen(RECT rect, float scale) noexcept
+void Window::cancel_fullscreen(Rect rect, float scale) noexcept
 {
   _fullscreen = false;
   update_by_real_rect(rect, scale);
   keep_blur_window_behind_resize();
 }
 
-void Window::cancel_fullscreen_maximize(RECT rect, float scale) noexcept
+void Window::cancel_fullscreen_maximize(Rect rect, float scale) noexcept
 {
-  auto monitor = Monitor{ rect };
+  auto monitor = Monitor{ rect.RECT_ref() };
   if (_maximized)  rect = monitor.work_rect();
   if (_fullscreen) rect = monitor.rect();
   _maximized  = false;
@@ -574,7 +576,7 @@ void Window::keep_blur_window_behind_resize() const noexcept
     SetWindowPos(_blur_window, _handle, _x, _y, _width, _height, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
 }
 
-void Window::resize_blur_window(RECT rect) const noexcept
+void Window::resize_blur_window(Rect rect) const noexcept
 {
   SetWindowPos(_blur_window, _handle, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
 }

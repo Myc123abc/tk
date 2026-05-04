@@ -40,6 +40,7 @@ struct vec<2, T>
   constexpr vec(X x, Y y) noexcept
     : x(static_cast<T>(x)), y(static_cast<T>(y)) {}
 
+  // TODO: replace initializer_list for performance
   template <Numeric U>
   constexpr vec(std::initializer_list<U> values) noexcept
   {
@@ -77,6 +78,15 @@ struct vec<2, T>
 
 template <Numeric T>
 inline constexpr auto dot(vec<2, T> lhs, vec<2, T> rhs) noexcept -> T { return lhs.x * rhs.x + lhs.y * rhs.y; }
+
+template <typename T>
+struct is_vec2 : std::false_type {};
+
+template <Numeric T>
+struct is_vec2<vec<2, T>> : std::true_type {};
+
+template <typename T>
+concept Vec2 = is_vec2<std::remove_cvref_t<T>>::value;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                               float3

@@ -1,3 +1,4 @@
+#if 0
 #include "frame_data.hpp"
 #include "ui_context.hpp"
 #include "triangulator.hpp"
@@ -801,3 +802,4 @@ void FrameData::union_end() noexcept
 }
 
 }
+#endif

@@ -23,7 +23,6 @@ void UIContext::init() noexcept
 {
   _fullscreen_window = g_wnd_mgr.create_fullscreen_window();
   g_text_engine.init();
-  FrameData::init();
 }
 
 void UIContext::destroy() noexcept
@@ -47,6 +46,7 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
     _wnd_names.emplace(handle, name);
     _wnd_ctx = &_wnd_ctxs[name.data()];
     _wnd_ctx->can_be_closed = is_closed;
+    _wnd_ctx->frame_data.init(width, height);
   }
   else 
     _wnd_ctx = &_wnd_ctxs[name.data()];
@@ -172,7 +172,7 @@ void UIContext::render() noexcept
 
     if (!wnd.is_resizing())
     {
-      data->add_scissor_rect(wnd.content_rect());
+      data->build_ui_render_call(wnd.content_rect());
       if (!wnd.is_fullscreen() && !wnd.is_maximized())
         window_shadow_wireframe_process(wnd_ctx, wnd, wnd.shadow_rect());
       g_renderer.submit({ handle, data });
@@ -184,7 +184,7 @@ void UIContext::render() noexcept
         wnd_ctx.need_clear = false;
         g_renderer.submit({ handle });
       }
-      data->add_scissor_rect(wnd.rect());
+      data->build_ui_render_call(wnd.rect());
       window_shadow_wireframe_process(wnd_ctx, wnd, wnd.real_rect());
       data->set_window_pos(wnd.real_pos());
       if (wnd.cfg().backdrop.style != ui::BackdropStyle::none)
@@ -249,7 +249,7 @@ void UIContext::postprocess_render() noexcept
   if (_btn_state.id)
   {
     auto pos = get_cursor_pos();
-    if (!point_in(get_cursor_pos(), _btn_state.left_top, _btn_state.right_bottom))
+    if (!Rect{ _btn_state.left_top, _btn_state.right_bottom }.contains(get_cursor_pos()))
       _btn_state.move_out = true;
   }
 
@@ -262,7 +262,7 @@ void UIContext::postprocess_render() noexcept
   tp          = now;
 }
 
-void UIContext::window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer::Window const& wnd, RECT scissor_rect) noexcept
+void UIContext::window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer::Window const& wnd, Rect scissor_rect) noexcept
 {
   auto const& cfg = wnd.cfg();
   if (!cfg.display_window_shadow && !cfg.wireframe_color)
@@ -292,7 +292,7 @@ void UIContext::window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer
     return {};
   };
 
-  data->set_window_shadow(scissor_rect, wnd.real_extent(), wnd.shadow_thickness(), {}, cfg.display_window_shadow ? 5 : 0, 15, get_wireframe_color());
+  data->build_window_shadow_render_call(scissor_rect, wnd.real_extent(), wnd.shadow_thickness(), {}, cfg.display_window_shadow ? 5 : 0, 15, get_wireframe_color());
 }
 
 void UIContext::add_mouse_left_button_state(size_t id, float2 left_top, float2 right_bottom) noexcept
