@@ -258,7 +258,10 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
         g_ctx.graphics_pipe_set(PipelineType::ui, call.scissor_rect, "constants", Constants
         {
           .render_target_extent = res.render_target()->extent(),
-          .window_pos           = frame_data->window_pos(),
+          .window_extent        = frame_data->window_extent(),
+          .window_pos           = call.window_pos,
+          .tile_size            = frame_data->tile_size(),
+          .tile_count           = frame_data->tile_count(),
         },
         {
           { "cmds",     frame.buffer.cmds_gpu_handle()                                    },
@@ -274,7 +277,7 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
         {
           .render_target_extent = res.render_target()->extent(),
           .window_extent        = call.window_shadow.window_extent,
-          .window_pos           = frame_data->window_pos(),
+          .window_pos           = call.window_pos,
           .shadow_thickness     = call.window_shadow.shadow_thickness,
           .shadow_radius        = call.window_shadow.radius,
           .shadow_color         = call.window_shadow.color,

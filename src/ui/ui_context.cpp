@@ -172,7 +172,7 @@ void UIContext::render() noexcept
 
     if (!wnd.is_resizing())
     {
-      data->build_ui_render_call(wnd.content_rect());
+      data->build_ui_render_call(wnd.content_rect(), wnd.content_pos());
       if (!wnd.is_fullscreen() && !wnd.is_maximized())
         window_shadow_wireframe_process(wnd_ctx, wnd, wnd.shadow_rect());
       g_renderer.submit({ handle, data });
@@ -184,9 +184,8 @@ void UIContext::render() noexcept
         wnd_ctx.need_clear = false;
         g_renderer.submit({ handle });
       }
-      data->build_ui_render_call(wnd.rect());
+      data->build_ui_render_call(wnd.rect(), wnd.pos());
       window_shadow_wireframe_process(wnd_ctx, wnd, wnd.real_rect());
-      data->set_window_pos(wnd.real_pos());
       if (wnd.cfg().backdrop.style != ui::BackdropStyle::none)
         g_renderer.submit({ _fullscreen_window, data, handle, wnd.rect() });
       else
@@ -292,7 +291,7 @@ void UIContext::window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer
     return {};
   };
 
-  data->build_window_shadow_render_call(scissor_rect, wnd.real_extent(), wnd.shadow_thickness(), {}, cfg.display_window_shadow ? 5 : 0, 15, get_wireframe_color());
+  data->build_window_shadow_render_call(scissor_rect, wnd.is_resizing() ? wnd.real_pos() : float2{}, wnd.real_extent(), wnd.shadow_thickness(), {}, cfg.display_window_shadow ? 5 : 0, 15, get_wireframe_color());
 }
 
 void UIContext::add_mouse_left_button_state(size_t id, float2 left_top, float2 right_bottom) noexcept

@@ -18,7 +18,7 @@ struct Constants
   uint   draw_wireframe;
 };
 
-enum : uint
+enum : int
 {
   add_rect,
   add_triangle,
@@ -31,14 +31,13 @@ enum : uint
 
 struct DrawCmd
 {
-  uint   type;
+  int    type;
   float4 color;
   float  thickness;
   float2 p0;
   float2 p1;
   float2 p2;
   float2 p3;
-  uint   idx;
 };
 
 struct Tile

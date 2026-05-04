@@ -16,6 +16,7 @@ struct RenderCall
 {
   RenderCallType type;
   Rect           scissor_rect;
+  uint2          window_pos;
 
   union
   {
@@ -123,11 +124,12 @@ public:
   void add_bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept;
   void add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept;
 
-  void build_ui_render_call(Rect rect) noexcept;
-  void build_window_shadow_render_call(Rect scissor_rect, uint2 window_extent, float shadow_thickness, Color color, float radius, float softness, std::optional<float4> wireframe_color) noexcept;
+  void build_ui_render_call(Rect rect, uint2 window_pos) noexcept;
+  void build_window_shadow_render_call(Rect scissor_rect, uint2 window_pos, uint2 window_extent, float shadow_thickness, Color color, float radius, float softness, std::optional<float4> wireframe_color) noexcept;
 
-  void set_window_pos(float2 pos) noexcept { _window_pos = pos; }
-  auto window_pos() const noexcept { return _window_pos; }
+  auto window_extent() const noexcept { return _window_extent; }
+  auto tile_size() const noexcept { return _tile_size; }
+  auto tile_count() const noexcept { return _tile_count; }
 
   auto& render_calls() const noexcept { return _calls; }
   auto& cmds() const noexcept { return _cmds; }
@@ -147,6 +149,7 @@ private:
 
   uint2                   _tile_size;
   uint2                   _tile_count;
+  uint2                   _window_extent;
   std::vector<Tile>       _tiles;
   std::vector<DrawCmd>    _cmds;
   std::vector<uint>       _cmd_idxs;
@@ -157,8 +160,6 @@ private:
     uint count;
   };
   std::vector<GPUTile>    _gpu_tiles;
-
-  float2                  _window_pos;
 
   std::vector<RenderCall> _calls;
 };

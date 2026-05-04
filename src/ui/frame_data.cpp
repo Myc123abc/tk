@@ -109,15 +109,21 @@ namespace tk::ui {
 void FrameData::clear() noexcept
 {
   _cmds.clear();
-  _window_pos = {};
+  _cmd_idxs.clear();
+  for (auto& tile : _tiles)
+    tile.cmd_idxs.clear();
+  _gpu_tiles.clear();
+  _gpu_tiles.resize(_tiles.size());
+  _calls.clear();
 }
 
 void FrameData::init(uint width, uint height, uint2 tile_size) noexcept
 {
-  _tile_size  = tile_size;
-  _tile_count = (float2{ width, height } + tile_size - 1) / tile_size;
+  _window_extent = { width, height };
+  _tile_size     = tile_size;
+  _tile_count    = (float2{ width, height } + tile_size - 1) / tile_size;
   _tiles.clear();
-  _tiles.resize(_tile_count.x + _tile_count.y);
+  _tiles.resize(_tile_count.x * _tile_count.y);
   _gpu_tiles.resize(_tiles.size());
 }
 
@@ -470,41 +476,46 @@ void FrameData::add_image(ImageHandle handle, float2 left_top, float2 right_bott
   auto cmd_idx = _cmds.size();
 
   auto& cmd = _cmds.emplace_back(DrawCmd{});
-  cmd.type  = DrawCmdType::add_rect;
+  cmd.type  = DrawCmdType::add_image;
   cmd.color = { 1, 1, 1, static_cast<float>(alpha) / 255};
   cmd.image = { left_top, right_bottom, renderer::g_renderer.descriptor_idx(handle) };
 
   add_command(cmd_idx, { left_top, right_bottom });
 }
 
-void FrameData::build_ui_render_call(Rect rect) noexcept
+void FrameData::build_ui_render_call(Rect rect, uint2 window_pos) noexcept
 {
   auto& call = _calls.emplace_back(RenderCall{});
   call.type         = RenderCallType::ui;
   call.scissor_rect = rect;
+  call.window_pos   = window_pos;
 
   // copy cmd_idxs
   auto size = uint{};
   for (auto const& tile : _tiles) size += tile.cmd_idxs.size();
   _cmd_idxs.resize(size);
-  auto beg = 0;
-  for (auto const& tile : _tiles)
+  _gpu_tiles.resize(_tiles.size());
+  auto beg = 0u;
+  for (auto i = 0u; i < _tiles.size(); ++i)
   {
+    auto const& tile = _tiles[i];
     auto cnt = tile.cmd_idxs.size();
-    memcpy(_cmd_idxs.data() + beg, tile.cmd_idxs.data(), sizeof(uint) * cnt);
+    if (cnt)
+      memcpy(_cmd_idxs.data() + beg, tile.cmd_idxs.data(), sizeof(uint) * cnt);
 
     // build gpu tiles
-    _gpu_tiles.emplace_back(beg, cnt);
+    _gpu_tiles[i] = { beg, static_cast<uint>(cnt) };
     beg += cnt;
   }
 }
 
-void FrameData::build_window_shadow_render_call(Rect scissor_rect, uint2 window_extent, float shadow_thickness, Color color, float radius, float softness, std::optional<float4> wireframe_color) noexcept
+void FrameData::build_window_shadow_render_call(Rect scissor_rect, uint2 window_pos, uint2 window_extent, float shadow_thickness, Color color, float radius, float softness, std::optional<float4> wireframe_color) noexcept
 {
   auto& call = _calls.emplace_back(RenderCall{});
-  call.type = RenderCallType::window_shadow;
-  call.scissor_rect = scissor_rect;
+  call.type          = RenderCallType::window_shadow;
+  call.scissor_rect  = scissor_rect;
   call.window_shadow = { window_extent, shadow_thickness, { color.r, color.g, color.b }, radius, softness, wireframe_color };
+  call.window_pos    = window_pos;
 }
 
 }

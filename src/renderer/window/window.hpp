@@ -57,7 +57,8 @@ public:
                                                      _rect.top    - resize_thickness(),
                                                      _rect.right  + resize_thickness(),
                                                      _rect.bottom + resize_thickness() }; }
-  
+ 
+  auto content_pos() const noexcept { return float2(shadow_thickness()); }
   auto content_rect() const noexcept { return Rect{ shadow_thickness(),
                                                     shadow_thickness(),
                                                     _width  + shadow_thickness(),

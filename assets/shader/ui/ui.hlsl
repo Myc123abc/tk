@@ -20,10 +20,10 @@ float4 blend(float4 src, float4 dst)
   src.rgb *= src.a;
   dst.rgb *= dst.a;
 
-  float a    = src.a + dst.a * (1 - src.a);
-  float3 rgb = src.rgb + dst.rgb + (1 - src.a);
+  float a = src.a + dst.a * (1.0 - src.a);
+  float3 rgb = src.rgb + dst.rgb * (1.0 - src.a);
 
-  if (a > 0) rgb /= a;
+  if (a > 0.0) rgb /= a;
 
   return float4(rgb, a);
 }
@@ -113,7 +113,7 @@ float4 ps(float4 pos4 : SV_POSITION) : SV_TARGET
       if (uv.x < 0 || uv.x > 1 || uv.y < 0 || uv.y > 1)
         break;
 
-      float4 texel = images[NonUniformResourceIndex(cmd.idx)].Sample(g_sampler, uv);
+      float4 texel = images[NonUniformResourceIndex(asuint(cmd.p2.x))].Sample(g_sampler, uv);
       texel *= cmd.color;
       color = blend(color, texel);
     }
