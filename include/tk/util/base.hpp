@@ -411,4 +411,9 @@ constexpr auto abs(float2 v) noexcept -> float2
   return { std::abs(v.x), std::abs(v.y) };
 }
 
+constexpr auto floor(float2 v) noexcept -> float2
+{
+  return { std::floor(v.x), std::floor(v.y) };
+}
+
 }
