@@ -221,7 +221,7 @@ void FrameData::add_command(uint cmd_idx, float2 p0, float2 p1, float thickness)
 
 void FrameData::add_command(uint cmd_idx, Rect rect) noexcept
 {
-  assert(rect.left <= rect.right && rect.top <= rect.bottom);
+  assert(rect.left < rect.right && rect.top < rect.bottom);
 
   auto constexpr eps = 0.001f;
 

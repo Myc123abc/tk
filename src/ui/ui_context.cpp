@@ -46,11 +46,14 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
     _wnd_names.emplace(handle, name);
     _wnd_ctx = &_wnd_ctxs[name.data()];
     _wnd_ctx->can_be_closed = is_closed;
-    _wnd_ctx->frame_data.init(width, height);
+    _wnd = g_wnd_mgr.get_window(_wnd_ctx->handle);
+    _wnd_ctx->frame_data.init(_wnd->real_width(), _wnd->real_height());
   }
   else 
+  {
     _wnd_ctx = &_wnd_ctxs[name.data()];
-  _wnd = g_wnd_mgr.get_window(_wnd_ctx->handle);
+    _wnd = g_wnd_mgr.get_window(_wnd_ctx->handle);
+  }
   _wnd_ctx->is_called = true;
 
   update_window_config(cfg);

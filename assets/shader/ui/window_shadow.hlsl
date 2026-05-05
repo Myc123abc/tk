@@ -24,7 +24,7 @@ float4 ps(float4 pos : SV_Position) : SV_TARGET
 
   // discard window content region
   if (pos.x > p0.x && pos.x < p1.x && pos.y > p0.y && pos.y < p1.y)
-    discard;
+    return float4(0, 0, 0, 0);
 
   // calculate shadow color
   float4 color = float4(0, 0, 0, 0);

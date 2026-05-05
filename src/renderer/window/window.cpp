@@ -162,6 +162,7 @@ auto Window::move_from_maximize() noexcept -> int2
 
   update_rect();
   g_renderer.resize_window_resource(_handle, real_width(), real_height());
+  g_ui_ctx.get_window_context(_handle)->frame_data.init(real_width(), real_height());
 
   resize_window();
 
@@ -323,7 +324,7 @@ void Window::resize(ResizeType type, int dx, int dy) noexcept
     _resizing = true;
     auto ctx = g_ui_ctx.get_window_context(_handle);
     ctx->need_clear = true;
-    ctx->frame_data.init(_width, _height);
+    ctx->frame_data.init(real_width(), real_height());
   }
 }
 
@@ -446,6 +447,7 @@ void Window::maximize() noexcept
   _rect        = Monitor{ _handle }.work_rect();
   update_by_rect();
   g_renderer.resize_window_resource(_handle, real_width(), real_height());
+  g_ui_ctx.get_window_context(_handle)->frame_data.init(real_width(), real_height());
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
   keep_blur_window_behind_resize();
 }
@@ -489,6 +491,7 @@ void Window::restore() noexcept
   _rect      = _backup_rect;
   update_by_rect();
   g_renderer.resize_window_resource(_handle, real_width(), real_height());
+  g_ui_ctx.get_window_context(_handle)->frame_data.init(real_width(), real_height());
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
   keep_blur_window_behind_resize();
 }
@@ -501,6 +504,8 @@ void Window::fullscreen() noexcept
   _rect        = Monitor{ _handle }.rect();
   update_by_rect();
   g_renderer.resize_window_resource(_handle, real_width(), real_height());
+  g_ui_ctx.get_window_context(_handle)->frame_data.init(real_width(), real_height());
+  SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
   keep_blur_window_behind_resize();
 }
@@ -511,6 +516,8 @@ void Window::restore_fullscreen() noexcept
   _rect       = _backup_rect;
   update_by_rect();
   g_renderer.resize_window_resource(_handle, real_width(), real_height());
+  g_ui_ctx.get_window_context(_handle)->frame_data.init(real_width(), real_height());
+  SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
   SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(), SWP_NOZORDER | SWP_NOACTIVATE);
   keep_blur_window_behind_resize();
 }

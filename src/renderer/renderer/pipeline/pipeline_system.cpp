@@ -33,6 +33,7 @@ void PipelineSystem::init() noexcept
 
   info.graphics.stencil = {};
   info.shader = "assets/shader/ui/window_shadow.hlsl";
+  info.graphics.blend = BlendState::Default();
   _pipes.emplace(PipelineType::window_shadow, info);
 
   // res = generate_root_signature(
