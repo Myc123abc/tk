@@ -20,7 +20,8 @@ public:
 
   Monitor(Rect rect) noexcept
   {
-    set_info(MonitorFromRect(rect.RECT_ptr(), MONITOR_DEFAULTTOPRIMARY));
+    auto rc = rect.to_RECT();
+    set_info(MonitorFromRect(&rc, MONITOR_DEFAULTTOPRIMARY));
   }
 
   Monitor(POINT point) noexcept

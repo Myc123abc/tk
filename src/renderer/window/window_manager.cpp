@@ -237,7 +237,8 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     {
       // limit cursor move area
       auto rect = get_virtual_workarea_rect();
-      ClipCursor(rect.RECT_ptr());
+      auto rc = rect.to_RECT();
+      ClipCursor(&rc);
 
       // moving
       if (left_button_down_resize_type == ResizeType::none)
@@ -346,12 +347,14 @@ void WindowManager::update_fullscreen_window() noexcept
     _fullscreen_window._width, _fullscreen_window._height, SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
-auto WindowManager::create_fullscreen_window() noexcept -> HWND
+auto WindowManager::create_fullscreen_window() noexcept -> std::tuple<HWND, uint, uint>
 {
   assert(!_fullscreen_window._handle);
   auto rect = get_virtual_screen_rect();
-  _fullscreen_window.init_auxiliary(0, 0, rect.right - rect.left, rect.bottom - rect.top);
-  return _fullscreen_window._handle;
+  auto width  = rect.right  - rect.left;
+  auto height = rect.bottom - rect.top;
+  _fullscreen_window.init_auxiliary(0, 0, width, height);
+  return { _fullscreen_window._handle, width, height };
 }
 
 auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height, ui::Backdrop const& backdrop) noexcept -> HWND

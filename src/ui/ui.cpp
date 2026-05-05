@@ -191,6 +191,13 @@ void rectangle(float2 left_top, float2 right_bottom, Color color, float thicknes
   right_bottom *= scale;
   thickness    *= scale;
 
+  if (g_ui_ctx.window()->is_resizing())
+  {
+    offset = g_ui_ctx.window()->real_pos();
+    left_top     += offset;
+    right_bottom += offset;
+  }
+
   left_top     += .5f;
   right_bottom += .5f;
 
@@ -212,6 +219,14 @@ void triangle(float2 p0, float2 p1, float2 p2, Color color, float thickness) noe
   p2        *= scale;
   thickness *= scale;
 
+  if (g_ui_ctx.window()->is_resizing())
+  {
+    offset = g_ui_ctx.window()->real_pos();
+    p0 += offset;
+    p1 += offset;
+    p2 += offset;
+  }
+
 	g_ui_ctx.frame_data()->add_triangle(p0, p1, p2, color, thickness);
 }
 
@@ -226,6 +241,12 @@ void circle(float2 center, float radius, Color color, float thickness) noexcept
   radius    *= scale;
   center    *= scale;
   thickness *= scale;
+
+  if (g_ui_ctx.window()->is_resizing())
+  {
+    offset = g_ui_ctx.window()->real_pos();
+    center += offset;
+  }
 
   g_ui_ctx.frame_data()->add_circle(center, radius, color, thickness);
 }
@@ -246,6 +267,13 @@ void line(float2 p0, float2 p1, Color color, float thickness) noexcept
   p0        *= scale;
   p1        *= scale;
   thickness *= scale;
+
+  if (g_ui_ctx.window()->is_resizing())
+  {
+    offset = g_ui_ctx.window()->real_pos();
+    p0 += offset;
+    p1 += offset;
+  }
 
   p0 += .5f;
   p1 += .5f;
@@ -270,6 +298,14 @@ void bezier_quad(float2 p0, float2 p1, float2 p2, Color color, float thickness) 
   p2        *= scale;
   thickness *= scale;
 
+  if (g_ui_ctx.window()->is_resizing())
+  {
+    offset = g_ui_ctx.window()->real_pos();
+    p0 += offset;
+    p1 += offset;
+    p2 += offset;
+  }
+
   g_ui_ctx.frame_data()->add_bezier_quad(p0, p1, p2, color, thickness);
 }
 
@@ -292,6 +328,15 @@ void bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float
   p3        *= scale;
   thickness *= scale;
 
+  if (g_ui_ctx.window()->is_resizing())
+  {
+    offset = g_ui_ctx.window()->real_pos();
+    p0 += offset;
+    p1 += offset;
+    p2 += offset;
+    p3 += offset;
+  }
+
   g_ui_ctx.frame_data()->add_bezier_cubic(p0, p1, p2, p3, color, thickness);
 }
 
@@ -308,6 +353,8 @@ void path_line_to(float2 p) noexcept
 
   auto scale = g_ui_ctx.window()->scale();
   p *= scale;
+
+  // TODO: resize offset
 
   // g_ui_ctx.frame_data()->path_line_to(p);
 }
@@ -486,7 +533,7 @@ auto button(
   }
 
   // draw button
-  ui::rectangle({ x, y }, { x + width, y + height }, button_color);
+  ui::rectangle({ x, y }, { x + static_cast<int>(width), y + static_cast<int>(height) }, button_color);
 
   // draw icon
   if (icon_update_func)

@@ -63,7 +63,8 @@ void Context::set_scissor_rect(Rect rect) noexcept
   if (rect != _scissor_rect)
   {
     _scissor_rect = rect;
-    _cmd->RSSetScissorRects(1, _scissor_rect.RECT_ptr());
+    auto rc = rect.to_RECT();
+    _cmd->RSSetScissorRects(1, &rc);
   }
 }
 

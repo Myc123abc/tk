@@ -317,13 +317,16 @@ void Window::resize(ResizeType type, int dx, int dy) noexcept
   if (!_resizing)
   {
     _resizing = true;
-    g_ui_ctx.get_window_context(_handle)->need_clear = true;
+    auto ctx = g_ui_ctx.get_window_context(_handle);
+    ctx->need_clear = true;
+    ctx->switch_frame_data();
   }
 }
 
 void Window::resize_end() noexcept
 {
   _resizing = false;
+  g_ui_ctx.get_window_context(_handle)->switch_frame_data();
   g_ui_ctx.clear_fullscreen_window();
   g_renderer.resize_window_resource(_handle, real_width(), real_height());
   g_renderer.clear_blur_resize_data();
@@ -465,7 +468,7 @@ void Window::cancel_fullscreen(Rect rect, float scale) noexcept
 
 void Window::cancel_fullscreen_maximize(Rect rect, float scale) noexcept
 {
-  auto monitor = Monitor{ rect.RECT_ref() };
+  auto monitor = Monitor{ rect.to_RECT() };
   if (_maximized)  rect = monitor.work_rect();
   if (_fullscreen) rect = monitor.rect();
   _maximized  = false;
