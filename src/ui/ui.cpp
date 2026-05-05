@@ -191,6 +191,9 @@ void rectangle(float2 left_top, float2 right_bottom, Color color, float thicknes
   right_bottom *= scale;
   thickness    *= scale;
 
+  left_top     += .5f;
+  right_bottom += .5f;
+
   g_ui_ctx.frame_data()->add_rect(left_top, right_bottom, color, thickness);
 }
 
@@ -243,6 +246,9 @@ void line(float2 p0, float2 p1, Color color, float thickness) noexcept
   p0        *= scale;
   p1        *= scale;
   thickness *= scale;
+
+  p0 += .5f;
+  p1 += .5f;
 
   g_ui_ctx.frame_data()->add_line(p0, p1, color, thickness);
 }

@@ -364,11 +364,11 @@ int main()
 
       static auto fmt = 0;
 
-      // if (ui::button("btn1", 0, 0, 100, 100, 0xffffffff, 0x00ff00ff))
-      //   ++fmt;
-      // if (ui::button("btn2", 50, 50, 100, 100, 0xffffffff, 0x00ff00ff))
-      //   wnd2_is_closed = !wnd2_is_closed;
-      // ui::add_move_invalid_area({}, { 150, 150 });
+      if (ui::button("btn1", 0, 0, 100, 100, 0xffffffff, 0x00ff00ff))
+        ++fmt;
+      if (ui::button("btn2", 50, 50, 100, 100, 0xffffffff, 0x00ff00ff))
+        wnd2_is_closed = !wnd2_is_closed;
+      ui::add_move_invalid_area({}, { 150, 150 });
 
       // circle_draw_test();
       // line_draw_test();

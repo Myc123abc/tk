@@ -13,9 +13,6 @@
 namespace tk::ui {
 
 Singleton(ImageManager, g_img_mgr,
-public:
-  void destroy() noexcept;
-
 private:
   struct ImageInfo
   {
@@ -33,6 +30,8 @@ private:
   using PoolType    = ObjectPool<ImageInfo, Image_Pool_Init_Capacity>;
 public:
   using ImageHandle = PoolType::Handle;
+
+  void destroy() noexcept;
 
   auto create_image(uint32_t width, uint32_t height, renderer::ImageFormat format) noexcept -> ImageHandle;
   void destroy_image(ImageHandle handle) noexcept;
@@ -55,7 +54,7 @@ private:
   PoolType                                     _pool;
   std::unordered_map<std::string, ImageHandle> _loaded_images;
   std::unordered_set<ImageHandle>              _images;
-  std::unordered_map<std::string, float2>        _image_extents;
+  std::unordered_map<std::string, float2>      _image_extents;
 
   struct LoadResult
   {

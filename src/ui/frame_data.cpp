@@ -373,11 +373,13 @@ void FrameData::add_line(float2 p0, float2 p1, Color color, float thickness) noe
 {
   auto cmd_idx = _cmds.size();
 
+  auto dp = abs(p1 - p0);
+
   auto& cmd = _cmds.emplace_back(DrawCmd{});
   cmd.type      = DrawCmdType::add_line;
   cmd.color     = color;
   cmd.thickness = thickness;
-  cmd.line      = { p0, p1 };
+  cmd.line      = { p0, p1, dp.x > dp.y || dp.y > dp.x };
 
   add_command(cmd_idx, p0, p1, thickness);
 }

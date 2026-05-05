@@ -28,7 +28,7 @@ float4 blend(float4 src, float4 dst)
   return float4(rgb, a);
 }
 
-float4 get_color(float4 color, float w, float d, float t)
+float get_d(float d, float t)
 {
   float value;
   if (t == 0)
@@ -42,6 +42,19 @@ float4 get_color(float4 color, float w, float d, float t)
     else
       value = -d - t + 1.0;
   }
+  return value;
+}
+
+float4 get_color_no_aa(float4 color, float d, float t)
+{
+  float value = get_d(d, t);
+  if (value > 1e-4) return float4(0, 0, 0, 0);
+  return color;
+}
+
+float4 get_color(float4 color, float w, float d, float t)
+{
+  float value = get_d(d, t);
   if (value >= w) return float4(0, 0, 0, 0);
 
   // float alpha = 1.0 - smoothstep(0.0, w, value);
@@ -53,7 +66,7 @@ float4 ps(float4 pos4 : SV_POSITION) : SV_TARGET
 {
   float2 pos = pos4.xy;
 
-  uint2 tile_idxs = (pos - constants.window_pos) / constants.tile_size;
+  uint2 tile_idxs = pos / constants.tile_size;
   uint  tile_idx  = tile_idxs.y * constants.tile_count.x + tile_idxs.x;
   Tile  tile      = tiles[tile_idx];
 
@@ -71,14 +84,14 @@ float4 ps(float4 pos4 : SV_POSITION) : SV_TARGET
       float2 extent_div2 = (cmd.p1 - cmd.p0) * 0.5;
       float2 center = cmd.p0 + extent_div2;
       float d = sdBox(pos - center, extent_div2);
-      color = blend(color, get_color(cmd.color, w, d, cmd.thickness));
+      color = blend(get_color_no_aa(cmd.color, d, cmd.thickness), color);
     }
     break;
 
     case add_triangle:
     {
       float d = sdTriangle(pos, cmd.p0, cmd.p1, cmd.p2);
-      color = blend(color, get_color(cmd.color, w, d, cmd.thickness));
+      color = blend(get_color(cmd.color, w, d, cmd.thickness), color);
     }
     break;
 
@@ -87,21 +100,24 @@ float4 ps(float4 pos4 : SV_POSITION) : SV_TARGET
       float2 center = cmd.p0;
       float radius = cmd.p1.x;
       float d = sdCircle(pos - center, radius);
-      color = blend(color, get_color(cmd.color, w, d, cmd.thickness));
+      color = blend(get_color(cmd.color, w, d, cmd.thickness), color);
     }
     break;
 
     case add_line:
     {
       float d = sdSegment(pos, cmd.p0, cmd.p1);
-      color = blend(color, get_color(cmd.color, w, d, cmd.thickness));
+      if (asuint(cmd.p2.x) == 1)
+        color = blend(get_color_no_aa(cmd.color, d, cmd.thickness), color);
+      else
+        color = blend(get_color(cmd.color, w, d, cmd.thickness), color);
     }
     break;
 
     case add_bezier_quad:
     {
       float d = sdBezier(pos, cmd.p0, cmd.p1, cmd.p2);
-      color = blend(color, get_color(cmd.color, w, d, cmd.thickness));
+      color = blend(get_color(cmd.color, w, d, cmd.thickness), color);
     }
     break;
 
@@ -115,7 +131,7 @@ float4 ps(float4 pos4 : SV_POSITION) : SV_TARGET
 
       float4 texel = images[NonUniformResourceIndex(asuint(cmd.p2.x))].Sample(g_sampler, uv);
       texel *= cmd.color;
-      color = blend(color, texel);
+      color = blend(texel, color);
     }
     break;
     }

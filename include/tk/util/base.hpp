@@ -4,6 +4,7 @@
 #include <numbers>
 #include <immintrin.h>
 #include <assert.h>
+#include <cmath>
 
 namespace tk {
 
@@ -403,6 +404,11 @@ constexpr auto normalize(float2 v) noexcept -> float2
 {
   auto len = length(v);
   return len > 0.f ? float2{ v.x / len, v.y / len } : float2{};
+}
+
+constexpr auto abs(float2 v) noexcept -> float2
+{
+  return { std::abs(v.x), std::abs(v.y) };
 }
 
 }

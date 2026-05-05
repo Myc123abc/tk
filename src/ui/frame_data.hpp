@@ -74,6 +74,7 @@ struct DrawCmd
     {
       float2 p0;
       float2 p1;
+      uint   no_aa; // hlsl make bool as uint
     } line;
 
     struct

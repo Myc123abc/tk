@@ -82,7 +82,7 @@ public:
   Image()                            = default;
   ~Image()                           = default;
   Image(Image const&)                = delete;
-  Image(Image&&) noexcept            = default;
+  Image(Image&&) noexcept            = default; // TODO: use global resource manager for image and buffer
   Image& operator=(Image const&)     = delete;
   Image& operator=(Image&&) noexcept = default;
 

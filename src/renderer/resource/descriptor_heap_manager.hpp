@@ -42,7 +42,7 @@ private:
   bool                  _valid{};
   uint                  _index{};
   DescriptorHeapType    _type{};
-  std::function<void()> _recreate_descriptor_func;
+  std::function<void()> _recreate_descriptor_func; // TODO: resdesign the recreate descriptor way
 };
 
 Singleton(DescriptorHeapManager, g_desc_heap_mgr,
