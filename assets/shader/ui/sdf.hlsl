@@ -1,3 +1,5 @@
+#include "cubic_bezier.hlsl"
+
 ////////////////////////////////////////////////////////////////////////////////
 //                            SDF functions
 ////////////////////////////////////////////////////////////////////////////////
@@ -72,6 +74,28 @@ float sdBezier(in float2 pos, in float2 A, in float2 B, in float2 C)
         // res = min(res,dot2(d+(c+b*t.z)*t.z));
     }
     return sqrt(res);
+}
+
+float sdCubicBezier(float2 p, float2 p0, float2 p1, float2 p2, float2 p3)
+{
+  float d = 1e20;
+
+  float2 prev = p0;
+  [unroll]
+  for (int i = 1; i <= 32; ++i)
+  {
+    float t = i / 32.0;
+    float u = 1.0 - t;
+    float2 cur = p0 * (u * u * u) +
+                 p1 * (3.0 * u * u * t) +
+                 p2 * (3.0 * u * t * t) +
+                 p3 * (t * t * t);
+
+    d = min(d, sdSegment(p, prev, cur));
+    prev = cur;
+  }
+
+  return d;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

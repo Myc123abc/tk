@@ -121,6 +121,13 @@ float4 ps(float4 pos4 : SV_POSITION) : SV_TARGET
     }
     break;
 
+    case add_bezier_cubic:
+    {
+      float d = sdCubicBezier(pos, cmd.p0, cmd.p1, cmd.p2, cmd.p3);
+      color = blend(get_color(cmd.color, w, d, cmd.thickness), color);
+    }
+    break;
+
     case add_image:
     {
       float2 size = cmd.p1 - cmd.p0;

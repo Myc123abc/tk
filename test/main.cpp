@@ -369,6 +369,9 @@ int main()
       if (ui::button("btn2", 50, 50, 100, 100, 0xffffffff, 0x00ff00ff))
         wnd2_is_closed = !wnd2_is_closed;
       ui::add_move_invalid_area({}, { 150, 150 });
+      
+      // ui::bezier_quad({20 ,20}, {50, 70}, { 80, 40 }, 0xff0000ff);
+      ui::bezier_cubic({20 ,20}, {50, 70}, { 60, 20 }, { 80, 40 }, 0xff0000ff);
 
       // circle_draw_test();
       // line_draw_test();
