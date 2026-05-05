@@ -32,15 +32,14 @@ public:
 
   void release() noexcept;
 
-  auto is_valid() const noexcept { return _valid; }
+  auto is_valid() const noexcept { return _index >= 0; }
 
   auto index() const noexcept { return _index; }
 
   void set(std::function<void()> func) noexcept { _recreate_descriptor_func = func; }
 
 private:
-  bool                  _valid{};
-  uint                  _index{};
+  int                   _index{ -1 };
   DescriptorHeapType    _type{};
   std::function<void()> _recreate_descriptor_func; // TODO: resdesign the recreate descriptor way
 };

@@ -96,7 +96,7 @@ struct DrawCmd
     {
       float2 left_top;
       float2 right_bottom;
-      uint   idx;
+      int    idx; // use int because descriptor handle's index is int, -1 for validation
     } image;
   };
 };

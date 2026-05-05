@@ -36,8 +36,7 @@ void DescriptorHandle::release() noexcept
   if (is_valid())
   {
     g_desc_heap_mgr._heaps[_type]._handles[_index].first = false;
-    _index = {};
-    _valid = false;
+    _index = -1;
   }
 }
 

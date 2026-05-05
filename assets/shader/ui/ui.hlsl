@@ -129,7 +129,7 @@ float4 ps(float4 pos4 : SV_POSITION) : SV_TARGET
       if (uv.x < 0 || uv.x > 1 || uv.y < 0 || uv.y > 1)
         break;
 
-      float4 texel = images[NonUniformResourceIndex(asuint(cmd.p2.x))].Sample(g_sampler, uv);
+      float4 texel = images[NonUniformResourceIndex(asint(cmd.p2.x))].Sample(g_sampler, uv);
       texel *= cmd.color;
       color = blend(texel, color);
     }
