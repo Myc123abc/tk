@@ -9,6 +9,7 @@
 #include "../window/window_manager.hpp"
 #include "context.hpp"
 #include "../resource/shader_type.hpp"
+#include "../../ui/ui_context.hpp"
 
 #include <dwmapi.h>
 
@@ -71,6 +72,7 @@ void Renderer::resize_window_resource(HWND handle, uint32_t width, uint32_t heig
 {
   err_if(!_res.contains(handle), "failed to destroy window render resource, it's unexist");
   _res[handle].resize(width, height);
+  ui::g_ui_ctx.get_window_context(handle)->frame_data.init(width, height);
 }
 
 void Renderer::create_image(ui::ImageHandle handle, uint32_t width, uint32_t height, ImageFormat format) noexcept
