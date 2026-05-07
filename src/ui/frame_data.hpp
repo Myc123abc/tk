@@ -39,8 +39,12 @@ enum class DrawCmdType
   add_circle,
   add_line,
   add_bezier_quad,
-  add_bezier_cubic,
   add_image,
+
+  add_path,
+  add_path_line,
+  add_path_arc,
+  add_path_bezier_quad,
 };
 
 struct DrawCmd
@@ -86,18 +90,37 @@ struct DrawCmd
 
     struct
     {
-      float2 p0;
-      float2 p1;
-      float2 p2;
-      float2 p3;
-    } bezier_cubic;
-
-    struct
-    {
       float2 left_top;
       float2 right_bottom;
       int    idx; // use int because descriptor handle's index is int, -1 for validation
     } image;
+
+    struct
+    {
+      uint beg;
+      uint count;
+    } path;
+
+    struct
+    {
+      float2 p0;
+      float2 p1;
+    } path_line;
+
+    struct
+    {
+      float2 p0;
+      float2 p1;
+      float2 p2;
+    } path_bezier_quad;
+
+    struct
+    {
+      float2 center;
+      float  radius;
+      float  beg;
+      float  end;
+    } path_arc;
   };
 };
 
@@ -125,22 +148,32 @@ public:
   void add_bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept;
   void add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept;
 
+  void path_begin() noexcept;
+  void add_path_line(float2 p0, float2 p1) noexcept;
+  void add_path_arc(float2 center, float radius, float min, float max) noexcept;
+  void add_path_bezier_quad(float2 p0, float2 p1, float2 p2) noexcept;
+  void add_path_bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3) noexcept;
+  void path_end(Color color, float thickness) noexcept;
+
   void build_ui_render_call(Rect rect, uint2 window_pos) noexcept;
   void build_window_shadow_render_call(Rect scissor_rect, uint2 window_pos, uint2 window_extent, float shadow_thickness, Color color, float radius, float softness, std::optional<float4> wireframe_color) noexcept;
 
   auto window_extent() const noexcept { return _window_extent; }
-  auto tile_size() const noexcept { return _tile_size; }
-  auto tile_count() const noexcept { return _tile_count; }
+  auto tile_size()     const noexcept { return _tile_size;     }
+  auto tile_count()    const noexcept { return _tile_count;    }
 
-  auto& render_calls() const noexcept { return _calls; }
-  auto& cmds() const noexcept { return _cmds; }
-  auto& cmd_idxs() const noexcept { return _cmd_idxs; }
-  auto& gpu_tiles() const noexcept { return _gpu_tiles; }
+  auto& render_calls() const noexcept { return _calls;     }
+  auto& cmds()         const noexcept { return _cmds;      }
+  auto& path_cmds()    const noexcept { return _path_cmds; }
+  auto& cmd_idxs()     const noexcept { return _cmd_idxs;  }
+  auto& gpu_tiles()    const noexcept { return _gpu_tiles; }
 
 private:
   void add_command(uint cmd_idx, Rect rect) noexcept;
   void add_command(uint cmd_idx, float2 p0, float2 p1, float thickness) noexcept;
   void add_command(uint cmd_idx, float2 center, float radius, float start_angle, float end_angle, bool ccw, float thickness) noexcept;
+
+  void bezier_cubic_to_quad(float2 p0, float2 p1, float2 p2, float2 p3, float tolerance = 0.5, uint level = 0) noexcept;
 
 private:
   struct Tile
@@ -153,6 +186,7 @@ private:
   uint2                   _window_extent;
   std::vector<Tile>       _tiles;
   std::vector<DrawCmd>    _cmds;
+  std::vector<DrawCmd>    _path_cmds;
   std::vector<uint>       _cmd_idxs;
 
   struct GPUTile
@@ -163,6 +197,9 @@ private:
   std::vector<GPUTile>    _gpu_tiles;
 
   std::vector<RenderCall> _calls;
+  DrawCmd*                _path_cmd{};
+
+  std::vector<std::tuple<float2, float2, float2>> _bezier_quads;
 };
 
 }

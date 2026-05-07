@@ -102,6 +102,21 @@ auto bezier_cubic_point(float2 p0, float2 p1, float2 p2, float2 p3, float t) noe
     p3 * (tt * t);
 }
 
+auto cubic_flatness(float2 p0, float2 p1, float2 p2, float2 p3) noexcept
+{
+  float2 d = p3 - p0;
+
+  float d2 = std::abs(cross(p1 - p3, d));
+  float d3 = std::abs(cross(p2 - p3, d));
+
+  return std::max(d2, d3);
+}
+
+auto cubic_to_quad_control(float2 p0, float2 p1, float2 p2, float2 p3) noexcept -> float2
+{
+  return (p1 * 3.f - p0 + p2 * 3.f - p3) * 0.25f;
+}
+
 }
 
 namespace tk::ui {
@@ -109,6 +124,7 @@ namespace tk::ui {
 void FrameData::clear() noexcept
 {
   _cmds.clear();
+  _path_cmds.clear();
   _cmd_idxs.clear();
   for (auto& tile : _tiles)
     tile.cmd_idxs.clear();
@@ -221,7 +237,7 @@ void FrameData::add_command(uint cmd_idx, float2 p0, float2 p1, float thickness)
 
 void FrameData::add_command(uint cmd_idx, Rect rect) noexcept
 {
-  assert(rect.left < rect.right && rect.top < rect.bottom);
+  assert(!rect.empty());
 
   auto constexpr eps = 0.001f;
 
@@ -284,6 +300,8 @@ void FrameData::add_command(uint cmd_idx, float2 center, float radius, float sta
 
 void FrameData::add_rect(float2 left_top, float2 right_bottom, Color color, float thickness) noexcept
 {
+  assert(!_path_cmd);
+
   if (left_top.x >= right_bottom.x || left_top.y >= right_bottom.y)
     return;
 
@@ -308,6 +326,8 @@ void FrameData::add_rect(float2 left_top, float2 right_bottom, Color color, floa
 
 void FrameData::add_triangle(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept
 {
+  assert(!_path_cmd);
+
   // reject degenerate triangle
   auto area2 = (p1.x - p0.x) * (p2.y - p0.y) - (p1.y - p0.y) * (p2.x - p0.x);
   if (std::abs(area2) <= 1e-6f)
@@ -340,6 +360,8 @@ void FrameData::add_triangle(float2 p0, float2 p1, float2 p2, Color color, float
 
 void FrameData::add_circle(float2 center, float radius, Color color, float thickness) noexcept
 {
+  assert(!_path_cmd);
+
   if (radius <= 0.f) return;
 
   radius = std::max(radius - 1.f, 1.f);
@@ -371,6 +393,8 @@ void FrameData::add_circle(float2 center, float radius, Color color, float thick
 
 void FrameData::add_line(float2 p0, float2 p1, Color color, float thickness) noexcept
 {
+  assert(!_path_cmd);
+
   auto cmd_idx = _cmds.size();
 
   auto dp = abs(p1 - p0);
@@ -379,13 +403,15 @@ void FrameData::add_line(float2 p0, float2 p1, Color color, float thickness) noe
   cmd.type      = DrawCmdType::add_line;
   cmd.color     = color;
   cmd.thickness = thickness;
-  cmd.line      = { p0, p1, dp.x > dp.y || dp.y > dp.x };
+  cmd.line      = { p0, p1, thickness > 1 ? false : dp.x > dp.y || dp.y > dp.x };
 
   add_command(cmd_idx, p0, p1, thickness);
 }
 
 void FrameData::add_bezier_quad(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept
 {
+  assert(!_path_cmd);
+
   if (p0 == p1 && p1 == p2) return;
 
   auto cmd_idx = _cmds.size();
@@ -429,49 +455,146 @@ void FrameData::add_bezier_quad(float2 p0, float2 p1, float2 p2, Color color, fl
 
 void FrameData::add_bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept
 {
+  assert(!_path_cmd && _bezier_quads.empty());
+
   if (p0 == p1 && p1 == p2 && p2 == p3)
     return;
 
-  auto cmd_idx = _cmds.size();
+  bezier_cubic_to_quad(p0, p1, p2, p3);
 
-  auto& cmd = _cmds.emplace_back(DrawCmd{});
-  cmd.type         = DrawCmdType::add_bezier_cubic;
-  cmd.color        = color;
-  cmd.thickness    = thickness;
-  cmd.bezier_cubic = { p0, p1, p2, p3 };
+  for (auto [p0, p1, p2] : _bezier_quads)
+    add_bezier_quad(p0, p1, p2, color, thickness);
+  _bezier_quads.clear();
+}
 
-  auto ctrl_len  = length(p1 - p0) + length(p2 - p1) + length(p3 - p2);
-  auto chord_len = length(p3 - p0);
-  auto curve_len = std::max(ctrl_len, chord_len);
+void FrameData::bezier_cubic_to_quad(float2 p0, float2 p1, float2 p2, float2 p3, float tolerance, uint level) noexcept
+{
+  auto chord = p3 - p0;
+  auto chord_len_sq = length(chord);
 
-  auto segments = std::clamp(static_cast<int>(std::ceil(curve_len / 16.f)), 4, 96);
-
-  if (thickness > 0.f)
+  if (level >= 10 || chord_len_sq <= 1e-6f)
   {
-    auto prev = p0;
-
-    for (auto i = 1; i <= segments; ++i)
-    {
-      auto t = static_cast<float>(i) / static_cast<float>(segments);
-      auto p = bezier_cubic_point(p0, p1, p2, p3, t);
-
-      add_command(cmd_idx, prev, p, thickness);
-      prev = p;
-    }
+    _bezier_quads.emplace_back(p0, cubic_to_quad_control(p0, p1, p2, p3), p3);
+    return;
   }
+
+  auto flatness = cubic_flatness(p0, p1, p2, p3);
+  if (flatness * flatness <= tolerance * tolerance * chord_len_sq)
+  {
+    _bezier_quads.emplace_back(p0, cubic_to_quad_control(p0, p1, p2, p3), p3);
+    return;
+  }
+
+  auto p01 = (p0 + p1) * 0.5f;
+  auto p12 = (p1 + p2) * 0.5f;
+  auto p23 = (p2 + p3) * 0.5f;
+
+  auto p012 = (p01 + p12) * 0.5f;
+  auto p123 = (p12 + p23) * 0.5f;
+  auto p0123 = (p012 + p123) * 0.5f;
+
+  bezier_cubic_to_quad(p0, p01, p012, p0123, tolerance, level + 1);
+  bezier_cubic_to_quad(p0123, p123, p23, p3, tolerance, level + 1);
+}
+
+void FrameData::path_begin() noexcept
+{
+  assert(!_path_cmd);
+  _path_cmd = &_cmds.emplace_back(DrawCmd{});
+  _path_cmd->type     = DrawCmdType::add_path;
+  _path_cmd->path.beg = _path_cmds.size();
+}
+
+void FrameData::add_path_line(float2 p0, float2 p1) noexcept
+{
+  assert(_path_cmd);
+  auto& cmd = _path_cmds.emplace_back(DrawCmd{});
+  cmd.type      = DrawCmdType::add_path_line;
+  cmd.path_line = { p0, p1 };
+}
+
+void FrameData::add_path_bezier_quad(float2 p0, float2 p1, float2 p2) noexcept
+{
+  assert(_path_cmd);
+  auto& cmd = _path_cmds.emplace_back(DrawCmd{});
+  cmd.type             = DrawCmdType::add_path_bezier_quad;
+  cmd.path_bezier_quad = { p0, p1, p2 };
+}
+
+void FrameData::add_path_bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3) noexcept
+{
+  assert(_path_cmd && _bezier_quads.empty());
+
+  bezier_cubic_to_quad(p0, p1, p2, p3);
+
+  for (auto [p0, p1, p2] : _bezier_quads)
+    add_path_bezier_quad(p0, p1, p2);
+  _bezier_quads.clear();
+}
+
+void FrameData::add_path_arc(float2 center, float radius, float min, float max) noexcept
+{
+  assert(_path_cmd);
+  auto& cmd = _path_cmds.emplace_back(DrawCmd{});
+  cmd.type     = DrawCmdType::add_path_arc;
+  cmd.path_arc = { center, radius, min, max };
+}
+
+void FrameData::path_end(Color color, float thickness) noexcept
+{
+  assert(_path_cmd);
+
+  auto cmd_idx    = _cmds.size() - 1;
+  auto path_beg   = _path_cmd->path.beg;
+  auto path_count = _path_cmds.size() - path_beg;
+
+  _path_cmd->color      = color;
+  _path_cmd->thickness  = thickness;
+  _path_cmd->path.count = path_count;
+
+  // stroke tiles overlap
+  if (thickness > 0)
+  {
+
+  }
+  // fiiled tiles overlap
   else
   {
-    auto left   = std::min({ p0.x, p1.x, p2.x, p3.x });
-    auto right  = std::max({ p0.x, p1.x, p2.x, p3.x });
-    auto top    = std::min({ p0.y, p1.y, p2.y, p3.y });
-    auto bottom = std::max({ p0.y, p1.y, p2.y, p3.y });
+    auto pts = std::vector<float2>{};
+    for (auto i = 0; i < path_count; ++i)
+    {
+      auto const& cmd = _path_cmds[path_beg + i];
+      switch (cmd.type)
+      {
+      default: std::unreachable();
 
-    add_command(cmd_idx, Rect{ left, top, right, bottom });
+      case DrawCmdType::add_path_line:
+        pts.emplace_back(cmd.path_line.p0);
+        pts.emplace_back(cmd.path_line.p1);
+        break;
+
+      case DrawCmdType::add_path_bezier_quad:
+        pts.emplace_back(cmd.path_bezier_quad.p0);
+        pts.emplace_back(cmd.path_bezier_quad.p1);
+        pts.emplace_back(cmd.path_bezier_quad.p2);
+        break;
+
+      case DrawCmdType::add_path_arc:
+        pts.emplace_back(cmd.path_arc.center + cmd.path_arc.radius);
+        pts.emplace_back(cmd.path_arc.center - cmd.path_arc.radius);
+        break;
+      }
+    }
+    add_command(cmd_idx, { pts });
   }
+
+  _path_cmd = {};
 }
 
 void FrameData::add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept
 {
+  assert(!_path_cmd);
+
   if (alpha == 0 || left_top.x >= right_bottom.x || left_top.y >= right_bottom.y)
     return;
 
@@ -487,6 +610,8 @@ void FrameData::add_image(ImageHandle handle, float2 left_top, float2 right_bott
 
 void FrameData::build_ui_render_call(Rect rect, uint2 window_pos) noexcept
 {
+  assert(!_path_cmd);
+
   auto& call = _calls.emplace_back(RenderCall{});
   call.type         = RenderCallType::ui;
   call.scissor_rect = rect;

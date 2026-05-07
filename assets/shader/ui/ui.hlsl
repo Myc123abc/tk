@@ -38,9 +38,9 @@ float get_d(float d, float t)
   else
   {
     if (d > 0.0)
-      value = d;
+      value = d - t * 0.5 + 1;
     else
-      value = -d - t + 1.0;
+      value = d;
   }
   return value;
 }
@@ -62,6 +62,98 @@ float4 get_color(float4 color, float w, float d, float t)
   return float4(color.rgb, color.a * alpha);
 }
 
+float get_path_dis(float2 pos, uint offset)
+{
+  DrawCmd cmd = path_cmds[offset];
+  switch (cmd.type)
+  {
+  case add_path_line:
+    return sdf_line_partition(pos, cmd.p0, cmd.p1);
+
+  case add_path_bezier_quad:
+    return sdf_bezier_partition(pos, cmd.p0, cmd.p1, cmd.p2);
+
+  case add_path_arc:
+    return sdArcAngles(pos, cmd.p0, cmd.p1.x, cmd.p1.y, cmd.p2.x, true, cmd.thickness * 0.5);
+  }
+  return 0;
+}
+
+float get_path_dis(float2 pos, uint beg, uint count)
+{
+  float d = asfloat(0xff7fffff);
+  for (uint i = 0; i < count; ++i)
+  {
+    float path_dis = get_path_dis(pos, beg + i);
+    float dis = max(d, path_dis);
+
+    // aliasing problem:
+    // when two line segment in same line, such as (0,0)(50,50) to (50,50)(100,100)
+    // max(d0,d1) will lead aliasing problem
+    // so use min(abs(d0),abs(d1)) to resolve
+    // well min's way can only use for 1-pixel case,
+    // so for filled and thickness wireform we use max still,
+    // and use min on bround, perfect! (I spent half day to resolve... my holiday...)
+    if (dis > 0)
+      d = min(abs(d), abs(path_dis));
+    else
+      d = dis;
+  }
+  return d;
+}
+
+float4 get_color(float2 pos, DrawCmd cmd, float w)
+{
+  switch (cmd.type)
+  {
+  case add_rect:
+  {
+    float2 extent_div2 = (cmd.p1 - cmd.p0) * 0.5;
+    float2 center = cmd.p0 + extent_div2;
+    float d = sdBox(pos - center, extent_div2);
+    return get_color_no_aa(cmd.color, d, cmd.thickness);
+  }
+
+  case add_triangle:
+  {
+    float d = sdTriangle(pos, cmd.p0, cmd.p1, cmd.p2);
+    return get_color(cmd.color, w, d, cmd.thickness);
+  }
+
+  case add_circle:
+  {
+    float2 center = cmd.p0;
+    float radius = cmd.p1.x;
+    float d = sdCircle(pos - center, radius);
+    return get_color(cmd.color, w, d, cmd.thickness);
+  }
+
+  case add_line:
+  {
+    float d = sdSegment(pos, cmd.p0, cmd.p1);
+    if (asuint(cmd.p2.x) == 1)
+      return get_color_no_aa(cmd.color, d, cmd.thickness);
+    else
+      return get_color(cmd.color, w, d, cmd.thickness);
+  }
+
+  case add_bezier_quad:
+  {
+    float d = sdBezier(pos, cmd.p0, cmd.p1, cmd.p2);
+    return get_color(cmd.color, w, d, cmd.thickness);
+  }
+
+  case add_path:
+  {
+    uint beg   = asuint(cmd.p0.x);
+    uint count = asuint(cmd.p0.y);
+    float d = get_path_dis(pos, beg, count);
+    return get_color(cmd.color, w, d, cmd.thickness);
+  }
+  }
+  return float4(0, 0, 0, 0);
+}
+
 float4 ps(float4 pos4 : SV_POSITION) : SV_TARGET
 {
   float2 pos = pos4.xy;
@@ -77,72 +169,22 @@ float4 ps(float4 pos4 : SV_POSITION) : SV_TARGET
   for (uint i = 0; i < tile.count; ++i)
   {
     DrawCmd cmd = cmds[cmd_idxs[tile.beg + i]];
-    switch (cmd.type)
-    {
-    case add_rect:
-    {
-      float2 extent_div2 = (cmd.p1 - cmd.p0) * 0.5;
-      float2 center = cmd.p0 + extent_div2;
-      float d = sdBox(pos - center, extent_div2);
-      color = blend(get_color_no_aa(cmd.color, d, cmd.thickness), color);
-    }
-    break;
 
-    case add_triangle:
-    {
-      float d = sdTriangle(pos, cmd.p0, cmd.p1, cmd.p2);
-      color = blend(get_color(cmd.color, w, d, cmd.thickness), color);
-    }
-    break;
-
-    case add_circle:
-    {
-      float2 center = cmd.p0;
-      float radius = cmd.p1.x;
-      float d = sdCircle(pos - center, radius);
-      color = blend(get_color(cmd.color, w, d, cmd.thickness), color);
-    }
-    break;
-
-    case add_line:
-    {
-      float d = sdSegment(pos, cmd.p0, cmd.p1);
-      if (asuint(cmd.p2.x) == 1)
-        color = blend(get_color_no_aa(cmd.color, d, cmd.thickness), color);
-      else
-        color = blend(get_color(cmd.color, w, d, cmd.thickness), color);
-    }
-    break;
-
-    case add_bezier_quad:
-    {
-      float d = sdBezier(pos, cmd.p0, cmd.p1, cmd.p2);
-      color = blend(get_color(cmd.color, w, d, cmd.thickness), color);
-    }
-    break;
-
-    case add_bezier_cubic:
-    {
-      float d = sdCubicBezier(pos, cmd.p0, cmd.p1, cmd.p2, cmd.p3);
-      color = blend(get_color(cmd.color, w, d, cmd.thickness), color);
-    }
-    break;
-
-    case add_image:
+    if (cmd.type == add_image)
     {
       float2 size = cmd.p1 - cmd.p0;
       float2 uv = (pos - cmd.p0) / size;
 
       if (uv.x < 0 || uv.x > 1 || uv.y < 0 || uv.y > 1)
-        break;
+        continue;
 
       float4 texel = images[NonUniformResourceIndex(asint(cmd.p2.x))].Sample(g_sampler, uv);
       texel *= cmd.color;
       color = blend(texel, color);
     }
-    break;
-    }
+    else
+      color = blend(get_color(pos, cmd, w), color);
   }
 
-  return color;
+  return float4(color.rgb * color.a, color.a);
 }

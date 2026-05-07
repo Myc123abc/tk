@@ -4,16 +4,21 @@
 
 #include <windows.h>
 
+#include <span>
+#include <cfloat>
+
 namespace tk {
 
 struct Rect
 {
-  float left;
-  float top;
-  float right;
-  float bottom;
+  float left{ FLT_MAX };
+  float top{ FLT_MAX };
+  float right{ -FLT_MAX };
+  float bottom{ -FLT_MAX };
 
   Rect() = default;
+
+  auto empty() const noexcept { return left >= right || top >= bottom; }
 
   template <Vec2 LTT, Vec2 RBT>
   Rect(LTT left_top, RBT right_bottom) noexcept :
@@ -41,6 +46,27 @@ struct Rect
   auto contains_bounding(T p) const noexcept { return p.x >= left && p.x <= right && p.y >= top && p.y <= bottom; }
 
   auto to_RECT() const noexcept { return RECT{ static_cast<LONG>(left), static_cast<LONG>(top), static_cast<LONG>(right), static_cast<LONG>(bottom) }; }
+
+  void expand(float2 p) noexcept
+  {
+    left   = fmin(p.x, left);
+    top    = fmin(p.y, top);
+    right  = fmax(p.x, right);
+    bottom = fmax(p.y, bottom);
+  }
+
+  void expand(std::span<float2> pts) noexcept
+  {
+    for (auto const& pt : pts)
+    {
+      left   = fmin(pt.x, left);
+      top    = fmin(pt.y, top);
+      right  = fmax(pt.x, right);
+      bottom = fmax(pt.y, bottom);
+    }
+  }
+
+  Rect(std::span<float2> pts) noexcept { expand(pts); }
 };
 
 }

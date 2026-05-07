@@ -199,7 +199,7 @@ void rectangle(float2 left_top, float2 right_bottom, Color color, float thicknes
   }
 
   left_top     = floor(left_top)     + .5f;
-  right_bottom = floor(right_bottom) + .5f;
+  right_bottom = floor(right_bottom) - .5f;
 
   g_ui_ctx.frame_data()->add_rect(left_top, right_bottom, color, thickness);
 }
@@ -344,22 +344,35 @@ void bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float
 ///                               Path
 ////////////////////////////////////////////////////////////////////////////////
 
-void path_line_to(float2 p) noexcept
+void path_begin() noexcept
+{
+  g_ui_ctx.check_draw();
+  g_ui_ctx.frame_data()->path_begin();
+}
+
+void path_line(float2 p0, float2 p1) noexcept
 {
 	g_ui_ctx.check_draw();
 
 	auto offset = g_ui_ctx.get_render_pos();
-  p += offset;
+  p0 += offset;
+  p1 += offset;
 
   auto scale = g_ui_ctx.window()->scale();
-  p *= scale;
+  p0 *= scale;
+  p1 *= scale;
 
-  // TODO: resize offset
+  if (g_ui_ctx.window()->is_resizing())
+  {
+    offset = g_ui_ctx.window()->real_pos();
+    p0 += offset;
+    p1 += offset;
+  }
 
-  // g_ui_ctx.frame_data()->path_line_to(p);
+  g_ui_ctx.frame_data()->add_path_line(p0, p1);
 }
 
-void path_arc_to(float2 center, float radius, float min, float max) noexcept
+void path_arc(float2 center, float radius, float min, float max) noexcept
 {
   g_ui_ctx.check_draw();
 
@@ -370,47 +383,74 @@ void path_arc_to(float2 center, float radius, float min, float max) noexcept
   center *= scale;
   radius *= scale;
 
-  // g_ui_ctx.frame_data()->path_arc_to(center, radius, min, max);
+  if (g_ui_ctx.window()->is_resizing())
+  {
+    offset = g_ui_ctx.window()->real_pos();
+    center += offset;
+  }
+
+  g_ui_ctx.frame_data()->add_path_arc(center, radius, min, max);
 }
 
-void path_bezier_quad_to(float2 p1, float2 p2) noexcept
+void path_bezier_quad(float2 p0, float2 p1, float2 p2) noexcept
 {
   g_ui_ctx.check_draw();
 
   auto offset = g_ui_ctx.get_render_pos();
+  p0 += offset;
   p1 += offset;
   p2 += offset;
 
   auto scale = g_ui_ctx.window()->scale();
+  p0 *= scale;
   p1 *= scale;
   p2 *= scale;
 
-  // g_ui_ctx.frame_data()->path_bezier_quad_to(p1, p2);
+  if (g_ui_ctx.window()->is_resizing())
+  {
+    offset = g_ui_ctx.window()->real_pos();
+    p0 += offset;
+    p1 += offset;
+    p2 += offset;
+  }
+
+  g_ui_ctx.frame_data()->add_path_bezier_quad(p0, p1, p2);
 }
 
-void path_bezier_cubic_to(float2 p1, float2 p2, float2 p3) noexcept
+void path_bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3) noexcept
 {
 	g_ui_ctx.check_draw();
 
 	auto offset = g_ui_ctx.get_render_pos();
+  p0 += offset;
   p1 += offset;
   p2 += offset;
   p3 += offset;
 
   auto scale = g_ui_ctx.window()->scale();
+  p0 *= scale;
   p1 *= scale;
   p2 *= scale;
   p3 *= scale;
 
-  // g_ui_ctx.frame_data()->path_bezier_cubic_to(p1, p2, p3);
+  if (g_ui_ctx.window()->is_resizing())
+  {
+    offset = g_ui_ctx.window()->real_pos();
+    p0 += offset;
+    p1 += offset;
+    p2 += offset;
+    p3 += offset;
+  }
+
+  g_ui_ctx.frame_data()->add_path_bezier_cubic(p0, p1, p2, p3);
 }
 
-void path_end(Color color, float thickness, bool is_closed) noexcept
+void path_end(Color color, float thickness) noexcept
 {
 	g_ui_ctx.check_draw();
   auto scale = g_ui_ctx.window()->scale();
   thickness *= scale;
-  // g_ui_ctx.frame_data()->path_end(color, thickness, is_closed);
+  g_ui_ctx.frame_data()->path_end(color, thickness);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

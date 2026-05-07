@@ -19,6 +19,7 @@ void PipelineSystem::init() noexcept
     { structured_buffer, "cmds",       0, 0                           },
     { structured_buffer, "cmd_idxs",   0, 1,                          },
     { structured_buffer, "tiles",      0, 2,                          },
+    { structured_buffer, "path_cmds",  0, 3                           },
     { textures,          "images",     1, 0,                          },
   }, true, true);
 

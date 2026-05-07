@@ -200,6 +200,7 @@ void RenderResource::clear_depth_stencil() noexcept
 void FrameBuffer::init() noexcept
 {
   _cmds.init(Buffer_Init_Size, true);
+  _path_cmds.init(Buffer_Init_Size, true);
   _cmd_idxs.init(Buffer_Init_Size, true);
   _tiles.init(Buffer_Init_Size, true);
 }
@@ -207,6 +208,7 @@ void FrameBuffer::init() noexcept
 void FrameBuffer::upload(ID3D12GraphicsCommandList1* cmd, ui::FrameData const* data) noexcept
 {
   _cmds.append_range(data->cmds());
+  _path_cmds.append_range(data->path_cmds());
   _cmd_idxs.append_range(data->cmd_idxs());
   _tiles.append_range(data->gpu_tiles());
 #if 0

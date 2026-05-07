@@ -1,9 +1,3 @@
-#include "cubic_bezier.hlsl"
-
-////////////////////////////////////////////////////////////////////////////////
-//                            SDF functions
-////////////////////////////////////////////////////////////////////////////////
-
 float sdTriangle(float2 p, float2 p0, float2 p1, float2 p2)
 {
   float2 e0 = p1-p0, e1 = p2-p1, e2 = p0-p2;
@@ -35,6 +29,62 @@ float sdSegment(in float2 p, in float2 a, in float2 b)
   float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
   return length(pa - ba * h);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+//                                  arc
+////////////////////////////////////////////////////////////////////////////////
+
+float sdArc( in float2 p, in float2 sc, in float ra, float rb )
+{
+    // sc is the sin/cos of the arc's aperture
+    p.x = abs(p.x);
+    return ((sc.y*p.x>sc.x*p.y) ? length(p-sc*ra) : 
+                                  abs(length(p)-ra)) - rb;
+}
+
+static const float PI  = 3.14159265358979323846;
+static const float TAU = 6.28318530717958647692;
+
+float normalize_angle(float a)
+{
+    a = fmod(a, TAU);
+    if (a < 0.0) a += TAU;
+    return a;
+}
+
+float angle_delta_ccw(float from, float to)
+{
+    float d = normalize_angle(to) - normalize_angle(from);
+    if (d < 0.0) d += TAU;
+    return d;
+}
+
+float2 rotate2d(float2 p, float a)
+{
+    float s = sin(a);
+    float c = cos(a);
+    return float2(c * p.x - s * p.y, s * p.x + c * p.y);
+}
+
+float sdArcAngles(float2 p, float2 center, float radius, float beg, float end, bool ccw, float halfThickness)
+{
+    beg = normalize_angle(beg);
+    end = normalize_angle(end);
+
+    float sweep = ccw ? angle_delta_ccw(beg, end) : angle_delta_ccw(end, beg);
+    float mid   = ccw ? normalize_angle(beg + sweep * 0.5) : normalize_angle(beg - sweep * 0.5);
+    float halfA = sweep * 0.5;
+
+    float2 q = p - center;
+    q = rotate2d(q, -mid);
+
+    float2 sc = float2(sin(halfA), cos(halfA));
+    return sdArc(q, sc, radius, halfThickness);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//                                  bezier
+////////////////////////////////////////////////////////////////////////////////
 
 float dot2(float2 v) { return dot(v, v); }
 
@@ -74,28 +124,6 @@ float sdBezier(in float2 pos, in float2 A, in float2 B, in float2 C)
         // res = min(res,dot2(d+(c+b*t.z)*t.z));
     }
     return sqrt(res);
-}
-
-float sdCubicBezier(float2 p, float2 p0, float2 p1, float2 p2, float2 p3)
-{
-  float d = 1e20;
-
-  float2 prev = p0;
-  [unroll]
-  for (int i = 1; i <= 32; ++i)
-  {
-    float t = i / 32.0;
-    float u = 1.0 - t;
-    float2 cur = p0 * (u * u * u) +
-                 p1 * (3.0 * u * u * t) +
-                 p2 * (3.0 * u * t * t) +
-                 p3 * (t * t * t);
-
-    d = min(d, sdSegment(p, prev, cur));
-    prev = cur;
-  }
-
-  return d;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

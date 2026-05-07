@@ -266,10 +266,11 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
           .tile_count           = frame_data->tile_count(),
         },
         {
-          { "cmds",     frame.buffer.cmds_gpu_handle()                                    },
-          { "cmd_idxs", frame.buffer.cmd_idxs_gpu_handle()                                },
-          { "tiles",    frame.buffer.tiles_gpu_handle( )                                  },
-          { "images",   g_desc_heap_mgr.first_gpu_handle(DescriptorHeapType::cbv_srv_uav) },
+          { "cmds",      frame.buffer.cmds_gpu_handle()                                    },
+          { "path_cmds", frame.buffer.path_cmds_gpu_handle()                               },
+          { "cmd_idxs",  frame.buffer.cmd_idxs_gpu_handle()                                },
+          { "tiles",     frame.buffer.tiles_gpu_handle( )                                  },
+          { "images",    g_desc_heap_mgr.first_gpu_handle(DescriptorHeapType::cbv_srv_uav) },
         });
         g_ctx.draw(2);
         break;
