@@ -395,12 +395,17 @@ constexpr auto dot(float2 a, float2 b) noexcept
   return a.x * b.x + a.y * b.y;
 }
 
-constexpr auto length(float2 p) noexcept
+constexpr auto length_sq(float2 p) noexcept
 {
   return dot(p, p);
 }
 
-constexpr auto normalize(float2 v) noexcept -> float2
+inline auto length(float2 p) noexcept
+{
+  return std::sqrt(length_sq(p));
+}
+
+inline auto normalize(float2 v) noexcept -> float2
 {
   auto len = length(v);
   return len > 0.f ? float2{ v.x / len, v.y / len } : float2{};

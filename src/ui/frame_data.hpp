@@ -38,6 +38,7 @@ enum class DrawCmdType
   add_triangle,
   add_circle,
   add_line,
+  add_arc,
   add_bezier_quad,
   add_image,
 
@@ -83,6 +84,13 @@ struct DrawCmd
 
     struct
     {
+      float2 center;
+      float2 p0;
+      float2 p1;
+    } arc;
+
+    struct
+    {
       float2 p0;
       float2 p1;
       float2 p2;
@@ -117,9 +125,8 @@ struct DrawCmd
     struct
     {
       float2 center;
-      float  radius;
-      float  beg;
-      float  end;
+      float2 p0;
+      float2 p1;
     } path_arc;
   };
 };
@@ -144,13 +151,14 @@ public:
   void add_triangle(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
   void add_circle(float2 center, float radius, Color color, float thickness) noexcept;
   void add_line(float2 p0, float2 p1, Color color, float thickness) noexcept;
+  void add_arc(float2 center, float2 p0, float2 p1, Color color, float thickness) noexcept;
   void add_bezier_quad(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
   void add_bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept;
   void add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept;
 
   void path_begin() noexcept;
   void add_path_line(float2 p0, float2 p1) noexcept;
-  void add_path_arc(float2 center, float radius, float min, float max) noexcept;
+  void add_path_arc(float2 center, float2 p0, float2 p1) noexcept;
   void add_path_bezier_quad(float2 p0, float2 p1, float2 p2) noexcept;
   void add_path_bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3) noexcept;
   void path_end(Color color, float thickness) noexcept;
@@ -171,6 +179,7 @@ public:
 private:
   void add_command(uint cmd_idx, Rect rect) noexcept;
   void add_command(uint cmd_idx, float2 p0, float2 p1, float thickness) noexcept;
+  void add_command(uint cmd_idx, float2 center, float2 p0, float2 p1, float thickness) noexcept;
   void add_command(uint cmd_idx, float2 center, float radius, float start_angle, float end_angle, bool ccw, float thickness) noexcept;
 
   void bezier_cubic_to_quad(float2 p0, float2 p1, float2 p2, float2 p3, float tolerance = 0.5, uint level = 0) noexcept;

@@ -193,17 +193,19 @@ void test_path_draw() noexcept
   pos = float2{ 10, 10 };
   pos.y += 110;
   ui::path_begin();
-  ui::path_arc({ pos.x + 50, pos.y + 50 }, 25, - std::numbers::pi * 0.5, std::numbers::pi);
+  ui::path_arc({ pos.x + 50, pos.y + 50 }, { pos.x + 50, pos.y + 25 }, { pos.x + 25, pos.y + 50 });
   ui::path_end(0xff0000ff);
 
   pos.x += 110;
   ui::path_begin();
-  ui::path_arc({ pos.x + 50, pos.y + 50 }, 25, - std::numbers::pi * 0.5, std::numbers::pi);
+  ui::path_line({ pos.x + 15, pos.y + 85 }, { pos.x + 40, pos.y + 35 });
+  ui::path_arc({ pos.x + 60, pos.y + 35 }, { pos.x + 40, pos.y + 35 }, { pos.x + 80, pos.y + 35 });
+  ui::path_line({ pos.x + 80, pos.y + 35 }, { pos.x + 105, pos.y + 85 });
   ui::path_end(0xff0000ff, 3);
 
   pos.x += 110;
   ui::path_begin();
-  ui::path_arc({ pos.x + 50, pos.y + 50 }, 25, - std::numbers::pi * 0.5, std::numbers::pi);
+  ui::path_arc({ pos.x + 50, pos.y + 50 }, { pos.x + 50, pos.y + 25 }, { pos.x + 25, pos.y + 50 });
   ui::path_end(0xff0000ff, 3);
 
   pos = float2{ 10, 10 };
@@ -268,6 +270,15 @@ void test_path_draw() noexcept
   ui::path_begin();
   ui::path_bezier_cubic(pos, { pos.x + 50, pos.y }, { pos.x + 100, pos.y + 100 }, { pos.x + 50, pos.y + 100 });
   ui::path_end(0xff0000ff, 3);
+
+  pos = float2{ 10, 10 };
+  pos.y += 110 * 5;
+  ui::path_begin();
+  ui::path_line({ pos.x, pos.y }, { pos.x + 100, pos.y });
+  ui::path_arc({ pos.x + 150, pos.y + 50 }, { pos.x + 100, pos.y + 100 }, { pos.x + 100, pos.y });
+  ui::path_line({ pos.x + 100, pos.y + 100 }, { pos.x, pos.y + 100 });
+  ui::path_line({ pos.x, pos.y + 100 }, { pos.x, pos.y });
+  ui::path_end(0x00ffffff, 3);
 }
 
 inline auto img1 = "assets/image/test.jpg";
@@ -387,16 +398,6 @@ int main()
         wnd2_is_closed = !wnd2_is_closed;
       ui::add_move_invalid_area({}, { 150, 150 });
 
-      ui::path_begin();
-      ui::path_line({10, 10}, {110, 10});
-      // ui::path_bezier_quad({110, 10}, {110, 110}, {60, 110});
-      ui::path_bezier_cubic({110, 10}, {110, 110}, {60, 10}, { 60, 110});
-      // ui::path_bezier_quad({110, 10}, {110, 110}, {90, 50});
-      // ui::path_bezier_quad({90, 50}, {70, 60}, { 60, 110});
-      // ui::path_arc({75, 60}, 25, 0, std::numbers::pi);
-      ui::path_line({60, 110}, {10, 10});
-      ui::path_end(0x0000ffff, 0);
-      
       // circle_draw_test();
       // line_draw_test();
       // test_path_draw();

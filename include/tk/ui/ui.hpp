@@ -317,6 +317,16 @@ void circle(float2 center, float radius, Color color = {}, float thickness = {})
 void line(float2 p0, float2 p1, Color color = {}, float thickness = 1.f) noexcept;
 
 /**
+ * draw an arc
+ * @param center
+ * @param p0
+ * @param p1
+ * @param color
+ * @param thickness
+ */
+void arc(float2 center, float2 p0, float2 p1, Color color = {}, float thickness = 1.f) noexcept;
+
+/**
  * draw a quad bezier
  * @param p0
  * @param p1
@@ -352,13 +362,12 @@ void path_begin() noexcept;
 void path_line(float2 p0, float2 p1) noexcept;
 
 /**
- * path arc to center with min to max
+ * path arc
  * @param center
- * @param radius
- * @param min
- * @param max
+ * @param p0
+ * @param p1
  */
-void path_arc(float2 center, float radius, float min, float max) noexcept;
+void path_arc(float2 center, float2 p0, float2 p1) noexcept;
 
 /**
  * path bezier quad draw

@@ -24,6 +24,7 @@ enum : int
   add_triangle,
   add_circle,
   add_line,
+  add_arc,
   add_bezier_quad,
   add_image,
 

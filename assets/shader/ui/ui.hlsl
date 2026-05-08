@@ -62,44 +62,58 @@ float4 get_color(float4 color, float w, float d, float t)
   return float4(color.rgb, color.a * alpha);
 }
 
-float get_path_dis(float2 pos, uint offset)
+float get_path_edge_dis(float2 pos, uint offset)
 {
   DrawCmd cmd = path_cmds[offset];
   switch (cmd.type)
   {
   case add_path_line:
-    return sdf_line_partition(pos, cmd.p0, cmd.p1);
+    return sdSegment(pos, cmd.p0, cmd.p1);
 
   case add_path_bezier_quad:
-    return sdf_bezier_partition(pos, cmd.p0, cmd.p1, cmd.p2);
+    return sdBezier(pos, cmd.p0, cmd.p1, cmd.p2);
 
   case add_path_arc:
-    return sdArcAngles(pos, cmd.p0, cmd.p1.x, cmd.p1.y, cmd.p2.x, true, cmd.thickness * 0.5);
+    return sdArc(pos, cmd.p0, cmd.p1, cmd.p2);
   }
   return 0;
 }
 
-float get_path_dis(float2 pos, uint beg, uint count)
+int get_path_winding(float2 pos, uint offset)
 {
-  float d = asfloat(0xff7fffff);
+  DrawCmd cmd = path_cmds[offset];
+  switch (cmd.type)
+  {
+  case add_path_line:
+    return path_line_winding(pos, cmd.p0, cmd.p1);
+
+  case add_path_bezier_quad:
+    return path_bezier_winding(pos, cmd.p0, cmd.p1, cmd.p2);
+
+  case add_path_arc:
+    return path_arc_winding(pos, cmd.p0, cmd.p1, cmd.p2);
+  }
+  return 0;
+}
+
+float get_path_stroke_dis(float2 pos, uint beg, uint count)
+{
+  float d = asfloat(0x7f7fffff);
+  for (uint i = 0; i < count; ++i)
+    d = min(d, get_path_edge_dis(pos, beg + i));
+  return d;
+}
+
+float get_path_fill_dis(float2 pos, uint beg, uint count)
+{
+  float d = asfloat(0x7f7fffff);
+  int winding = 0;
   for (uint i = 0; i < count; ++i)
   {
-    float path_dis = get_path_dis(pos, beg + i);
-    float dis = max(d, path_dis);
-
-    // aliasing problem:
-    // when two line segment in same line, such as (0,0)(50,50) to (50,50)(100,100)
-    // max(d0,d1) will lead aliasing problem
-    // so use min(abs(d0),abs(d1)) to resolve
-    // well min's way can only use for 1-pixel case,
-    // so for filled and thickness wireform we use max still,
-    // and use min on bround, perfect! (I spent half day to resolve... my holiday...)
-    if (dis > 0)
-      d = min(abs(d), abs(path_dis));
-    else
-      d = dis;
+    d = min(d, get_path_edge_dis(pos, beg + i));
+    winding += get_path_winding(pos, beg + i);
   }
-  return d;
+  return winding == 0 ? d : -d;
 }
 
 float4 get_color(float2 pos, DrawCmd cmd, float w)
@@ -137,6 +151,12 @@ float4 get_color(float2 pos, DrawCmd cmd, float w)
       return get_color(cmd.color, w, d, cmd.thickness);
   }
 
+  case add_arc:
+  {
+    float d = sdArc(pos, cmd.p0, cmd.p1, cmd.p2);
+    return get_color(cmd.color, w, d, cmd.thickness);
+  }
+
   case add_bezier_quad:
   {
     float d = sdBezier(pos, cmd.p0, cmd.p1, cmd.p2);
@@ -147,7 +167,7 @@ float4 get_color(float2 pos, DrawCmd cmd, float w)
   {
     uint beg   = asuint(cmd.p0.x);
     uint count = asuint(cmd.p0.y);
-    float d = get_path_dis(pos, beg, count);
+    float d = cmd.thickness > 0 ? get_path_stroke_dis(pos, beg, count) : get_path_fill_dis(pos, beg, count);
     return get_color(cmd.color, w, d, cmd.thickness);
   }
   }
