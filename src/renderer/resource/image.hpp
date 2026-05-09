@@ -3,6 +3,8 @@
 #include "descriptor_heap_manager.hpp"
 #include "util/flag.hpp"
 #include "util/base.hpp"
+#include "../../util/object_pool.hpp"
+#include "../config.hpp"
 
 #include <dxgi1_6.h>
 #include <directx/d3dx12.h>
@@ -82,9 +84,9 @@ public:
   Image()                            = default;
   ~Image()                           = default;
   Image(Image const&)                = delete;
-  Image(Image&&) noexcept            = default; // TODO: use global resource manager for image and buffer
+  Image(Image&&) noexcept            = delete;
   Image& operator=(Image const&)     = delete;
-  Image& operator=(Image&&) noexcept = default;
+  Image& operator=(Image&&) noexcept = delete;
 
   void init(uint32_t width , uint32_t height, ImageFormat format, ImageType types, bool use_mipmap = false) noexcept;
   void init(IDXGISwapChain1* swapchain, uint32_t index) noexcept;
@@ -141,6 +143,38 @@ private:
 
   // std::vector<DescriptorHandle>          _mipmap_uavs;
 };
+
+using ImagePoolType = ObjectPool<Image, Image_Pool_Init_Capacity>;
+using ImageHandle = ImagePoolType::Handle;
+
+Singleton(ImageManager, g_img_mgr,
+public:
+  auto create(uint32_t width , uint32_t height, ImageFormat format, ImageType types, bool use_mipmap = false) noexcept
+  {
+    auto handle = _pool.alloc();
+    _pool[handle].init(width, height, format, types, use_mipmap);
+    return handle;
+  }
+
+  auto create(IDXGISwapChain1* swapchain, uint32_t index) noexcept
+  {
+    auto handle = _pool.alloc();
+    _pool[handle].init(swapchain, index);
+    return handle;
+  }
+
+  auto destroy(ImageHandle handle) noexcept
+  {
+    _pool[handle].destroy();
+    _pool.free(handle);
+  }
+
+  auto& operator[](ImageHandle handle) noexcept { return _pool[handle]; }
+  auto get(ImageHandle handle) noexcept { return _pool.get(handle); }
+
+private:
+  ImagePoolType _pool;
+)
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Copy Operations

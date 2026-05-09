@@ -36,12 +36,9 @@ public:
 
   auto index() const noexcept { return _index; }
 
-  void set(std::function<void()> func) noexcept { _recreate_descriptor_func = func; }
-
 private:
-  int                   _index{ -1 };
-  DescriptorHeapType    _type{};
-  std::function<void()> _recreate_descriptor_func; // TODO: resdesign the recreate descriptor way
+  int                _index{ -1 };
+  DescriptorHeapType _type{};
 };
 
 Singleton(DescriptorHeapManager, g_desc_heap_mgr,
@@ -72,9 +69,16 @@ public:
     auto size() const noexcept { return _handles.size(); }
 
   private:
-    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>   _heap;
-    std::vector<std::pair<bool, DescriptorHandle>> _handles;
-    DescriptorHeapType                             _type{};
+    struct DescriptorSlot
+    {
+      bool                  used{};
+      DescriptorHandle      handle{};
+      std::function<void()> recreate_descriptor{};
+    };
+
+    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _heap;
+    std::vector<DescriptorSlot>                  _handles;
+    DescriptorHeapType                           _type{};
   };
 
 public:

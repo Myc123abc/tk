@@ -41,16 +41,6 @@ struct vec<2, T>
   constexpr vec(X x, Y y) noexcept
     : x(static_cast<T>(x)), y(static_cast<T>(y)) {}
 
-  // TODO: replace initializer_list for performance
-  template <Numeric U>
-  constexpr vec(std::initializer_list<U> values) noexcept
-  {
-    assert(values.size() <= 2);
-    auto it = values.begin();
-    if (it != values.end()) x = static_cast<T>(*it++);
-    if (it != values.end()) y = static_cast<T>(*it++);
-  }
-
   constexpr auto operator+(T v) const noexcept -> self { return { x + v, y + v }; }
   constexpr auto operator-(T v) const noexcept -> self { return { x - v, y - v }; }
   constexpr auto operator*(T v) const noexcept -> self { return { x * v, y * v }; }

@@ -49,6 +49,12 @@ auto get_gauss_weights(float sigma) noexcept
 
 namespace tk::renderer {
 
+void ComputeEngine::destroy() noexcept
+{
+  for (auto const& img : _blur_tmp_images) g_img_mgr.destroy(img.img);
+  Engine::destroy();
+}
+
 auto ComputeEngine::get_tmp_img() noexcept -> std::pair<Image*, uint32_t>
 {
   Image*   tmp_img{};
@@ -57,14 +63,14 @@ auto ComputeEngine::get_tmp_img() noexcept -> std::pair<Image*, uint32_t>
       it != _blur_tmp_images.end())
   {
     it->in_use = true;
-    tmp_img    = &it->img;
+    tmp_img    = g_img_mgr.get(it->img);
     idx        = it - _blur_tmp_images.begin();
   }
   else
   {
     auto& res = _blur_tmp_images.emplace_back();
     res.in_use = true;
-    tmp_img    = &res.img;
+    tmp_img    = g_img_mgr.get(res.img);
     idx        = _blur_tmp_images.size() - 1;
   }
   return { tmp_img, idx };

@@ -41,6 +41,9 @@ void Renderer::destroy() noexcept
   while (!_frame_render_complete_funcs.empty())
     message_process();
 
+  for (auto const& img : _upload_images) g_img_mgr.destroy(img.second);
+  for (auto const& img : _images) g_img_mgr.destroy(img.second);
+
   // destroy render resources
   g_graphics_engine.destroy();
   g_comp_engine.destroy();
@@ -77,11 +80,8 @@ void Renderer::resize_window_resource(HWND handle, uint32_t width, uint32_t heig
 
 void Renderer::create_image(ui::ImageHandle handle, uint32_t width, uint32_t height, ImageFormat format) noexcept
 {
-  auto image = Image{};
-  image.init(width, height, format, ImageType::srv);
-
   assert(!_images.contains(handle));
-  _images.emplace(handle, std::move(image));
+  _images.emplace(handle, g_img_mgr.create(width, height, format, ImageType::srv));
 }
 
 void Renderer::destroy_image(ui::ImageHandle handle) noexcept
@@ -97,7 +97,7 @@ void Renderer::destroy_image(ui::ImageHandle handle) noexcept
   else if (_images.contains(handle))
   {
     // already uploaded, release image resource
-    add_frame_render_complete_func([image = std::move(_images[handle])] mutable { image.destroy(); });
+    add_frame_render_complete_func([image = _images[handle]] { g_img_mgr.destroy(image); });
     _images.erase(handle);
   }
 }
@@ -105,11 +105,10 @@ void Renderer::destroy_image(ui::ImageHandle handle) noexcept
 void Renderer::upload_image(ui::ImageHandle handle, uint32_t width, uint32_t height, Bitmap const& bitmap, bool use_mipmap) noexcept
 {
   // create image resource
-  auto image = Image{};
-  image.init(bitmap.width, bitmap.height, ImageFormat::rgba8_unorm, ImageType::srv, use_mipmap);
+  auto h = g_img_mgr.create(bitmap.width, bitmap.height, ImageFormat::rgba8_unorm, ImageType::srv, use_mipmap);
 
   // store image and bitmap for upload
-  _upload_images[handle] = std::move(image);
+  _upload_images[handle] = h;
   _bitmaps[handle]       = bitmap;
 
   if (use_mipmap)
@@ -159,7 +158,7 @@ void Renderer::upload_images() noexcept
   if (!_upload_images.empty())
   {
     assert(_upload_images.size() == _bitmaps.size());
-    
+
     // upload images by copy engine
     g_copy_engine.acquire_slot();
     g_copy_engine.copy(
@@ -168,7 +167,7 @@ void Renderer::upload_images() noexcept
         | std::ranges::to<std::vector<Bitmap>>(),
       _upload_images
         | std::views::values
-        | std::views::transform([](auto& img) { return &img; })
+        | std::views::transform([](auto img) { return g_img_mgr.get(img); })
         | std::ranges::to<std::vector<Image*>>());
     auto fence_value = g_copy_engine.submit_slot();
 
@@ -179,8 +178,8 @@ void Renderer::upload_images() noexcept
       g_comp_engine.wait(g_copy_engine, fence_value);
 
     // move upload images to images
-    for (auto& [idx, img] : _upload_images)
-      _images[idx] = std::move(img);
+    for (auto [idx, img] : _upload_images)
+      _images[idx] = img;
 
     // free bitmaps
     for (auto const& bitmap : _bitmaps | std::views::values) stbi_image_free(bitmap.data);

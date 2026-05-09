@@ -27,8 +27,7 @@ float4 blend(float4 src, float4 dst)
 
   return float4(rgb, a);
 }
-
-float get_d(float d, float t)
+float get_d_line(float d, float t)
 {
   float value;
   if (t == 0)
@@ -45,11 +44,45 @@ float get_d(float d, float t)
   return value;
 }
 
+float get_d(float d, float t)
+{
+  float value;
+  if (t == 0)
+    value = d;
+  else if (t == 1)
+    value = abs(d);
+  else
+  {
+    if (d > 0.0)
+      value = d;
+    else
+      value = -d - t * 0.5;
+  }
+  return value;
+}
+
+float4 get_color_no_aa_line(float4 color, float d, float t)
+{
+  float value = get_d_line(d, t);
+  if (value > 1e-5) return float4(0, 0, 0, 0);
+  return color;
+}
+
 float4 get_color_no_aa(float4 color, float d, float t)
 {
   float value = get_d(d, t);
-  if (value > 1e-4) return float4(0, 0, 0, 0);
+  if (value > 1e-5) return float4(0, 0, 0, 0);
   return color;
+}
+
+float4 get_color_line(float4 color, float w, float d, float t)
+{
+  float value = get_d_line(d, t);
+  if (value >= w) return float4(0, 0, 0, 0);
+
+  // float alpha = 1.0 - smoothstep(0.0, w, value);
+  float alpha = saturate(1.f - value * rcp(w));
+  return float4(color.rgb, color.a * alpha);
 }
 
 float4 get_color(float4 color, float w, float d, float t)
@@ -146,21 +179,21 @@ float4 get_color(float2 pos, DrawCmd cmd, float w)
   {
     float d = sdSegment(pos, cmd.p0, cmd.p1);
     if (asuint(cmd.p2.x) == 1)
-      return get_color_no_aa(cmd.color, d, cmd.thickness);
+      return get_color_no_aa_line(cmd.color, d, cmd.thickness);
     else
-      return get_color(cmd.color, w, d, cmd.thickness);
+      return get_color_line(cmd.color, w, d, cmd.thickness);
   }
 
   case add_arc:
   {
     float d = sdArc(pos, cmd.p0, cmd.p1, cmd.p2);
-    return get_color(cmd.color, w, d, cmd.thickness);
+    return get_color_line(cmd.color, w, d, cmd.thickness);
   }
 
   case add_bezier_quad:
   {
     float d = sdBezier(pos, cmd.p0, cmd.p1, cmd.p2);
-    return get_color(cmd.color, w, d, cmd.thickness);
+    return get_color_line(cmd.color, w, d, cmd.thickness);
   }
 
   case add_path:

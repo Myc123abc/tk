@@ -40,7 +40,7 @@ public:
 
   void clear_blur_resize_data() noexcept { _blur_host_window = {}; _blur_window_rect = {}; }
 
-  auto descriptor_idx(ui::ImageHandle handle) noexcept { return _images[handle].srv().index(); }
+  auto descriptor_idx(ui::ImageHandle handle) noexcept { return g_img_mgr[_images[handle]].srv().index(); }
 
 private:
   void preprocess_render()  noexcept;
@@ -68,10 +68,10 @@ private:
 ///                           Image
 ////////////////////////////////////////////////////////////////////////////////
 
-  std::unordered_map<ui::ImageHandle, Image>  _images;
-  std::unordered_map<ui::ImageHandle, Bitmap> _bitmaps;
-  std::unordered_map<ui::ImageHandle, Image>  _upload_images;
-  std::vector<ui::ImageHandle>                _pending_mipmap_image_handles;
+  std::unordered_map<ui::ImageHandle, ImageHandle> _images;
+  std::unordered_map<ui::ImageHandle, Bitmap>      _bitmaps;
+  std::unordered_map<ui::ImageHandle, ImageHandle> _upload_images;
+  std::vector<ui::ImageHandle>                     _pending_mipmap_image_handles;
 )
 
 }
