@@ -48,24 +48,18 @@ public:
 
     // ui::begin_union();
 
-    ui::path_begin();
-    ui::path_line(_pts[0], _pts[1]);
-    ui::path_bezier_quad(_pts[1], _pts[8], _pts[2]);
-    ui::path_line(_pts[2], _pts[3]);
-    ui::path_line(_pts[3], _pts[0]);
-    ui::path_end(color, thickness);
+    ui::path_begin(_pts[0]);
+    ui::path_line_to(_pts[1]);
+    ui::path_quad_bezier_to(_pts[8], _pts[2]);
+    ui::path_line_to(_pts[3]);
+    ui::path_end(color, thickness, true);
 
-    ui::path_begin();
-    ui::path_bezier_quad(_pts[7], _pts[9], _pts[4]);
-    ui::path_line(_pts[4], _pts[5]);
+    ui::path_begin(_pts[7]);
+    ui::path_quad_bezier_to(_pts[9], _pts[4]);
+    ui::path_line_to(_pts[5]);
     if (_pts[6] != _pts[5])
-    {
-      ui::path_line(_pts[5], _pts[6]);
-      ui::path_line(_pts[6], _pts[7]);
-    }
-    else
-      ui::path_line(_pts[5], _pts[7]);
-    ui::path_end(color, thickness);
+      ui::path_line_to(_pts[6]);
+    ui::path_end(color, thickness, true);
 
     // ui::end_union(color, thickness);
 
@@ -171,114 +165,107 @@ void line_draw_test() noexcept
 void test_path_draw() noexcept
 {
   auto pos = float2{ 10, 10 };
-  ui::path_begin();
-  ui::path_line({ pos.x, pos.y }, { pos.x + 100, pos.y + 100 });
-  ui::path_line({ pos.x + 100, pos.y + 100 }, { pos.x + 50, pos.y + 75 });
-  ui::path_line({ pos.x + 50, pos.y + 75 }, pos);
-  ui::path_end(0xff0000ff);
+  ui::path_begin(pos);
+  ui::path_line_to({ pos.x + 100, pos.y + 100 });
+  ui::path_line_to({ pos.x + 50, pos.y + 75 });
+  ui::path_end(0xff0000ff, 0, true);
 
   pos.x += 110;
-  ui::path_begin();
-  ui::path_line({ pos.x, pos.y }, { pos.x + 100, pos.y + 100 });
-  ui::path_line({ pos.x + 100, pos.y + 100 }, { pos.x + 50, pos.y + 75 });
-  ui::path_line({ pos.x + 50, pos.y + 75 }, pos);
-  ui::path_end(0xff0000ff, 1);
+  ui::path_begin(pos);
+  ui::path_line_to({ pos.x + 100, pos.y + 100 });
+  ui::path_line_to({ pos.x + 50, pos.y + 75 });
+  ui::path_end(0xff0000ff, 1, true);
 
   pos.x += 110;
-  ui::path_begin();
-  ui::path_line({ pos.x, pos.y }, { pos.x + 100, pos.y + 100 });
-  ui::path_line({ pos.x + 100, pos.y + 100 }, { pos.x + 50, pos.y + 75 });
-  ui::path_end(0xff0000ff, 1);
+  ui::path_begin(pos);
+  ui::path_line_to({ pos.x + 100, pos.y + 100 });
+  ui::path_line_to({ pos.x + 50, pos.y + 75 });
+  ui::path_end(0xff0000ff, 1, false);
 
   pos = float2{ 10, 10 };
   pos.y += 110;
-  ui::path_begin();
-  ui::path_arc({ pos.x + 50, pos.y + 50 }, { pos.x + 50, pos.y + 25 }, { pos.x + 25, pos.y + 50 });
-  ui::path_end(0xff0000ff);
+  ui::path_begin({ pos.x + 50, pos.y + 25 });
+  ui::path_arc_to({ pos.x + 50, pos.y + 50 }, { pos.x + 25, pos.y + 50 }, false);
+  ui::path_end(0xff0000ff, 0, false);
 
   pos.x += 110;
-  ui::path_begin();
-  ui::path_line({ pos.x + 15, pos.y + 85 }, { pos.x + 40, pos.y + 35 });
-  ui::path_arc({ pos.x + 60, pos.y + 35 }, { pos.x + 40, pos.y + 35 }, { pos.x + 80, pos.y + 35 });
-  ui::path_line({ pos.x + 80, pos.y + 35 }, { pos.x + 105, pos.y + 85 });
-  ui::path_end(0xff0000ff, 3);
+  ui::path_begin({ pos.x + 15, pos.y + 85 });
+  ui::path_line_to({ pos.x + 40, pos.y + 35 });
+  ui::path_arc_to({ pos.x + 60, pos.y + 35 }, { pos.x + 80, pos.y + 35 }, false);
+  ui::path_line_to({ pos.x + 105, pos.y + 85 });
+  ui::path_end(0xff0000ff, 3, false);
 
   pos.x += 110;
-  ui::path_begin();
-  ui::path_arc({ pos.x + 50, pos.y + 50 }, { pos.x + 50, pos.y + 25 }, { pos.x + 25, pos.y + 50 });
-  ui::path_end(0xff0000ff, 3);
+  ui::path_begin({ pos.x + 50, pos.y + 25 });
+  ui::path_arc_to({ pos.x + 50, pos.y + 50 }, { pos.x + 25, pos.y + 50 }, false);
+  ui::path_end(0xff0000ff, 3, false);
 
   pos = float2{ 10, 10 };
   pos.y += 110 * 2;
-  ui::path_begin();
-  ui::path_line(pos, { pos.x, pos.y + 100 });
-  ui::path_bezier_quad({ pos.x, pos.y + 100 }, { pos.x + 100, pos.y + 50 }, pos);
-  ui::path_end(0xff0000ff);
+  ui::path_begin(pos);
+  ui::path_line_to({ pos.x, pos.y + 100 });
+  ui::path_quad_bezier_to({ pos.x + 100, pos.y + 50 }, pos);
+  ui::path_end(0xff0000ff, 0, false);
 
   pos.x += 110;
-  ui::path_begin();
-  ui::path_line(pos, { pos.x, pos.y + 100 });
-  ui::path_bezier_quad({ pos.x, pos.y + 100 }, { pos.x + 100, pos.y + 50 }, pos);
-  ui::path_end(0xff0000ff, 3);
+  ui::path_begin(pos);
+  ui::path_line_to({ pos.x, pos.y + 100 });
+  ui::path_quad_bezier_to({ pos.x + 100, pos.y + 50 }, pos);
+  ui::path_end(0xff0000ff, 3, false);
 
   pos.x += 110;
-  ui::path_begin();
-  ui::path_bezier_quad({ pos.x, pos.y + 100 }, { pos.x + 100, pos.y + 50 }, pos);
-  ui::path_end(0xff0000ff, 3);
+  ui::path_begin({ pos.x, pos.y + 100 });
+  ui::path_quad_bezier_to({ pos.x + 100, pos.y + 50 }, pos);
+  ui::path_end(0xff0000ff, 3, false);
 
   pos = float2{ 10, 10 };
   pos.y += 110 * 3;
-  ui::path_begin();
-  ui::path_line(pos, { pos.x + 100, pos.y });
-  ui::path_line({ pos.x + 100, pos.y }, { pos.x + 50, pos.y + 40 });
-  ui::path_line({ pos.x + 50, pos.y + 40 }, { pos.x + 100, pos.y + 100 });
-  ui::path_line({ pos.x + 100, pos.y + 100 }, { pos.x, pos.y + 100 });
-  ui::path_line({ pos.x, pos.y + 100 }, pos);
-  ui::path_end(0xff0000ff);
+  ui::path_begin(pos);
+  ui::path_line_to({ pos.x + 100, pos.y });
+  ui::path_line_to({ pos.x + 50, pos.y + 40 });
+  ui::path_line_to({ pos.x + 100, pos.y + 100 });
+  ui::path_line_to({ pos.x, pos.y + 100 });
+  ui::path_end(0xff0000ff, 0, true);
 
   pos.x += 110;
-  ui::path_begin();
-  ui::path_line(pos, { pos.x + 100, pos.y });
-  ui::path_line({ pos.x + 100, pos.y }, { pos.x + 50, pos.y + 40 });
-  ui::path_line({ pos.x + 50, pos.y + 40 }, { pos.x + 100, pos.y + 100 });
-  ui::path_line({ pos.x + 100, pos.y + 100 }, { pos.x, pos.y + 100 });
-  ui::path_line({ pos.x, pos.y + 100 }, pos);
-  ui::path_end(0xff0000ff, 3);
+  ui::path_begin(pos);
+  ui::path_line_to({ pos.x + 100, pos.y });
+  ui::path_line_to({ pos.x + 50, pos.y + 40 });
+  ui::path_line_to({ pos.x + 100, pos.y + 100 });
+  ui::path_line_to({ pos.x, pos.y + 100 });
+  ui::path_end(0xff0000ff, 3, true);
 
   pos.x += 110;
-  ui::path_begin();
-  ui::path_line(pos, { pos.x + 100, pos.y });
-  ui::path_line({ pos.x + 100, pos.y }, { pos.x + 50, pos.y + 40 });
-  ui::path_line({ pos.x + 50, pos.y + 40 }, { pos.x + 100, pos.y + 100 });
-  ui::path_line({ pos.x + 100, pos.y + 100 }, { pos.x, pos.y + 100 });
-  ui::path_end(0xff0000ff, 3);
+  ui::path_begin(pos);
+  ui::path_line_to({ pos.x + 100, pos.y });
+  ui::path_line_to({ pos.x + 50, pos.y + 40 });
+  ui::path_line_to({ pos.x + 100, pos.y + 100 });
+  ui::path_line_to({ pos.x, pos.y + 100 });
+  ui::path_end(0xff0000ff, 3, false);
 
   pos = float2{ 10, 10 };
   pos.y += 110 * 4;
-  ui::path_begin();
-  ui::path_line(pos, { pos.x + 50, pos.y + 100 });
-  ui::path_bezier_cubic(pos, { pos.x + 50, pos.y }, { pos.x + 100, pos.y + 100 }, { pos.x + 50, pos.y + 100 });
-  ui::path_end(0xff0000ff);
+  ui::path_begin(pos);
+  ui::path_cubic_bezier_to({ pos.x + 50, pos.y }, { pos.x + 100, pos.y + 100 }, { pos.x + 50, pos.y + 100 });
+  ui::path_end(0xff0000ff, 0, true);
 
   pos.x += 110;
-  ui::path_begin();
-  ui::path_line(pos, { pos.x + 50, pos.y + 100 });
-  ui::path_bezier_cubic(pos, { pos.x + 50, pos.y }, { pos.x + 100, pos.y + 100 }, { pos.x + 50, pos.y + 100 });
-  ui::path_end(0xff0000ff, 3);
+  ui::path_begin(pos);
+  ui::path_cubic_bezier_to({ pos.x + 50, pos.y }, { pos.x + 100, pos.y + 100 }, { pos.x + 50, pos.y + 100 });
+  ui::path_end(0xff0000ff, 3, true);
 
   pos.x += 110;
-  ui::path_begin();
-  ui::path_bezier_cubic(pos, { pos.x + 50, pos.y }, { pos.x + 100, pos.y + 100 }, { pos.x + 50, pos.y + 100 });
-  ui::path_end(0xff0000ff, 3);
+  ui::path_begin(pos);
+  ui::path_cubic_bezier_to({ pos.x + 50, pos.y }, { pos.x + 100, pos.y + 100 }, { pos.x + 50, pos.y + 100 });
+  ui::path_end(0xff0000ff, 3, false);
 
   pos = float2{ 10, 10 };
   pos.y += 110 * 5;
-  ui::path_begin();
-  ui::path_line({ pos.x, pos.y }, { pos.x + 100, pos.y });
-  ui::path_arc({ pos.x + 150, pos.y + 50 }, { pos.x + 100, pos.y + 100 }, { pos.x + 100, pos.y });
-  ui::path_line({ pos.x + 100, pos.y + 100 }, { pos.x, pos.y + 100 });
-  ui::path_line({ pos.x, pos.y + 100 }, { pos.x, pos.y });
-  ui::path_end(0x00ffffff, 3);
+  ui::path_begin(pos);
+  ui::path_line_to({ pos.x + 100, pos.y });
+  ui::path_arc_to({ pos.x + 50, pos.y + 50 }, { pos.x + 100, pos.y + 100 }, false);
+  ui::path_line_to({ pos.x, pos.y + 100 });
+  ui::path_end(0x00ffffff, 3, true);
 }
 
 inline auto img1 = "assets/image/test.jpg";

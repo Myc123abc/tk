@@ -235,7 +235,7 @@ void line(float2 p0, float2 p1, Color color, float thickness) noexcept
   g_ui_ctx.frame_data()->add_line(p0, p1, color, thickness);
 }
 
-void arc(float2 center, float2 p0, float2 p1, Color color, float thickness) noexcept
+void arc(float2 center, float2 p0, float2 p1, bool ccw, Color color, float thickness) noexcept
 {
   g_ui_ctx.check_draw();
   if (thickness < 1) thickness = 1;
@@ -243,68 +243,70 @@ void arc(float2 center, float2 p0, float2 p1, Color color, float thickness) noex
   center = floor(center) + .5f;
   p0     = floor(p0)     + .5f;
   p1     = floor(p1)     + .5f;
+  if (ccw) std::swap(p0, p1);
   g_ui_ctx.frame_data()->add_arc(center, p0, p1, color, thickness);
 }
 
-void bezier_quad(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept
+void quad_bezier(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept
 {
 	g_ui_ctx.check_draw();
   if (thickness < 1) thickness = 1;
   adjust_pos(p0, p1, p2); adjust_scale(thickness);
-  g_ui_ctx.frame_data()->add_bezier_quad(p0, p1, p2, color, thickness);
+  g_ui_ctx.frame_data()->add_quad_bezier(p0, p1, p2, color, thickness);
 }
 
-void bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept
+void cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept
 {
 	g_ui_ctx.check_draw();
   if (thickness < 1) thickness = 1;
   adjust_pos(p0, p1, p2, p3); adjust_scale(thickness);
-  g_ui_ctx.frame_data()->add_bezier_cubic(p0, p1, p2, p3, color, thickness);
+  g_ui_ctx.frame_data()->add_cubic_bezier(p0, p1, p2, p3, color, thickness);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                               Path
 ////////////////////////////////////////////////////////////////////////////////
 
-void path_begin() noexcept
+void path_begin(float2 p0) noexcept
 {
   g_ui_ctx.check_draw();
-  g_ui_ctx.frame_data()->path_begin();
+  adjust_pos(p0);
+  g_ui_ctx.frame_data()->path_begin(p0);
 }
 
-void path_line(float2 p0, float2 p1) noexcept
+void path_line_to(float2 p1) noexcept
 {
 	g_ui_ctx.check_draw();
-  adjust_pos(p0, p1);
-  g_ui_ctx.frame_data()->add_path_line(p0, p1);
+  adjust_pos(p1);
+  g_ui_ctx.frame_data()->add_path_line_to(p1);
 }
 
-void path_arc(float2 center, float2 p0, float2 p1) noexcept
+void path_arc_to(float2 center, float2 p1, bool ccw) noexcept
 {
   g_ui_ctx.check_draw();
-  adjust_pos(center, p0, p1);
-  g_ui_ctx.frame_data()->add_path_arc(center, p0, p1);
+  adjust_pos(center, p1);
+  g_ui_ctx.frame_data()->add_path_arc_to(center, p1, ccw);
 }
 
-void path_bezier_quad(float2 p0, float2 p1, float2 p2) noexcept
+void path_quad_bezier_to(float2 p1, float2 p2) noexcept
 {
   g_ui_ctx.check_draw();
-  adjust_pos(p0, p1, p2);
-  g_ui_ctx.frame_data()->add_path_bezier_quad(p0, p1, p2);
+  adjust_pos(p1, p2);
+  g_ui_ctx.frame_data()->add_path_quad_bezier_to(p1, p2);
 }
 
-void path_bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3) noexcept
+void path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept
 {
 	g_ui_ctx.check_draw();
-  adjust_pos(p0, p1, p2, p3);
-  g_ui_ctx.frame_data()->add_path_bezier_cubic(p0, p1, p2, p3);
+  adjust_pos(p1, p2, p3);
+  g_ui_ctx.frame_data()->add_path_cubic_bezier_to(p1, p2, p3);
 }
 
-void path_end(Color color, float thickness) noexcept
+void path_end(Color color, float thickness, bool close) noexcept
 {
 	g_ui_ctx.check_draw();
   adjust_scale(thickness);
-  g_ui_ctx.frame_data()->path_end(color, thickness);
+  g_ui_ctx.frame_data()->path_end(color, thickness, close);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -84,14 +84,14 @@ public:
   void add_triangle(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
   void add_circle(float2 center, float radius, Color color, float thickness) noexcept;
   void add_line(float2 p0, float2 p1, Color color, float thickness) noexcept;
-  void add_bezier_quad(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
-  void add_bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept;
+  void add_quad_bezier(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
+  void add_cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept;
   void add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept;
 
   void path_line_to(float2 p) noexcept { _points.emplace_back(p); }
   void path_arc_to(float2 center, float radius, float min, float max) noexcept;
-  void path_bezier_quad_to(float2 p1, float2 p2) noexcept;
-  void path_bezier_cubic_to(float2 p1, float2 p2, float2 p3) noexcept;
+  void path__to(float2 p1, float2 p2) noexcept;
+  void path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept;
   void path_end(Color color, float thickness, bool is_closed) noexcept;
 
   void add_scissor_rect(RECT rect) noexcept;
@@ -153,8 +153,8 @@ private:
   void _path_arc_to(float2 center, float radius, int min, int max) noexcept;
   void _path_arc_to(float2 center, float radius, int min, int max, int segment_cnt) noexcept;
 
-  void path_bezier_quad_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float tess_tol, int level) noexcept;
-  void path_bezier_cubic_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float2 p3, float tess_tol, int level) noexcept;
+  void path__curve_to_casteljau(float2 p0, float2 p1, float2 p2, float tess_tol, int level) noexcept;
+  void path_cubic_bezier_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float2 p3, float tess_tol, int level) noexcept;
 
 private:
   std::vector<Vertex>   _vertices;

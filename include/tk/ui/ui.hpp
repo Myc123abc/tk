@@ -321,10 +321,11 @@ void line(float2 p0, float2 p1, Color color = {}, float thickness = 1.f) noexcep
  * @param center
  * @param p0
  * @param p1
+ * @param ccw whether counter clockwise
  * @param color
  * @param thickness
  */
-void arc(float2 center, float2 p0, float2 p1, Color color = {}, float thickness = 1.f) noexcept;
+void arc(float2 center, float2 p0, float2 p1, bool ccw, Color color = {}, float thickness = 1.f) noexcept;
 
 /**
  * draw a quad bezier
@@ -334,7 +335,7 @@ void arc(float2 center, float2 p0, float2 p1, Color color = {}, float thickness 
  * @param color
  * @param thickness
  */
-void bezier_quad(float2 p0, float2 p1, float2 p2, Color color = {}, float thickness = 1.f) noexcept;
+void quad_bezier(float2 p0, float2 p1, float2 p2, Color color = {}, float thickness = 1.f) noexcept;
 
 /**
  * draw a cubic bezier
@@ -345,53 +346,54 @@ void bezier_quad(float2 p0, float2 p1, float2 p2, Color color = {}, float thickn
  * @param color
  * @param thickness
  */
-void bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3, Color color = {}, float thickness = 1.f) noexcept;
+void cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Color color = {}, float thickness = 1.f) noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Path
 ////////////////////////////////////////////////////////////////////////////////
 
-/// path draw start
-void path_begin() noexcept;
+/**
+ * start to draw a path
+ * @param p0 start point
+ */
+void path_begin(float2 p0) noexcept;
 
 /**
  * path line
- * @param p0
  * @param p1
  */
-void path_line(float2 p0, float2 p1) noexcept;
+void path_line_to(float2 p1) noexcept;
 
 /**
  * path arc
  * @param center
- * @param p0
  * @param p1
+ * @param ccw whether counter clockwise
  */
-void path_arc(float2 center, float2 p0, float2 p1) noexcept;
+void path_arc_to(float2 center, float2 p1, bool ccw) noexcept;
 
 /**
  * path bezier quad draw
- * @param p0
  * @param p1
  * @param p2
  */
-void path_bezier_quad(float2 p0, float2 p1, float2 p2) noexcept;
+void path_quad_bezier_to(float2 p1, float2 p2) noexcept;
 
 /**
  * path bezier cubic draw
- * @param p0
  * @param p1
  * @param p2
  * @param p3
  */
-void path_bezier_cubic(float2 p0 ,float2 p1, float2 p2, float2 p3) noexcept;
+void path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept;
 
 /**
  * path draw end
  * @param color
  * @param thickness
+ * @param close close with a line
  */
-void path_end(Color color, float thickness = 0.f) noexcept;
+void path_end(Color color, float thickness, bool close) noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                               Widget

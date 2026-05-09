@@ -119,13 +119,13 @@ auto rect_angle_hit(Rect r, float2 center, float start, float end, bool ccw) noe
   return false;
 }
 
-auto bezier_quad_point(float2 p0, float2 p1, float2 p2, float t) noexcept -> float2
+auto quad_bezier_point(float2 p0, float2 p1, float2 p2, float t) noexcept -> float2
 {
   auto u = 1.f - t;
   return p0 * (u * u) + p1 * (2.f * u * t) + p2 * (t * t);
 }
 
-auto bezier_cubic_point(float2 p0, float2 p1, float2 p2, float2 p3, float t) noexcept -> float2
+auto cubic_bezier_point(float2 p0, float2 p1, float2 p2, float2 p3, float t) noexcept -> float2
 {
   auto u  = 1.f - t;
   auto uu = u * u;
@@ -474,7 +474,7 @@ void FrameData::add_arc(float2 center, float2 p0, float2 p1, Color color, float 
   add_command(cmd_idx, center, p0, p1, thickness);
 }
 
-void FrameData::add_bezier_quad(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept
+void FrameData::add_quad_bezier(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept
 {
   assert(!_path_cmd);
 
@@ -490,10 +490,10 @@ void FrameData::add_bezier_quad(float2 p0, float2 p1, float2 p2, Color color, fl
   auto cmd_idx = _cmds.size();
 
   auto& cmd = _cmds.emplace_back(DrawCmd{});
-  cmd.type        = DrawCmdType::add_bezier_quad;
+  cmd.type        = DrawCmdType::add_quad_bezier;
   cmd.color       = color;
   cmd.thickness   = thickness;
-  cmd.bezier_quad = { p0, p1, p2 };
+  cmd.quad_bezier = { p0, p1, p2 };
 
   auto chord = length(p2 - p0);
   auto ctrl  = length(p1 - p0) + length(p2 - p1);
@@ -509,7 +509,7 @@ void FrameData::add_bezier_quad(float2 p0, float2 p1, float2 p2, Color color, fl
     for (int i = 1; i <= segments; ++i)
     {
       auto t = static_cast<float>(i) / static_cast<float>(segments);
-      auto p = bezier_quad_point(p0, p1, p2, t);
+      auto p = quad_bezier_point(p0, p1, p2, t);
 
       add_command(cmd_idx, prev, p, thickness);
       prev = p;
@@ -526,9 +526,9 @@ void FrameData::add_bezier_quad(float2 p0, float2 p1, float2 p2, Color color, fl
   }
 }
 
-void FrameData::add_bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept
+void FrameData::add_cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept
 {
-  assert(!_path_cmd && _bezier_quads.empty());
+  assert(!_path_cmd && _quad_beziers.empty());
 
   if (p0 == p1 && p1 == p2 && p2 == p3)
     return;
@@ -540,28 +540,28 @@ void FrameData::add_bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3, Col
     return;
   }
 
-  bezier_cubic_to_quad(p0, p1, p2, p3);
+  cubic_bezier_to_quad(p0, p1, p2, p3);
 
-  for (auto [p0, p1, p2] : _bezier_quads)
-    add_bezier_quad(p0, p1, p2, color, thickness);
-  _bezier_quads.clear();
+  for (auto [p0, p1, p2] : _quad_beziers)
+    add_quad_bezier(p0, p1, p2, color, thickness);
+  _quad_beziers.clear();
 }
 
-void FrameData::bezier_cubic_to_quad(float2 p0, float2 p1, float2 p2, float2 p3, float tolerance, uint level) noexcept
+void FrameData::cubic_bezier_to_quad(float2 p0, float2 p1, float2 p2, float2 p3, float tolerance, uint level) noexcept
 {
   auto chord = p3 - p0;
   auto chord_len_sq = length_sq(chord);
 
   if (level >= 10 || chord_len_sq <= 1e-6f)
   {
-    _bezier_quads.emplace_back(p0, cubic_to_quad_control(p0, p1, p2, p3), p3);
+    _quad_beziers.emplace_back(p0, cubic_to_quad_control(p0, p1, p2, p3), p3);
     return;
   }
 
   auto flatness = cubic_flatness(p0, p1, p2, p3);
   if (flatness * flatness <= tolerance * tolerance * chord_len_sq)
   {
-    _bezier_quads.emplace_back(p0, cubic_to_quad_control(p0, p1, p2, p3), p3);
+    _quad_beziers.emplace_back(p0, cubic_to_quad_control(p0, p1, p2, p3), p3);
     return;
   }
 
@@ -573,68 +573,83 @@ void FrameData::bezier_cubic_to_quad(float2 p0, float2 p1, float2 p2, float2 p3,
   auto p123 = (p12 + p23) * 0.5f;
   auto p0123 = (p012 + p123) * 0.5f;
 
-  bezier_cubic_to_quad(p0, p01, p012, p0123, tolerance, level + 1);
-  bezier_cubic_to_quad(p0123, p123, p23, p3, tolerance, level + 1);
+  cubic_bezier_to_quad(p0, p01, p012, p0123, tolerance, level + 1);
+  cubic_bezier_to_quad(p0123, p123, p23, p3, tolerance, level + 1);
 }
 
-void FrameData::path_begin() noexcept
+void FrameData::path_begin(float2 p0) noexcept
 {
   assert(!_path_cmd);
   _path_cmd = &_cmds.emplace_back(DrawCmd{});
   _path_cmd->type     = DrawCmdType::add_path;
   _path_cmd->path.beg = _path_cmds.size();
+  _path_point         = p0;
+  _path_beg_point     = p0;
 }
 
-void FrameData::add_path_line(float2 p0, float2 p1) noexcept
+void FrameData::add_path_line_to(float2 p1) noexcept
 {
   assert(_path_cmd);
   auto& cmd = _path_cmds.emplace_back(DrawCmd{});
   cmd.type      = DrawCmdType::add_path_line;
-  cmd.path_line = { p0, p1 };
+  cmd.path_line = { _path_point, p1 };
+  _path_point   = p1;
 }
 
-void FrameData::add_path_bezier_quad(float2 p0, float2 p1, float2 p2) noexcept
+void FrameData::add_path_quad_bezier_to(float2 p1, float2 p2) noexcept
 {
   assert(_path_cmd);
+  auto p0 = _path_point;
   if (std::abs(cross(p2 - p0, p1 - p0)) < 1e-5)
   {
-    add_path_line(p0, p2);
+    add_path_line_to(p2);
     return;
   }
   auto& cmd = _path_cmds.emplace_back(DrawCmd{});
-  cmd.type             = DrawCmdType::add_path_bezier_quad;
-  cmd.path_bezier_quad = { p0, p1, p2 };
+  cmd.type             = DrawCmdType::add_path_quad_bezier;
+  cmd.path_quad_bezier = { p0, p1, p2 };
+  _path_point = p2;
 }
 
-void FrameData::add_path_bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3) noexcept
+void FrameData::add_path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept
 {
-  assert(_path_cmd && _bezier_quads.empty());
-
+  assert(_path_cmd && _quad_beziers.empty());
+  auto p0 = _path_point;
   if (std::abs(cross(p3 - p0, p1 - p0)) < 1e-5 &&
       std::abs(cross(p3 - p0, p2 - p0)) < 1e-5)
   {
-    add_path_line(p0, p3);
+    add_path_line_to(p3);
     return;
   }
 
-  bezier_cubic_to_quad(p0, p1, p2, p3);
+  cubic_bezier_to_quad(p0, p1, p2, p3);
 
-  for (auto [p0, p1, p2] : _bezier_quads)
-    add_path_bezier_quad(p0, p1, p2);
-  _bezier_quads.clear();
+  for (auto [p0, p1, p2] : _quad_beziers)
+  {
+    _path_point = p0;
+    add_path_quad_bezier_to(p1, p2);
+  }
+  _quad_beziers.clear();
+  _path_point = p3;
 }
 
-void FrameData::add_path_arc(float2 center, float2 p0, float2 p1) noexcept
+void FrameData::add_path_arc_to(float2 center, float2 p1, bool ccw) noexcept
 {
   assert(_path_cmd);
   auto& cmd = _path_cmds.emplace_back(DrawCmd{});
   cmd.type     = DrawCmdType::add_path_arc;
-  cmd.path_arc = { center, p0, p1 };
+  if (ccw)
+    cmd.path_arc = { center, p1, _path_point };
+  else
+    cmd.path_arc = { center, _path_point, p1 };
+  _path_point = p1;
 }
 
-void FrameData::path_end(Color color, float thickness) noexcept
+void FrameData::path_end(Color color, float thickness, bool close) noexcept
 {
   assert(_path_cmd);
+
+  if (close) add_path_line_to(_path_beg_point);
 
   auto cmd_idx    = _cmds.size() - 1;
   auto path_beg   = _path_cmd->path.beg;
@@ -662,11 +677,11 @@ void FrameData::path_end(Color color, float thickness) noexcept
         add_command(cmd_idx, cmd.path_arc.center, cmd.path_arc.p0, cmd.path_arc.p1, thickness);
         break;
 
-      case DrawCmdType::add_path_bezier_quad:
+      case DrawCmdType::add_path_quad_bezier:
       {
-        auto p0 = cmd.path_bezier_quad.p0;
-        auto p1 = cmd.path_bezier_quad.p1;
-        auto p2 = cmd.path_bezier_quad.p2;
+        auto p0 = cmd.path_quad_bezier.p0;
+        auto p1 = cmd.path_quad_bezier.p1;
+        auto p2 = cmd.path_quad_bezier.p2;
 
         auto chord = length(p2 - p0);
         auto ctrl  = length(p1 - p0) + length(p2 - p1);
@@ -677,7 +692,7 @@ void FrameData::path_end(Color color, float thickness) noexcept
         for (int j = 1; j <= segments; ++j)
         {
           auto t = static_cast<float>(j) / static_cast<float>(segments);
-          auto p = bezier_quad_point(p0, p1, p2, t);
+          auto p = quad_bezier_point(p0, p1, p2, t);
 
           add_command(cmd_idx, prev, p, thickness);
           prev = p;
@@ -703,10 +718,10 @@ void FrameData::path_end(Color color, float thickness) noexcept
         pts.emplace_back(cmd.path_line.p1);
         break;
 
-      case DrawCmdType::add_path_bezier_quad:
-        pts.emplace_back(cmd.path_bezier_quad.p0);
-        pts.emplace_back(cmd.path_bezier_quad.p1);
-        pts.emplace_back(cmd.path_bezier_quad.p2);
+      case DrawCmdType::add_path_quad_bezier:
+        pts.emplace_back(cmd.path_quad_bezier.p0);
+        pts.emplace_back(cmd.path_quad_bezier.p1);
+        pts.emplace_back(cmd.path_quad_bezier.p2);
         break;
 
       case DrawCmdType::add_path_arc:

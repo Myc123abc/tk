@@ -39,13 +39,13 @@ enum class DrawCmdType
   add_circle,
   add_line,
   add_arc,
-  add_bezier_quad,
+  add_quad_bezier,
   add_image,
 
   add_path,
   add_path_line,
   add_path_arc,
-  add_path_bezier_quad,
+  add_path_quad_bezier,
 };
 
 struct DrawCmd
@@ -94,7 +94,7 @@ struct DrawCmd
       float2 p0;
       float2 p1;
       float2 p2;
-    } bezier_quad;
+    } quad_bezier;
 
     struct
     {
@@ -120,7 +120,7 @@ struct DrawCmd
       float2 p0;
       float2 p1;
       float2 p2;
-    } path_bezier_quad;
+    } path_quad_bezier;
 
     struct
     {
@@ -152,16 +152,16 @@ public:
   void add_circle(float2 center, float radius, Color color, float thickness) noexcept;
   void add_line(float2 p0, float2 p1, Color color, float thickness) noexcept;
   void add_arc(float2 center, float2 p0, float2 p1, Color color, float thickness) noexcept;
-  void add_bezier_quad(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
-  void add_bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept;
+  void add_quad_bezier(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
+  void add_cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept;
   void add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept;
 
-  void path_begin() noexcept;
-  void add_path_line(float2 p0, float2 p1) noexcept;
-  void add_path_arc(float2 center, float2 p0, float2 p1) noexcept;
-  void add_path_bezier_quad(float2 p0, float2 p1, float2 p2) noexcept;
-  void add_path_bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3) noexcept;
-  void path_end(Color color, float thickness) noexcept;
+  void path_begin(float2 p0) noexcept;
+  void add_path_line_to(float2 p1) noexcept;
+  void add_path_arc_to(float2 center, float2 p1, bool ccw) noexcept;
+  void add_path_quad_bezier_to(float2 p1, float2 p2) noexcept;
+  void add_path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept;
+  void path_end(Color color, float thickness, bool close) noexcept;
 
   void build_ui_render_call(Rect rect, uint2 window_pos) noexcept;
   void build_window_shadow_render_call(Rect scissor_rect, uint2 window_pos, uint2 window_extent, float shadow_thickness, Color color, float radius, float softness, std::optional<float4> wireframe_color) noexcept;
@@ -182,7 +182,7 @@ private:
   void add_command(uint cmd_idx, float2 center, float2 p0, float2 p1, float thickness) noexcept;
   void add_command(uint cmd_idx, float2 center, float radius, float start_angle, float end_angle, bool ccw, float thickness) noexcept;
 
-  void bezier_cubic_to_quad(float2 p0, float2 p1, float2 p2, float2 p3, float tolerance = 0.5, uint level = 0) noexcept;
+  void cubic_bezier_to_quad(float2 p0, float2 p1, float2 p2, float2 p3, float tolerance = 0.5, uint level = 0) noexcept;
 
 private:
   struct Tile
@@ -207,8 +207,10 @@ private:
 
   std::vector<RenderCall> _calls;
   DrawCmd*                _path_cmd{};
+  float2                  _path_point{};
+  float2                  _path_beg_point{};
 
-  std::vector<std::tuple<float2, float2, float2>> _bezier_quads;
+  std::vector<std::tuple<float2, float2, float2>> _quad_beziers;
 };
 
 }

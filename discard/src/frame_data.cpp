@@ -194,25 +194,25 @@ void FrameData::add_line(float2 p0, float2 p1, Color color, float thickness) noe
   add_poly_line(color, thickness, false);
 }
 
-void FrameData::add_bezier_quad(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept
+void FrameData::add_quad_bezier(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept
 {
   if (_using_discard_shapes) color.a = 1.f;
   else if (color.a == 0) return;
 
   assert(_points.empty());
   _points.emplace_back(p0);
-  path_bezier_quad_curve_to_casteljau(p0, p1, p2, curve_tessellation_tol, 0);
+  path_quad_bezier_curve_to_casteljau(p0, p1, p2, curve_tessellation_tol, 0);
   add_poly_line(color, thickness, false);
 }
 
-void FrameData::add_bezier_cubic(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept
+void FrameData::add_cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept
 {
   if (_using_discard_shapes) color.a = 1.f;
   else if (color.a == 0) return;
 
   assert(_points.empty());
   _points.emplace_back(p0);
-  path_bezier_cubic_curve_to_casteljau(p0, p1, p2, p3, curve_tessellation_tol, 0);
+  path_cubic_bezier_curve_to_casteljau(p0, p1, p2, p3, curve_tessellation_tol, 0);
   add_poly_line(color, thickness, false);
 }
 
@@ -236,7 +236,7 @@ void FrameData::path_end(Color color, float thickness, bool is_closed) noexcept
   }
 }
 
-void FrameData::path_bezier_quad_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float tess_tol, int level) noexcept
+void FrameData::path_quad_bezier_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float tess_tol, int level) noexcept
 {
   auto dp  = p2 - p0;
   auto det = cross(p1 - p2, dp);
@@ -247,12 +247,12 @@ void FrameData::path_bezier_quad_curve_to_casteljau(float2 p0, float2 p1, float2
     auto p01  = ( p0 +  p1) * .5f;
     auto p12  = ( p1 +  p2) * .5f;
     auto p012 = (p01 + p12) * .5f;
-    path_bezier_quad_curve_to_casteljau(p0, p01, p012, tess_tol, level + 1);
-    path_bezier_quad_curve_to_casteljau(p012, p12, p2, tess_tol, level + 1);
+    path_quad_bezier_curve_to_casteljau(p0, p01, p012, tess_tol, level + 1);
+    path_quad_bezier_curve_to_casteljau(p012, p12, p2, tess_tol, level + 1);
   }
 }
 
-void FrameData::path_bezier_cubic_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float2 p3, float tess_tol, int level) noexcept
+void FrameData::path_cubic_bezier_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float2 p3, float tess_tol, int level) noexcept
 {
   auto dp = p3 - p0;
   auto d2 = cross(p1 - p3, dp);
@@ -269,8 +269,8 @@ void FrameData::path_bezier_cubic_curve_to_casteljau(float2 p0, float2 p1, float
     auto p012  = ( p01 +  p12) * .5f;
     auto p123  = ( p12 +  p23) * .5f;
     auto p0123 = (p012 + p123) * .5f;
-    path_bezier_cubic_curve_to_casteljau(p0, p01, p012, p0123, tess_tol, level + 1);
-    path_bezier_cubic_curve_to_casteljau(p0123, p123, p23, p3, tess_tol, level + 1);
+    path_cubic_bezier_curve_to_casteljau(p0, p01, p012, p0123, tess_tol, level + 1);
+    path_cubic_bezier_curve_to_casteljau(p0123, p123, p23, p3, tess_tol, level + 1);
   }
 }
 
@@ -538,16 +538,16 @@ void FrameData::_path_arc_to(float2 center, float radius, int min, int max, int 
   }
 }
 
-void FrameData::path_bezier_quad_to(float2 p1, float2 p2) noexcept
+void FrameData::path_quad_bezier_to(float2 p1, float2 p2) noexcept
 {
   assert(!_points.empty());
-  path_bezier_quad_curve_to_casteljau(_points.back(), p1, p2, curve_tessellation_tol, 0);
+  path_quad_bezier_curve_to_casteljau(_points.back(), p1, p2, curve_tessellation_tol, 0);
 }
 
-void FrameData::path_bezier_cubic_to(float2 p1, float2 p2, float2 p3) noexcept
+void FrameData::path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept
 {
   assert(!_points.empty());
-  path_bezier_cubic_curve_to_casteljau(_points.back(), p1, p2, p3, curve_tessellation_tol, 0);
+  path_cubic_bezier_curve_to_casteljau(_points.back(), p1, p2, p3, curve_tessellation_tol, 0);
 }
 
 void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noexcept
