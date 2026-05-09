@@ -1,6 +1,9 @@
 #include "common.hlsl"
 #include "sdf.hlsl"
 
+#define FLT_MAX 0x7f7fffff
+#define FLT_MIN 0xff7fffff
+
 float4 vs(uint id : SV_VertexID) : SV_POSITION
 {
   float2 vertices[] =
@@ -131,7 +134,7 @@ int get_path_winding(float2 pos, uint offset)
 
 float get_path_stroke_dis(float2 pos, uint beg, uint count)
 {
-  float d = asfloat(0x7f7fffff);
+  float d = FLT_MAX;
   for (uint i = 0; i < count; ++i)
     d = min(d, get_path_edge_dis(pos, beg + i));
   return d;
@@ -139,7 +142,7 @@ float get_path_stroke_dis(float2 pos, uint beg, uint count)
 
 float get_path_fill_dis(float2 pos, uint beg, uint count)
 {
-  float d = asfloat(0x7f7fffff);
+  float d = FLT_MAX;
   int winding = 0;
   for (uint i = 0; i < count; ++i)
   {
@@ -207,6 +210,46 @@ float4 get_color(float2 pos, DrawCmd cmd, float w)
   return float4(0, 0, 0, 0);
 }
 
+float get_sd(float2 pos, DrawCmd cmd)
+{
+  switch (cmd.type)
+  {
+  case add_rect:
+  {
+    float2 extent_div2 = (cmd.p1 - cmd.p0) * 0.5;
+    float2 center = cmd.p0 + extent_div2;
+    return sdBox(pos - center, extent_div2);
+  }
+
+  case add_triangle:
+    return sdTriangle(pos, cmd.p0, cmd.p1, cmd.p2);
+
+  case add_circle:
+  {
+    float2 center = cmd.p0;
+    float radius = cmd.p1.x;
+    return sdCircle(pos - center, radius);
+  }
+
+  case add_line:
+    return sdSegment(pos, cmd.p0, cmd.p1);
+
+  case add_arc:
+    return sdArc(pos, cmd.p0, cmd.p1, cmd.p2);
+
+  case add_bezier_quad:
+    return sdBezier(pos, cmd.p0, cmd.p1, cmd.p2);
+
+  case add_path:
+  {
+    uint beg   = asuint(cmd.p0.x);
+    uint count = asuint(cmd.p0.y);
+    return get_path_fill_dis(pos, beg, count);
+  }
+  }
+  return FLT_MAX;
+}
+
 float4 ps(float4 pos4 : SV_POSITION) : SV_TARGET
 {
   float2 pos = pos4.xy;
@@ -219,9 +262,38 @@ float4 ps(float4 pos4 : SV_POSITION) : SV_TARGET
 
   float w = length(float2(ddx_fine(pos.x), ddy_fine(pos.y)));
 
+  int    op    = op_none;
+
   for (uint i = 0; i < tile.count; ++i)
   {
     DrawCmd cmd = cmds[cmd_idxs[tile.beg + i]];
+
+    if (cmd.op == op_uni)
+    {
+      float  min_d = FLT_MAX;
+      float4 min_col;
+      float  min_t;
+
+      float d = get_sd(pos, cmd);
+      if (d < min_d)
+      {
+        min_d   = d;
+        min_col = cmd.color;
+        min_t   = cmd.thickness;
+      }
+
+      uint cnt = cmd.uni_cnt;
+      for (uint j = 1; j < cnt; ++j)
+      {
+        cmd = cmds[cmd_idxs[tile.beg + i + j]];
+        min_d = min(min_d, get_sd(pos, cmd));
+      }
+
+      color = blend(get_color(min_col, w, min_d, min_t), color);
+
+      i += cnt - 1;
+      continue;
+    }
 
     if (cmd.type == add_image)
     {

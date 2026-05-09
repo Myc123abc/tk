@@ -1,6 +1,8 @@
 #include "frame_data.hpp"
 #include "../renderer/renderer/renderer.hpp"
 
+#include <ranges>
+
 using namespace tk;
 
 namespace {
@@ -360,6 +362,7 @@ void FrameData::add_rect(float2 left_top, float2 right_bottom, Color color, floa
   cmd.color     = color;
   cmd.thickness = thickness;
   cmd.rect      = { left_top, right_bottom };
+  cmd.op        = _op;
 
   if (thickness > 0.f)
   {
@@ -388,6 +391,7 @@ void FrameData::add_triangle(float2 p0, float2 p1, float2 p2, Color color, float
   cmd.color     = color;
   cmd.thickness = thickness;
   cmd.triangle  = { p0, p1, p2 };
+  cmd.op        = _op;
 
   if (thickness > 0.f)
   {
@@ -421,6 +425,7 @@ void FrameData::add_circle(float2 center, float radius, Color color, float thick
   cmd.color     = color;
   cmd.thickness = thickness;
   cmd.circle    = { center, radius };
+  cmd.op        = _op;
 
   if (thickness > 0.f)
   {
@@ -452,6 +457,7 @@ void FrameData::add_line(float2 p0, float2 p1, Color color, float thickness) noe
   cmd.color     = color;
   cmd.thickness = thickness;
   cmd.line      = { p0, p1, thickness > 1 ? false : dp.x < 1e-5 || dp.y < 1e-5 };
+  cmd.op        = _op;
 
   add_command(cmd_idx, p0, p1, thickness);
 }
@@ -470,6 +476,7 @@ void FrameData::add_arc(float2 center, float2 p0, float2 p1, Color color, float 
   cmd.color     = color;
   cmd.thickness = thickness;
   cmd.arc       = { center, p0, p1 };
+  cmd.op        = _op;
 
   add_command(cmd_idx, center, p0, p1, thickness);
 }
@@ -494,6 +501,7 @@ void FrameData::add_quad_bezier(float2 p0, float2 p1, float2 p2, Color color, fl
   cmd.color       = color;
   cmd.thickness   = thickness;
   cmd.quad_bezier = { p0, p1, p2 };
+  cmd.op          = _op;
 
   auto chord = length(p2 - p0);
   auto ctrl  = length(p1 - p0) + length(p2 - p1);
@@ -577,12 +585,17 @@ void FrameData::cubic_bezier_to_quad(float2 p0, float2 p1, float2 p2, float2 p3,
   cubic_bezier_to_quad(p0123, p123, p23, p3, tolerance, level + 1);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///                               path
+////////////////////////////////////////////////////////////////////////////////
+
 void FrameData::path_begin(float2 p0) noexcept
 {
   assert(!_path_cmd);
   _path_cmd = &_cmds.emplace_back(DrawCmd{});
   _path_cmd->type     = DrawCmdType::add_path;
   _path_cmd->path.beg = _path_cmds.size();
+  _path_cmd->op       = _op;
   _path_point         = p0;
   _path_beg_point     = p0;
 }
@@ -645,7 +658,7 @@ void FrameData::add_path_arc_to(float2 center, float2 p1, bool ccw) noexcept
   _path_point = p1;
 }
 
-void FrameData::path_end(Color color, float thickness, bool close) noexcept
+void FrameData::path_end(bool close, Color color, float thickness) noexcept
 {
   assert(_path_cmd);
 
@@ -738,6 +751,34 @@ void FrameData::path_end(Color color, float thickness, bool close) noexcept
 
   _path_cmd = {};
 }
+////////////////////////////////////////////////////////////////////////////////
+///                              union
+////////////////////////////////////////////////////////////////////////////////
+
+void FrameData::union_beg() noexcept
+{
+  assert(!_path_cmd);
+  _op          = DrawCmdOp::uni;
+  _uni_cmd_beg = _cmds.size();
+}
+
+void FrameData::union_end(Color color, float thickness) noexcept
+{
+  assert(!_path_cmd && !_cmds.empty() && _cmds.back().op == _op);
+  for (auto i = _uni_cmd_beg; i < _cmds.size(); ++i)
+  {
+    auto& cmd = _cmds[i];
+    if (cmd.op != _op) break;
+    cmd.color     = color;
+    cmd.thickness = thickness;
+    cmd.uni_cnt   = _cmds.size() - i;
+  }
+  _op = {};
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///                              other
+////////////////////////////////////////////////////////////////////////////////
 
 void FrameData::add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept
 {

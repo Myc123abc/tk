@@ -48,11 +48,19 @@ enum class DrawCmdType
   add_path_quad_bezier,
 };
 
+enum class DrawCmdOp
+{
+  none,
+  uni,
+};
+
 struct DrawCmd
 {
-  DrawCmdType type;
+  DrawCmdType type{};
   Color       color;
   float       thickness{};
+  DrawCmdOp   op{};
+  uint        uni_cnt{};
 
   union
   {
@@ -161,7 +169,10 @@ public:
   void add_path_arc_to(float2 center, float2 p1, bool ccw) noexcept;
   void add_path_quad_bezier_to(float2 p1, float2 p2) noexcept;
   void add_path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept;
-  void path_end(Color color, float thickness, bool close) noexcept;
+  void path_end(bool close, Color color, float thickness) noexcept;
+
+  void union_beg() noexcept;
+  void union_end(Color color, float thickness) noexcept;
 
   void build_ui_render_call(Rect rect, uint2 window_pos) noexcept;
   void build_window_shadow_render_call(Rect scissor_rect, uint2 window_pos, uint2 window_extent, float shadow_thickness, Color color, float radius, float softness, std::optional<float4> wireframe_color) noexcept;
@@ -211,6 +222,9 @@ private:
   float2                  _path_beg_point{};
 
   std::vector<std::tuple<float2, float2, float2>> _quad_beziers;
+
+  DrawCmdOp _op{};
+  uint      _uni_cmd_beg{};
 };
 
 }

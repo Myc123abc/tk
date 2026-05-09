@@ -189,12 +189,12 @@ void discard_end() noexcept
 
 void union_beg() noexcept
 {
-  // g_ui_ctx.frame_data()->union_beg();
+  g_ui_ctx.frame_data()->union_beg();
 }
 
-void union_end() noexcept
+void union_end(Color color, float thickness) noexcept
 {
-  // g_ui_ctx.frame_data()->union_end();
+  g_ui_ctx.frame_data()->union_end(color, thickness);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -302,11 +302,11 @@ void path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept
   g_ui_ctx.frame_data()->add_path_cubic_bezier_to(p1, p2, p3);
 }
 
-void path_end(Color color, float thickness, bool close) noexcept
+void path_end(bool close, Color color, float thickness) noexcept
 {
 	g_ui_ctx.check_draw();
   adjust_scale(thickness);
-  g_ui_ctx.frame_data()->path_end(color, thickness, close);
+  g_ui_ctx.frame_data()->path_end(close, color, thickness);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -272,8 +272,12 @@ void discard_end() noexcept;
 /// union operation begin
 void union_beg() noexcept;
 
-/// union operation end
-void union_end() noexcept;
+/**
+ * union operation end
+ * @param color
+ * @param thickness
+ */
+void union_end(Color color, float thickness) noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                            Geometry
@@ -389,11 +393,11 @@ void path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept;
 
 /**
  * path draw end
+ * @param close close with a line
  * @param color
  * @param thickness
- * @param close close with a line
  */
-void path_end(Color color, float thickness, bool close) noexcept;
+void path_end(bool close = {}, Color color = {}, float thickness = {}) noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                               Widget

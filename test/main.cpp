@@ -46,22 +46,22 @@ public:
     for (auto const& pt : _lerp_pts)
       _pts.emplace_back(ui::lerp(pt.p0, pt.p1, v));
 
-    // ui::begin_union();
+    ui::union_beg();
 
     ui::path_begin(_pts[0]);
     ui::path_line_to(_pts[1]);
     ui::path_quad_bezier_to(_pts[8], _pts[2]);
     ui::path_line_to(_pts[3]);
-    ui::path_end(color, thickness, true);
+    ui::path_end(true);
 
     ui::path_begin(_pts[7]);
     ui::path_quad_bezier_to(_pts[9], _pts[4]);
     ui::path_line_to(_pts[5]);
     if (_pts[6] != _pts[5])
       ui::path_line_to(_pts[6]);
-    ui::path_end(color, thickness, true);
+    ui::path_end(true);
 
-    // ui::end_union(color, thickness);
+    ui::union_end(color, thickness);
 
     return clicked;
   }
@@ -315,16 +315,6 @@ void test_discard(uint32_t fmt) noexcept
   ui::discard_end();
 }
 
-void test_union() noexcept
-{
-  ui::union_beg();
-  auto pos = float2{ 10, 10 };
-  ui::triangle( pos, pos + float2{ 30, 30 }, pos + float2{ 0, 60 }, 0xff0000ff, 1);
-  pos.x += 50;
-  ui::triangle( pos, pos + float2{ -30, 30 }, pos + float2{ 0, 60 }, 0xff0000ff, 1);
-  ui::union_end();
-}
-
 int main()
 {
   tk::init();
@@ -389,7 +379,6 @@ int main()
       // line_draw_test();
       // test_path_draw();
       // test_discard(fmt);
-      // test_union();
 
       ui::end();
     }

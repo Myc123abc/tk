@@ -34,11 +34,19 @@ enum : int
   add_path_bezier_quad,
 };
 
+enum : int
+{
+  op_none,
+  op_uni,
+};
+
 struct DrawCmd
 {
   int    type;
   float4 color;
   float  thickness;
+  int    op;
+  uint   uni_cnt;
   float2 p0;
   float2 p1;
   float2 p2;
