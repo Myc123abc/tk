@@ -250,6 +250,40 @@ float get_sd(float2 pos, DrawCmd cmd)
   return FLT_MAX;
 }
 
+float4 get_color(DrawCmd cmd, float2 pos, float w, uint tile_beg, inout uint i)
+{
+  if (cmd.op & op_uni)
+  {
+    float min_d = get_sd(pos, cmd);
+    uint  cnt   = cmd.uni_cnt;
+    for (uint j = 1; j < cnt; ++j)
+    {
+      cmd = cmds[cmd_idxs[tile_beg + i + j]];
+      min_d = min(min_d, get_sd(pos, cmd));
+    }
+
+    i += cnt;
+    return get_color(cmd.color, w, min_d, cmd.thickness);
+  }
+
+  ++i;
+
+  if (cmd.type == add_image)
+  {
+    float2 size = cmd.p1 - cmd.p0;
+    float2 uv = (pos - cmd.p0) / size;
+
+    if (uv.x < 0 || uv.x > 1 || uv.y < 0 || uv.y > 1)
+      return float4(0, 0, 0, 0);
+
+    return images[NonUniformResourceIndex(asint(cmd.p2.x))].Sample(g_sampler, uv) * cmd.color;
+  }
+  else
+    return get_color(pos, cmd, w);
+
+  return float4(0, 0, 0, 0);
+}
+
 float4 ps(float4 pos4 : SV_POSITION) : SV_TARGET
 {
   float2 pos = pos4.xy;
@@ -262,53 +296,36 @@ float4 ps(float4 pos4 : SV_POSITION) : SV_TARGET
 
   float w = length(float2(ddx_fine(pos.x), ddy_fine(pos.y)));
 
-  int    op    = op_none;
+  uint   discard_end = 0;
+  float4 discard_a   = 0;
 
-  for (uint i = 0; i < tile.count; ++i)
+  for (uint i = 0; i < tile.count;)
   {
     DrawCmd cmd = cmds[cmd_idxs[tile.beg + i]];
 
-    if (cmd.op == op_uni)
+    if (discard_end && i >= discard_end)
     {
-      float  min_d = FLT_MAX;
-      float4 min_col;
-      float  min_t;
+      discard_end = 0;
+      discard_a   = 0;
+    }
 
-      float d = get_sd(pos, cmd);
-      if (d < min_d)
-      {
-        min_d   = d;
-        min_col = cmd.color;
-        min_t   = cmd.thickness;
-      }
-
-      uint cnt = cmd.uni_cnt;
-      for (uint j = 1; j < cnt; ++j)
-      {
-        cmd = cmds[cmd_idxs[tile.beg + i + j]];
-        min_d = min(min_d, get_sd(pos, cmd));
-      }
-
-      color = blend(get_color(min_col, w, min_d, min_t), color);
-
-      i += cnt - 1;
+    if (cmd.op & op_discard_shape)
+    {
+      discard_a = max(get_color(cmd, pos, w, tile.beg, i).a, discard_a);
       continue;
     }
 
-    if (cmd.type == add_image)
+    if (cmd.op & op_discard)
     {
-      float2 size = cmd.p1 - cmd.p0;
-      float2 uv = (pos - cmd.p0) / size;
-
-      if (uv.x < 0 || uv.x > 1 || uv.y < 0 || uv.y > 1)
-        continue;
-
-      float4 texel = images[NonUniformResourceIndex(asint(cmd.p2.x))].Sample(g_sampler, uv);
-      texel *= cmd.color;
-      color = blend(texel, color);
+      if (discard_end == 0) discard_end = cmd.discard_cnt + i;
+      float4 col = get_color(cmd, pos, w, tile.beg, i);
+      col.rgb *= 1.0 - discard_a;
+      col.a   *= 1.0 - discard_a;
+      color = blend(col, color);
+      continue;
     }
-    else
-      color = blend(get_color(pos, cmd, w), color);
+
+    color = blend(get_color(cmd, pos, w, tile.beg, i), color);
   }
 
   return float4(color.rgb * color.a, color.a);

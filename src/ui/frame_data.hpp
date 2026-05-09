@@ -3,6 +3,7 @@
 #include "ui/ui.hpp"
 #include "util/rect.hpp"
 #include "image_manager.hpp"
+#include "util/flag.hpp"
 
 namespace tk::ui {
 
@@ -48,11 +49,12 @@ enum class DrawCmdType
   add_path_quad_bezier,
 };
 
-enum class DrawCmdOp
-{
-  none,
-  uni,
-};
+Flag(DrawCmdOp,
+  none          = 0b000,
+  uni           = 0b001,
+  discard_shape = 0b010,
+  discard       = 0b100,
+)
 
 struct DrawCmd
 {
@@ -61,6 +63,7 @@ struct DrawCmd
   float       thickness{};
   DrawCmdOp   op{};
   uint        uni_cnt{};
+  uint        discard_cnt{};
 
   union
   {
@@ -174,6 +177,9 @@ public:
   void union_beg() noexcept;
   void union_end(Color color, float thickness) noexcept;
 
+  void discard_beg(std::function<void()> func) noexcept;
+  void discard_end() noexcept;
+
   void build_ui_render_call(Rect rect, uint2 window_pos) noexcept;
   void build_window_shadow_render_call(Rect scissor_rect, uint2 window_pos, uint2 window_extent, float shadow_thickness, Color color, float radius, float softness, std::optional<float4> wireframe_color) noexcept;
 
@@ -225,6 +231,8 @@ private:
 
   DrawCmdOp _op{};
   uint      _uni_cmd_beg{};
+  uint      _discard_cmd_beg{};
+  bool      _discard_shape{};
 };
 
 }

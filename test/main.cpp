@@ -435,8 +435,10 @@ int main()
       }
       if (is_loaded) loop_trigger.update();
 
+      ui::discard_beg([]{ ui::circle({50,50}, 50); });
       if (!ui::image(img1, {}, wnd_ext, 0x44))
         info("loading {}", img1);
+      ui::discard_end();
 
       // circle point
       auto size = ui::window_drawable_extent();

@@ -752,19 +752,20 @@ void FrameData::path_end(bool close, Color color, float thickness) noexcept
   _path_cmd = {};
 }
 ////////////////////////////////////////////////////////////////////////////////
-///                              union
+///                          union & discard
 ////////////////////////////////////////////////////////////////////////////////
 
 void FrameData::union_beg() noexcept
 {
-  assert(!_path_cmd);
-  _op          = DrawCmdOp::uni;
+  // I don't think the union op can use on discard shape
+  assert(!_path_cmd && !_discard_shape);
+  _op |= DrawCmdOp::uni;
   _uni_cmd_beg = _cmds.size();
 }
 
 void FrameData::union_end(Color color, float thickness) noexcept
 {
-  assert(!_path_cmd && !_cmds.empty() && _cmds.back().op == _op);
+  assert(!_path_cmd && !_discard_shape && !_cmds.empty() && _cmds.back().op == _op);
   for (auto i = _uni_cmd_beg; i < _cmds.size(); ++i)
   {
     auto& cmd = _cmds[i];
@@ -773,6 +774,32 @@ void FrameData::union_end(Color color, float thickness) noexcept
     cmd.thickness = thickness;
     cmd.uni_cnt   = _cmds.size() - i;
   }
+  _op &= ~DrawCmdOp::uni;
+}
+
+void FrameData::discard_beg(std::function<void()> func) noexcept
+{
+  assert(!_path_cmd && !_discard_shape);
+
+  auto discard_shape_beg = _cmds.size();
+  _discard_shape = true;
+  _op = DrawCmdOp::discard_shape;
+  func();
+  _discard_shape = false;
+
+  for (auto i = discard_shape_beg; i < _cmds.size(); ++i)
+    _cmds[i].color.a = 1.0f;
+
+  _discard_cmd_beg = _cmds.size();
+  _op = DrawCmdOp::discard;
+}
+
+void FrameData::discard_end() noexcept
+{
+  assert(!_path_cmd && !_discard_shape && !_cmds.empty() && has_flag(_cmds.back().op, DrawCmdOp::discard));
+  for (auto i = _discard_cmd_beg; i < _cmds.size(); ++i)
+    _cmds[i].discard_cnt = _cmds.size() - i;
+
   _op = {};
 }
 
@@ -782,7 +809,7 @@ void FrameData::union_end(Color color, float thickness) noexcept
 
 void FrameData::add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept
 {
-  assert(!_path_cmd);
+  assert(!_path_cmd && !_discard_shape);
 
   if (alpha == 0 || left_top.x >= right_bottom.x || left_top.y >= right_bottom.y)
     return;
@@ -793,6 +820,7 @@ void FrameData::add_image(ImageHandle handle, float2 left_top, float2 right_bott
   cmd.type  = DrawCmdType::add_image;
   cmd.color = { 1, 1, 1, static_cast<float>(alpha) / 255};
   cmd.image = { left_top, right_bottom, renderer::g_renderer.descriptor_idx(handle) };
+  cmd.op    = _op;
 
   add_command(cmd_idx, { left_top, right_bottom });
 }

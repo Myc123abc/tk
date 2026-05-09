@@ -179,12 +179,12 @@ void restore_fullscreen_window() noexcept
 
 void discard_beg(std::function<void()> func) noexcept
 {
-  // g_ui_ctx.frame_data()->discard_beg(func);
+  g_ui_ctx.frame_data()->discard_beg(func);
 }
 
 void discard_end() noexcept
 {
-  // g_ui_ctx.frame_data()->discard_end();
+  g_ui_ctx.frame_data()->discard_end();
 }
 
 void union_beg() noexcept
@@ -347,7 +347,7 @@ void reset_tween(std::string_view name) noexcept
   g_ui_ctx.reset_tween(g_ui_ctx.get_id(name));
 }
 
-auto button(size_t id, int x, int y, uint32_t width, uint32_t height) noexcept-> ButtonState
+auto button(size_t id, float x, float y, uint32_t width, uint32_t height) noexcept-> ButtonState
 {
   g_ui_ctx.check_draw();
 
@@ -379,15 +379,15 @@ auto button(size_t id, int x, int y, uint32_t width, uint32_t height) noexcept->
   return { is_hovered && ui::is_click_on(left_top, right_bottom), is_hovered, is_move_out };
 }
 
-auto button(std::string_view name, int x, int y, uint32_t width, uint32_t height) noexcept-> ButtonState
+auto button(std::string_view name, float x, float y, uint32_t width, uint32_t height) noexcept-> ButtonState
 {
   return button(g_ui_ctx.generic_id(name), x, y, width, height);
 }
 
 auto button(
   std::string_view name,
-  int              x,
-  int              y,
+  float            x,
+  float            y,
   uint32_t         width,
   uint32_t         height,
   Color            button_color,
@@ -400,8 +400,8 @@ auto button(
 
 auto button(
   std::string_view                               name,
-  int                                            x,
-  int                                            y,
+  float                                          x,
+  float                                          y,
   uint32_t                                       width,
   uint32_t                                       height,
   Color                                          button_color,
@@ -429,7 +429,7 @@ auto button(
   }
 
   // draw button
-  ui::rectangle({ x, y }, { x + static_cast<int>(width), y + static_cast<int>(height) }, button_color);
+  ui::rectangle({ x, y }, { x + width, y + height }, button_color);
 
   // draw icon
   if (icon_update_func)
@@ -438,7 +438,11 @@ auto button(
     auto x_offset = (width  - icon_width)  / 2;
     auto y_offset = (height - icon_height) / 2;
     
-    g_ui_ctx.render_on(x + x_offset, y + y_offset, [&]
+    auto scale  = g_ui_ctx.window()->scale();
+    auto icon_x = std::round((x + x_offset) * scale) / scale;
+    auto icon_y = std::round((y + y_offset) * scale) / scale;
+
+    g_ui_ctx.render_on(icon_x, icon_y, [&]
     {
       icon_update_func(icon_width, icon_height, icon_color);
     });

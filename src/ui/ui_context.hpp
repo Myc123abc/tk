@@ -58,10 +58,10 @@ public:
 
   auto is_hover_on(size_t id, float2 left_top, float2 right_bottom) noexcept -> bool;
 
-  void set_render_pos(int x, int y) noexcept { _wnd_ctx->render_pos = { x + renderer::Window_Shadow_Thickness, y + renderer::Window_Shadow_Thickness }; }
+  void set_render_pos(float x, float y) noexcept { _wnd_ctx->render_pos = { x + renderer::Window_Shadow_Thickness, y + renderer::Window_Shadow_Thickness }; }
   auto get_render_pos() const noexcept { return _wnd_ctx->render_pos; }
 
-  void render_on(int x, int y, std::move_only_function<void()>&& func) noexcept;
+  void render_on(float x, float y, std::move_only_function<void()>&& func) noexcept;
 
   auto generic_id(std::string_view name) noexcept -> size_t;
   auto get_id(std::string_view name) const noexcept -> size_t;

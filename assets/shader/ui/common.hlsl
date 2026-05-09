@@ -36,8 +36,10 @@ enum : int
 
 enum : int
 {
-  op_none,
-  op_uni,
+  op_none          = 0b000,
+  op_uni           = 0b001,
+  op_discard_shape = 0b010,
+  op_discard       = 0b100
 };
 
 struct DrawCmd
@@ -47,6 +49,7 @@ struct DrawCmd
   float  thickness;
   int    op;
   uint   uni_cnt;
+  uint   discard_cnt;
   float2 p0;
   float2 p1;
   float2 p2;

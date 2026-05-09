@@ -424,7 +424,7 @@ struct ButtonState
  * @param height
  * @return button state
  */
-auto button(std::string_view name, int x, int y, uint32_t width, uint32_t height) noexcept-> ButtonState;
+auto button(std::string_view name, float x, float y, uint32_t width, uint32_t height) noexcept-> ButtonState;
 
 /**
  * normal button
@@ -439,8 +439,8 @@ auto button(std::string_view name, int x, int y, uint32_t width, uint32_t height
  */
 auto button(
   std::string_view name,
-  int              x,
-  int              y,
+  float            x,
+  float            y,
   uint32_t         width,
   uint32_t         height,
   Color            button_color,
@@ -449,7 +449,6 @@ auto button(
 /**
  * draw a button, can draw an icon in the center of button
  * default have a color lerp animation when cursor hover on button and leave on it
- * TODO: add bitmap draw replace draw icon by hand
  * @param name name cannot be duplicate in the window
  * @param x
  * @param y
@@ -468,8 +467,8 @@ auto button(
  */
 auto button(
   std::string_view                               name,
-  int                                            x,
-  int                                            y,
+  float                                          x,
+  float                                          y,
   uint32_t                                       width,
   uint32_t                                       height,
   Color                                          button_color,

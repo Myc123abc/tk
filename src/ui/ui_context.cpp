@@ -324,7 +324,7 @@ auto UIContext::is_cursor_move_out(size_t id) noexcept -> bool
   return _btn_state.id != id ? false : _btn_state.move_out;
 }
 
-void UIContext::render_on(int x, int y, std::move_only_function<void()>&& func) noexcept
+void UIContext::render_on(float x, float y, std::move_only_function<void()>&& func) noexcept
 {
   assert(func);
   auto org_pos = g_ui_ctx.get_render_pos();
