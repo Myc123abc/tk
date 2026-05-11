@@ -15,12 +15,9 @@ void PipelineSystem::init() noexcept
 
   auto res = generate_root_signature(
   {
-    { constants,         "constants",  0, 0, false, sizeof(Constants) },
-    { structured_buffer, "cmds",       0, 0                           },
-    { structured_buffer, "cmd_idxs",   0, 1,                          },
-    { structured_buffer, "tiles",      0, 2,                          },
-    { structured_buffer, "path_cmds",  0, 3                           },
-    { textures,          "images",     1, 0,                          },
+    { constants, "constants",  0, 0, false, sizeof(Constants) },
+    { texture,   "image",      0, 0, true                     },
+    { texture,   "mask_image", 0, 1, true                     },
   }, true, true);
 
   auto info = PipelineCreateInfo{};
@@ -29,8 +26,38 @@ void PipelineSystem::init() noexcept
   info.graphics.ps             = "ps";
   info.includes                = { "assets/shader/ui" };
   info.graphics.rtv_format     = RenderResource::Render_Target_Format;
+  info.graphics.blend          = BlendState::Default();
   info.root_signature_result   = res;
   _pipes.emplace(PipelineType::ui, info);
+
+  auto stencil = StencilState{};
+  stencil.op = StencilOp::replace;
+  info.graphics.stencil = stencil;
+  info.graphics.blend   = {};
+  _pipes.emplace(PipelineType::stencil_replace_write, info);
+
+  stencil.op            = StencilOp::keep;
+  stencil.comp          = CompFunc::equal;
+  stencil.write_color   = true;
+  info.graphics.stencil = stencil;
+  info.graphics.blend   = BlendState::Default();
+  _pipes.emplace(PipelineType::stencil_equal_test, info);
+
+  stencil.comp          = CompFunc::not_equal;
+  info.graphics.stencil = stencil;
+  _pipes.emplace(PipelineType::stencil_not_equal_test, info);
+
+  info.graphics.stencil = {};
+  info.shader = "assets/shader/ui/window_shadow.hlsl";
+  _pipes.emplace(PipelineType::window_shadow, info);
+
+  info.shader = "assets/shader/ui/discard_draw.hlsl";
+  _pipes.emplace(PipelineType::discard_draw, info);
+
+  info.shader = "assets/shader/ui/mask_write.hlsl";
+  info.graphics.rtv_format = ImageFormat::r8_unorm;
+  info.graphics.blend      = BlendState::Max();
+  _pipes.emplace(PipelineType::mask_write, info);
 
   info.graphics.stencil = {};
   info.shader = "assets/shader/ui/window_shadow.hlsl";

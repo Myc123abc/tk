@@ -27,6 +27,17 @@ void Renderer::init() noexcept
   g_graphics_engine.init();
   g_comp_engine.init();
   g_copy_engine.init(); 
+
+  ui::Write_Image_Handle = ui::g_img_mgr.create_image(1, 1, ImageFormat::bgra8_unorm);
+
+  auto white = 0xffffffff;
+  auto bitmap = Bitmap{};
+  bitmap.init(1, 1, 4, &white);
+  
+  g_copy_engine.acquire_slot();
+  g_copy_engine.copy({ bitmap }, { g_img_mgr.get(_images[ui::Write_Image_Handle]) });
+  auto fence_value = g_copy_engine.submit_slot();
+  g_graphics_engine.wait(g_copy_engine, fence_value);
 }
 
 void Renderer::render() noexcept
@@ -75,7 +86,6 @@ void Renderer::resize_window_resource(HWND handle, uint32_t width, uint32_t heig
 {
   err_if(!_res.contains(handle), "failed to destroy window render resource, it's unexist");
   _res[handle].resize(width, height);
-  ui::g_ui_ctx.get_window_context(handle)->frame_data()->init(width, height);
 }
 
 void Renderer::create_image(ui::ImageHandle handle, uint32_t width, uint32_t height, ImageFormat format) noexcept
@@ -243,53 +253,80 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
 {
   if (!frame_data) return;
 
+  assert(frame_data->check());
+
   auto cmd = g_graphics_engine.cmd();
 
   g_ctx.set_cmd(cmd);
 
-  auto& frame = res.current_frame();
-  frame.buffer.clear().upload(cmd, frame_data);
+  res.current_frame().buffer.clear().upload(cmd, frame_data);
 
-  for (auto const& call : frame_data->render_calls())
+  auto constants = Constants
   {
-    using Type = ui::RenderCallType;
-    switch (call.type)
+    .render_target_extent = res.render_target()->extent(),
+    .window_pos           = frame_data->window_pos(),
+  };
+
+  for (auto const& draw_cmd : frame_data->draw_cmds())
+  {
+    using Type = ui::DrawCmdType;
+    switch (draw_cmd.type)
     {
       case Type::ui:
-        g_ctx.graphics_pipe_set(PipelineType::ui, call.scissor_rect, "constants", Constants
+        g_ctx.graphics_draw(PipelineType::ui, res.render_target(), {}, draw_cmd, "constants", constants,
         {
-          .render_target_extent = res.render_target()->extent(),
-          .window_extent        = frame_data->window_extent(),
-          .window_pos           = call.window_pos,
-          .tile_size            = frame_data->tile_size(),
-          .tile_count           = frame_data->tile_count(),
-        },
-        {
-          { "cmds",      frame.buffer.cmds_gpu_handle()                                    },
-          { "path_cmds", frame.buffer.path_cmds_gpu_handle()                               },
-          { "cmd_idxs",  frame.buffer.cmd_idxs_gpu_handle()                                },
-          { "tiles",     frame.buffer.tiles_gpu_handle( )                                  },
-          { "images",    g_desc_heap_mgr.first_gpu_handle(DescriptorHeapType::cbv_srv_uav) },
+          { "image", g_img_mgr[_images[draw_cmd.ui.image_handle]].srv().gpu_handle() },
         });
-        g_ctx.draw(2);
         break;
 
-      case Type::window_shadow:
-        g_ctx.graphics_pipe_set(PipelineType::window_shadow, call.scissor_rect, "constants", Constants
+      case Type::clear_mask_image:
+        res.mask_image()->clear_render_target(g_graphics_engine.cmd(), draw_cmd.clear_rect ? std::optional{ draw_cmd.clear_rect->to_RECT() } : std::optional<RECT>{});
+        break;
+
+      case Type::clear_tmp_image:
+        res.tmp_image()->clear_render_target(g_graphics_engine.cmd(), draw_cmd.clear_rect ? std::optional{ draw_cmd.clear_rect->to_RECT() } : std::optional<RECT>{});
+        break;
+
+      case Type::mask_write:
+        g_ctx.graphics_draw(PipelineType::mask_write, res.mask_image(), {}, draw_cmd, "constants", constants);
+        break;
+
+      case Type::discard_draw_tmp:
+        g_ctx.graphics_draw(PipelineType::ui, res.tmp_image(), {}, draw_cmd, "constants", constants,
         {
-          .render_target_extent = res.render_target()->extent(),
-          .window_extent        = call.window_shadow.window_extent,
-          .window_pos           = call.window_pos,
-          .shadow_thickness     = call.window_shadow.shadow_thickness,
-          .shadow_radius        = call.window_shadow.radius,
-          .shadow_color         = call.window_shadow.color,
-          .shadow_softness      = call.window_shadow.softness,
-          .wireframe_color      = call.window_shadow.wireframe_color ? call.window_shadow.wireframe_color.value() : float4{},
-          .draw_wireframe       = call.window_shadow.wireframe_color.has_value(),
+          { "image", g_img_mgr[_images[draw_cmd.ui.image_handle]].srv().gpu_handle() },
         });
-        g_ctx.draw(2);
+        break;
+
+      case Type::composite_tmp:
+        res.mask_image()->set_state(cmd, ImageState::pixel);
+        res.tmp_image()->set_state(cmd, ImageState::pixel);
+        g_ctx.graphics_draw(PipelineType::discard_draw, res.render_target(), {}, draw_cmd, "constants", constants,
+        {
+          { "image",      res.tmp_image()->srv().gpu_handle()  },
+          { "mask_image", res.mask_image()->srv().gpu_handle() },
+        });
         break;
     }
+  }
+
+  auto const& window_shadow_info = frame_data->window_shadow_info();
+  if (window_shadow_info)
+  {
+    g_ctx.set_render_target(res.render_target(), {});
+    g_ctx.graphics_pipe_set(PipelineType::window_shadow, window_shadow_info->scissor_rect, "constants", Constants
+    {
+      .render_target_extent = constants.render_target_extent,
+      .window_extent        = window_shadow_info->window_extent,
+      .window_pos           = frame_data->window_pos(),
+      .shadow_thickness     = window_shadow_info->shadow_thickness,
+      .shadow_radius        = window_shadow_info->radius,
+      .shadow_color         = window_shadow_info->color,
+      .shadow_softness      = window_shadow_info->softness,
+      .wireframe_color      = window_shadow_info->wireframe_color ? window_shadow_info->wireframe_color.value() : float4{},
+      .draw_wireframe       = window_shadow_info->wireframe_color.has_value(),
+    });
+    g_ctx.draw(2);
   }
 }
 

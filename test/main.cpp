@@ -46,22 +46,22 @@ public:
     for (auto const& pt : _lerp_pts)
       _pts.emplace_back(ui::lerp(pt.p0, pt.p1, v));
 
-    ui::union_beg();
+    // ui::union_beg();
 
     ui::path_begin(_pts[0]);
     ui::path_line_to(_pts[1]);
     ui::path_quad_bezier_to(_pts[8], _pts[2]);
     ui::path_line_to(_pts[3]);
-    ui::path_end(true);
+    ui::path_end(0xffffffff, 1, true);
 
     ui::path_begin(_pts[7]);
     ui::path_quad_bezier_to(_pts[9], _pts[4]);
     ui::path_line_to(_pts[5]);
     if (_pts[6] != _pts[5])
       ui::path_line_to(_pts[6]);
-    ui::path_end(true);
+    ui::path_end(0xffffffff, 1, true);
 
-    ui::union_end(color, thickness);
+    // ui::union_end(color, thickness);
 
     return clicked;
   }
@@ -377,7 +377,7 @@ int main()
 
       // circle_draw_test();
       // line_draw_test();
-      // test_path_draw();
+      test_path_draw();
       // test_discard(fmt);
 
       ui::end();

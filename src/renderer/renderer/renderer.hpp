@@ -2,6 +2,7 @@
 
 #include "../resource/render_resource.hpp"
 #include "../../ui/image_manager.hpp"
+#include "util/rect.hpp"
 
 #include <functional>
 #include <deque>

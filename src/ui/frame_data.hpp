@@ -1,144 +1,50 @@
 #pragma once
 
 #include "ui/ui.hpp"
-#include "util/rect.hpp"
+#include "../renderer/resource/shader_type.hpp"
 #include "image_manager.hpp"
-#include "util/flag.hpp"
+#include "util/rect.hpp"
 
 namespace tk::ui {
 
-enum class RenderCallType
+struct WindowShadowInfo
 {
-  ui,
-  window_shadow,
+  Rect                 scissor_rect;
+  uint2                window_extent{};
+  float                shadow_thickness{};
+  float3               color{};
+  float                radius{};
+  float                softness{};
+  std::optional<float4> wireframe_color;
 };
 
-struct RenderCall
-{
-  RenderCallType type;
-  Rect           scissor_rect;
-  uint2          window_pos;
-
-  union
-  {
-    struct
-    {
-      uint2                 window_extent{};
-      float                 shadow_thickness{};
-      float3                color{};
-      float                 radius{};
-      float                 softness{};
-      std::optional<float4> wireframe_color;
-    } window_shadow;
-  };
-};
+inline ImageHandle Write_Image_Handle = {};
 
 enum class DrawCmdType
 {
-  add_rect,
-  add_triangle,
-  add_circle,
-  add_line,
-  add_arc,
-  add_quad_bezier,
-  add_image,
-
-  add_path,
-  add_path_line,
-  add_path_arc,
-  add_path_quad_bezier,
+  ui,
+  clear_mask_image,
+  clear_tmp_image,
+  mask_write,
+  discard_draw_tmp,
+  composite_tmp,
 };
-
-Flag(DrawCmdOp,
-  none          = 0b000,
-  uni           = 0b001,
-  discard_shape = 0b010,
-  discard       = 0b100,
-)
 
 struct DrawCmd
 {
-  DrawCmdType type{};
-  Color       color;
-  float       thickness{};
-  DrawCmdOp   op{};
-  uint        uni_cnt{};
-  uint        discard_cnt{};
+  DrawCmdType type;
 
   union
   {
     struct
     {
-      float2 left_top;
-      float2 right_bottom;
-    } rect;
+      uint32_t    idx_beg{};
+      uint32_t    idx_size{};
+      Rect        scissor_rect{};
+      ImageHandle image_handle;
+    } ui;
 
-    struct
-    {
-      float2 p0;
-      float2 p1;
-      float2 p2;
-    } triangle;
-
-    struct
-    {
-      float2 center;
-      float radius;
-    } circle;
-
-    struct
-    {
-      float2 p0;
-      float2 p1;
-      uint   no_aa; // hlsl make bool as uint
-    } line;
-
-    struct
-    {
-      float2 center;
-      float2 p0;
-      float2 p1;
-    } arc;
-
-    struct
-    {
-      float2 p0;
-      float2 p1;
-      float2 p2;
-    } quad_bezier;
-
-    struct
-    {
-      float2 left_top;
-      float2 right_bottom;
-      int    idx; // use int because descriptor handle's index is int, -1 for validation
-    } image;
-
-    struct
-    {
-      uint beg;
-      uint count;
-    } path;
-
-    struct
-    {
-      float2 p0;
-      float2 p1;
-    } path_line;
-
-    struct
-    {
-      float2 p0;
-      float2 p1;
-      float2 p2;
-    } path_quad_bezier;
-
-    struct
-    {
-      float2 center;
-      float2 p0;
-      float2 p1;
-    } path_arc;
+    std::optional<Rect> clear_rect{};
   };
 };
 
@@ -152,12 +58,28 @@ public:
   FrameData& operator=(FrameData const&) = delete;
   FrameData& operator=(FrameData&&)      = delete;
 
-  void init(uint width, uint height, uint2 tile_size = { 128, 128 }) noexcept;
-  void clear() noexcept;
+  static void init() noexcept;
 
-  //
-  // Commands
-  //
+  void clear() noexcept
+  {
+    _vertices.clear();
+    _indices.clear();
+    _draw_cmds.clear();
+    _draw_cmd_rect_idxs.clear();
+    _points.clear();
+    _normals.clear();
+    _vertex_beg           = {};
+    _index_beg            = {};
+    _tmp_vertices_size    = {};
+    _tmp_indices_size     = {};
+    _draw_index_beg       = {};
+    _window_pos           = {};
+    _window_shadow_info   = {};
+    _use_discard          = {};
+    _using_discard_shapes = {};
+    _discard_vtx_beg      = {};
+  }
+
   void add_rect(float2 left_top, float2 right_bottom, Color color, float thickness) noexcept;
   void add_triangle(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
   void add_circle(float2 center, float radius, Color color, float thickness) noexcept;
@@ -168,71 +90,107 @@ public:
   void add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept;
 
   void path_begin(float2 p0) noexcept;
-  void add_path_line_to(float2 p1) noexcept;
+  void add_path_line_to(float2 p) noexcept { _points.emplace_back(p); }
   void add_path_arc_to(float2 center, float2 p1, bool ccw) noexcept;
   void add_path_quad_bezier_to(float2 p1, float2 p2) noexcept;
   void add_path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept;
-  void path_end(bool close, Color color, float thickness) noexcept;
+  void path_end(Color color, float thickness, bool close) noexcept;
 
-  void union_beg() noexcept;
-  void union_end(Color color, float thickness) noexcept;
+  void add_scissor_rect(Rect rect) noexcept;
 
   void discard_beg(std::function<void()> func) noexcept;
   void discard_end() noexcept;
+  void union_beg() noexcept;
+  void union_end(Color color = {}, float thickness = {}) noexcept;
 
-  void build_ui_render_call(Rect rect, uint2 window_pos) noexcept;
-  void build_window_shadow_render_call(Rect scissor_rect, uint2 window_pos, uint2 window_extent, float shadow_thickness, Color color, float radius, float softness, std::optional<float4> wireframe_color) noexcept;
+  void set_window_pos(float2 pos) noexcept { _window_pos = pos; }
+  auto window_pos() const noexcept { return _window_pos; }
 
-  auto window_extent() const noexcept { return _window_extent; }
-  auto tile_size()     const noexcept { return _tile_size;     }
-  auto tile_count()    const noexcept { return _tile_count;    }
+  void set_window_shadow(Rect scissor_rect, uint2 window_extent, float shadow_thickness, Color color, float radius, float softness, std::optional<float4> wireframe_color) noexcept
+  {
+    _window_shadow_info = { scissor_rect, window_extent, shadow_thickness, { color.r, color.g, color.b }, radius, softness, wireframe_color };
+  }
+  auto& window_shadow_info() const noexcept { return _window_shadow_info; }
 
-  auto& render_calls() const noexcept { return _calls;     }
-  auto& cmds()         const noexcept { return _cmds;      }
-  auto& path_cmds()    const noexcept { return _path_cmds; }
-  auto& cmd_idxs()     const noexcept { return _cmd_idxs;  }
-  auto& gpu_tiles()    const noexcept { return _gpu_tiles; }
+  auto& vertices()  const noexcept { return _vertices;  }
+  auto& indices()   const noexcept { return _indices;   }
+  auto& draw_cmds() const noexcept { return _draw_cmds; }
+
+  auto check() const noexcept { return _draw_cmd_rect_idxs.empty(); }
 
 private:
-  void add_command(uint cmd_idx, Rect rect) noexcept;
-  void add_command(uint cmd_idx, float2 p0, float2 p1, float thickness) noexcept;
-  void add_command(uint cmd_idx, float2 center, float2 p0, float2 p1, float thickness) noexcept;
-  void add_command(uint cmd_idx, float2 center, float radius, float start_angle, float end_angle, bool ccw, float thickness) noexcept;
+  using Vertex = renderer::Vertex;
 
-  void cubic_bezier_to_quad(float2 p0, float2 p1, float2 p2, float2 p3, float tolerance = 0.5, uint level = 0) noexcept;
+  auto expand_beg(uint32_t vertices_size, uint32_t indices_size) noexcept -> std::pair<Vertex*, uint16_t*>
+  {
+    _tmp_vertices_size = vertices_size;
+    _tmp_indices_size  = indices_size;
+
+    _vertices.resize(_vertices.size() + vertices_size);
+    _indices.resize(_indices.size() + indices_size);
+
+    return { _vertices.data() + _vertex_beg, _indices.data() + _index_beg };
+  }
+
+  void expand_end() noexcept
+  {
+    _vertex_beg += _tmp_vertices_size;
+    _index_beg  += _tmp_indices_size;
+  }
 
 private:
-  struct Tile
-  {
-    std::vector<uint> cmd_idxs;
-  };
+  auto get_rect(uint32_t vtx_beg, uint32_t vtx_cnt) const noexcept -> Rect;
+  void add_rect(float2 left_top, float2 right_bottom, Color color = {}) noexcept;
 
-  uint2                   _tile_size;
-  uint2                   _tile_count;
-  uint2                   _window_extent;
-  std::vector<Tile>       _tiles;
-  std::vector<DrawCmd>    _cmds;
-  std::vector<DrawCmd>    _path_cmds;
-  std::vector<uint>       _cmd_idxs;
+  void push_draw_cmd(DrawCmdType type, ImageHandle image_handle = Write_Image_Handle) noexcept;
+  void push_draw_cmd_clear_rect(DrawCmdType type, std::optional<Rect> rect = {}) noexcept;
 
-  struct GPUTile
-  {
-    uint beg;
-    uint count;
-  };
-  std::vector<GPUTile>    _gpu_tiles;
+  void add_convex_poly_filled(Color color) noexcept;
+  void add_concave_poly_filled(Color color) noexcept;
 
-  std::vector<RenderCall> _calls;
-  DrawCmd*                _path_cmd{};
-  float2                  _path_point{};
-  float2                  _path_beg_point{};
+  static auto calc_circle_segment_count(float radius) noexcept -> float;
+  static auto get_circle_segment_count(float radius) noexcept -> uint32_t;
 
-  std::vector<std::tuple<float2, float2, float2>> _quad_beziers;
+  void add_poly_line(Color color, float thickness, bool is_closed) noexcept;
+  void path_arc_to(float2 center, float radius, float min, float max) noexcept;
+  void _path_arc_to(float2 center, float radius, int min, int max) noexcept;
+  void _path_arc_to(float2 center, float radius, int min, int max, int segment_cnt) noexcept;
 
-  DrawCmdOp _op{};
-  uint      _uni_cmd_beg{};
-  uint      _discard_cmd_beg{};
-  bool      _discard_shape{};
+  void path_bezier_quad_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float tess_tol, int level) noexcept;
+  void path_bezier_cubic_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float2 p3, float tess_tol, int level) noexcept;
+
+private:
+  std::vector<Vertex>   _vertices;
+  std::vector<uint16_t> _indices;
+  uint32_t              _vertex_beg{};
+  uint32_t              _index_beg{};
+
+  uint32_t              _tmp_vertices_size{};
+  uint32_t              _tmp_indices_size{};
+
+  std::vector<DrawCmd>  _draw_cmds;
+  std::vector<uint32_t> _draw_cmd_rect_idxs;
+  uint32_t              _draw_index_beg{};
+
+  float2                _window_pos{};
+
+  std::optional<WindowShadowInfo> _window_shadow_info;
+
+  std::vector<float2> _points;
+  std::vector<float2> _normals;
+  std::vector<float2> _tmp_buf;
+
+  bool     _using_discard_shapes{};
+  bool     _use_discard{};
+  uint32_t _discard_vtx_beg{};
+
+  inline static auto constexpr arc_table_size         = 48;
+  inline static auto constexpr arc_sample_max         = arc_table_size;
+  inline static auto constexpr curve_tessellation_tol = 1.25f;
+  inline static auto constexpr tessellation_max_error = 0.3f;
+  inline static auto           arc_radius_cutoff      = 0.f;
+  inline static std::array<int, arc_table_size + 16> _circle_segment_counts;
+  inline static std::array<float2, arc_table_size>   _arc_vertices;
 };
 
 }

@@ -31,12 +31,7 @@ struct WindowContext
   bool      need_clear{};
   bool      set_fullscreen{};
   bool      first_time_call{ true };
-
-  auto frame_data() noexcept { return _frame_data_ptr; }
-  void switch_frame_data() noexcept;
-private:
-  FrameData  _frame_data;
-  FrameData* _frame_data_ptr{ &_frame_data };
+  FrameData frame_data;
 };
 
 #define KEY_ENTRY_INIT(name, _) { Key::name, {} },
@@ -87,7 +82,7 @@ public:
   void clear_state() noexcept;
 
   auto window() const noexcept { return _wnd; }
-  auto frame_data() noexcept { return _wnd_ctx->frame_data(); }
+  auto frame_data() noexcept { return &_wnd_ctx->frame_data; }
 
 private:
   void update_window_config(WindowConfig const& cfg) noexcept;
@@ -106,7 +101,6 @@ private:
   renderer::Window* _wnd{};
   WindowContext*    _wnd_ctx{};
   HWND              _fullscreen_window{};
-  FrameData         _fullscreen_frame_data;
   bool              _fullscreen_window_need_clear{};
 
   bool   _call_begin{};

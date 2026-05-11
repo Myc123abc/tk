@@ -29,7 +29,7 @@ public:
   static LRESULT CALLBACK wnd_proc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param) noexcept;
   static LRESULT CALLBACK blur_wnd_proc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param) noexcept;
 
-  auto create_fullscreen_window() noexcept -> std::tuple<HWND, uint, uint>;
+  auto create_fullscreen_window() noexcept -> HWND;
   auto create_window(int x, int y, uint32_t width, uint32_t height, ui::Backdrop const& backdrop) noexcept -> HWND;
   void close_window(HWND handle) noexcept;
   void close_fullscreen_window() const noexcept;

@@ -26,11 +26,6 @@ void adjust_pos(Args&... args) noexcept
   auto wnd = g_ui_ctx.window();
   auto scale = wnd->scale();
   ((args *= scale), ...);
-  if (wnd->is_resizing())
-  {
-    offset = wnd->real_pos();
-    ((args += offset), ...);
-  }
 }
 
 template <typename... Args>
@@ -76,6 +71,7 @@ auto image_extent(std::string_view path) noexcept -> float2
 
 auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept -> bool
 {
+  adjust_pos(left_top, right_bottom);
   return g_ui_ctx.image(path, left_top, right_bottom, alpha);
 }
 
@@ -205,8 +201,6 @@ void rectangle(float2 left_top, float2 right_bottom, Color color, float thicknes
 {
 	g_ui_ctx.check_draw();
   adjust_pos(left_top, right_bottom); adjust_scale(thickness);
-  left_top     = floor(left_top)     + .5f;
-  right_bottom = floor(right_bottom) - .5f;
   g_ui_ctx.frame_data()->add_rect(left_top, right_bottom, color, thickness);
 }
 
@@ -302,11 +296,11 @@ void path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept
   g_ui_ctx.frame_data()->add_path_cubic_bezier_to(p1, p2, p3);
 }
 
-void path_end(bool close, Color color, float thickness) noexcept
+void path_end(Color color, float thickness, bool close) noexcept
 {
 	g_ui_ctx.check_draw();
   adjust_scale(thickness);
-  g_ui_ctx.frame_data()->path_end(close, color, thickness);
+  g_ui_ctx.frame_data()->path_end(color, thickness, close);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

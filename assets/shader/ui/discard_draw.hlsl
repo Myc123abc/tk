@@ -20,6 +20,7 @@ float4 ps(PS_Param args) : SV_TARGET
   float4 col  = image.Sample(g_sampler, uv);
   float  mask = 1.0 - mask_image.Sample(g_sampler, uv).r;
 
+  if (col.a > 0.0) col.rgb /= col.a;
   col.a *= mask;
 
   return col;

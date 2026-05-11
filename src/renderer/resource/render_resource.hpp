@@ -18,33 +18,19 @@ public:
 
   void destroy() noexcept
   {
-    _cmds.destroy();
-    _path_cmds.destroy();
-    _cmd_idxs.destroy();
-    _tiles.destroy();
+    _vertices_indices_buffer.destroy();
   }
 
   auto clear() noexcept -> FrameBuffer&
   {
-    _cmds.clear();
-    _path_cmds.clear();
-    _cmd_idxs.clear();
-    _tiles.clear();
+    _vertices_indices_buffer.clear();
     return *this;
   }
 
   void upload(ID3D12GraphicsCommandList1* cmd, ui::FrameData const* data) noexcept;
 
-  auto cmds_gpu_handle()      const noexcept { return _cmds.gpu_handle();      }
-  auto path_cmds_gpu_handle() const noexcept { return _path_cmds.gpu_handle(); }
-  auto cmd_idxs_gpu_handle()  const noexcept { return _cmd_idxs.gpu_handle();  }
-  auto tiles_gpu_handle()     const noexcept { return _tiles.gpu_handle();     }
-
 private:
-  Buffer _cmds;
-  Buffer _path_cmds;
-  Buffer _cmd_idxs;
-  Buffer _tiles;
+  Buffer _vertices_indices_buffer;
 };
 
 class RenderResource
@@ -78,6 +64,8 @@ public:
   auto& current_frame() noexcept { return _frames[_frame_index];                }
   auto  render_target() noexcept { return g_img_mgr.get(current_frame().image); }
   auto  depth_stencil() noexcept { return g_img_mgr.get(_dsv_image);            }
+  auto  mask_image()    noexcept { return g_img_mgr.get(_mask_image);           }
+  auto  tmp_image()     noexcept { return g_img_mgr.get(_tmp_image);            }
 
 private:
   struct Frame
@@ -91,6 +79,8 @@ private:
 
   std::array<Frame, Frame_Count>              _frames;
   ImageHandle                                 _dsv_image;
+  ImageHandle                                 _mask_image;
+  ImageHandle                                 _tmp_image;
 
   Microsoft::WRL::ComPtr<IDXGISwapChain4>     _swapchain;
   HANDLE                                      _swapchain_waitable_obj;

@@ -393,11 +393,11 @@ void path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept;
 
 /**
  * path draw end
- * @param close close with a line
  * @param color
  * @param thickness
+ * @param close close with a line
  */
-void path_end(bool close = {}, Color color = {}, float thickness = {}) noexcept;
+void path_end(Color color = {}, float thickness = {}, bool close = {}) noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                               Widget

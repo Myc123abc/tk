@@ -2,6 +2,7 @@
 
 #include "../../util/singleton.hpp"
 #include "pipeline/pipeline_system.hpp"
+#include "util/rect.hpp"
 
 #include <d3d12.h>
 #include <unordered_map>
@@ -42,6 +43,11 @@ public:
   template <typename T>
   requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
   void graphics_pipe_set(PipelineType type, Rect scissor_rect, std::string_view constants_name, T const& constants, std::initializer_list<DescriptorInfo> descs = {}) noexcept;
+
+  template <typename T>
+  requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
+  void graphics_draw(PipelineType type, Image* render_target, Image* depth_stencil, ui::DrawCmd const& cmd,
+    std::string_view constants_name, T const& constants, std::initializer_list<DescriptorInfo> descs = {}) noexcept;
 
 private:
   using DescMapType = std::unordered_map<uint32_t, D3D12_GPU_DESCRIPTOR_HANDLE>;
@@ -107,6 +113,16 @@ void Context::graphics_pipe_set(PipelineType type, Rect scissor_rect, std::strin
   for (auto const& [name, handle] : descs)
     set_graphics_descriptor(pipe->root_param_idx(name), handle);
   set_scissor_rect(scissor_rect);
+}
+
+template <typename T>
+requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
+void Context::graphics_draw(PipelineType type, Image* render_target, Image* depth_stencil, ui::DrawCmd const& cmd,
+  std::string_view constants_name, T const& constants, std::initializer_list<DescriptorInfo> descs) noexcept
+{
+  set_render_target(render_target, depth_stencil);
+  graphics_pipe_set(type, cmd.ui.scissor_rect, constants_name, constants, descs);
+  draw(cmd.ui.idx_beg, cmd.ui.idx_size);
 }
 
 }

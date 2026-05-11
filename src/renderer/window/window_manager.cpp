@@ -347,14 +347,14 @@ void WindowManager::update_fullscreen_window() noexcept
     _fullscreen_window._width, _fullscreen_window._height, SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
-auto WindowManager::create_fullscreen_window() noexcept -> std::tuple<HWND, uint, uint>
+auto WindowManager::create_fullscreen_window() noexcept -> HWND
 {
   assert(!_fullscreen_window._handle);
   auto rect = get_virtual_screen_rect();
   auto width  = rect.right  - rect.left;
   auto height = rect.bottom - rect.top;
   _fullscreen_window.init_auxiliary(0, 0, width, height);
-  return { _fullscreen_window._handle, width, height };
+  return _fullscreen_window._handle;
 }
 
 auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height, ui::Backdrop const& backdrop) noexcept -> HWND

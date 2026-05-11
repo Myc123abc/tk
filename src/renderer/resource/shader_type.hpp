@@ -4,6 +4,13 @@
 
 namespace tk::renderer {
 
+struct alignas(16) Vertex
+{
+  float2 pos{};
+  float2 uv{};
+  float4 color{};
+};
+
 struct alignas(16) Constants
 {
   uint2  render_target_extent;
@@ -17,9 +24,6 @@ struct alignas(16) Constants
   float  shadow_softness{};
 
   float4 wireframe_color;
-
-  uint2  tile_size;
-  uint2  tile_count;
 
   uint   draw_wireframe{};
 };
