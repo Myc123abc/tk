@@ -1,6 +1,6 @@
 #include "compiler.hpp"
 #include "util/error_handling.hpp"
-#include "../../core.hpp"
+#include "../core.hpp"
 
 #include <utf8.h>
 

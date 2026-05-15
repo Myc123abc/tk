@@ -1,7 +1,7 @@
 #include "pipeline_system.hpp"
-#include "../../core.hpp"
+#include "../core.hpp"
 #include "util/error_handling.hpp"
-#include "../../resource/shader_type.hpp"
+#include "../resource/shader_type.hpp"
 
 #include <ranges>
 
@@ -30,6 +30,9 @@ void PipelineSystem::init() noexcept
   info.root_signature_result   = res;
   _pipes.emplace(PipelineType::ui, info);
 
+  info.shader = "assets/shader/ui/composite_write.hlsl";
+  _pipes.emplace(PipelineType::composite_write, info);
+
   auto stencil = StencilState{};
   stencil.op = StencilOp::replace;
   info.graphics.stencil = stencil;
@@ -57,7 +60,10 @@ void PipelineSystem::init() noexcept
   info.shader = "assets/shader/ui/mask_write.hlsl";
   info.graphics.rtv_format = ImageFormat::r8_unorm;
   info.graphics.blend      = BlendState::Max();
-  _pipes.emplace(PipelineType::mask_write, info);
+  _pipes.emplace(PipelineType::mask_write_max, info);
+
+  info.graphics.blend = BlendState::Add();
+  _pipes.emplace(PipelineType::mask_write_add, info);
 
   info.graphics.stencil = {};
   info.shader = "assets/shader/ui/window_shadow.hlsl";

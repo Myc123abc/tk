@@ -1,7 +1,7 @@
 #include "ui_context.hpp"
 #include "util/error_handling.hpp"
 #include "../renderer/window/window_manager.hpp"
-#include "../renderer/renderer/renderer.hpp"
+#include "../renderer/renderer.hpp"
 #include "../util/hash.hpp"
 #include "image_manager.hpp"
 #include "text_engine.hpp"
@@ -169,15 +169,17 @@ void UIContext::render() noexcept
   // process window render datas
   for (auto& wnd_ctx : _wnd_ctxs | std::views::values)
   {
-    auto        handle = wnd_ctx.handle;
-    auto        data   = &wnd_ctx.frame_data;
-    auto const& wnd    = *g_wnd_mgr.get_window(handle);
+    auto handle = wnd_ctx.handle;
+    auto data   = &wnd_ctx.frame_data;
 
-    if (!wnd.is_resizing())
+    _wnd = g_wnd_mgr.get_window(handle);
+
+    if (!_wnd->is_resizing())
     {
-      data->add_scissor_rect(wnd.content_rect());
-      if (!wnd.is_fullscreen() && !wnd.is_maximized())
-        window_shadow_wireframe_process(wnd_ctx, wnd, wnd.shadow_rect());
+      data->add_scissor_rect(_wnd->content_rect());
+      if (!_wnd->is_fullscreen() && !_wnd->is_maximized())
+        window_shadow_wireframe_process(wnd_ctx, *_wnd, _wnd->shadow_rect());
+      data->build_render_cmds();
       g_renderer.submit({ handle, data });
     }
     else
@@ -187,11 +189,12 @@ void UIContext::render() noexcept
         wnd_ctx.need_clear = false;
         g_renderer.submit({ handle });
       }
-      data->set_window_pos(wnd.real_pos());
-      data->add_scissor_rect(wnd.rect());
-      window_shadow_wireframe_process(wnd_ctx, wnd, wnd.real_rect());
-      if (wnd.cfg().backdrop.style != ui::BackdropStyle::none)
-        g_renderer.submit({ _fullscreen_window, data, handle, wnd.rect() });
+      data->set_window_pos(_wnd->real_pos());
+      data->add_scissor_rect(_wnd->rect());
+      window_shadow_wireframe_process(wnd_ctx, *_wnd, _wnd->real_rect());
+      data->build_render_cmds();
+      if (_wnd->cfg().backdrop.style != ui::BackdropStyle::none)
+        g_renderer.submit({ _fullscreen_window, data, handle, _wnd->rect() });
       else
         g_renderer.submit({ _fullscreen_window, data });
     }

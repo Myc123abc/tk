@@ -1,9 +1,9 @@
 #include "compute_engine.hpp"
 #include "../resource/descriptor_heap_manager.hpp"
-#include "../renderer/pipeline/pipeline_system.hpp"
+#include "../pipeline/pipeline_system.hpp"
 #include "../resource/shader_type.hpp"
 #include "graphics_engine.hpp"
-#include "../renderer/context.hpp"
+#include "../context.hpp"
 
 #include <assert.h>
 #include <ranges>

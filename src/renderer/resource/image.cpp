@@ -73,7 +73,7 @@ void Image::destroy() noexcept
   _desc.dsv.release();
 }
 
-void Image::init(uint32_t width , uint32_t height, ImageFormat format, ImageType type, bool use_mipmap) noexcept
+void Image::init(uint width , uint height, ImageFormat format, ImageType type, bool use_mipmap) noexcept
 {
   auto device = g_core.device();
 
@@ -109,7 +109,7 @@ void Image::init(uint32_t width , uint32_t height, ImageFormat format, ImageType
   create_descriptor(use_mipmap);
 }
 
-void Image::init(IDXGISwapChain1* swapchain, uint32_t index) noexcept
+void Image::init(IDXGISwapChain1* swapchain, uint index) noexcept
 {
   err_if(swapchain->GetBuffer(index, IID_PPV_ARGS(_handle.ReleaseAndGetAddressOf())),
          "failed to get descriptor");
@@ -124,7 +124,7 @@ void Image::init(IDXGISwapChain1* swapchain, uint32_t index) noexcept
   create_descriptor();
 }
 
-// void Image::init(ImageType type, HANDLE handle, uint32_t width, uint32_t height) noexcept
+// void Image::init(ImageType type, HANDLE handle, uint width, uint height) noexcept
 // {
 //   _state  = dx12_resource_state(type);
 //   _width  = width;
@@ -236,13 +236,16 @@ void Image::clear(ID3D12GraphicsCommandList1* cmd, D3D12_CPU_DESCRIPTOR_HANDLE c
   cmd->ClearUnorderedAccessViewFloat(gpu_handle, cpu_handle, _handle.Get(), values, 1, &rect);
 }
 
-void Image::clear_render_target(ID3D12GraphicsCommandList1* cmd, std::optional<RECT> rect) noexcept
+void Image::clear_render_target(ID3D12GraphicsCommandList1* cmd, std::optional<Rect> rect) noexcept
 {
   err_if(!has_flag(_type, ImageType::rtv), "clear render target only use on rtv");
   set_state(cmd, ImageState::render_target);
   float constexpr clear_color[4]{};
   if (rect)
-    cmd->ClearRenderTargetView(_desc.rtv.cpu_handle(), clear_color, 1, &rect.value());
+  {
+    auto rc = rect->to_RECT();
+    cmd->ClearRenderTargetView(_desc.rtv.cpu_handle(), clear_color, 1, &rc);
+  }
   else
     cmd->ClearRenderTargetView(_desc.rtv.cpu_handle(), clear_color, 0, nullptr);
 }
@@ -254,7 +257,7 @@ void Image::clear_depth_stencil(ID3D12GraphicsCommandList1* cmd) noexcept
   cmd->ClearDepthStencilView(dsv().cpu_handle(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.f, 0, 0, nullptr);
 }
 
-auto Image::per_pixel_size() const noexcept -> uint32_t
+auto Image::per_pixel_size() const noexcept -> uint
 {
   switch (_format)
   {
@@ -311,8 +314,8 @@ void copy(
   LONG                        right,
   LONG                        bottom,
   Image&                      dst,
-  uint32_t                    x,
-  uint32_t                    y) noexcept
+  uint                        x,
+  uint                        y) noexcept
 {
   src.set_state(cmd, ImageState::copy_src);
   dst.set_state(cmd, ImageState::copy_dst);

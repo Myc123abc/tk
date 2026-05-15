@@ -1,3 +1,4 @@
+// size limit 64 WORDs(32 bits), 256 bytes, 64 float, 16 float4
 struct Constants
 {
   uint2  render_target_extent;
@@ -11,7 +12,13 @@ struct Constants
   float  shadow_softness;
 
   float4 wireframe_color;
-  
+
+  float2 mask_offset;
+  float2 mask_extent;
+
+  float2 composite_offset;
+  float2 composite_extent;
+
   uint   draw_wireframe;
 };
 

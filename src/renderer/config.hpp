@@ -20,4 +20,7 @@ constexpr auto Image_Pool_Init_Capacity = 32;
 
 constexpr auto Mouse_Left_Down_Press_Start_Time = 400;
 
+constexpr auto Default_Image_Init_Width  = 512;
+constexpr auto Default_Image_Init_Height = 512;
+
 }

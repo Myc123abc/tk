@@ -18,8 +18,6 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
   for (auto& frame : _frames)
     frame.image = g_img_mgr.create(width, height, Render_Target_Format, ImageType::rtv);
   _dsv_image  = g_img_mgr.create(width, height, ImageFormat::d24_s8, ImageType::dsv);
-  _mask_image = g_img_mgr.create(width, height, ImageFormat::r8_unorm, ImageType::rtv | ImageType::srv);
-  _tmp_image  = g_img_mgr.create(width, height, Render_Target_Format, ImageType::rtv | ImageType::srv);
 
   // create swapchain
   ComPtr<IDXGISwapChain1> swapchain;
@@ -73,8 +71,6 @@ void RenderResource::destroy() noexcept
 {
   CloseHandle(_swapchain_waitable_obj);
   g_img_mgr.destroy(_dsv_image);
-  g_img_mgr.destroy(_mask_image);
-  g_img_mgr.destroy(_tmp_image);
   for (auto& frame : _frames)
   {
     g_img_mgr.destroy(frame.image);
@@ -115,8 +111,6 @@ void RenderResource::resize(uint32_t width, uint32_t height) noexcept
     g_img_mgr[frame.image].resize(width, height);
   }
   g_img_mgr[_dsv_image].resize(width, height);
-  g_img_mgr[_mask_image].resize(width, height);
-  g_img_mgr[_tmp_image].resize(width, height);
 }
 
 void RenderResource::wait_frame_complete() noexcept
@@ -143,11 +137,7 @@ void RenderResource::render_begin() noexcept
   // bind heaps
   g_desc_heap_mgr.bind_heaps(cmd);
 
-  clear_render_target();
-
-  // set viewport
-  auto viewport = CD3DX12_VIEWPORT{ 0.f, 0.f, static_cast<float>(g_img_mgr[frame.image].width()), static_cast<float>(g_img_mgr[frame.image].height()) };
-  cmd->RSSetViewports(1, &viewport);
+  render_target()->clear_render_target(g_graphics_engine.cmd());
 }
 
 void RenderResource::render_end() noexcept
@@ -181,22 +171,6 @@ void RenderResource::present(bool vsync) const noexcept
     err_if(res == DXGI_ERROR_DEVICE_HUNG, "failed to present, device hung");
     err_if(true, "failed to present : {}", static_cast<uint32_t>(res));
   }
-}
-
-void RenderResource::set_render_target() noexcept
-{
-  auto rtv = render_target()->rtv().cpu_handle();
-  g_graphics_engine.cmd()->OMSetRenderTargets(1, &rtv, false, nullptr);
-}
-
-void RenderResource::clear_render_target() noexcept
-{
-  render_target()->clear_render_target(g_graphics_engine.cmd());
-}
-
-void RenderResource::clear_depth_stencil() noexcept
-{
-  depth_stencil()->clear_depth_stencil(g_graphics_engine.cmd());
 }
 
 void FrameBuffer::init() noexcept

@@ -12,6 +12,7 @@ void Context::set_cmd(ID3D12GraphicsCommandList1* cmd) noexcept
   _graphics_constants_root_param_idx = {};
   _compute_constants_root_param_idx  = {};
   _primitive_topology                = {};
+  _viewport                          = {};
   _scissor_rect                      = {};
   _stencil_value                     = {};
   _render_target                     = {};
@@ -58,17 +59,25 @@ void Context::set_primitive_topology(D3D_PRIMITIVE_TOPOLOGY primitive_topology) 
   }
 }
 
+void Context::set_viewport(Rect rect) noexcept
+{
+  if (_viewport.replace(rect))
+  {
+    auto vp = CD3DX12_VIEWPORT{ rect.left, rect.top, rect.width(), rect.height() };
+    _cmd->RSSetViewports(1, &vp);
+  }
+}
+
 void Context::set_scissor_rect(Rect rect) noexcept
 {
-  if (rect != _scissor_rect)
+  if (_scissor_rect.replace(rect))
   {
-    _scissor_rect = rect;
     auto rc = rect.to_RECT();
     _cmd->RSSetScissorRects(1, &rc);
   }
 }
 
-void Context::set_stencil_value(uint32_t value) noexcept
+void Context::set_stencil_value(uint value) noexcept
 {
   if (!_stencil_value || _stencil_value.value() != value)
   {
@@ -77,22 +86,22 @@ void Context::set_stencil_value(uint32_t value) noexcept
   }
 }
 
-void Context::draw(uint32_t count) const noexcept
+void Context::draw(uint count) const noexcept
 {
   _cmd->DrawInstanced(3 * count, 1, 0, 0);
 }
 
-void Context::draw(uint32_t start_idx, uint32_t size) const noexcept
+void Context::draw(uint start_idx, uint size) const noexcept
 {
   _cmd->DrawIndexedInstanced(size, 1, start_idx, 0, 0);
 }
 
-void Context::dispatch(uint32_t x, uint32_t y, uint32_t z) const noexcept
+void Context::dispatch(uint x, uint y, uint z) const noexcept
 {
   _cmd->Dispatch(x, y, z);
 }
 
-void Context::set_graphics_descriptor(uint32_t root_param_idx, D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept
+void Context::set_graphics_descriptor(uint root_param_idx, D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept
 {
   if (!_graphics_descriptors.contains(root_param_idx))
   {
@@ -106,7 +115,7 @@ void Context::set_graphics_descriptor(uint32_t root_param_idx, D3D12_GPU_DESCRIP
   }
 }
 
-void Context::set_compute_descriptor(uint32_t root_param_idx, D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept
+void Context::set_compute_descriptor(uint root_param_idx, D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept
 {
   if (!_compute_descriptors.contains(root_param_idx))
   {

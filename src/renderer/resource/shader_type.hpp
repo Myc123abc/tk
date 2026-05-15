@@ -25,6 +25,12 @@ struct alignas(16) Constants
 
   float4 wireframe_color;
 
+  float2 mask_offset;
+  float2 mask_extent;
+
+  float2 composite_offset;
+  float2 composite_extent;
+
   uint   draw_wireframe{};
 };
 

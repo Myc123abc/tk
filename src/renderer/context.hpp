@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../util/singleton.hpp"
+#include "../util/singleton.hpp"
 #include "pipeline/pipeline_system.hpp"
 #include "util/rect.hpp"
 
@@ -10,47 +10,67 @@
 
 namespace tk::renderer {
 
+struct PipelineDescriptorInfo
+{
+  std::string_view            name;
+  D3D12_GPU_DESCRIPTOR_HANDLE handle;
+};
+
+template <typename T>
+requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0) && (sizeof(T) <= 256)
+struct GraphicsPipeSetInfo
+{
+  PipelineType                        type;
+  Rect                                viewport;
+  Rect                                scissor;
+  std::string_view                    constants_name;
+  T                                   constants;
+  std::vector<PipelineDescriptorInfo> descs;
+};
+
+template <typename T>
+struct GraphicsDrawInfo
+{
+  GraphicsPipeSetInfo<T> pipe_info;
+  Image*                 render_target{};
+  Image*                 depth_stencil{};
+  uint                   idx_beg{};
+  uint                   idx_cnt{};
+};
+
 Singleton(Context, g_ctx,
 public:
   void set_cmd(ID3D12GraphicsCommandList1* cmd) noexcept;
   void set_pipe(ID3D12PipelineState* pipe_state) noexcept;
   void set_graphics_root_signature(ID3D12RootSignature* root_signature) noexcept;
   void set_compute_root_signature(ID3D12RootSignature* root_signature) noexcept;
-  void set_graphics_descriptor(uint32_t root_param_idx, D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept;
-  void set_compute_descriptor(uint32_t root_param_idx, D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept;
+  void set_graphics_descriptor(uint root_param_idx, D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept;
+  void set_compute_descriptor(uint root_param_idx, D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept;
   void set_primitive_topology(D3D_PRIMITIVE_TOPOLOGY primitive_topology) noexcept;
+  void set_viewport(Rect rect) noexcept;
   void set_scissor_rect(Rect rect) noexcept;
-  void set_stencil_value(uint32_t value) noexcept;
+  void set_stencil_value(uint value) noexcept;
   void set_render_target(Image* render_tareget_image, Image* depth_stencil_image) noexcept;
-  void draw(uint32_t count) const noexcept;
-  void draw(uint32_t start_idx, uint32_t size) const noexcept;
-  void dispatch(uint32_t x, uint32_t y, uint32_t z) const noexcept;
+  void draw(uint count) const noexcept;
+  void draw(uint start_idx, uint size) const noexcept;
+  void dispatch(uint x, uint y, uint z) const noexcept;
 
   template <typename T>
   requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
-  void set_graphics_constants(uint32_t root_param_idx, T const& constants) noexcept;
+  void set_graphics_constants(uint root_param_idx, T const& constants) noexcept;
 
   template <typename T>
   requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
-  void set_compute_constants(uint32_t root_param_idx, T const& constants);
-
-  struct DescriptorInfo
-  {
-    std::string_view            name;
-    D3D12_GPU_DESCRIPTOR_HANDLE handle;
-  };
+  void set_compute_constants(uint root_param_idx, T const& constants);
 
   template <typename T>
-  requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
-  void graphics_pipe_set(PipelineType type, Rect scissor_rect, std::string_view constants_name, T const& constants, std::initializer_list<DescriptorInfo> descs = {}) noexcept;
+  void graphics_pipe_set(GraphicsPipeSetInfo<T> const& info) noexcept;
 
   template <typename T>
-  requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
-  void graphics_draw(PipelineType type, Image* render_target, Image* depth_stencil, ui::DrawCmd const& cmd,
-    std::string_view constants_name, T const& constants, std::initializer_list<DescriptorInfo> descs = {}) noexcept;
+  void graphics_draw(GraphicsDrawInfo<T> const& info) noexcept;
 
 private:
-  using DescMapType = std::unordered_map<uint32_t, D3D12_GPU_DESCRIPTOR_HANDLE>;
+  using DescMapType = std::unordered_map<uint, D3D12_GPU_DESCRIPTOR_HANDLE>;
 
   ID3D12GraphicsCommandList1* _cmd{};
   ID3D12PipelineState*        _pipe_state{};
@@ -58,20 +78,21 @@ private:
   ID3D12RootSignature*        _compute_root_signature{};
   DescMapType                 _graphics_descriptors;
   DescMapType                 _compute_descriptors;
-  uint32_t                    _graphics_constants_root_param_idx{};
+  uint                        _graphics_constants_root_param_idx{};
   std::vector<uint8_t>        _graphics_constants;
-  uint32_t                    _compute_constants_root_param_idx{};
+  uint                        _compute_constants_root_param_idx{};
   std::vector<uint8_t>        _compute_constants;
   D3D_PRIMITIVE_TOPOLOGY      _primitive_topology{};
+  Rect                        _viewport{};
   Rect                        _scissor_rect{};
-  std::optional<uint32_t>     _stencil_value{};
+  std::optional<uint>         _stencil_value{};
   D3D12_CPU_DESCRIPTOR_HANDLE _render_target{};
   D3D12_CPU_DESCRIPTOR_HANDLE _depth_stencil{};
 )
 
 template <typename T>
 requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
-void Context::set_graphics_constants(uint32_t root_param_idx, T const& constants) noexcept
+void Context::set_graphics_constants(uint root_param_idx, T const& constants) noexcept
 {
   auto size = sizeof(constants);
   if (_graphics_constants_root_param_idx != root_param_idx ||
@@ -87,7 +108,7 @@ void Context::set_graphics_constants(uint32_t root_param_idx, T const& constants
 
 template <typename T>
 requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
-void Context::set_compute_constants(uint32_t root_param_idx, T const& constants)
+void Context::set_compute_constants(uint root_param_idx, T const& constants)
 {
   auto size = sizeof(constants);
   if (_compute_constants_root_param_idx != root_param_idx ||
@@ -102,27 +123,25 @@ void Context::set_compute_constants(uint32_t root_param_idx, T const& constants)
 }
 
 template <typename T>
-requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
-void Context::graphics_pipe_set(PipelineType type, Rect scissor_rect, std::string_view constants_name, T const& constants, std::initializer_list<DescriptorInfo> descs) noexcept
+void Context::graphics_pipe_set(GraphicsPipeSetInfo<T> const& info) noexcept
 {
-  auto pipe = g_pipe_sys.pipe(type);
+  auto pipe = g_pipe_sys.pipe(info.type);
   set_pipe(pipe->pipe_state.Get());
   set_graphics_root_signature(pipe->root_signature);
   set_primitive_topology(pipe->primive_topology);
-  set_graphics_constants(pipe->root_param_idx(constants_name), constants);
-  for (auto const& [name, handle] : descs)
+  set_graphics_constants(pipe->root_param_idx(info.constants_name), info.constants);
+  for (auto const& [name, handle] : info.descs)
     set_graphics_descriptor(pipe->root_param_idx(name), handle);
-  set_scissor_rect(scissor_rect);
+  set_viewport(info.viewport);
+  set_scissor_rect(info.scissor);
 }
 
 template <typename T>
-requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0)
-void Context::graphics_draw(PipelineType type, Image* render_target, Image* depth_stencil, ui::DrawCmd const& cmd,
-  std::string_view constants_name, T const& constants, std::initializer_list<DescriptorInfo> descs) noexcept
+void Context::graphics_draw(GraphicsDrawInfo<T> const& info) noexcept
 {
-  set_render_target(render_target, depth_stencil);
-  graphics_pipe_set(type, cmd.ui.scissor_rect, constants_name, constants, descs);
-  draw(cmd.ui.idx_beg, cmd.ui.idx_size);
+  set_render_target(info.render_target, info.depth_stencil);
+  graphics_pipe_set(info.pipe_info);
+  draw(info.idx_beg, info.idx_cnt);
 }
 
 }

@@ -1,5 +1,5 @@
 #include "window.hpp"
-#include "../renderer/renderer.hpp"
+#include "../renderer.hpp"
 #include "window_manager.hpp"
 #include "../../ui/ui_context.hpp"
 #include "../config.hpp"

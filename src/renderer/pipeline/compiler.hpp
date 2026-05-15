@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../../../util/hash.hpp"
-#include "../../../util/singleton.hpp"
+#include "../../util/hash.hpp"
+#include "../../util/singleton.hpp"
 #include "util/base.hpp"
 
 #include <directx/d3dx12.h>
