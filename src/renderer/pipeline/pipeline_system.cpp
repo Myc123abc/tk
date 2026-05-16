@@ -86,7 +86,7 @@ auto PipelineSystem::find_root_param(std::span<CD3DX12_ROOT_PARAMETER1> params) 
   {
     auto const& cur_params = pair.second;
     if (cur_params.size() != params.size()) return false;
-    for (auto i : std::views::iota(0u, cur_params.size()))
+    for (auto i = 0; i < cur_params.size(); ++i)
     {
       if (memcmp(&cur_params[i], &params[i], sizeof(CD3DX12_ROOT_PARAMETER1)))
         return false;

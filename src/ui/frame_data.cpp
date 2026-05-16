@@ -3,7 +3,6 @@
 #include "triangulator.hpp"
 
 #include <numbers>
-#include <ranges>
 
 using namespace tk;
 
@@ -83,10 +82,10 @@ namespace tk::ui {
 void FrameData::init() noexcept
 {
   _circle_segment_counts[0] = arc_sample_max;
-  for (auto i : std::views::iota(1u, _circle_segment_counts.size()))
+  for (auto i = 1; i < _circle_segment_counts.size(); ++i)
     _circle_segment_counts[i] = calc_circle_segment_count(static_cast<float>(i));
 
-  for (auto i : std::views::iota(0u, _arc_vertices.size()))
+  for (auto i = 0; i < _arc_vertices.size(); ++i)
   {
     auto const a = i * 2 * std::numbers::pi / _arc_vertices.size();
     _arc_vertices[i] = { std::cos(a), std::sin(a) };
@@ -277,7 +276,7 @@ void FrameData::_add_cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Co
 void FrameData::path_begin(float2 p0) noexcept
 {
   auto& cmd = _draw_cmds.emplace_back();
-  cmd.type = DrawCmd::Type::path_begin;
+  cmd.type       = DrawCmd::Type::path_begin;
   cmd.path_begin = { p0 };
 }
 
@@ -290,14 +289,14 @@ void FrameData::_path_begin(float2 p0) noexcept
 void FrameData::add_path_line_to(float2 p) noexcept
 {
   auto& cmd = _draw_cmds.emplace_back();
-  cmd.type = DrawCmd::Type::add_path_line_to;
+  cmd.type             = DrawCmd::Type::add_path_line_to;
   cmd.add_path_line_to = { p };
 }
 
 void FrameData::add_path_arc_to(float2 center, float2 p1, bool ccw) noexcept
 {
   auto& cmd = _draw_cmds.emplace_back();
-  cmd.type = DrawCmd::Type::add_path_arc_to;
+  cmd.type            = DrawCmd::Type::add_path_arc_to;
   cmd.add_path_arc_to = { center, p1, ccw };
 }
 
@@ -321,7 +320,7 @@ void FrameData::_add_path_arc_to(float2 center, float2 p1, bool ccw) noexcept
 void FrameData::add_path_quad_bezier_to(float2 p1, float2 p2) noexcept
 {
   auto& cmd = _draw_cmds.emplace_back();
-  cmd.type = DrawCmd::Type::add_path_quad_bezier_to;
+  cmd.type                    = DrawCmd::Type::add_path_quad_bezier_to;
   cmd.add_path_quad_bezier_to = { p1, p2 };
 }
 
@@ -334,7 +333,7 @@ void FrameData::_add_path_quad_bezier_to(float2 p1, float2 p2) noexcept
 void FrameData::add_path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept
 {
   auto& cmd = _draw_cmds.emplace_back();
-  cmd.type = DrawCmd::Type::add_path_cubic_bezier_to;
+  cmd.type                     = DrawCmd::Type::add_path_cubic_bezier_to;
   cmd.add_path_cubic_bezier_to = { p1, p2, p3 };
 }
 
@@ -347,7 +346,7 @@ void FrameData::_add_path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexc
 void FrameData::path_end(bool close, Color color, float thickness) noexcept
 {
   auto& cmd = _draw_cmds.emplace_back();
-  cmd.type = DrawCmd::Type::path_end;
+  cmd.type     = DrawCmd::Type::path_end;
   cmd.path_end = { close, color, thickness };
 }
 
@@ -425,7 +424,7 @@ void FrameData::add_convex_poly_filled(Color color) noexcept
 
   auto inner_idx = _vertex_beg;
   auto outer_idx = _vertex_beg + 1;
-  for (auto i : std::views::iota(2u, pt_cnt))
+  for (auto i = 2; i < pt_cnt; ++i)
   {
     indices[0] = static_cast<uint16_t>(inner_idx);
     indices[1] = static_cast<uint16_t>(inner_idx + ((i - 1) << 1));
@@ -767,7 +766,7 @@ auto FrameData::get_rect(uint32_t vtx_beg, uint32_t vtx_cnt) const noexcept -> R
   assert(vtx_beg + vtx_cnt <= _vertices.size());
 
   auto rc = Rect{};
-  for (auto i : std::views::iota(0u, vtx_cnt))
+  for (auto i = 0; i < vtx_cnt; ++i)
   {
     auto const& vtx = _vertices[vtx_beg + i];
     rc.left   = std::min(rc.left,   std::floor(vtx.pos.x));
@@ -862,7 +861,7 @@ void FrameData::discard_beg(std::function<void()> func) noexcept
 
 void FrameData::_discard_beg(uint count, uint& idx) noexcept
 {
-  assert(!_build_mode.contains(BuildMode::discard));
+  assert(!_build_mode.all(BuildMode::discard, BuildMode::uni));
 
   push_render_cmd(RenderCmdType::ui);
 
@@ -904,6 +903,11 @@ void FrameData::_discard_end() noexcept
 
 void FrameData::union_beg() noexcept
 {
+  // TODO: test discard with union
+  // assert(!_build_mode.contains(BuildMode::discard));
+  assert(!_build_mode.contains(BuildMode::uni));
+  _build_mode.add(BuildMode::uni);
+  _union_draw_cmd_idx = _draw_cmds.size();
   auto& cmd = _draw_cmds.emplace_back();
   cmd.type = DrawCmd::Type::union_beg;
 }
@@ -911,12 +915,74 @@ void FrameData::union_beg() noexcept
 void FrameData::_union_beg() noexcept
 {
   push_render_cmd(RenderCmdType::ui);
+  // TODO: remove
   // push_render_cmd_clear_rect(RenderCmdType::clear_mask_image);
   // push_render_cmd_clear_rect(RenderCmdType::clear_composite_image);
 }
 
 void FrameData::union_end(Color color, float thickness) noexcept
 {
+  assert(_build_mode.contains(BuildMode::uni));
+  _build_mode.remove(BuildMode::uni);
+
+  using Type = DrawCmd::Type;
+  for (; _union_draw_cmd_idx < _draw_cmds.size(); ++_union_draw_cmd_idx)
+  {
+    auto& cmd = _draw_cmds[_union_draw_cmd_idx];
+    switch (cmd.type)
+    {
+    case Type::add_rect:
+      cmd.add_rect.color     = color;
+      cmd.add_rect.thickness = thickness;
+      break;
+
+    case Type::add_triangle:
+      cmd.add_triangle.color     = color;
+      cmd.add_triangle.thickness = thickness;
+      break;
+
+    case Type::add_circle:
+      cmd.add_circle.color     = color;
+      cmd.add_circle.thickness = thickness;
+      break;
+
+    case Type::add_line:
+      cmd.add_line.color     = color;
+      cmd.add_line.thickness = thickness;
+      break;
+
+    case Type::add_arc:
+      cmd.add_arc.color     = color;
+      cmd.add_arc.thickness = thickness;
+      break;
+
+    case Type::add_quad_bezier:
+      cmd.add_quad_bezier.color     = color;
+      cmd.add_quad_bezier.thickness = thickness;
+      break;
+
+    case Type::add_cubic_bezier:
+      cmd.add_cubic_bezier.color     = color;
+      cmd.add_cubic_bezier.thickness = thickness;
+      break;
+
+    case Type::path_end:
+      cmd.path_end.color     = color;
+      cmd.path_end.thickness = thickness;
+      break;
+
+    case Type::path_begin:
+    case Type::add_path_line_to:
+    case Type::add_path_arc_to:
+    case Type::add_path_quad_bezier_to:
+    case Type::add_path_cubic_bezier_to:
+    case Type::union_beg:
+      break;
+
+    default: std::unreachable();
+    }
+  }
+
   auto& cmd = _draw_cmds.emplace_back();
   cmd.type = DrawCmd::Type::union_end;
   cmd.union_end = { color, thickness };

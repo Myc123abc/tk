@@ -200,7 +200,7 @@ void Image::create_descriptor(bool use_mipmap) noexcept
   //   // get count of mipmap images
   //   auto count = _handle->GetDesc().MipLevels;
   //   _mipmap_uavs.reserve(count);
-  //   for (auto i : std::views::iota(1u, count))
+  //   for (auto i = 1; i < count; ++i)
   //   {
   //     // pop descriptor handle
   //     auto handle = g_desc_heap_mgr.pop_handle(DescriptorHeapType::cbv_srv_uav);

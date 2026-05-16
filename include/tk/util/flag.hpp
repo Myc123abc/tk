@@ -68,6 +68,12 @@ public:
   }
 
   template <typename... Args>
+  constexpr auto all(Args... args) const noexcept -> bool
+  {
+    return (contains(Flag{ args }) && ...);
+  }
+
+  template <typename... Args>
   constexpr auto any(Args... args) const noexcept -> bool
   {
     return (contains(Flag{ args }) || ...);

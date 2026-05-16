@@ -10,12 +10,12 @@ namespace tk::ui {
 
 struct WindowShadowInfo
 {
-  Rect                 scissor_rect;
-  uint2                window_extent{};
-  float                shadow_thickness{};
-  float3               color{};
-  float                radius{};
-  float                softness{};
+  Rect                  scissor_rect;
+  uint2                 window_extent{};
+  float                 shadow_thickness{};
+  float3                color{};
+  float                 radius{};
+  float                 softness{};
   std::optional<float4> wireframe_color;
 };
 
@@ -43,8 +43,8 @@ struct RenderCmd
   {
     struct
     {
-      uint32_t    idx_beg{};
-      uint32_t    idx_size{};
+      uint        idx_beg{};
+      uint        idx_size{};
       Rect        scissor_rect{};
       ImageHandle image_handle;
     } ui;
@@ -85,6 +85,7 @@ public:
     _using_discard_shapes          = {};
     _discard_vtx_beg               = {};
     _clear_composite_image_cmd_idx = {};
+    _union_draw_cmd_idx            = {};
   }
 
   struct DrawCmd
@@ -213,9 +214,9 @@ public:
 
     struct
     {
-      bool   close{};
-      Color  color{};
-      float  thickness{};
+      bool  close{};
+      Color color{};
+      float thickness{};
     } path_end{};
 
     struct
@@ -225,7 +226,7 @@ public:
 
     struct
     {
-      uint32_t count{};
+      uint count{};
     } discard_beg{};
 
     struct
@@ -311,7 +312,7 @@ public:
 private:
   using Vertex = renderer::Vertex;
 
-  auto expand_beg(uint32_t vertices_size, uint32_t indices_size) noexcept -> std::pair<Vertex*, uint16_t*>
+  auto expand_beg(uint vertices_size, uint indices_size) noexcept -> std::pair<Vertex*, uint16*>
   {
     _tmp_vertices_size = vertices_size;
     _tmp_indices_size  = indices_size;
@@ -329,7 +330,7 @@ private:
   }
 
 private:
-  auto get_rect(uint32_t vtx_beg, uint32_t vtx_cnt) const noexcept -> Rect;
+  auto get_rect(uint vtx_beg, uint vtx_cnt) const noexcept -> Rect;
   void add_rect(float2 left_top, float2 right_bottom, Color color = {}) noexcept;
 
   void push_render_cmd(RenderCmdType type, ImageHandle image_handle = Write_Image_Handle) noexcept;
@@ -339,7 +340,7 @@ private:
   void add_concave_poly_filled(Color color) noexcept;
 
   static auto calc_circle_segment_count(float radius) noexcept -> float;
-  static auto get_circle_segment_count(float radius) noexcept -> uint32_t;
+  static auto get_circle_segment_count(float radius) noexcept -> uint;
 
   void add_poly_line(Color color, float thickness, bool is_closed) noexcept;
   void path_arc_to(float2 center, float radius, float min, float max) noexcept;
@@ -350,18 +351,18 @@ private:
   void path_bezier_cubic_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float2 p3, float tess_tol, int level) noexcept;
 
 private:
-  std::vector<DrawCmd>  _draw_cmds;
-  std::vector<Vertex>   _vertices;
-  std::vector<uint16_t> _indices;
-  uint32_t              _vertex_beg{};
-  uint32_t              _index_beg{};
+  std::vector<DrawCmd> _draw_cmds;
+  std::vector<Vertex>  _vertices;
+  std::vector<uint16>  _indices;
+  uint                 _vertex_beg{};
+  uint                 _index_beg{};
 
-  uint32_t _tmp_vertices_size{};
-  uint32_t _tmp_indices_size{};
+  uint _tmp_vertices_size{};
+  uint _tmp_indices_size{};
 
   std::vector<RenderCmd> _render_cmds;
-  std::vector<uint32_t>  _render_cmd_rect_idxs;
-  uint32_t               _draw_index_beg{};
+  std::vector<uint>      _render_cmd_rect_idxs;
+  uint                   _draw_index_beg{};
 
   float2 _window_pos{};
 
@@ -379,9 +380,10 @@ private:
   };
   Flag<BuildMode> _build_mode;
 
-  bool     _using_discard_shapes{};
-  uint32_t _discard_vtx_beg{};
-  uint     _clear_composite_image_cmd_idx{};
+  bool _using_discard_shapes{};
+  uint _discard_vtx_beg{};
+  uint _clear_composite_image_cmd_idx{};
+  uint _union_draw_cmd_idx{};
 
   inline static auto constexpr arc_table_size         = 48;
   inline static auto constexpr arc_sample_max         = arc_table_size;

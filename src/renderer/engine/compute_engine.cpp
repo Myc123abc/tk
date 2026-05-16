@@ -109,7 +109,7 @@ void ComputeEngine::blur(Image& src, Image& dst, float sigma, uint32_t blur_coun
   g_ctx.set_compute_root_signature(horizontal_pipe->root_signature);
   g_ctx.set_compute_constants(horizontal_pipe->root_param_idx("constants"), constants);
 
-  for (auto i : std::views::iota(0u, blur_count))
+  for (auto i = 0; i < blur_count; ++i)
   {
     g_ctx.set_pipe(horizontal_pipe->pipe_state.Get());
     dst.set_state(cmd(), ImageState::non_pixel);

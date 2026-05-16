@@ -446,7 +446,7 @@ void Renderer::generate_mipmap() noexcept
     auto src_width  = img.width();
     auto src_height = img.height();
 
-    for (auto i : std::views::iota(0u, img.mipmap_uavs().size()))
+    for (auto i = 0; i < img.mipmap_uavs().size(); ++i)
     {
       constants.texel_size = float2{ 1.0 / src_width, 1.0 / src_height };
       constants.mip_level  = i;

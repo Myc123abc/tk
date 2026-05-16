@@ -8,7 +8,9 @@
 
 namespace tk {
 
-using uint = uint32_t;
+using uint   = uint32_t;
+using uint16 = uint16_t;
+using uint8  = uint8_t;
 
 template <typename T>
 concept Numeric = std::integral<T> || std::floating_point<T>;
