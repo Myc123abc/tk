@@ -4,6 +4,7 @@
 #include "../renderer/resource/shader_type.hpp"
 #include "image_manager.hpp"
 #include "util/rect.hpp"
+#include "util/flag.hpp"
 
 namespace tk::ui {
 
@@ -80,7 +81,7 @@ public:
     _draw_index_beg                = {};
     _window_pos                    = {};
     _window_shadow_info            = {};
-    _use_discard                   = {};
+    _build_mode                    = {};
     _using_discard_shapes          = {};
     _discard_vtx_beg               = {};
     _clear_composite_image_cmd_idx = {};
@@ -370,8 +371,15 @@ private:
   std::vector<float2> _normals;
   std::vector<float2> _tmp_buf;
 
+  enum class BuildMode
+  {
+    none    = 0b00,
+    discard = 0b01,
+    uni     = 0b10,
+  };
+  Flag<BuildMode> _build_mode;
+
   bool     _using_discard_shapes{};
-  bool     _use_discard{};
   uint32_t _discard_vtx_beg{};
   uint     _clear_composite_image_cmd_idx{};
 

@@ -49,12 +49,13 @@ enum class DrawCmdType
   add_path_quad_bezier,
 };
 
-Flag(DrawCmdOp,
+enum class DrawCmdOp
+{
   none          = 0b000,
   uni           = 0b001,
   discard_shape = 0b010,
   discard       = 0b100,
-)
+};
 
 struct DrawCmd
 {

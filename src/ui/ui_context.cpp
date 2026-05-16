@@ -510,7 +510,7 @@ void UIContext::update_keys() noexcept
   }
 }
 
-auto UIContext::get_key(Key key) noexcept -> KeyState
+auto UIContext::get_key(Key key) noexcept -> Flag<KeyState>
 {
   using enum KeyState;
 

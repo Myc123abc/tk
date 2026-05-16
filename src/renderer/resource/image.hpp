@@ -18,13 +18,14 @@ namespace tk::renderer {
 ///                             Structure
 ////////////////////////////////////////////////////////////////////////////////
 
-Flag(ImageType,
+enum class ImageType
+{
   none = 0,
   srv  = 1 << 0,
   uav  = 1 << 1,
   rtv  = 1 << 2,
   dsv  = 1 << 3,
-)
+};
 
 enum class ImageFormat
 {
@@ -89,7 +90,7 @@ public:
   Image& operator=(Image const&)     = delete;
   Image& operator=(Image&&) noexcept = delete;
 
-  void init(uint width , uint height, ImageFormat format, ImageType types, bool use_mipmap = false) noexcept;
+  void init(uint width , uint height, ImageFormat format, Flag<ImageType> type, bool use_mipmap = false) noexcept;
   void init(IDXGISwapChain1* swapchain, uint index) noexcept;
   // void init(ImageType type, HANDLE handle, uint width, uint height) noexcept;
   void init(float width, float height, Image const& src) noexcept { init(width, height, static_cast<ImageFormat>(src._format), src._type); }
@@ -132,7 +133,7 @@ private:
   uint                                   _width{};
   uint                                   _height{};
   DXGI_FORMAT                            _format{};
-  ImageType                              _type{};
+  Flag<ImageType>                        _type{};
   D3D12_RESOURCE_STATES                  _state{};
 
   struct Descriptors
@@ -152,7 +153,7 @@ using ImageHandle = ImagePoolType::Handle;
 
 Singleton(ImageManager, g_img_mgr,
 public:
-  auto create(uint width , uint height, ImageFormat format, ImageType types, bool use_mipmap = false) noexcept
+  auto create(uint width , uint height, ImageFormat format, Flag<ImageType> types, bool use_mipmap = false) noexcept
   {
     auto handle = _pool.alloc();
     _pool[handle].init(width, height, format, types, use_mipmap);

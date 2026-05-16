@@ -831,7 +831,7 @@ void FrameData::_add_image(ImageHandle handle, float2 left_top, float2 right_bot
   assert(!_using_discard_shapes);
   if (alpha == 0) return;
 
-  auto type = _use_discard ? RenderCmdType::discard_draw_composite : RenderCmdType::ui;
+  auto type = _build_mode.contains(BuildMode::discard) ? RenderCmdType::discard_draw_composite : RenderCmdType::ui;
   push_render_cmd(type);
 
   auto col = Color{ 1, 1, 1, static_cast<float>(alpha) / 255 };
@@ -862,7 +862,7 @@ void FrameData::discard_beg(std::function<void()> func) noexcept
 
 void FrameData::_discard_beg(uint count, uint& idx) noexcept
 {
-  assert(!_use_discard);
+  assert(!_build_mode.contains(BuildMode::discard));
 
   push_render_cmd(RenderCmdType::ui);
 
@@ -877,7 +877,7 @@ void FrameData::_discard_beg(uint count, uint& idx) noexcept
   _clear_composite_image_cmd_idx = _render_cmds.size();
   push_render_cmd_clear_rect(RenderCmdType::clear_composite_image);
 
-  _use_discard     = true;
+  _build_mode.add(BuildMode::discard);
   _discard_vtx_beg = _vertex_beg;
 }
 
@@ -888,9 +888,9 @@ void FrameData::discard_end() noexcept
 
 void FrameData::_discard_end() noexcept
 {
-  assert(_use_discard && _vertices.size() > _discard_vtx_beg);
+  assert(_build_mode.contains(BuildMode::discard) && _vertices.size() > _discard_vtx_beg);
 
-  _use_discard = false;
+  _build_mode.remove(BuildMode::discard);
 
   auto rc = get_rect(_discard_vtx_beg, static_cast<uint32_t>(_vertices.size() - _discard_vtx_beg));
   _render_cmds[_clear_composite_image_cmd_idx].clear_rect = rc;

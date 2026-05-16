@@ -418,7 +418,7 @@ auto button(
   if (mouse_down_color && state.hovered)
   {
     auto state = g_ui_ctx.get_key(Key::Mouse_Left_Button);
-    if (has_flag(state, KeyState::down) || state == KeyState::press)
+    if (state.contains(KeyState::down) || state == KeyState::press)
       button_color = mouse_down_color.value();
   }
 

@@ -162,7 +162,7 @@ private:
   std::unordered_set<Key> _down_keys;
 
 public:
-  auto get_key(Key key) noexcept -> KeyState;
+  auto get_key(Key key) noexcept -> Flag<KeyState>;
 )
 
 }
