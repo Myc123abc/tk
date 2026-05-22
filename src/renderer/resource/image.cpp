@@ -250,11 +250,17 @@ void Image::clear_render_target(ID3D12GraphicsCommandList1* cmd, std::optional<R
     cmd->ClearRenderTargetView(_desc.rtv.cpu_handle(), clear_color, 0, nullptr);
 }
 
-void Image::clear_depth_stencil(ID3D12GraphicsCommandList1* cmd) noexcept
+void Image::clear_depth_stencil(ID3D12GraphicsCommandList1* cmd, std::optional<Rect> rect) noexcept
 {
   err_if(!_type.contains(ImageType::dsv), "clear depth stencil only use on dsv");
   set_state(cmd, ImageState::depth_write);
-  cmd->ClearDepthStencilView(dsv().cpu_handle(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.f, 0, 0, nullptr);
+  if (rect)
+  {
+    auto rc = rect->to_RECT();
+    cmd->ClearDepthStencilView(dsv().cpu_handle(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.f, 0, 1, &rc);
+  }
+  else
+    cmd->ClearDepthStencilView(dsv().cpu_handle(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.f, 0, 0, nullptr);
 }
 
 auto Image::per_pixel_size() const noexcept -> uint

@@ -30,9 +30,6 @@ enum class RenderCmdType
   discard_write,
   discard_draw_composite,
   discard_composite,
-
-  clear_union_image,
-  union_write,
 };
 
 struct RenderCmd
@@ -85,7 +82,6 @@ public:
     _using_discard_shapes          = {};
     _discard_vtx_beg               = {};
     _clear_composite_image_cmd_idx = {};
-    _union_draw_cmd_idx            = {};
   }
 
   struct DrawCmd
@@ -109,8 +105,6 @@ public:
       add_scissor_rect,
       discard_beg,
       discard_end,
-      union_beg,
-      union_end,
     } type{};
 
     struct
@@ -232,16 +226,6 @@ public:
     struct
     {
     } discard_end{};
-
-    struct
-    {
-    } union_beg{};
-
-    struct
-    {
-      Color color{};
-      float thickness{};
-    } union_end{};
   };
 
   void add_rect(float2 left_top, float2 right_bottom, Color color, float thickness) noexcept;
@@ -264,8 +248,6 @@ public:
 
   void discard_beg(std::function<void()> func) noexcept;
   void discard_end() noexcept;
-  void union_beg() noexcept;
-  void union_end(Color color = {}, float thickness = {}) noexcept;
 
 private:
   void _add_rect(float2 left_top, float2 right_bottom, Color color, float thickness) noexcept;
@@ -278,7 +260,7 @@ private:
   void _add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept;
 
   void _path_begin(float2 p0) noexcept;
-  void _add_path_line_to(float2 p) noexcept { _points.emplace_back(p); }
+  void _add_path_line_to(float2 p) noexcept { if (_points.back() != p) _points.emplace_back(p); }
   void _add_path_arc_to(float2 center, float2 p1, bool ccw) noexcept;
   void _add_path_quad_bezier_to(float2 p1, float2 p2) noexcept;
   void _add_path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept;
@@ -288,8 +270,6 @@ private:
 
   void _discard_beg(uint count, uint& idx) noexcept;
   void _discard_end() noexcept;
-  void _union_beg() noexcept;
-  void _union_end(Color color, float thickness) noexcept;
 
 public:
   void build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept;
@@ -330,7 +310,8 @@ private:
   }
 
 private:
-  auto get_rect(uint vtx_beg, uint vtx_cnt) const noexcept -> Rect;
+  auto get_vertices_bound_rect(uint vtx_beg, uint vtx_cnt) const noexcept -> Rect;
+  auto get_vertices_bound_rect(uint vtx_beg) const noexcept { return get_vertices_bound_rect(vtx_beg, _vertices.size() - vtx_beg); }
   void add_rect(float2 left_top, float2 right_bottom, Color color = {}) noexcept;
 
   void push_render_cmd(RenderCmdType type, ImageHandle image_handle = Write_Image_Handle) noexcept;
@@ -376,14 +357,12 @@ private:
   {
     none    = 0b00,
     discard = 0b01,
-    uni     = 0b10,
   };
   Flag<BuildMode> _build_mode;
 
   bool _using_discard_shapes{};
   uint _discard_vtx_beg{};
   uint _clear_composite_image_cmd_idx{};
-  uint _union_draw_cmd_idx{};
 
   inline static auto constexpr arc_table_size         = 48;
   inline static auto constexpr arc_sample_max         = arc_table_size;

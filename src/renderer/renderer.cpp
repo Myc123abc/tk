@@ -289,7 +289,7 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
     .window_pos           = frame_data->window_pos(),
   };
 
-  auto clear_render_target = [this](ImageHandle& handle, Rect rect)
+  auto clear_resize_render_target = [this, cmd](ImageHandle& handle, Rect rect)
   {
     auto& img = g_img_mgr[handle];
     if (rect.width() > img.width() || rect.height() > img.height())
@@ -297,10 +297,10 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
       add_frame_render_complete_func([handle] { g_img_mgr.destroy(handle); });
       handle = g_img_mgr.create(rect.width(), rect.height(), img);
     }
-    g_img_mgr[handle].clear_render_target(g_graphics_engine.cmd());
+    g_img_mgr[handle].clear_render_target(cmd);
   };
 
-  auto graphics_draw = [&](ui::RenderCmd const& cmd, PipelineType type, Image* rt, Rect scissor, std::vector<PipelineDescriptorInfo> const& descs = {})
+  auto graphics_draw = [&](ui::RenderCmd const& cmd, PipelineType type, Image* rt, Image* ds, Rect scissor, std::vector<PipelineDescriptorInfo> const& descs = {})
   {
     constants.render_target_extent = rt->extent();
     g_ctx.graphics_draw(GraphicsDrawInfo
@@ -313,8 +313,9 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
         .constants_name = "Constants",
         .constants      = constants,
         .descs          = descs,
-    },
+      },
       .render_target = rt,
+      .depth_stencil = ds,
       .idx_beg       = cmd.ui.idx_beg,
       .idx_cnt       = cmd.ui.idx_size,
     });
@@ -323,70 +324,65 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
   Rect discard_mask_rc, discard_composite_rc;
 
   auto rt = res.render_target();
+  auto ds = res.depth_stencil();
 
   for (auto const& render_cmd : frame_data->render_cmds())
   {
     using Type = ui::RenderCmdType;
     switch (render_cmd.type)
     {
-      case Type::ui:
-        graphics_draw(render_cmd, PipelineType::ui, rt, render_cmd.ui.scissor_rect,
-        {
-          { "image", g_img_mgr[_images[render_cmd.ui.image_handle]].srv().gpu_handle() },
-        });
-        break;
-
-      case Type::clear_discard_image:
-        assert(render_cmd.clear_rect);
-        discard_mask_rc = render_cmd.clear_rect.value();
-        clear_render_target(_discard_image, discard_mask_rc);
-        break;
-
-      case Type::clear_composite_image:
-        assert(render_cmd.clear_rect);
-        discard_composite_rc = render_cmd.clear_rect.value();
-        clear_render_target(_composite_image, discard_composite_rc);
-        break;
-
-      case Type::discard_write:
-        constants.mask_offset = -discard_mask_rc.pos();
-        graphics_draw(render_cmd, PipelineType::mask_write_max, g_img_mgr.get(_discard_image), { 0, 0, discard_mask_rc.extent() });
-        break;
-
-      case Type::discard_draw_composite:
-        constants.composite_offset = -discard_composite_rc.pos();
-        graphics_draw(render_cmd, PipelineType::composite_write, g_img_mgr.get(_composite_image), { 0, 0, discard_composite_rc.extent() },
-        {
-          { "image", g_img_mgr[_images[render_cmd.ui.image_handle]].srv().gpu_handle() },
-        });
-        break;
-
-      case Type::discard_composite:
+    case Type::ui:
+      graphics_draw(render_cmd, PipelineType::ui, rt, {}, render_cmd.ui.scissor_rect,
       {
-        auto& discard_img   = g_img_mgr[_discard_image];
-        auto& composite_img = g_img_mgr[_composite_image];
-
-        constants.mask_offset      = -discard_mask_rc.pos();
-        constants.mask_extent      = discard_img.extent();
-        constants.composite_offset = -discard_composite_rc.pos();
-        constants.composite_extent = composite_img.extent();
-
-        discard_img.set_state(cmd, ImageState::pixel);
-        composite_img.set_state(cmd, ImageState::pixel);
-
-        graphics_draw(render_cmd, PipelineType::discard_draw, rt, render_cmd.ui.scissor_rect,
-        {
-          { "image",      composite_img.srv().gpu_handle() },
-          { "mask_image", discard_img.srv().gpu_handle()   },
-        });
-      }
+        { "image", g_img_mgr[_images[render_cmd.ui.image_handle]].srv().gpu_handle() },
+      });
       break;
 
-      case Type::clear_union_image:
-        break;
+    case Type::clear_discard_image:
+      assert(render_cmd.clear_rect);
+      discard_mask_rc = render_cmd.clear_rect.value();
+      clear_resize_render_target(_discard_image, discard_mask_rc);
+      break;
 
-      case Type::union_write:
-        break;
+    case Type::clear_composite_image:
+      assert(render_cmd.clear_rect);
+      discard_composite_rc = render_cmd.clear_rect.value();
+      clear_resize_render_target(_composite_image, discard_composite_rc);
+      break;
+
+    case Type::discard_write:
+      constants.mask_offset = -discard_mask_rc.pos();
+      graphics_draw(render_cmd, PipelineType::mask_write_max, g_img_mgr.get(_discard_image), {}, { 0, 0, discard_mask_rc.extent() });
+      break;
+
+    case Type::discard_draw_composite:
+      constants.composite_offset = -discard_composite_rc.pos();
+      graphics_draw(render_cmd, PipelineType::composite_write, g_img_mgr.get(_composite_image), {}, { 0, 0, discard_composite_rc.extent() },
+      {
+        { "image", g_img_mgr[_images[render_cmd.ui.image_handle]].srv().gpu_handle() },
+      });
+      break;
+
+    case Type::discard_composite:
+    {
+      auto& discard_img   = g_img_mgr[_discard_image];
+      auto& composite_img = g_img_mgr[_composite_image];
+
+      constants.mask_offset      = -discard_mask_rc.pos();
+      constants.mask_extent      = discard_img.extent();
+      constants.composite_offset = -discard_composite_rc.pos();
+      constants.composite_extent = composite_img.extent();
+
+      discard_img.set_state(cmd, ImageState::pixel);
+      composite_img.set_state(cmd, ImageState::pixel);
+
+      graphics_draw(render_cmd, PipelineType::discard_draw, rt, {}, render_cmd.ui.scissor_rect,
+      {
+        { "image",      composite_img.srv().gpu_handle() },
+        { "mask_image", discard_img.srv().gpu_handle()   },
+      });
+    }
+    break;
     }
   }
 

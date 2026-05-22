@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../util/singleton.hpp"
-#include "../resource/render_resource.hpp"
+#include "../resource/image.hpp"
 #include "compiler.hpp"
 
 #include <span>
@@ -22,10 +22,6 @@ enum class PipelineType
   composite_write,
 
   discard_draw,
-
-  stencil_replace_write,
-  stencil_equal_test,
-  stencil_not_equal_test,
 };
 
 enum class StencilOp

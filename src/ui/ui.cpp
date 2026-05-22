@@ -183,16 +183,6 @@ void discard_end() noexcept
   g_ui_ctx.frame_data()->discard_end();
 }
 
-void union_beg() noexcept
-{
-  g_ui_ctx.frame_data()->union_beg();
-}
-
-void union_end(Color color, float thickness) noexcept
-{
-  g_ui_ctx.frame_data()->union_end(color, thickness);
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 ///                            Geometry
 ////////////////////////////////////////////////////////////////////////////////

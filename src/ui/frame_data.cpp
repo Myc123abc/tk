@@ -414,7 +414,7 @@ void FrameData::path_bezier_cubic_curve_to_casteljau(float2 p0, float2 p1, float
 
 void FrameData::add_convex_poly_filled(Color color) noexcept
 {
-  auto pt_cnt = static_cast<uint32_t>(_points.size());
+  auto pt_cnt = static_cast<uint>(_points.size());
   assert(pt_cnt > 2);
 
   auto aa_width = g_ui_ctx.window()->scale();
@@ -433,13 +433,13 @@ void FrameData::add_convex_poly_filled(Color color) noexcept
   }
 
   _normals.resize(pt_cnt);
-  for (uint32_t i0 = pt_cnt - 1, i1 = 0; i1 < pt_cnt; i0 = i1++)
+  for (uint i0 = pt_cnt - 1, i1 = 0; i1 < pt_cnt; i0 = i1++)
   {
     auto dp = fast_normalize(_points[i1] - _points[i0]);
     _normals[i0] = { dp.y, -dp.x };
   }
 
-  for (uint32_t i0 = pt_cnt - 1, i1 = 0; i1 < pt_cnt; i0 = i1++)
+  for (uint i0 = pt_cnt - 1, i1 = 0; i1 < pt_cnt; i0 = i1++)
   {
     auto dmp = fix_normal((_normals[i0] + _normals[i1]) * .5f) * aa_width * .5f;
     vertices[0] = { _points[i1] - dmp, {}, color  };
@@ -461,10 +461,10 @@ void FrameData::add_convex_poly_filled(Color color) noexcept
 
 void FrameData::add_concave_poly_filled(Color color) noexcept
 {
-  auto pt_cnt = static_cast<uint32_t>(_points.size());
+  auto pt_cnt = static_cast<uint>(_points.size());
   assert(pt_cnt > 2);
 
-  uint32_t triangle[3]{};
+  uint triangle[3]{};
   auto const aa_size = g_ui_ctx.window()->scale();
   auto col_trans = Color{ color.r, color.g, color.b, 0 };
 
@@ -516,12 +516,12 @@ void FrameData::add_concave_poly_filled(Color color) noexcept
   _points.clear();
 }
 
-auto FrameData::get_circle_segment_count(float radius) noexcept -> uint32_t
+auto FrameData::get_circle_segment_count(float radius) noexcept -> uint
 {
   int const idx = static_cast<int>(radius + 0.999999f);
   if (idx >= 0 && idx < static_cast<int>(_circle_segment_counts.size()))
     return _circle_segment_counts[idx];
-  return static_cast<uint32_t>(calc_circle_segment_count(radius));
+  return static_cast<uint>(calc_circle_segment_count(radius));
 }
 
 void FrameData::path_arc_to(float2 center, float radius, float min, float max) noexcept
@@ -644,7 +644,7 @@ void FrameData::_path_arc_to(float2 center, float radius, int min, int max, int 
 
 void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noexcept
 {
-  auto pt_cnt = static_cast<uint32_t>(_points.size());
+  auto pt_cnt = static_cast<uint>(_points.size());
   assert(pt_cnt >= 2);
 
   auto const count      = is_closed ? pt_cnt : pt_cnt - 1;
@@ -705,7 +705,7 @@ void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noex
       out_vtx[2] = _points[i2] - dm_in;
       out_vtx[3] = _points[i2] - dm_out;
 
-      uint32_t vals[] = { idx2 + 1, idx1 + 1, idx1 + 2, idx1 + 2, idx2 + 2, idx2 + 1, idx2 + 1, idx1 + 1, idx1 + 0, idx1 + 0, idx2 + 0, idx2 + 1, idx2 + 2, idx1 + 2, idx1 + 3, idx1 + 3, idx2 + 3, idx2 + 2 };
+      uint vals[] = { idx2 + 1, idx1 + 1, idx1 + 2, idx1 + 2, idx2 + 2, idx2 + 1, idx2 + 1, idx1 + 1, idx1 + 0, idx1 + 0, idx2 + 0, idx2 + 1, idx2 + 2, idx1 + 2, idx1 + 3, idx1 + 3, idx2 + 3, idx2 + 2 };
       for (auto v : vals) *idx++ = static_cast<uint16_t>(v);
 
       idx1 = idx2;
@@ -742,7 +742,7 @@ void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noex
       out_vtx[0] = _points[i2] + dm;
       out_vtx[1] = _points[i2] - dm;
 
-      uint32_t vals[] = { idx2 + 0, idx1 + 0, idx1 + 2, idx1 + 2, idx2 + 2, idx2 + 0, idx2 + 1, idx1 + 1, idx1 + 0, idx1 + 0, idx2 + 0, idx2 + 1 };
+      uint vals[] = { idx2 + 0, idx1 + 0, idx1 + 2, idx1 + 2, idx2 + 2, idx2 + 0, idx2 + 1, idx1 + 1, idx1 + 0, idx1 + 0, idx2 + 0, idx2 + 1 };
       for (auto v : vals) *idx++ = static_cast<uint16_t>(v);
 
       idx1 = idx2;
@@ -761,7 +761,7 @@ void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noex
   _points.clear();
 }
 
-auto FrameData::get_rect(uint32_t vtx_beg, uint32_t vtx_cnt) const noexcept -> Rect
+auto FrameData::get_vertices_bound_rect(uint vtx_beg, uint vtx_cnt) const noexcept -> Rect
 {
   assert(vtx_beg + vtx_cnt <= _vertices.size());
 
@@ -780,10 +780,10 @@ auto FrameData::get_rect(uint32_t vtx_beg, uint32_t vtx_cnt) const noexcept -> R
 
 void FrameData::push_render_cmd(RenderCmdType type, ImageHandle image_handle) noexcept
 {
-  if (auto res = static_cast<uint32_t>(_indices.size() - _draw_index_beg))
+  if (auto res = static_cast<uint>(_indices.size() - _draw_index_beg))
   {
     if (type == RenderCmdType::ui)
-      _render_cmd_rect_idxs.emplace_back(static_cast<uint32_t>(_render_cmds.size()));
+      _render_cmd_rect_idxs.emplace_back(_render_cmds.size());
 
     auto& cmd = _render_cmds.emplace_back();
     cmd.type            = type;
@@ -791,7 +791,7 @@ void FrameData::push_render_cmd(RenderCmdType type, ImageHandle image_handle) no
     cmd.ui.idx_size     = res;
     cmd.ui.image_handle = image_handle;
 
-    _draw_index_beg = static_cast<uint32_t>(_indices.size());
+    _draw_index_beg = static_cast<uint>(_indices.size());
   }
 }
 
@@ -856,12 +856,12 @@ void FrameData::discard_beg(std::function<void()> func) noexcept
   _draw_cmds.emplace_back().type = DrawCmd::Type::discard_beg;
   auto beg = _draw_cmds.size();
   func();
-  _draw_cmds[cmd_idx].discard_beg.count = static_cast<uint32_t>(_draw_cmds.size() - beg);
+  _draw_cmds[cmd_idx].discard_beg.count = static_cast<uint>(_draw_cmds.size() - beg);
 }
 
 void FrameData::_discard_beg(uint count, uint& idx) noexcept
 {
-  assert(!_build_mode.all(BuildMode::discard, BuildMode::uni));
+  assert(!_build_mode.contains(BuildMode::discard));
 
   push_render_cmd(RenderCmdType::ui);
 
@@ -870,7 +870,7 @@ void FrameData::_discard_beg(uint count, uint& idx) noexcept
   for (auto i = 0u; i < count; ++i) build_render_cmd(_draw_cmds[++idx], idx);
   _using_discard_shapes = false;
 
-  push_render_cmd_clear_rect(RenderCmdType::clear_discard_image, get_rect(_discard_vtx_beg, _vertices.size() - _discard_vtx_beg));
+  push_render_cmd_clear_rect(RenderCmdType::clear_discard_image, get_vertices_bound_rect(_discard_vtx_beg));
   push_render_cmd(RenderCmdType::discard_write);
 
   _clear_composite_image_cmd_idx = _render_cmds.size();
@@ -891,7 +891,7 @@ void FrameData::_discard_end() noexcept
 
   _build_mode.remove(BuildMode::discard);
 
-  auto rc = get_rect(_discard_vtx_beg, static_cast<uint32_t>(_vertices.size() - _discard_vtx_beg));
+  auto rc = get_vertices_bound_rect(_discard_vtx_beg);
   _render_cmds[_clear_composite_image_cmd_idx].clear_rect = rc;
   push_render_cmd(RenderCmdType::discard_draw_composite);
   add_rect({ rc.left, rc.top }, { rc.right, rc.bottom });
@@ -899,98 +899,6 @@ void FrameData::_discard_end() noexcept
 
   auto wnd = g_ui_ctx.window();
   _render_cmds.back().ui.scissor_rect = wnd->is_resizing() ? wnd->rect() : wnd->content_rect(); 
-}
-
-void FrameData::union_beg() noexcept
-{
-  // TODO: test discard with union
-  // assert(!_build_mode.contains(BuildMode::discard));
-  assert(!_build_mode.contains(BuildMode::uni));
-  _build_mode.add(BuildMode::uni);
-  _union_draw_cmd_idx = _draw_cmds.size();
-  auto& cmd = _draw_cmds.emplace_back();
-  cmd.type = DrawCmd::Type::union_beg;
-}
-
-void FrameData::_union_beg() noexcept
-{
-  push_render_cmd(RenderCmdType::ui);
-  // TODO: remove
-  // push_render_cmd_clear_rect(RenderCmdType::clear_mask_image);
-  // push_render_cmd_clear_rect(RenderCmdType::clear_composite_image);
-}
-
-void FrameData::union_end(Color color, float thickness) noexcept
-{
-  assert(_build_mode.contains(BuildMode::uni));
-  _build_mode.remove(BuildMode::uni);
-
-  using Type = DrawCmd::Type;
-  for (; _union_draw_cmd_idx < _draw_cmds.size(); ++_union_draw_cmd_idx)
-  {
-    auto& cmd = _draw_cmds[_union_draw_cmd_idx];
-    switch (cmd.type)
-    {
-    case Type::add_rect:
-      cmd.add_rect.color     = color;
-      cmd.add_rect.thickness = thickness;
-      break;
-
-    case Type::add_triangle:
-      cmd.add_triangle.color     = color;
-      cmd.add_triangle.thickness = thickness;
-      break;
-
-    case Type::add_circle:
-      cmd.add_circle.color     = color;
-      cmd.add_circle.thickness = thickness;
-      break;
-
-    case Type::add_line:
-      cmd.add_line.color     = color;
-      cmd.add_line.thickness = thickness;
-      break;
-
-    case Type::add_arc:
-      cmd.add_arc.color     = color;
-      cmd.add_arc.thickness = thickness;
-      break;
-
-    case Type::add_quad_bezier:
-      cmd.add_quad_bezier.color     = color;
-      cmd.add_quad_bezier.thickness = thickness;
-      break;
-
-    case Type::add_cubic_bezier:
-      cmd.add_cubic_bezier.color     = color;
-      cmd.add_cubic_bezier.thickness = thickness;
-      break;
-
-    case Type::path_end:
-      cmd.path_end.color     = color;
-      cmd.path_end.thickness = thickness;
-      break;
-
-    case Type::path_begin:
-    case Type::add_path_line_to:
-    case Type::add_path_arc_to:
-    case Type::add_path_quad_bezier_to:
-    case Type::add_path_cubic_bezier_to:
-    case Type::union_beg:
-      break;
-
-    default: std::unreachable();
-    }
-  }
-
-  auto& cmd = _draw_cmds.emplace_back();
-  cmd.type = DrawCmd::Type::union_end;
-  cmd.union_end = { color, thickness };
-}
-
-void FrameData::_union_end(Color, float) noexcept
-{
-  // push_render_cmd(RenderCmdType::mask_write_add);
 }
 
 void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
@@ -1065,14 +973,6 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
 
   case Type::discard_end:
     _discard_end();
-    break;
-
-  case Type::union_beg:
-    _union_beg();
-    break;
-
-  case Type::union_end:
-    _union_end(cmd.union_end.color, cmd.union_end.thickness);
     break;
   }
 }

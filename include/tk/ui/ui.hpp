@@ -269,16 +269,6 @@ void discard_beg(std::function<void()> func) noexcept;
 /// discard operation over
 void discard_end() noexcept;
 
-/// union operation begin
-void union_beg() noexcept;
-
-/**
- * union operation end
- * @param color
- * @param thickness
- */
-void union_end(Color color, float thickness) noexcept;
-
 ////////////////////////////////////////////////////////////////////////////////
 ///                            Geometry
 ////////////////////////////////////////////////////////////////////////////////

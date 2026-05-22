@@ -72,22 +72,22 @@ public:
 private:
   using DescMapType = std::unordered_map<uint, D3D12_GPU_DESCRIPTOR_HANDLE>;
 
-  ID3D12GraphicsCommandList1* _cmd{};
-  ID3D12PipelineState*        _pipe_state{};
-  ID3D12RootSignature*        _graphics_root_signature{};
-  ID3D12RootSignature*        _compute_root_signature{};
-  DescMapType                 _graphics_descriptors;
-  DescMapType                 _compute_descriptors;
-  uint                        _graphics_constants_root_param_idx{};
-  std::vector<uint8_t>        _graphics_constants;
-  uint                        _compute_constants_root_param_idx{};
-  std::vector<uint8_t>        _compute_constants;
-  D3D_PRIMITIVE_TOPOLOGY      _primitive_topology{};
-  Rect                        _viewport{};
-  Rect                        _scissor_rect{};
-  std::optional<uint>         _stencil_value{};
-  D3D12_CPU_DESCRIPTOR_HANDLE _render_target{};
-  D3D12_CPU_DESCRIPTOR_HANDLE _depth_stencil{};
+  ID3D12GraphicsCommandList1*                _cmd{};
+  ID3D12PipelineState*                       _pipe_state{};
+  ID3D12RootSignature*                       _graphics_root_signature{};
+  ID3D12RootSignature*                       _compute_root_signature{};
+  DescMapType                                _graphics_descriptors;
+  DescMapType                                _compute_descriptors;
+  uint                                       _graphics_constants_root_param_idx{};
+  std::vector<uint8_t>                       _graphics_constants;
+  uint                                       _compute_constants_root_param_idx{};
+  std::vector<uint8_t>                       _compute_constants;
+  D3D_PRIMITIVE_TOPOLOGY                     _primitive_topology{};
+  Rect                                       _viewport{};
+  Rect                                       _scissor_rect{};
+  std::optional<uint>                        _stencil_value{};
+  std::optional<D3D12_CPU_DESCRIPTOR_HANDLE> _render_target{};
+  std::optional<D3D12_CPU_DESCRIPTOR_HANDLE> _depth_stencil{};
 )
 
 template <typename T>

@@ -131,19 +131,35 @@ void Context::set_compute_descriptor(uint root_param_idx, D3D12_GPU_DESCRIPTOR_H
 
 void Context::set_render_target(Image* render_tareget_image, Image* depth_stencil_image) noexcept
 {
-  assert(render_tareget_image);
-  render_tareget_image->set_state(_cmd, ImageState::render_target);
-  auto rtv = render_tareget_image->rtv().cpu_handle();
+  auto rtv = render_tareget_image ? render_tareget_image->rtv().cpu_handle() : D3D12_CPU_DESCRIPTOR_HANDLE{};
   auto dsv = depth_stencil_image ? depth_stencil_image->dsv().cpu_handle() : D3D12_CPU_DESCRIPTOR_HANDLE{};
-  assert(rtv.ptr);
-  if (rtv.ptr != _render_target.ptr || dsv.ptr != _depth_stencil.ptr)
+  if (render_tareget_image)
   {
-    if (dsv.ptr)
-      _cmd->OMSetRenderTargets(1, &rtv, false, &dsv);
-    else
-      _cmd->OMSetRenderTargets(1, &rtv, false, nullptr);
-    _render_target = rtv;
-    _depth_stencil = dsv;
+    render_tareget_image->set_state(_cmd, ImageState::render_target);
+    assert(rtv.ptr);
+    if (!_render_target || rtv.ptr != _render_target->ptr ||
+        !_depth_stencil || dsv.ptr != _depth_stencil->ptr)
+    {
+      if (depth_stencil_image)
+        _cmd->OMSetRenderTargets(1, &rtv, false, &dsv);
+      else
+        _cmd->OMSetRenderTargets(1, &rtv, false, nullptr);
+      _render_target = rtv;     
+      _depth_stencil = dsv;
+    }
+  }
+  else
+  {
+    if (_render_target  ||
+        !_depth_stencil || dsv.ptr != _depth_stencil->ptr)
+    {
+      if (depth_stencil_image)
+        _cmd->OMSetRenderTargets(0, nullptr, false, &dsv);
+      else
+        std::unreachable();
+      _render_target = rtv;
+      _depth_stencil = dsv;
+    }
   }
 }
 

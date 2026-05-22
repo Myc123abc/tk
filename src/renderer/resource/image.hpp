@@ -104,7 +104,7 @@ public:
 
   void clear(ID3D12GraphicsCommandList1* cmd, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) const noexcept;
   void clear_render_target(ID3D12GraphicsCommandList1* cmd, std::optional<Rect> rect = {}) noexcept;
-  void clear_depth_stencil(ID3D12GraphicsCommandList1* cmd) noexcept;
+  void clear_depth_stencil(ID3D12GraphicsCommandList1* cmd, std::optional<Rect> rect = {}) noexcept;
 
   auto handle() const noexcept { return _handle.Get();                     }
   auto format() const noexcept { return static_cast<ImageFormat>(_format); }

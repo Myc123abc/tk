@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <optional>
 
+#include "util/base.hpp"
+
 namespace tk::renderer {
 
 class Engine
@@ -18,13 +20,13 @@ public:
   Engine& operator=(Engine const&) = delete;
   Engine& operator=(Engine&&)      = delete;
 
-  auto signal() noexcept -> uint64_t;
+  auto signal() noexcept -> uint64;
   [[nodiscard]]
-  auto submit() noexcept -> uint64_t;
+  auto submit() noexcept -> uint64;
 
   auto fence_completed_value() const noexcept { return _fence->GetCompletedValue(); }
 
-  void wait(Engine const& engine, std::optional<uint64_t> fence_value = {}) const noexcept;
+  void wait(Engine const& engine, std::optional<uint64> fence_value = {}) const noexcept;
 
   auto queue() const noexcept { return _queue.Get(); }
 
@@ -44,7 +46,7 @@ private:
   Microsoft::WRL::ComPtr<ID3D12CommandAllocator>     _cmd_alloc;
   Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList1> _cmd;
   Microsoft::WRL::ComPtr<ID3D12Fence>                _fence;
-  uint64_t                                           _fence_value{};
+  uint64                                             _fence_value{};
   HANDLE                                             _fence_event{};
 };
 
