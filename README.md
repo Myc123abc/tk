@@ -15,3 +15,4 @@ A visual novel engine.
 |libunibreak|Zlib|https://github.com/adah1972/libunibreak|
 |stb|MIT|https://github.com/nothings/stb|
 |utfcpp|MIT|https://github.com/nemtrif/utfcpp|
+|Clipper2|BSL-1.0|https://github.com/AngusJohnson/Clipper2|

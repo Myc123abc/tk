@@ -102,6 +102,8 @@ public:
       add_path_quad_bezier_to,
       add_path_cubic_bezier_to,
       path_end,
+      union_beg,
+      union_end,
       add_scissor_rect,
       discard_beg,
       discard_end,
@@ -215,6 +217,12 @@ public:
 
     struct
     {
+      Color color{};
+      float thickness{};
+    } union_end{};
+
+    struct
+    {
       Rect rect{};
     } add_scissor_rect{};
 
@@ -244,6 +252,9 @@ public:
   void add_path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept;
   void path_end(bool close, Color color, float thickness) noexcept;
 
+  void union_beg() noexcept;
+  void union_end(Color color, float thickness) noexcept;
+
   void add_scissor_rect(Rect rect) noexcept;
 
   void discard_beg(std::function<void()> func) noexcept;
@@ -265,6 +276,7 @@ private:
   void _add_path_quad_bezier_to(float2 p1, float2 p2) noexcept;
   void _add_path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept;
   void _path_end(bool close, Color color, float thickness) noexcept;
+  void _union_beg(uint& idx) noexcept;
 
   void _add_scissor_rect(Rect rect) noexcept;
 
@@ -355,8 +367,9 @@ private:
 
   enum class BuildMode
   {
-    none    = 0b00,
-    discard = 0b01,
+    none    = 0b000,
+    discard = 0b001,
+    uni     = 0b010,
   };
   Flag<BuildMode> _build_mode;
 

@@ -27,35 +27,41 @@ public:
     if (clicked) _paused = !_paused;
     auto v = ui::ping_pong(_lerp_name, !_paused, 100'000);
 
-    auto rc_w = width / 3;
-
     _lerp_pts = std::vector<LerpPoint>
     {
-      { p0, p0,                    },
-      { p0, p0 + float2{ rc_w, 0 } },
-      { p2, p2 + float2{ rc_w, 0 } },
-      { p2, p2,                    },
-      { p0, { p1.x - rc_w, p0. y } },
-      { p1, { p1.x, p0.y },        },
-      { p1, { p1.x, p2.y },        },
-      { p2, { p1.x - rc_w, p2.y }  },
+      //         playback button                    pause button
+      { p0,                                p0,                              },
+      { p0 + float2(width / 2,  height / 4), p0 + float2( width / 3, 0)         },
+      { p2 + float2(width / 2, -height / 4), p2 + float2( width / 3, 0)         },
+      { p2,                                p2,                              },
+      { p0 + float2(width / 2,  height / 4), { p1.x - width / 3, p0.y },      },
+      { p1,                                { p1.x, p0.y },                  },
+      { p1,                                { p1.x, p2.y },                  },
+      { p2 + float2(width / 2, -height / 4), { p1.x - width / 3, p2.y },      },
+      { p1,                                p0 + float2(width / 3, height / 2) },
+      { { p0.x, p1.y },                    { p1.x - width / 3, p1.y },      },
     };
 
     _pts.clear();
     for (auto const& pt : _lerp_pts)
       _pts.emplace_back(ui::lerp(pt.p0, pt.p1, v));
 
+    ui::union_beg();
+
     ui::path_begin(_pts[0]);
     ui::path_line_to(_pts[1]);
-    ui::path_line_to(_pts[2]);
+    ui::path_quad_bezier_to(_pts[8], _pts[2]);
     ui::path_line_to(_pts[3]);
-    ui::path_end(true, color, thickness);
+    ui::path_end();
 
-    ui::path_begin(_pts[4]);
+    ui::path_begin(_pts[7]);
+    ui::path_quad_bezier_to(_pts[9], _pts[4]);
     ui::path_line_to(_pts[5]);
-    ui::path_line_to(_pts[6]);
-    ui::path_line_to(_pts[7]);
-    ui::path_end(true, color, thickness);
+    if (_pts[6] != _pts[5])
+      ui::path_line_to(_pts[6]);
+    ui::path_end();
+
+    ui::union_end(color, thickness);
 
     return clicked;
   }
@@ -374,6 +380,13 @@ int main()
       // line_draw_test();
       // test_path_draw();
       // test_discard(fmt);
+      
+      ui::discard_beg([]{ ui::rectangle({70, 70}, {300, 90});});
+      ui::union_beg();
+      ui::circle({50, 50}, 40);
+      ui::circle({90, 90}, 40);
+      ui::union_end(0xff0000ff, 3);
+      ui::discard_end();
 
       ui::end();
     }

@@ -389,6 +389,16 @@ void path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept;
  */
 void path_end(bool close = true, Color color = {}, float thickness = {}) noexcept;
 
+/// start collecting closed shapes for a union boolean operation
+void union_beg() noexcept;
+
+/**
+ * draw union result of collected closed shapes
+ * @param color
+ * @param thickness
+ */
+void union_end(Color color = {}, float thickness = {}) noexcept;
+
 ////////////////////////////////////////////////////////////////////////////////
 ///                               Widget
 ////////////////////////////////////////////////////////////////////////////////

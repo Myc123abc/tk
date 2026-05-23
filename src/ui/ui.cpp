@@ -293,6 +293,19 @@ void path_end(bool close, Color color, float thickness) noexcept
   g_ui_ctx.frame_data()->path_end(close, color, thickness);
 }
 
+void union_beg() noexcept
+{
+  g_ui_ctx.check_draw();
+  g_ui_ctx.frame_data()->union_beg();
+}
+
+void union_end(Color color, float thickness) noexcept
+{
+  g_ui_ctx.check_draw();
+  adjust_scale(thickness);
+  g_ui_ctx.frame_data()->union_end(color, thickness);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 ///                               Widget
 ////////////////////////////////////////////////////////////////////////////////

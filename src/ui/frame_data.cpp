@@ -2,6 +2,8 @@
 #include "ui_context.hpp"
 #include "triangulator.hpp"
 
+#include <clipper2/clipper.h>
+
 #include <numbers>
 
 using namespace tk;
@@ -350,6 +352,18 @@ void FrameData::path_end(bool close, Color color, float thickness) noexcept
   cmd.path_end = { close, color, thickness };
 }
 
+void FrameData::union_beg() noexcept
+{
+  _draw_cmds.emplace_back().type = DrawCmd::Type::union_beg;
+}
+
+void FrameData::union_end(Color color, float thickness) noexcept
+{
+  auto& cmd = _draw_cmds.emplace_back();
+  cmd.type      = DrawCmd::Type::union_end;
+  cmd.union_end = { color, thickness };
+}
+
 void FrameData::_path_end(bool close, Color color, float thickness) noexcept
 {
   if (_points.size() < 2)
@@ -409,6 +423,147 @@ void FrameData::path_bezier_cubic_curve_to_casteljau(float2 p0, float2 p1, float
     auto p0123 = (p012 + p123) * .5f;
     path_bezier_cubic_curve_to_casteljau(p0, p01, p012, p0123, tess_tol, level + 1);
     path_bezier_cubic_curve_to_casteljau(p0123, p123, p23, p3, tess_tol, level + 1);
+  }
+}
+
+void FrameData::_union_beg(uint& idx) noexcept
+{
+  using namespace Clipper2Lib;
+
+  assert(!_build_mode.contains(BuildMode::uni));
+  _build_mode.add(BuildMode::uni);
+
+  auto subjects = PathsD{};
+
+  auto add_current_path = [&]
+  {
+    if (_points.size() > 1 && _points.front() == _points.back())
+      _points.pop_back();
+
+    if (_points.size() < 3)
+    {
+      _points.clear();
+      return;
+    }
+
+    auto& path = subjects.emplace_back();
+    path.reserve(_points.size());
+    for (auto const p : _points)
+      path.emplace_back(static_cast<double>(p.x), static_cast<double>(p.y));
+
+    _points.clear();
+  };
+
+  auto union_color     = Color{};
+  auto union_thickness = 0.f;
+  auto found_end       = false;
+
+  while (++idx < _draw_cmds.size())
+  {
+    auto const& cmd = _draw_cmds[idx];
+    switch (cmd.type)
+    {
+    case DrawCmd::Type::add_rect:
+      assert(_points.empty());
+      _points.emplace_back(cmd.add_rect.left_top);
+      _points.emplace_back(cmd.add_rect.right_bottom.x, cmd.add_rect.left_top.y);
+      _points.emplace_back(cmd.add_rect.right_bottom);
+      _points.emplace_back(cmd.add_rect.left_top.x, cmd.add_rect.right_bottom.y);
+      add_current_path();
+      break;
+
+    case DrawCmd::Type::add_triangle:
+      assert(_points.empty());
+      _points.emplace_back(cmd.add_triangle.p0);
+      _points.emplace_back(cmd.add_triangle.p1);
+      _points.emplace_back(cmd.add_triangle.p2);
+      add_current_path();
+      break;
+
+    case DrawCmd::Type::add_circle:
+      assert(_points.empty());
+      path_arc_to(cmd.add_circle.center, cmd.add_circle.radius - .5f, 0, std::numbers::pi_v<float> * 2.f);
+      if (!_points.empty())
+        _points.pop_back();
+      add_current_path();
+      break;
+
+    case DrawCmd::Type::path_begin:
+      _points.clear();
+      _path_begin(cmd.path_begin.p0);
+      break;
+
+    case DrawCmd::Type::add_path_line_to:
+      if (!_points.empty())
+        _add_path_line_to(cmd.add_path_line_to.p);
+      break;
+
+    case DrawCmd::Type::add_path_arc_to:
+      if (!_points.empty())
+        _add_path_arc_to(cmd.add_path_arc_to.center, cmd.add_path_arc_to.p1, cmd.add_path_arc_to.ccw);
+      break;
+
+    case DrawCmd::Type::add_path_quad_bezier_to:
+      if (!_points.empty())
+        _add_path_quad_bezier_to(cmd.add_path_quad_bezier_to.p1, cmd.add_path_quad_bezier_to.p2);
+      break;
+
+    case DrawCmd::Type::add_path_cubic_bezier_to:
+      if (!_points.empty())
+        _add_path_cubic_bezier_to(cmd.add_path_cubic_bezier_to.p1, cmd.add_path_cubic_bezier_to.p2, cmd.add_path_cubic_bezier_to.p3);
+      break;
+
+    case DrawCmd::Type::path_end:
+      if (cmd.path_end.close)
+        add_current_path();
+      else
+        _points.clear();
+      break;
+
+    case DrawCmd::Type::union_end:
+      union_color     = cmd.union_end.color;
+      union_thickness = cmd.union_end.thickness;
+      found_end       = true;
+      break;
+
+    case DrawCmd::Type::discard_beg:
+    case DrawCmd::Type::discard_end:
+      assert(false && "discard operations cannot be nested or crossed");
+      std::unreachable();
+
+    default:
+      _points.clear();
+      break;
+    }
+
+    if (found_end)
+      break;
+  }
+
+  _build_mode.remove(BuildMode::uni);
+  _points.clear();
+  if (!found_end || subjects.empty())
+    return;
+
+  if (_using_discard_shapes) union_color.a = 1.f;
+  else if (union_color.a == 0) return;
+
+  auto solution = Union(subjects, FillRule::NonZero, 2);
+  for (auto const& path : solution)
+  {
+    if (path.size() < 3)
+      continue;
+
+    _points.reserve(path.size());
+    for (auto const& pt : path)
+      _points.emplace_back(static_cast<float>(pt.x), static_cast<float>(pt.y));
+
+    if (union_thickness > 0)
+      add_poly_line(union_color, union_thickness, true);
+    else if (is_convex(_points))
+      add_convex_poly_filled(union_color);
+    else
+      add_concave_poly_filled(union_color);
   }
 }
 
@@ -862,6 +1017,8 @@ void FrameData::discard_beg(std::function<void()> func) noexcept
 void FrameData::_discard_beg(uint count, uint& idx) noexcept
 {
   assert(!_build_mode.contains(BuildMode::discard));
+  assert(!_build_mode.contains(BuildMode::uni));
+  _build_mode.add(BuildMode::discard);
 
   push_render_cmd(RenderCmdType::ui);
 
@@ -961,6 +1118,13 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
 
   case Type::path_end:
     _path_end(cmd.path_end.close, cmd.path_end.color, cmd.path_end.thickness);
+    break;
+
+  case Type::union_beg:
+    _union_beg(idx);
+    break;
+
+  case Type::union_end:
     break;
 
   case Type::add_scissor_rect:
