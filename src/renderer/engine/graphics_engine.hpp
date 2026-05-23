@@ -1,21 +1,26 @@
 #pragma once
 
-#include "engine.hpp"
+#include "slots.hpp"
+#include "../resource/image.hpp"
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
-class GraphicsEngine final : public Engine
-{
+Singleton_Derive(GraphicsEngine, g_graphics_engine, Engine,
 public:
-  static auto instance() noexcept -> GraphicsEngine&
+  void init() noexcept
   {
-    static GraphicsEngine instance;
-    return instance;
+    Engine::init(D3D12_COMMAND_LIST_TYPE_DIRECT);
+    _slots.init(this);
   }
 
-  void init() noexcept { Engine::init(D3D12_COMMAND_LIST_TYPE_DIRECT); }
-};
+  void copy(Image& src, Image& dst) noexcept { _cpy_imgs.emplace_back(&src, &dst); }
 
-inline static auto& g_graphics_engine{ GraphicsEngine::instance() };
+  void acquire_slot() noexcept;
+  auto submit_slot() noexcept -> uint64_t;
 
-}}
+private:
+  Slots<D3D12_COMMAND_LIST_TYPE_DIRECT>  _slots;
+  std::vector<std::pair<Image*, Image*>> _cpy_imgs{};
+)
+
+}

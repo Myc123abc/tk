@@ -11,7 +11,7 @@
 
 using namespace tk::renderer;
 
-namespace tk { namespace ui {
+namespace tk::ui {
 
 void Font::init(std::string_view path) noexcept
 {
@@ -103,4 +103,4 @@ auto TextEngine::parse(std::string_view text) noexcept -> ParseResult
   return res;
 }
 
-}}
+}

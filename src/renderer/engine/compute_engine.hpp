@@ -1,42 +1,40 @@
 #pragma once
 
-#include "engine.hpp"
+#include "slots.hpp"
+#include "../resource/image.hpp"
 
+#include <deque>
 #include <vector>
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
-class ComputeEngine final : public Engine
-{
+Singleton_Derive(ComputeEngine, g_comp_engine, Engine,
 public:
-  static auto instance() noexcept -> ComputeEngine&
+  void init() noexcept
   {
-    static ComputeEngine instance;
-    return instance;
+    Engine::init(D3D12_COMMAND_LIST_TYPE_COMPUTE);
+    _slots.init(this);
   }
 
-  void init() noexcept { Engine::init(D3D12_COMMAND_LIST_TYPE_COMPUTE); }
+  void destroy() noexcept;
 
-  void acquire_slot() noexcept;
+  void blur(Image& src, Image& dst, float sigma, uint32_t blur_count) noexcept;
 
-  [[nodiscard]]
-  auto submit_slot() noexcept -> uint64_t;
+  void update() noexcept;
 
 private:
-  struct Slot
+  auto get_tmp_img() noexcept -> std::pair<Image*, uint32_t>;
+
+private:
+  Slots<D3D12_COMMAND_LIST_TYPE_COMPUTE> _slots;
+
+  struct BlurTmpImage
   {
-    Microsoft::WRL::ComPtr<ID3D12CommandAllocator> cmd_alloc;
-    uint64_t                                       fence_value{};  
-
-    auto is_idle() const noexcept -> bool;
-
-    Slot() noexcept;
+    ImageHandle img;
+    bool        in_use{};
   };
+  std::vector<BlurTmpImage>                 _blur_tmp_images;
+  std::deque<std::pair<uint32_t, uint64_t>> _used_blur_tmp_images;
+)
 
-  std::vector<Slot> _slots;
-  Slot*             _slot{};
-};
-
-inline static auto& g_compute_engine{ ComputeEngine::instance() };
-
-}}
+}

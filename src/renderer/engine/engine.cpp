@@ -2,7 +2,7 @@
 #include "../core.hpp"
 #include "util/error_handling.hpp"
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 void Engine::init(D3D12_COMMAND_LIST_TYPE type) noexcept
 {
@@ -25,13 +25,13 @@ void Engine::init(D3D12_COMMAND_LIST_TYPE type) noexcept
   err_if(!_fence_event, "failed to create win32 event");
 }
 
-auto Engine::signal() noexcept -> uint64_t
+auto Engine::signal() noexcept -> uint64
 {
   err_if(_queue->Signal(_fence.Get(), ++_fence_value), "failed to signal fence");
   return _fence_value;
 }
 
-auto Engine::submit() noexcept -> uint64_t
+auto Engine::submit() noexcept -> uint64
 {
   auto cmds = { _cmd.Get() };
   for (auto const& cmd : cmds)
@@ -40,9 +40,9 @@ auto Engine::submit() noexcept -> uint64_t
   return signal();
 }
 
-void Engine::wait(Engine const& engine, std::optional<uint64_t> fence_value) const noexcept
+void Engine::wait(Engine const& engine, std::optional<uint64> fence_value) const noexcept
 {
-  _queue->Wait(engine._fence.Get(), fence_value ? fence_value.value() : engine._fence_value);
+  _queue->Wait(engine._fence.Get(), fence_value.value_or(engine._fence_value));
 }
 
 auto Engine::set_event_on_completion() const noexcept -> HANDLE
@@ -65,4 +65,4 @@ auto Engine::reset_cmd(ID3D12CommandAllocator* alloc) const noexcept -> ID3D12Gr
   return _cmd.Get();
 }
 
-}}
+}

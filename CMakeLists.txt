@@ -12,11 +12,14 @@ set(FT_DISABLE_PNG ON)
 set(FT_DISABLE_HARFBUZZ ON)
 set(FT_DISABLE_BROTLI ON)
 
+set(CLIPPER2_UTILS OFF)
+set(CLIPPER2_EXAMPLES OFF)
+set(CLIPPER2_TESTS OFF)
+
 add_subdirectory(vendor/DirectX-Headers)
-add_subdirectory(vendor/glm)
-add_subdirectory(vendor/SPSCQueue)
 add_subdirectory(vendor/freetype)
 add_subdirectory(vendor/harfbuzz)
+add_subdirectory(vendor/Clipper2/CPP)
 
 # when generator not vs, rc files will be built fail
 if (NOT "${CMAKE_GENERATOR}" MATCHES "Visual Studio")
@@ -31,29 +34,30 @@ target_include_directories(libunibreak PUBLIC vendor/libunibreak/src)
 file(GLOB_RECURSE TK_SRC src/*.cpp)
 add_library(tk ${TK_SRC})
 target_compile_definitions(tk
-  PRIVATE
+  PUBLIC
     WIN32_LEAN_AND_MEAN
     NOMINMAX
+  PRIVATE
     UTF_CPP_CPLUSPLUS=202002L
 )
 target_include_directories(tk
   PUBLIC
     include
-  PRAIVATE
+  PRIVATE
     include/tk
     vendor/stb
     vendor/utfcpp/source
     vendor/freetype/include
+    vendor/Clipper2/CPP/Clipper2Lib/include
 )
 target_link_libraries(tk
-  PUBLIC
-    glm::glm
   PRIVATE
     d3d12 dxgi dcomp dxguid dxcompiler shcore
+    windowsapp dwmapi d3d11 d2d1
     DirectX-Headers
-    SPSCQueue
     harfbuzz
     libunibreak
+    Clipper2
 )
 
 add_executable(test test/main.cpp)

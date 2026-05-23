@@ -1,0 +1,480 @@
+#include "renderer.hpp"
+#include "core.hpp"
+#include "engine/graphics_engine.hpp"
+#include "engine/compute_engine.hpp"
+#include "engine/copy_engine.hpp"
+#include "util/error_handling.hpp"
+#include "resource/descriptor_heap_manager.hpp"
+#include "pipeline/pipeline_system.hpp"
+#include "window/window_manager.hpp"
+#include "context.hpp"
+#include "resource/shader_type.hpp"
+#include "config.hpp"
+
+#include <dwmapi.h>
+
+#include <stb_image.h>
+
+#include <ranges>
+
+namespace tk::renderer {
+
+void Renderer::init() noexcept
+{
+  g_core.init();
+  g_pipe_sys.init();
+  g_desc_heap_mgr.init();
+  g_graphics_engine.init();
+  g_comp_engine.init();
+  g_copy_engine.init(); 
+
+  init_images();  
+}
+
+void Renderer::init_images() noexcept
+{
+  //
+  // ui use, write image for normal shapes rendering
+  //
+  ui::Write_Image_Handle = ui::g_img_mgr.create_image(1, 1, ImageFormat::bgra8_unorm);
+
+  auto white = 0xffffffff;
+  auto bitmap = Bitmap{};
+  bitmap.init(1, 1, 4, &white);
+  
+  g_copy_engine.acquire_slot();
+  g_copy_engine.copy({ bitmap }, { g_img_mgr.get(_images[ui::Write_Image_Handle]) });
+  auto fence_value = g_copy_engine.submit_slot();
+  g_graphics_engine.wait(g_copy_engine, fence_value);
+
+  //
+  // discard image, composite image for discard operation
+  //
+  _discard_image   = g_img_mgr.create(Default_Image_Init_Width, Default_Image_Init_Height, ImageFormat::r8_unorm,                ImageType::rtv | ImageType::srv);
+  _composite_image = g_img_mgr.create(Default_Image_Init_Width, Default_Image_Init_Height, RenderResource::Render_Target_Format, ImageType::rtv | ImageType::srv);
+}  
+
+void Renderer::destroy_images() noexcept
+{
+  for (auto const& img : _upload_images) g_img_mgr.destroy(img.second);
+  for (auto const& img : _images) g_img_mgr.destroy(img.second);
+
+  g_img_mgr.destroy(_discard_image);
+  g_img_mgr.destroy(_composite_image);
+}
+
+void Renderer::render() noexcept
+{
+  message_process();
+  process_render();
+}
+
+void Renderer::destroy() noexcept
+{
+  // pop all message
+  while (!_frame_render_complete_funcs.empty())
+    message_process();
+
+  destroy_images();
+
+  // destroy render resources
+  g_graphics_engine.destroy();
+  g_comp_engine.destroy();
+  g_copy_engine.destroy();
+  for (auto& res : _res | std::views::values) res.destroy();
+}
+
+void Renderer::create_window_resource(HWND handle, uint32_t width, uint32_t height) noexcept
+{
+  err_if(_res.contains(handle), "failed to create window render resource, it's already exist");
+  auto res = RenderResource{};
+  res.init(handle, width, height);
+  _res.emplace(handle, std::move(res));
+}
+
+void Renderer::destroy_window_resource(HWND handle, HWND blur_handle) noexcept
+{
+  err_if(!_res.contains(handle), "failed to destroy window render resource, it's unexist");
+  add_frame_render_complete_func([handle = handle, blur_handle = blur_handle, res = std::move(_res[handle])] mutable
+  {
+    res.destroy();
+    g_wnd_mgr.destroy_window(handle, blur_handle);
+  });
+  _res.erase(handle);
+  _destroied_windows.emplace(handle);
+}
+
+void Renderer::resize_window_resource(HWND handle, uint32_t width, uint32_t height) noexcept
+{
+  err_if(!_res.contains(handle), "failed to destroy window render resource, it's unexist");
+  _res[handle].resize(width, height);
+}
+
+void Renderer::create_image(ui::ImageHandle handle, uint32_t width, uint32_t height, ImageFormat format) noexcept
+{
+  assert(!_images.contains(handle));
+  _images.emplace(handle, g_img_mgr.create(width, height, format, ImageType::srv));
+}
+
+void Renderer::destroy_image(ui::ImageHandle handle) noexcept
+{
+  if (_upload_images.contains(handle))
+  {
+    assert(_bitmaps.contains(handle));
+
+    // not upload yet, remove upload image
+    _upload_images.erase(handle);
+    _bitmaps.erase(handle);
+  }
+  else if (_images.contains(handle))
+  {
+    // already uploaded, release image resource
+    add_frame_render_complete_func([image = _images[handle]] { g_img_mgr.destroy(image); });
+    _images.erase(handle);
+  }
+}
+
+void Renderer::upload_image(ui::ImageHandle handle, uint32_t width, uint32_t height, Bitmap const& bitmap, bool use_mipmap) noexcept
+{
+  // create image resource
+  auto h = g_img_mgr.create(bitmap.width, bitmap.height, ImageFormat::rgba8_unorm, ImageType::srv, use_mipmap);
+
+  // store image and bitmap for upload
+  _upload_images[handle] = h;
+  _bitmaps[handle]       = bitmap;
+
+  if (use_mipmap)
+    _pending_mipmap_image_handles.emplace_back(handle);
+}
+
+void Renderer::add_frame_render_complete_func(std::move_only_function<void()>&& func) noexcept
+{
+  auto last_fence_values = std::vector<std::pair<Engine&, uint64_t>>
+  {
+    { g_graphics_engine, g_graphics_engine.signal() },
+  };
+  _frame_render_complete_funcs.emplace_back([func = std::move(func), last_fence_values = std::move(last_fence_values)]() mutable
+  {
+    for (auto [engine, last_fence_value] : last_fence_values)
+    {
+      auto fence_value = engine.fence_completed_value();
+      err_if(fence_value == UINT64_MAX, "failed to get fence value because device is removed");
+      if (fence_value < last_fence_value) return false;
+    }
+    func();
+    return true;
+  });
+}
+
+void Renderer::message_process() noexcept
+{
+  for (auto it = _frame_render_complete_funcs.begin(); it != _frame_render_complete_funcs.end();)
+    (*it)() ? it = _frame_render_complete_funcs.erase(it) : ++it;
+}
+
+void Renderer::preprocess_render() noexcept
+{
+  upload_images();
+  g_comp_engine.update();
+
+  if (_blur_host_window)
+  {
+    DwmFlush();
+    g_wnd_mgr.resize_blur_window(_blur_host_window, _blur_window_rect);
+    clear_blur_resize_data();
+  }
+}
+
+void Renderer::upload_images() noexcept
+{
+  if (!_upload_images.empty())
+  {
+    assert(_upload_images.size() == _bitmaps.size());
+
+    // upload images by copy engine
+    g_copy_engine.acquire_slot();
+    g_copy_engine.copy(
+      _bitmaps
+        | std::views::values
+        | std::ranges::to<std::vector<Bitmap>>(),
+      _upload_images
+        | std::views::values
+        | std::views::transform([](auto img) { return g_img_mgr.get(img); })
+        | std::ranges::to<std::vector<Image*>>());
+    auto fence_value = g_copy_engine.submit_slot();
+
+    // wait upload images complete before rendering
+    g_graphics_engine.wait(g_copy_engine, fence_value);
+    // also wait for compute engine if need to generate mipamp
+    if (!_pending_mipmap_image_handles.empty())
+      g_comp_engine.wait(g_copy_engine, fence_value);
+
+    // move upload images to images
+    for (auto [idx, img] : _upload_images)
+      _images[idx] = img;
+
+    // free bitmaps
+    for (auto const& bitmap : _bitmaps | std::views::values) stbi_image_free(bitmap.data);
+
+    _upload_images.clear();
+    _bitmaps.clear();
+  }
+}
+
+void Renderer::process_render() noexcept
+{  
+  preprocess_render();
+
+  generate_mipmap();
+
+  for (auto [handle, data, blur_host_window, blur_window_rect] : _render_infos)
+  {
+    // continue if the window is destoried
+    if (_destroied_windows.contains(handle)) continue;
+    _render_windows.emplace_back(handle);
+
+    // render
+    auto& res = _res[handle];
+    res.wait_frame_complete();
+    res.render_begin();
+    render(res, data);
+    res.render_end();
+
+    if (blur_host_window)
+    {
+      _blur_host_window = blur_host_window;
+      _blur_window_rect = blur_window_rect;
+    }
+  }
+  _render_infos.clear();
+
+  // present windows
+  if (_render_windows.size() == 1)
+    _res[_render_windows.back()].present(true);
+  else if (_render_windows.size() > 1)
+  {
+    for (auto handle : _render_windows | std::views::take(_render_windows.size() - 1))
+      _res[handle].present(false);
+    _res[_render_windows.back()].present(true);
+  }
+
+  // show blur window
+  if (!_show_blur_wnds.empty() &&
+      std::ranges::any_of(_render_windows, [&](auto handle) { return _show_blur_wnds.contains(handle); }))
+  {
+    DwmFlush();
+    for (auto wnd : _show_blur_wnds | std::views::keys)
+      g_wnd_mgr.get_window(wnd)->show_blur_window();
+    _show_blur_wnds.clear();
+  }
+
+  postprocess_render();
+}
+
+void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noexcept
+{
+  if (!frame_data) return;
+
+  assert(frame_data->check());
+
+  auto cmd = g_graphics_engine.cmd();
+
+  g_ctx.set_cmd(cmd);
+
+  res.current_frame().buffer.clear().upload(cmd, frame_data);
+
+  auto constants = Constants
+  {
+    .render_target_extent = res.render_target()->extent(),
+    .window_pos           = frame_data->window_pos(),
+  };
+
+  auto clear_resize_render_target = [this, cmd](ImageHandle& handle, Rect rect)
+  {
+    auto& img = g_img_mgr[handle];
+    if (rect.width() > img.width() || rect.height() > img.height())
+    {
+      add_frame_render_complete_func([handle] { g_img_mgr.destroy(handle); });
+      handle = g_img_mgr.create(rect.width(), rect.height(), img);
+    }
+    g_img_mgr[handle].clear_render_target(cmd);
+  };
+
+  auto graphics_draw = [&](ui::RenderCmd const& cmd, PipelineType type, Image* rt, Image* ds, Rect scissor, std::vector<PipelineDescriptorInfo> const& descs = {})
+  {
+    constants.render_target_extent = rt->extent();
+    g_ctx.graphics_draw(GraphicsDrawInfo
+    {
+      .pipe_info = GraphicsPipeSetInfo
+      {
+        .type           = type,
+        .viewport       = rt->rect(),
+        .scissor        = scissor,
+        .constants_name = "Constants",
+        .constants      = constants,
+        .descs          = descs,
+      },
+      .render_target = rt,
+      .depth_stencil = ds,
+      .idx_beg       = cmd.ui.idx_beg,
+      .idx_cnt       = cmd.ui.idx_size,
+    });
+  };
+
+  Rect discard_mask_rc, discard_composite_rc;
+
+  auto rt = res.render_target();
+  auto ds = res.depth_stencil();
+
+  for (auto const& render_cmd : frame_data->render_cmds())
+  {
+    using Type = ui::RenderCmdType;
+    switch (render_cmd.type)
+    {
+    case Type::ui:
+      graphics_draw(render_cmd, PipelineType::ui, rt, {}, render_cmd.ui.scissor_rect,
+      {
+        { "image", g_img_mgr[_images[render_cmd.ui.image_handle]].srv().gpu_handle() },
+      });
+      break;
+
+    case Type::clear_discard_image:
+      assert(render_cmd.clear_rect);
+      discard_mask_rc = render_cmd.clear_rect.value();
+      clear_resize_render_target(_discard_image, discard_mask_rc);
+      break;
+
+    case Type::clear_composite_image:
+      assert(render_cmd.clear_rect);
+      discard_composite_rc = render_cmd.clear_rect.value();
+      clear_resize_render_target(_composite_image, discard_composite_rc);
+      break;
+
+    case Type::discard_write:
+      constants.mask_offset = -discard_mask_rc.pos();
+      graphics_draw(render_cmd, PipelineType::mask_write_max, g_img_mgr.get(_discard_image), {}, { 0, 0, discard_mask_rc.extent() });
+      break;
+
+    case Type::discard_draw_composite:
+      constants.composite_offset = -discard_composite_rc.pos();
+      graphics_draw(render_cmd, PipelineType::composite_write, g_img_mgr.get(_composite_image), {}, { 0, 0, discard_composite_rc.extent() },
+      {
+        { "image", g_img_mgr[_images[render_cmd.ui.image_handle]].srv().gpu_handle() },
+      });
+      break;
+
+    case Type::discard_composite:
+    {
+      auto& discard_img   = g_img_mgr[_discard_image];
+      auto& composite_img = g_img_mgr[_composite_image];
+
+      constants.mask_offset      = -discard_mask_rc.pos();
+      constants.mask_extent      = discard_img.extent();
+      constants.composite_offset = -discard_composite_rc.pos();
+      constants.composite_extent = composite_img.extent();
+
+      discard_img.set_state(cmd, ImageState::pixel);
+      composite_img.set_state(cmd, ImageState::pixel);
+
+      graphics_draw(render_cmd, PipelineType::discard_draw, rt, {}, render_cmd.ui.scissor_rect,
+      {
+        { "image",      composite_img.srv().gpu_handle() },
+        { "mask_image", discard_img.srv().gpu_handle()   },
+      });
+    }
+    break;
+    }
+  }
+
+  auto const& window_shadow_info = frame_data->window_shadow_info();
+  if (window_shadow_info)
+  {
+    g_ctx.graphics_pipe_set(GraphicsPipeSetInfo
+    {
+      .type           = PipelineType::window_shadow,
+      .viewport       = res.render_target()->rect(),
+      .scissor        = window_shadow_info->scissor_rect,
+      .constants_name = "constants",
+      .constants      = Constants
+      {
+        .render_target_extent = constants.render_target_extent,
+        .window_extent        = window_shadow_info->window_extent,
+        .window_pos           = frame_data->window_pos(),
+        .shadow_thickness     = window_shadow_info->shadow_thickness,
+        .shadow_radius        = window_shadow_info->radius,
+        .shadow_color         = window_shadow_info->color,
+        .shadow_softness      = window_shadow_info->softness,
+        .wireframe_color      = window_shadow_info->wireframe_color ? window_shadow_info->wireframe_color.value() : float4{},
+        .draw_wireframe       = window_shadow_info->wireframe_color.has_value(),
+      }
+    });
+    g_ctx.draw(2);
+  }
+}
+
+void Renderer::postprocess_render() noexcept
+{
+  _destroied_windows.clear();
+  _render_windows.clear();
+}
+
+void Renderer::generate_mipmap() noexcept
+{
+#if 0
+  if (_pending_mipmap_image_handles.empty()) return;
+
+  g_comp_engine.acquire_slot();
+
+  auto cmd = g_comp_engine.cmd();
+  _mipmap_pipeline.bind(cmd);
+
+  // generate mipmaps of images
+  struct MipmapGenerationCostant
+  {
+    float2 texel_size{};
+    uint32_t  mip_level{};
+  };
+  auto constants = MipmapGenerationCostant{};
+  for (auto const& handle : _pending_mipmap_image_handles)
+  {
+    auto const& img = _images[handle];
+
+    auto src_width  = img.width();
+    auto src_height = img.height();
+
+    for (auto i = 0; i < img.mipmap_uavs().size(); ++i)
+    {
+      constants.texel_size = float2{ 1.0 / src_width, 1.0 / src_height };
+      constants.mip_level  = i;
+
+      _mipmap_pipeline.set_constants(cmd, "constants", constants);
+      _mipmap_pipeline.set_descriptors(cmd,
+      {
+        { "src", img.gpu_handle()                  },
+        { "dst", img.mipmap_uavs()[i].gpu_handle() },
+      });
+
+      auto dst_width  = std::max(1u, src_width  >> 1);
+      auto dst_height = std::max(1u, src_height >> 1);
+
+      cmd->Dispatch(((dst_width + 7) / 8), ((dst_height + 7) / 8), 1);
+
+      src_width  = dst_width;
+      src_height = dst_height;
+    }
+  }
+
+  // wait mipmap generation complete
+  g_graphics_engine.wait(g_comp_engine, g_comp_engine.submit_slot());
+
+  // release mipmap uavs after generation complete
+  add_frame_render_complete_func([this, handles = std::move(_pending_mipmap_image_handles)]
+  {
+    for (auto const& handle : handles)
+      _images[handle].release_mipmap_uavs();
+  });
+  _pending_mipmap_image_handles.clear();
+#endif
+}
+
+}

@@ -1,10 +1,10 @@
 #include "copy_engine.hpp"
 #include "../../util/align.hpp"
-#include "../core.hpp"
+#include "../resource/image.hpp"
 
 #include <algorithm>
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Upload Buffer
@@ -28,6 +28,8 @@ void UploadBuffer::add_images(std::vector<Image*> const& images, std::vector<Bit
 
 void UploadBuffer::upload(ID3D12GraphicsCommandList1* cmd) noexcept
 {
+  if (_infos.empty()) return;
+
   // calculate required intermediate sizes
   auto intermediate_sizes = std::vector<uint32_t>{};
   intermediate_sizes.reserve(_infos.size());
@@ -55,43 +57,22 @@ void UploadBuffer::upload(ID3D12GraphicsCommandList1* cmd) noexcept
 ///                             Copy Engine
 ////////////////////////////////////////////////////////////////////////////////
 
-auto CopyEngine::Slot::is_idle() const noexcept -> bool
-{
-  return g_copy_engine.fence_completed_value() >= fence_value;
-}
-
-CopyEngine::Slot::Slot() noexcept
-{
-  cmd_alloc = g_core.create_cmd_alloc(D3D12_COMMAND_LIST_TYPE_COPY);
-}
-
 void CopyEngine::acquire_slot() noexcept
 {
-  if (auto it = std::ranges::find_if(_slots, [this](auto slot) { return slot.is_idle(); });
-      it != _slots.end())
-  {
-    _slot = &*it;
-  }
-  else
-  {
-    _slots.emplace_back(Slot{});
-    _slot = &_slots.back();
-  }
-  reset_cmd(_slot->cmd_alloc.Get());
-}
-
-void CopyEngine::copy(std::vector<Bitmap> const& bitmaps, std::vector<Image*> const& images) noexcept
-{
-  assert(_slot && _slot->is_idle());
-  _slot->upload_buffer.add_images(images, bitmaps);
+  _slots.acquire_slot();
 }
 
 auto CopyEngine::submit_slot() noexcept -> uint64_t
 {
-  assert(_slot && _slot->is_idle());
-  _slot->upload_buffer.upload(cmd());
-  _slot->fence_value = submit(); 
-  return _slot->fence_value;
+  _slots.slot()->data.upload(cmd());
+  return _slots.submit_slot();
 }
 
-}}
+void CopyEngine::copy(std::vector<Bitmap> const& bitmaps, std::vector<Image*> const& images) noexcept
+{
+  auto slot = _slots.slot();
+  assert(slot && _slots.is_idle(slot));
+  slot->data.add_images(images, bitmaps);
+}
+
+}

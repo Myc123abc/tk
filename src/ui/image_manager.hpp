@@ -3,32 +3,16 @@
 #include "../renderer/resource/image.hpp"
 #include "../util/object_pool.hpp"
 #include "config.hpp"
+#include "../util/singleton.hpp"
+#include "../util/thread_pool.hpp"
 
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 
-namespace tk { namespace ui {
+namespace tk::ui {
 
-class ImageManager
-{
-private:
-  ImageManager()                           = default;
-  ~ImageManager()                          = default;
-public:
-  ImageManager(ImageManager const&)            = delete;
-  ImageManager(ImageManager&&)                 = delete;
-  ImageManager& operator=(ImageManager const&) = delete;
-  ImageManager& operator=(ImageManager&&)      = delete;
-
-  static auto instance() noexcept -> ImageManager&
-  {
-    static ImageManager instance;
-    return instance;
-  }
-
-  void destroy() noexcept;
-
+Singleton(ImageManager, g_img_mgr,
 private:
   struct ImageInfo
   {
@@ -36,7 +20,7 @@ private:
     uint32_t height{};
     bool     has_mipmap{};
 
-    auto extent() const noexcept -> glm::vec2 { return { width, height }; }
+    auto extent() const noexcept -> float2 { return { width, height }; }
 
     ImageInfo() noexcept = default;
     ImageInfo(uint32_t width, uint32_t height, bool has_mipmap) noexcept
@@ -47,32 +31,39 @@ private:
 public:
   using ImageHandle = PoolType::Handle;
 
+  void destroy() noexcept;
+
   auto create_image(uint32_t width, uint32_t height, renderer::ImageFormat format) noexcept -> ImageHandle;
   void destroy_image(ImageHandle handle) noexcept;
 
-  auto try_load(std::string_view path, glm::vec2 extent) noexcept -> bool;
-  // TODO: only call when images so much even exceed gpu memory
+  auto try_load(std::string_view path) noexcept -> bool;
   void unload(std::string_view path) noexcept;
 
-  void try_generate_mipmap(glm::vec2 extent) const noexcept;
+  void try_generate_mipmap(float2 extent) const noexcept;
 
   auto contains(std::string_view path) const noexcept { return _loaded_images.contains(path.data());   }
-  auto extent(std::string_view path) noexcept -> glm::vec2;
-  auto handle(std::string_view path) const noexcept { return _loaded_images.at(path.data()); }
+  auto extent(std::string_view path) noexcept -> float2;
+  auto handle(std::string_view path) noexcept { return _loaded_images[path.data()]; }
+
+  void update() noexcept;
 
 private:
-  void load(std::string_view path, uint32_t width, uint32_t height, void* data, bool use_mipmap) noexcept;
-  void generate_mipmap(std::string_view path) noexcept;
+  void load(std::string_view path, uint32_t width, uint32_t height, void* data, bool use_mipmap = false) noexcept;
 
 private:
   PoolType                                     _pool;
   std::unordered_map<std::string, ImageHandle> _loaded_images;
   std::unordered_set<ImageHandle>              _images;
-  std::unordered_map<std::string, glm::vec2>   _image_extents;
-};
+  std::unordered_map<std::string, float2>      _image_extents;
 
-inline static auto& g_img_mgr{ ImageManager::instance() };
+  struct LoadResult
+  {
+    void* data{};
+    int   w{}, h{};
+  };
+  std::unordered_map<std::string, Task<LoadResult>> _load_tasks;
+)
 
 using ImageHandle = ImageManager::ImageHandle;
 
-}}
+}

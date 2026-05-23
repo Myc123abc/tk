@@ -1,5 +1,8 @@
 #pragma once
 
+#include "../../util/singleton.hpp"
+#include "util/base.hpp"
+
 #include <d3d12.h>
 #include <wrl/client.h>
 
@@ -7,7 +10,7 @@
 #include <unordered_map>
 #include <functional>
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 inline auto RTV_Size         = 0u;
 inline auto CBV_SRV_UAV_Size = 0u;
@@ -15,9 +18,9 @@ inline auto DSV_Size         = 0u;
 
 enum class DescriptorHeapType
 {
-  cbv_srv_uav,
-  rtv,
-  dsv,
+  cbv_srv_uav = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+  rtv         = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+  dsv         = D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
 };
 
 class DescriptorHandle
@@ -33,18 +36,16 @@ public:
 
   auto index() const noexcept { return _index; }
 
-  void set(std::function<void()> func) noexcept { _recreate_descriptor_func = func; }
-
 private:
-  int                   _index{ -1 };
-  DescriptorHeapType    _type{};
-  std::function<void()> _recreate_descriptor_func;
+  int                _index{ -1 };
+  DescriptorHeapType _type{};
 };
 
-class DescriptorHeapManager
-{
+Singleton(DescriptorHeapManager, g_desc_heap_mgr,
+
   friend class DescriptorHandle;
 
+public:
   class DescriptorHeap
   {
     friend class DescriptorHandle;
@@ -68,44 +69,35 @@ class DescriptorHeapManager
     auto size() const noexcept { return _handles.size(); }
 
   private:
-    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>   _heap;
-    std::vector<std::pair<bool, DescriptorHandle>> _handles;
-    DescriptorHeapType                             _type{};
+    struct DescriptorSlot
+    {
+      bool                  used{};
+      DescriptorHandle      handle{};
+      std::function<void()> recreate_descriptor{};
+    };
+
+    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _heap;
+    std::vector<DescriptorSlot>                  _handles;
+    DescriptorHeapType                           _type{};
   };
 
-private:
-  DescriptorHeapManager()                                        = default;
-  ~DescriptorHeapManager()                                       = default;
 public:
-  DescriptorHeapManager(DescriptorHeapManager const&)            = delete;
-  DescriptorHeapManager(DescriptorHeapManager&&)                 = delete;
-  DescriptorHeapManager& operator=(DescriptorHeapManager const&) = delete;
-  DescriptorHeapManager& operator=(DescriptorHeapManager&&)      = delete;
-
-  static auto const instance() noexcept
-  {
-    static DescriptorHeapManager instance;
-    return &instance;
-  }
-
   void init() noexcept;
 
   auto pop_handle(DescriptorHeapType type, std::function<void()> recreate_descriptor_func = {}) noexcept { return _heaps[type].pop_handle(recreate_descriptor_func); }
 
   void bind_heaps(ID3D12GraphicsCommandList1* cmd) noexcept;
 
-  void reserve(DescriptorHeapType type, uint32_t capacity) noexcept { _heaps.at(type).reserve(capacity); }
+  void reserve(DescriptorHeapType type, uint32_t capacity) noexcept { _heaps[type].reserve(capacity); }
 
-  auto size(DescriptorHeapType type) const noexcept { return _heaps.at(type).size(); }
+  auto size(DescriptorHeapType type) noexcept { return _heaps[type].size(); }
 
-  auto usable_handle_count(DescriptorHeapType type) const noexcept { return _heaps.at(type).usable_handle_count(); }
+  auto usable_handle_count(DescriptorHeapType type) noexcept { return _heaps[type].usable_handle_count(); }
 
-  auto first_gpu_handle(DescriptorHeapType type) const noexcept { return _heaps.at(type)._heap->GetGPUDescriptorHandleForHeapStart(); }
+  auto first_gpu_handle(DescriptorHeapType type) noexcept { return _heaps[type]._heap->GetGPUDescriptorHandleForHeapStart(); }
 
 private:
   std::unordered_map<DescriptorHeapType, DescriptorHeap> _heaps;
-};
+)
 
-inline static auto& g_desc_heap_mgr{ *DescriptorHeapManager::instance() };
-
-}}
+}

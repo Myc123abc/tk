@@ -1,10 +1,10 @@
 #pragma once
 
-#include "engine.hpp"
+#include "slots.hpp"
 #include "../resource/image.hpp"
 #include "../resource/buffer.hpp"
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
 
 class UploadBuffer
 {
@@ -23,40 +23,21 @@ private:
   std::vector<Info> _infos;
 };
 
-class CopyEngine final : public Engine
-{
+Singleton_Derive(CopyEngine, g_copy_engine, Engine,
 public:
-  static auto instance() noexcept -> CopyEngine&
+  void init() noexcept
   {
-    static CopyEngine instance;
-    return instance;
+    Engine::init(D3D12_COMMAND_LIST_TYPE_COPY);
+    _slots.init(this);
   }
 
-  void init() noexcept { Engine::init(D3D12_COMMAND_LIST_TYPE_COPY); }
-
   void acquire_slot() noexcept;
+  auto submit_slot() noexcept -> uint64_t;
 
   void copy(std::vector<Bitmap> const& bitmaps, std::vector<Image*> const& images) noexcept;
 
-  [[nodiscard]]
-  auto submit_slot() noexcept -> uint64_t;
-
 private:
-  struct Slot
-  {
-    Microsoft::WRL::ComPtr<ID3D12CommandAllocator> cmd_alloc;
-    UploadBuffer                                   upload_buffer;
-    uint64_t                                       fence_value{};
+  Slots<D3D12_COMMAND_LIST_TYPE_COPY, UploadBuffer> _slots;
+)
 
-    auto is_idle() const noexcept -> bool;
-
-    Slot() noexcept;
-  };
-
-  std::vector<Slot> _slots;
-  Slot*             _slot{};
-};
-
-inline static auto& g_copy_engine{ CopyEngine::instance() };
-
-}}
+}

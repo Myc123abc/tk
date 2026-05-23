@@ -3,12 +3,35 @@
 #include "image.hpp"
 #include "buffer.hpp"
 #include "../config.hpp"
+#include "../../ui/frame_data.hpp"
 
 #include <dcomp.h>
 
 #include <array>
 
-namespace tk { namespace renderer {
+namespace tk::renderer {
+
+class FrameBuffer
+{
+public:
+  void init() noexcept;
+
+  void destroy() noexcept
+  {
+    _vertices_indices_buffer.destroy();
+  }
+
+  auto clear() noexcept -> FrameBuffer&
+  {
+    _vertices_indices_buffer.clear();
+    return *this;
+  }
+
+  void upload(ID3D12GraphicsCommandList1* cmd, ui::FrameData const* data) noexcept;
+
+private:
+  Buffer _vertices_indices_buffer;
+};
 
 class RenderResource
 {
@@ -27,29 +50,29 @@ public:
 
   void resize(uint32_t width, uint32_t height) noexcept;
 
-  void wait_frame_complete() const noexcept;
+  void wait_frame_complete() noexcept;
 
   void render_begin() noexcept;
   void render_end() noexcept;
 
   void present(bool vsync) const noexcept;
 
-  void clear_image() noexcept;
-
-  auto& current_frame() noexcept { return _frames[_frame_index]; }
+  auto& current_frame() noexcept { return _frames[_frame_index];                }
+  auto  render_target() noexcept { return g_img_mgr.get(current_frame().image); }
+  auto  depth_stencil() noexcept { return g_img_mgr.get(_dsv_image);            }
 
 private:
   struct Frame
   {
-    Image                                          image;
-    Image                                          swapchain_image;
+    ImageHandle                                    image;
+    ImageHandle                                    swapchain_image;
     FrameBuffer                                    buffer;
     uint64_t                                       fence_value{};
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> cmd_alloc;
   };
 
   std::array<Frame, Frame_Count>              _frames;
-  Image                                       _dsv_image;
+  ImageHandle                                 _dsv_image;
 
   Microsoft::WRL::ComPtr<IDXGISwapChain4>     _swapchain;
   HANDLE                                      _swapchain_waitable_obj;
@@ -59,5 +82,4 @@ private:
   uint32_t                                    _frame_index{};
 };
 
-
-}}
+}
