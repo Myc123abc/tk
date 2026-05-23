@@ -1,7 +1,7 @@
 #include "descriptor_heap_manager.hpp"
 #include "util/error_handling.hpp"
 #include "../core.hpp"
-#include "../renderer/renderer.hpp"
+#include "../renderer.hpp"
 #include "../config.hpp"
 
 #include <algorithm>
@@ -35,7 +35,9 @@ void DescriptorHandle::release() noexcept
 {
   if (is_valid())
   {
-    g_desc_heap_mgr._heaps[_type]._handles[_index].first = false;
+    auto& slot = g_desc_heap_mgr._heaps[_type]._handles[_index];
+    slot.used                = false;
+    slot.recreate_descriptor = {};
     _index = -1;
   }
 }
@@ -72,43 +74,49 @@ void DescriptorHeapManager::DescriptorHeap::init(DescriptorHeapType type, uint32
 auto DescriptorHeapManager::DescriptorHeap::pop_handle(std::function<void()> recreate_descriptor_func) noexcept -> DescriptorHandle
 {
   // find a not used handle
-  auto it = std::ranges::find_if_not(_handles, [](auto const& handle) { return handle.first; });
+  auto it = std::ranges::find_if_not(_handles, [](auto const& slot) { return slot.used; });
 
   // if not found, the heap is full, expand it
   if (it == _handles.end())
   {
-    reserve(_handles.size() * 2);
-    return pop_handle(recreate_descriptor_func);
+    reserve(std::max<size_t>(_handles.size() * 2, 1));
+    it = std::ranges::find_if_not(_handles, [](auto const& slot) { return slot.used; });
   }
 
   // find a useful handle
-  it->first                            = true;
-  it->second._type                     = _type;
-  it->second._index                    = it - _handles.begin();
-  it->second._recreate_descriptor_func = recreate_descriptor_func;
-  return it->second;
+  it->used                = true;
+  it->handle._type        = _type;
+  it->handle._index       = it - _handles.begin();
+  it->recreate_descriptor = std::move(recreate_descriptor_func);
+  return it->handle;
 }
 
 void DescriptorHeapManager::DescriptorHeap::reserve(uint32_t capacity) noexcept
 {
   if (capacity > _handles.size())
   {
+    auto size = _handles.size();
+
     // destroy old heap
     g_renderer.add_frame_render_complete_func([_ = _heap] {});
 
     // create new bigger one
-    auto size = _handles.size();
-    init(_type, capacity);
+    auto heap_desc = D3D12_DESCRIPTOR_HEAP_DESC{};
+    heap_desc.NumDescriptors = capacity;
+    heap_desc.Type           = static_cast<D3D12_DESCRIPTOR_HEAP_TYPE>(_type);
+    heap_desc.Flags          = _type == DescriptorHeapType::cbv_srv_uav ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+    err_if(g_core.device()->CreateDescriptorHeap(&heap_desc, IID_PPV_ARGS(&_heap)), "failed to create descriptor heap");
+    _handles.resize(capacity);
 
     // recreate descriptors
-    std::ranges::for_each(_handles | std::views::take(size) | std::views::elements<1>,
-      [](auto const& handle) { if (handle._recreate_descriptor_func) handle._recreate_descriptor_func(); });
+    std::ranges::for_each(_handles | std::views::take(size),
+      [](auto const& slot) { if (slot.used && slot.recreate_descriptor) slot.recreate_descriptor(); });
   }
 }
 
 auto DescriptorHeapManager::DescriptorHeap::usable_handle_count() const noexcept -> uint32_t
 {
-  return std::ranges::count_if(_handles | std::views::elements<0>, [](auto usable) { return usable; });
+  return std::ranges::count_if(_handles, [](auto const& slot) { return slot.used; });
 }
 
 void DescriptorHeapManager::init() noexcept

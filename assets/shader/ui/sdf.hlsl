@@ -1,7 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////
-//                            SDF functions
-////////////////////////////////////////////////////////////////////////////////
-
 float sdTriangle(float2 p, float2 p0, float2 p1, float2 p2)
 {
   float2 e0 = p1-p0, e1 = p2-p1, e2 = p0-p2;
@@ -33,6 +29,29 @@ float sdSegment(in float2 p, in float2 a, in float2 b)
   float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
   return length(pa - ba * h);
 }
+
+float sdArc(float2 p, float2 c, float2 p1, float2 p2)
+{
+    float2 v1 = p1 - c;
+    float2 v2 = p2 - c;
+    // The parameters are over-determined by one degree of freedom.
+    // If p1 and p2 are not on the same distance from c, the arc doesn't
+    // actually end in p2, but the end cap is still centered there.
+    // Uncomment this line if needed to adjust the distance from p2 to c.
+    // v2 = normalize(v2)*length(v1);
+    float2 v = p - c;
+
+    // The signs of w.x, w.y are used to determine if we're in the gap
+    float2 w = float2(dot(v, -float2(-v1.y, v1.x)), dot(v, float2(-v2.y, v2.x)));
+    bool longarc = (dot(v1, float2(-v2.y, v2.x)) < 0.0); // Arc angle > pi
+    // Tweak by iq: "fake" OR/AND of booleans by max/min of floats
+    float ingap = longarc ? max(w.x,w.y) : min(w.x,w.y);
+    return (ingap > 0.0) ? min(length(p1-p), length(p2-p)) : abs(length(v) - length(v1));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//                                  bezier
+////////////////////////////////////////////////////////////////////////////////
 
 float dot2(float2 v) { return dot(v, v); }
 
@@ -173,4 +192,141 @@ float sdf_bezier_partition(in float2 pos, in float2 A, in float2 B, in float2 C)
     }
     
     return sign(sgn) * sqrt(res);
+}
+
+float2 bezier_quad_point(in float2 A, in float2 B, in float2 C, in float t)
+{
+    float omt = 1.0 - t;
+    return omt * omt * A + 2.0 * omt * t * B + t * t * C;
+}
+
+float2 bezier_quad_tangent(in float2 A, in float2 B, in float2 C, in float t)
+{
+    return 2.0 * (lerp(B - A, C - B, t));
+}
+
+int path_line_winding(in float2 pos, in float2 a, in float2 b)
+{
+    const float EPSILON = 1e-5;
+    float dy = b.y - a.y;
+    if (abs(dy) <= EPSILON)
+        return 0;
+
+    bool crosses = (a.y <= pos.y && b.y > pos.y) || (a.y > pos.y && b.y <= pos.y);
+    if (!crosses)
+        return 0;
+
+    float t = (pos.y - a.y) / dy;
+    float x = lerp(a.x, b.x, t);
+    if (x <= pos.x)
+        return 0;
+
+    return dy > 0.0 ? 1 : -1;
+}
+
+int path_bezier_winding(in float2 pos, in float2 A, in float2 B, in float2 C)
+{
+    const float EPSILON = 1e-5;
+
+    if ((all(abs(A - B) <= EPSILON) && all(abs(B - C) <= EPSILON)) ||
+        (all(abs(A - B) <= EPSILON) || all(abs(B - C) <= EPSILON) || all(abs(A - C) <= EPSILON)))
+    {
+        return path_line_winding(pos, A, C);
+    }
+
+    float qa = A.y - 2.0 * B.y + C.y;
+    float qb = 2.0 * (B.y - A.y);
+    float qc = A.y - pos.y;
+    int winding = 0;
+
+    if (abs(qa) <= EPSILON)
+    {
+        if (abs(qb) <= EPSILON)
+            return 0;
+
+        float t = -qc / qb;
+        if (t < 0.0 || t >= 1.0)
+            return 0;
+
+        float2 curve_pos = bezier_quad_point(A, B, C, t);
+        if (curve_pos.x <= pos.x)
+            return 0;
+
+        float dy = bezier_quad_tangent(A, B, C, t).y;
+        if (abs(dy) <= EPSILON)
+            return 0;
+
+        return dy > 0.0 ? 1 : -1;
+    }
+
+    float discriminant = qb * qb - 4.0 * qa * qc;
+    if (discriminant < 0.0)
+        return 0;
+
+    float root = sqrt(max(discriminant, 0.0));
+    float denom = 0.5 / qa;
+    float2 ts = float2((-qb - root) * denom, (-qb + root) * denom);
+
+    [unroll]
+    for (int i = 0; i < 2; ++i)
+    {
+        float t = ts[i];
+        if (t < 0.0 || t >= 1.0)
+            continue;
+
+        float2 curve_pos = bezier_quad_point(A, B, C, t);
+        if (curve_pos.x <= pos.x)
+            continue;
+
+        float dy = bezier_quad_tangent(A, B, C, t).y;
+        if (abs(dy) <= EPSILON)
+            continue;
+
+        winding += dy > 0.0 ? 1 : -1;
+    }
+
+    return winding;
+}
+
+int path_arc_winding(in float2 pos, in float2 center, in float2 p0, in float2 p1)
+{
+    const float EPSILON = 1e-5;
+    float radius = length(p0 - center);
+    if (radius <= EPSILON)
+        return 0;
+
+    float2 v1 = p0 - center;
+    float2 v2 = p1 - center;
+    float dy = pos.y - center.y;
+    float rr = radius * radius;
+    float yy = dy * dy;
+    if (yy > rr)
+        return 0;
+
+    float dx = sqrt(max(rr - yy, 0.0));
+    float2 xs = float2(center.x + dx, center.x - dx);
+    bool longarc = dot(v1, float2(-v2.y, v2.x)) < 0.0;
+    int winding = 0;
+
+    [unroll]
+    for (int i = 0; i < 2; ++i)
+    {
+        float x = xs[i];
+        if (x <= pos.x + EPSILON)
+            continue;
+
+        float2 v = float2(x, pos.y) - center;
+        float2 w = float2(dot(v, float2(v1.y, -v1.x)), dot(v, float2(-v2.y, v2.x)));
+        float ingap = longarc ? max(w.x, w.y) : min(w.x, w.y);
+        if (ingap > 0.0)
+            continue;
+
+        float tangent_y = x - center.x;
+        if (abs(tangent_y) <= EPSILON)
+            continue;
+
+        winding += tangent_y > 0.0 ? 1 : -1;
+    }
+
+    return winding;
 }

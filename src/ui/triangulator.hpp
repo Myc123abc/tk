@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util/vec.hpp"
+#include "util/base.hpp"
 
 #include <span>
 
@@ -17,7 +17,7 @@ struct TriangulatorNode
 
   Type              type{};
   uint32_t          idx{};
-  vec2              pos;
+  float2            pos;
   TriangulatorNode* next{};
   TriangulatorNode* prev{};
 
@@ -49,7 +49,7 @@ struct Triangulator
   static auto estimate_triangle_cnt(uint32_t pt_cnt) noexcept { return (pt_cnt < 3) ? 0 : pt_cnt - 2; }
   static auto estimate_buf_size(uint32_t pt_cnt) noexcept { return sizeof(TriangulatorNode) * pt_cnt + sizeof(TriangulatorNode*) * pt_cnt * 2; }
 
-  void init(std::span<vec2> points, void* buf) noexcept
+  void init(std::span<float2> points, void* buf) noexcept
   {
     assert(buf != nullptr && points.size() > 2);
     _triangles_left = estimate_triangle_cnt(points.size());
@@ -99,7 +99,7 @@ struct Triangulator
   }
 
 private:
-  void build_nodes(std::span<vec2> points) noexcept
+  void build_nodes(std::span<float2> points) noexcept
   {
     for (auto i = 0u; i < points.size(); ++i)
       _nodes[i] =
@@ -114,7 +114,7 @@ private:
     _nodes[points.size() - 1].next = _nodes;
   }
 
-  static auto is_clock_wise(vec2 a, vec2 b, vec2 c) noexcept
+  static auto is_clock_wise(float2 a, float2 b, float2 c) noexcept
   {
     return ((b.x - a.x) * (c.y - b.y)) - ((c.x - b.x) * (b.y - a.y)) > 0.f;
   }
@@ -131,7 +131,7 @@ private:
     }
   }
 
-  static auto triangle_contains(vec2 a, vec2 b, vec2 c, vec2 p) noexcept
+  static auto triangle_contains(float2 a, float2 b, float2 c, float2 p) noexcept
   {
     auto b1 = ((p.x - b.x) * (a.y - b.y) - (p.y - b.y) * (a.x - b.x)) < 0.0f;
     auto b2 = ((p.x - c.x) * (b.y - c.y) - (p.y - c.y) * (b.x - c.x)) < 0.0f;
@@ -139,7 +139,7 @@ private:
     return (b1 == b2) && (b2 == b3);
   }
 
-  auto is_ear(int i0, int i1, int i2, vec2 v0, vec2 v1, vec2 v2) const noexcept
+  auto is_ear(int i0, int i1, int i2, float2 v0, float2 v1, float2 v2) const noexcept
   {
     auto p_end = _reflexs.data + _reflexs.size;
     for (auto p = _reflexs.data; p < p_end; ++p)

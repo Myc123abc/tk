@@ -1,41 +1,45 @@
 #pragma once
 
-#include "util/vec.hpp"
+#include "util/base.hpp"
 
 namespace tk::renderer {
 
-// dx12 vertex is aligment at 8 bytes
-// here use 16 bytes because vec4 is simd which need 16 bytes aligment
 struct alignas(16) Vertex
 {
-  vec2 pos{};
-  vec2 uv{};
-  vec4 color{};
+  float2 pos{};
+  float2 uv{};
+  float4 color{};
 };
 
 struct alignas(16) Constants
 {
-  vec2u    render_target_extent{};
-  vec2u    window_extent{};
+  uint2  render_target_extent;
+  uint2  window_extent;
 
-  vec2     window_pos{};
-  float    shadow_thickness{};
-  float    shadow_radius{};
+  float2 window_pos;
+  float  shadow_thickness{};
+  float  shadow_radius{};
 
-  vec3     shadow_color{};
-  float    shadow_softness{};
+  float3 shadow_color;
+  float  shadow_softness{};
 
-  vec4     wireframe_color{};
+  float4 wireframe_color;
 
-  uint32_t draw_wireframe{};
+  float2 mask_offset;
+  float2 mask_extent;
+
+  float2 composite_offset;
+  float2 composite_extent;
+
+  uint   draw_wireframe{};
 };
 
 constexpr auto Max_Blur_Widget_Num = 5;
 struct alignas(16) BlurConstants
 {
-  uint32_t blur_radius{};
-  vec3     padding{};
-  float    widgets[Max_Blur_Widget_Num * 2 + 1]{};
+  uint   blur_radius{};
+  float3 padding{};
+  float  widgets[Max_Blur_Widget_Num * 2 + 1]{};
 };
 
 }

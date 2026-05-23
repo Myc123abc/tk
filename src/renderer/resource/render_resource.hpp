@@ -57,30 +57,22 @@ public:
 
   void present(bool vsync) const noexcept;
 
-  void set_render_target() noexcept;
-  void clear_render_target() noexcept;
-  void clear_depth_stencil() noexcept;
-
-  auto& current_frame() noexcept { return _frames[_frame_index];  }
-  auto  render_target() noexcept { return &current_frame().image; }
-  auto  depth_stencil() noexcept { return &_dsv_image;            }
-  auto  mask_image()    noexcept { return &_mask_image;           }
-  auto  tmp_image()     noexcept { return &_tmp_image;            }
+  auto& current_frame() noexcept { return _frames[_frame_index];                }
+  auto  render_target() noexcept { return g_img_mgr.get(current_frame().image); }
+  auto  depth_stencil() noexcept { return g_img_mgr.get(_dsv_image);            }
 
 private:
   struct Frame
   {
-    Image                                          image;
-    Image                                          swapchain_image;
+    ImageHandle                                    image;
+    ImageHandle                                    swapchain_image;
     FrameBuffer                                    buffer;
     uint64_t                                       fence_value{};
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> cmd_alloc;
   };
 
   std::array<Frame, Frame_Count>              _frames;
-  Image                                       _dsv_image;
-  Image                                       _mask_image;
-  Image                                       _tmp_image;
+  ImageHandle                                 _dsv_image;
 
   Microsoft::WRL::ComPtr<IDXGISwapChain4>     _swapchain;
   HANDLE                                      _swapchain_waitable_obj;

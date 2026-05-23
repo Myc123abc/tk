@@ -4,8 +4,14 @@
 #include <numbers>
 #include <immintrin.h>
 #include <assert.h>
+#include <cmath>
 
 namespace tk {
+
+using uint8  = uint8_t;
+using uint16 = uint16_t;
+using uint   = uint32_t;
+using uint64 = uint64_t;
 
 template <typename T>
 concept Numeric = std::integral<T> || std::floating_point<T>;
@@ -14,7 +20,7 @@ template <size_t N, Numeric T>
 struct vec;
 
 ////////////////////////////////////////////////////////////////////////////////
-///                               vec2
+///                               float2
 ////////////////////////////////////////////////////////////////////////////////
 
 template <Numeric T>
@@ -37,15 +43,6 @@ struct vec<2, T>
   template <Numeric X, Numeric Y>
   constexpr vec(X x, Y y) noexcept
     : x(static_cast<T>(x)), y(static_cast<T>(y)) {}
-
-  template <Numeric U>
-  constexpr vec(std::initializer_list<U> values) noexcept
-  {
-    assert(values.size() <= 2);
-    auto it = values.begin();
-    if (it != values.end()) x = static_cast<T>(*it++);
-    if (it != values.end()) y = static_cast<T>(*it++);
-  }
 
   constexpr auto operator+(T v) const noexcept -> self { return { x + v, y + v }; }
   constexpr auto operator-(T v) const noexcept -> self { return { x - v, y - v }; }
@@ -76,8 +73,17 @@ struct vec<2, T>
 template <Numeric T>
 inline constexpr auto dot(vec<2, T> lhs, vec<2, T> rhs) noexcept -> T { return lhs.x * rhs.x + lhs.y * rhs.y; }
 
+template <typename T>
+struct is_vec2 : std::false_type {};
+
+template <Numeric T>
+struct is_vec2<vec<2, T>> : std::true_type {};
+
+template <typename T>
+concept Vec2 = is_vec2<std::remove_cvref_t<T>>::value;
+
 ////////////////////////////////////////////////////////////////////////////////
-///                               vec3
+///                               float3
 ////////////////////////////////////////////////////////////////////////////////
 
 template <Numeric T>
@@ -149,7 +155,7 @@ template <Numeric T>
 inline constexpr auto dot(vec<3, T> lhs, vec<3, T> rhs) noexcept -> T { return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z; }
 
 ////////////////////////////////////////////////////////////////////////////////
-///                               vec4
+///                               float4
 ////////////////////////////////////////////////////////////////////////////////
 
 template <Numeric T>
@@ -238,7 +244,7 @@ template <Numeric T>
 inline constexpr auto dot(vec<4, T> lhs, vec<4, T> rhs) noexcept -> T { return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z + lhs.w * rhs.w; }
 
 ////////////////////////////////////////////////////////////////////////////////
-///                               vec4 simd
+///                               float4 simd
 ////////////////////////////////////////////////////////////////////////////////
 
 template <>
@@ -347,11 +353,15 @@ inline auto dot(vec<4, float> a, vec<4, float> b) noexcept -> float
 ///                               misc
 ////////////////////////////////////////////////////////////////////////////////
 
-using vec2  = vec<2, float>;
-using vec2i = vec<2, int>;
-using vec2u = vec<2, uint32_t>;
-using vec3  = vec<3, float>;
-using vec4  = vec<4, float>;
+using float2 = vec<2, float>;
+using float3 = vec<3, float>;
+using float4 = vec<4, float>;
+using int2   = vec<2, int>;
+using int3   = vec<3, int>;
+using int4   = vec<4, int>;
+using uint2  = vec<2, uint>;
+using uint3  = vec<3, uint>;
+using uint4  = vec<4, uint>;
 
 constexpr auto radians(float deg) noexcept
 {
@@ -363,24 +373,45 @@ constexpr auto degrees(float rad) noexcept
   return rad * (180.f / std::numbers::pi);
 }
 
-constexpr auto cross(vec2 a, vec2 b) noexcept
+constexpr auto cross(float2 a, float2 b) noexcept
 {
   return a.x * b.y - a.y * b.x;
 }
 
-constexpr auto cross(vec2 a, vec2 b, vec2 c) noexcept
+constexpr auto cross(float2 a, float2 b, float2 c) noexcept
 {
   return cross(b - a, c - a);
 }
 
-constexpr auto dot(vec2 a, vec2 b) noexcept
+constexpr auto dot(float2 a, float2 b) noexcept
 {
   return a.x * b.x + a.y * b.y;
 }
 
-constexpr auto length_sq(vec2 p) noexcept
+constexpr auto length_sq(float2 p) noexcept
 {
   return dot(p, p);
+}
+
+inline auto length(float2 p) noexcept
+{
+  return std::sqrt(length_sq(p));
+}
+
+inline auto normalize(float2 v) noexcept -> float2
+{
+  auto len = length(v);
+  return len > 0.f ? float2{ v.x / len, v.y / len } : float2{};
+}
+
+constexpr auto abs(float2 v) noexcept -> float2
+{
+  return { std::abs(v.x), std::abs(v.y) };
+}
+
+constexpr auto floor(float2 v) noexcept -> float2
+{
+  return { std::floor(v.x), std::floor(v.y) };
 }
 
 }

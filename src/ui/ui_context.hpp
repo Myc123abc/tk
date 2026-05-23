@@ -15,7 +15,7 @@
 
 namespace tk::ui {
 
-auto is_hover_on(vec2 left_top, vec2 right_bottom) noexcept -> bool;
+auto is_hover_on(float2 left_top, float2 right_bottom) noexcept -> bool;
 auto is_caps_locked() noexcept -> bool;
 
 struct WindowContext
@@ -27,16 +27,17 @@ struct WindowContext
   bool      is_called{};
   bool      can_be_closed{};
   bool      is_closed{};
-  vec2      render_pos{};
+  float2    render_pos{};
   bool      need_clear{};
-  FrameData frame_data;
   bool      set_fullscreen{};
   bool      first_time_call{ true };
+  FrameData frame_data;
 };
 
 #define KEY_ENTRY_INIT(name, _) { Key::name, {} },
 
 Singleton(UIContext, g_ui_ctx,
+  friend struct WindowContext;
 public:
   void init() noexcept;
   void destroy() noexcept;
@@ -50,12 +51,12 @@ public:
 
   void render() noexcept;
 
-  auto is_hover_on(size_t id, vec2 left_top, vec2 right_bottom) noexcept -> bool;
+  auto is_hover_on(size_t id, float2 left_top, float2 right_bottom) noexcept -> bool;
 
-  void set_render_pos(int x, int y) noexcept { _wnd_ctx->render_pos = { x + renderer::Window_Shadow_Thickness, y + renderer::Window_Shadow_Thickness }; }
+  void set_render_pos(float x, float y) noexcept { _wnd_ctx->render_pos = { x + renderer::Window_Shadow_Thickness, y + renderer::Window_Shadow_Thickness }; }
   auto get_render_pos() const noexcept { return _wnd_ctx->render_pos; }
 
-  void render_on(int x, int y, std::move_only_function<void()>&& func) noexcept;
+  void render_on(float x, float y, std::move_only_function<void()>&& func) noexcept;
 
   auto generic_id(std::string_view name) noexcept -> size_t;
   auto get_id(std::string_view name) const noexcept -> size_t;
@@ -67,8 +68,8 @@ public:
   void reset_tween(size_t id) noexcept;
   auto ping_pong(bool b, size_t id, double duration, Tween::Ease ease = {}) noexcept -> double;
 
-  auto image(std::string_view path, vec2 left_top, vec2 right_bottom, uint8_t alpha) noexcept -> bool;
-  auto text(std::string_view text, vec2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> vec2;
+  auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept -> bool;
+  auto text(std::string_view text, float2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> float2;
 
   void fullscreen_window() noexcept;
   void restore_fullscreen_window() noexcept;
@@ -91,7 +92,7 @@ private:
 
   void add_title_bar() noexcept;
   void fullscreen_process() noexcept;
-  void window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer::Window const& wnd, RECT scissor_rect) noexcept;
+  void window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer::Window const& wnd, Rect scissor_rect) noexcept;
 
 private:
   std::unordered_map<std::string, WindowContext> _wnd_ctxs;
@@ -119,13 +120,13 @@ public:
   // mouse state
   //
 public:
-  HWND                 cursor_on_window{};
-  HWND                 mouse_down_window{};
-  HWND                 mouse_up_window{};
-  std::optional<vec2i> mouse_down_pos;
-  std::optional<vec2i> mouse_up_pos;
-  bool                 is_move_from_maximize{};
-  bool                 draw_title_bar{};
+  HWND                cursor_on_window{};
+  HWND                mouse_down_window{};
+  HWND                mouse_up_window{};
+  std::optional<int2> mouse_down_pos;
+  std::optional<int2> mouse_up_pos;
+  bool                is_move_from_maximize{};
+  bool                draw_title_bar{};
 
   //
   // button state
@@ -134,13 +135,13 @@ private:
   struct ButtonState
   {
     size_t id{};
-    vec2   left_top{};
-    vec2   right_bottom{};
+    float2 left_top{};
+    float2 right_bottom{};
     bool   move_out{};
   } _btn_state;
   bool _interrupte{};
 public:
-  void add_mouse_left_button_state(size_t id, vec2 left_top, vec2 right_bottom) noexcept;
+  void add_mouse_left_button_state(size_t id, float2 left_top, float2 right_bottom) noexcept;
   auto is_cursor_move_out(size_t id) noexcept -> bool;
 
   //
@@ -161,7 +162,7 @@ private:
   std::unordered_set<Key> _down_keys;
 
 public:
-  auto get_key(Key key) noexcept -> KeyState;
+  auto get_key(Key key) noexcept -> Flag<KeyState>;
 )
 
 }

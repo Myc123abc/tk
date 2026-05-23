@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../util/flag.hpp"
-#include "../util/vec.hpp"
+#include "../util/base.hpp"
 #include "tween.hpp"
 
 #include <windows.h>
@@ -27,13 +27,13 @@ struct Color
     a = static_cast<float>((color      ) & 0xFF) / 255;
   }
 
-  Color(vec4 color) noexcept
+  Color(float4 color) noexcept
     : r(color.x), g(color.y), b(color.z), a(color.w) {}
 
   Color(float r, float g, float b, float a) noexcept
     : r(r), g(g), b(b), a(a) {}
 
-  operator vec4() noexcept { return { r, g, b, a }; }
+  operator float4() noexcept { return { r, g, b, a }; }
 
   float r{}, g{}, b{}, a{};
 };
@@ -45,7 +45,7 @@ struct Color
  * @param v lerp value
  * @return lerp color
  */
-auto lerp(Color x, Color y, float v) noexcept -> vec4;
+auto lerp(Color x, Color y, float v) noexcept -> float4;
 
 /**
  * get lerp value of two points
@@ -54,7 +54,7 @@ auto lerp(Color x, Color y, float v) noexcept -> vec4;
  * @param v
  * @return lerp value
  */
-auto lerp(vec2 x, vec2 y, float v) noexcept -> vec2;
+auto lerp(float2 x, float2 y, float v) noexcept -> float2;
 
 struct WindowConfig
 {
@@ -81,8 +81,8 @@ struct WindowConfig
       {
         float opacity{};
         float blur{};
-        vec4  tint_color{};
-        vec4  luminosity_color{};
+        float4 tint_color{};
+        float4 luminosity_color{};
       } acrylic;
     };
 
@@ -134,7 +134,7 @@ auto ping_pong(std::string_view name, bool b, double duration, Tween::Ease ease 
  * get cursor position
  * @return cursor position
  */
-auto get_cursor_pos() noexcept -> vec2;
+auto get_cursor_pos() noexcept -> float2;
 
 /**
  * reset tween
@@ -147,7 +147,7 @@ void reset_tween(std::string_view name) noexcept;
  * @param path
  * @return width and height of image, if not exist, return (0, 0)
  */
-auto image_extent(std::string_view path) noexcept -> vec2;
+auto image_extent(std::string_view path) noexcept -> float2;
 
 /**
  * display image
@@ -157,7 +157,7 @@ auto image_extent(std::string_view path) noexcept -> vec2;
  * @param alpha
  * @return false if image is unexist, or loading, or load failed
  */
-auto image(std::string_view path, vec2 left_top, vec2 right_bottom, uint8_t alpha = 0xff) noexcept -> bool;
+auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8_t alpha = 0xff) noexcept -> bool;
 
 /**
  * load image
@@ -188,7 +188,7 @@ enum class FontStyle
  * @param style regular(default), italic, bold, italic_bold
  * @return extent of text
  */
-auto text(std::string_view text, vec2 pos, float size, Color color, FontStyle style = {}) noexcept -> vec2;
+auto text(std::string_view text, float2 pos, float size, Color color, FontStyle style = {}) noexcept -> float2;
 
 /**
  * draw text
@@ -199,7 +199,7 @@ auto text(std::string_view text, vec2 pos, float size, Color color, FontStyle st
  * @param outer_color alpha not 0 then draw outline
  * @return extent of text
  */
-auto text(std::string_view text, vec2 pos, float size, Color inner_color, Color outer_color) noexcept -> vec2;
+auto text(std::string_view text, float2 pos, float size, Color inner_color, Color outer_color) noexcept -> float2;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Window
@@ -230,19 +230,19 @@ void end() noexcept;
  * @param width
  * @param height
  */
-void add_move_invalid_area(vec2 left_top, vec2 right_bottom) noexcept;
+void add_move_invalid_area(float2 left_top, float2 right_bottom) noexcept;
 
 /**
  * get window extent in current update function of window
  * @return extent of window
  */
-auto window_extent() noexcept -> vec2;
+auto window_extent() noexcept -> float2;
 
 /**
  * get window extent in current update function of window
  * @return extent of window without titlebar
  */
-auto window_drawable_extent() noexcept -> vec2;
+auto window_drawable_extent() noexcept -> float2;
 
 /**
  * whether current window is fullscreen
@@ -269,12 +269,6 @@ void discard_beg(std::function<void()> func) noexcept;
 /// discard operation over
 void discard_end() noexcept;
 
-/// union operation begin
-void union_beg() noexcept;
-
-/// union operation end
-void union_end() noexcept;
-
 ////////////////////////////////////////////////////////////////////////////////
 ///                            Geometry
 ////////////////////////////////////////////////////////////////////////////////
@@ -286,7 +280,7 @@ void union_end() noexcept;
  * @param color
  * @param thickness
  */
-void rectangle(vec2 left_top, vec2 right_bottom, Color color = {}, float thickness = {}) noexcept;
+void rectangle(float2 left_top, float2 right_bottom, Color color = {}, float thickness = {}) noexcept;
 
 /**
  * draw a triangle (clockwise)
@@ -296,7 +290,7 @@ void rectangle(vec2 left_top, vec2 right_bottom, Color color = {}, float thickne
  * @param color
  * @param thickness
  */
-void triangle(vec2 p0, vec2 p1, vec2 p2, Color color = {}, float thickness = {}) noexcept;
+void triangle(float2 p0, float2 p1, float2 p2, Color color = {}, float thickness = {}) noexcept;
 
 /**
  * draw a circle
@@ -305,7 +299,7 @@ void triangle(vec2 p0, vec2 p1, vec2 p2, Color color = {}, float thickness = {})
  * @param color
  * @param thickness
  */
-void circle(vec2 center, float radius, Color color = {}, float thickness = {}) noexcept;
+void circle(float2 center, float radius, Color color = {}, float thickness = {}) noexcept;
 
 /**
  * draw a line
@@ -314,7 +308,18 @@ void circle(vec2 center, float radius, Color color = {}, float thickness = {}) n
  * @param color
  * @param thickness
  */
-void line(vec2 p0, vec2 p1, Color color = {}, float thickness = 1.f) noexcept;
+void line(float2 p0, float2 p1, Color color = {}, float thickness = 1.f) noexcept;
+
+/**
+ * draw an arc
+ * @param center
+ * @param p0
+ * @param p1
+ * @param ccw whether counter clockwise
+ * @param color
+ * @param thickness
+ */
+void arc(float2 center, float2 p0, float2 p1, bool ccw, Color color = {}, float thickness = 1.f) noexcept;
 
 /**
  * draw a quad bezier
@@ -324,7 +329,7 @@ void line(vec2 p0, vec2 p1, Color color = {}, float thickness = 1.f) noexcept;
  * @param color
  * @param thickness
  */
-void bezier_quad(vec2 p0, vec2 p1, vec2 p2, Color color = {}, float thickness = 1.f) noexcept;
+void quad_bezier(float2 p0, float2 p1, float2 p2, Color color = {}, float thickness = 1.f) noexcept;
 
 /**
  * draw a cubic bezier
@@ -335,33 +340,38 @@ void bezier_quad(vec2 p0, vec2 p1, vec2 p2, Color color = {}, float thickness = 
  * @param color
  * @param thickness
  */
-void bezier_cubic(vec2 p0, vec2 p1, vec2 p2, vec2 p3, Color color = {}, float thickness = 1.f) noexcept;
+void cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Color color = {}, float thickness = 1.f) noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Path
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
- * path line to point
- * @param p
+ * start to draw a path
+ * @param p0 start point
  */
-void path_line_to(vec2 p) noexcept;
+void path_begin(float2 p0) noexcept;
 
 /**
- * path arc to center with min to max
- * @param center
- * @param radius
- * @param min
- * @param max
+ * path line
+ * @param p1
  */
-void path_arc_to(vec2 center, float radius, float min, float max) noexcept;
+void path_line_to(float2 p1) noexcept;
+
+/**
+ * path arc
+ * @param center
+ * @param p1
+ * @param ccw whether counter clockwise
+ */
+void path_arc_to(float2 center, float2 p1, bool ccw) noexcept;
 
 /**
  * path bezier quad draw
  * @param p1
  * @param p2
  */
-void path_bezier_quad_to(vec2 p1, vec2 p2) noexcept;
+void path_quad_bezier_to(float2 p1, float2 p2) noexcept;
 
 /**
  * path bezier cubic draw
@@ -369,15 +379,25 @@ void path_bezier_quad_to(vec2 p1, vec2 p2) noexcept;
  * @param p2
  * @param p3
  */
-void path_bezier_cubic_to(vec2 p1, vec2 p2, vec2 p3) noexcept;
+void path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept;
 
 /**
  * path draw end
+ * @param close close with a line
  * @param color
  * @param thickness
- * @param is_closed
  */
-void path_end(Color color, float thickness = 0.f, bool is_closed = true) noexcept;
+void path_end(bool close = true, Color color = {}, float thickness = {}) noexcept;
+
+/// start collecting closed shapes for a union boolean operation
+void union_beg() noexcept;
+
+/**
+ * draw union result of collected closed shapes
+ * @param color
+ * @param thickness
+ */
+void union_end(Color color = {}, float thickness = {}) noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                               Widget
@@ -404,7 +424,7 @@ struct ButtonState
  * @param height
  * @return button state
  */
-auto button(std::string_view name, int x, int y, uint32_t width, uint32_t height) noexcept-> ButtonState;
+auto button(std::string_view name, float x, float y, uint32_t width, uint32_t height) noexcept-> ButtonState;
 
 /**
  * normal button
@@ -419,8 +439,8 @@ auto button(std::string_view name, int x, int y, uint32_t width, uint32_t height
  */
 auto button(
   std::string_view name,
-  int              x,
-  int              y,
+  float            x,
+  float            y,
   uint32_t         width,
   uint32_t         height,
   Color            button_color,
@@ -429,7 +449,6 @@ auto button(
 /**
  * draw a button, can draw an icon in the center of button
  * default have a color lerp animation when cursor hover on button and leave on it
- * TODO: add bitmap draw replace draw icon by hand
  * @param name name cannot be duplicate in the window
  * @param x
  * @param y
@@ -448,8 +467,8 @@ auto button(
  */
 auto button(
   std::string_view                               name,
-  int                                            x,
-  int                                            y,
+  float                                          x,
+  float                                          y,
   uint32_t                                       width,
   uint32_t                                       height,
   Color                                          button_color,
@@ -479,17 +498,18 @@ enum class Key
 #undef X
 };
 
-Flag(KeyState,
+enum class KeyState
+{
   idle      = 0b0000,
   down      = 0b0001,
   down_idle = 0b0011,
   press     = 0b0101,
   up        = 0b1000,
-)
+};
 
 struct GetKeyResult
 {
-  KeyState state{};
+  Flag<KeyState> state{};
 
   constexpr operator bool() const noexcept
   {
@@ -497,7 +517,7 @@ struct GetKeyResult
            state == KeyState::press;
   }
 
-  auto has_down() const noexcept { return has_flag(state, KeyState::down); }
+  auto has_down() const noexcept { return state.contains(KeyState::down); }
 
   auto is_uppercase() const noexcept -> bool;
   auto is_lowercase() const noexcept -> bool { return !is_uppercase(); }

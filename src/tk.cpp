@@ -1,5 +1,5 @@
 #include "tk.hpp"
-#include "renderer/renderer/renderer.hpp"
+#include "renderer/renderer.hpp"
 #include "renderer/window/window_manager.hpp"
 #include "ui/ui_context.hpp"
 #include "util/thread_pool.hpp"
@@ -28,7 +28,7 @@ void destroy() noexcept
 
 void update() noexcept
 {
-  g_img_mgr.update();
+  ui::g_img_mgr.update();
   g_ui_ctx.render();
   g_wnd_mgr.message_process();
   g_renderer.render();

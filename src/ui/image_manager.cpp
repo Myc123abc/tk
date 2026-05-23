@@ -2,7 +2,7 @@
 #include <stb_image.h>
 
 #include "image_manager.hpp"
-#include "../renderer/renderer/renderer.hpp"
+#include "../renderer/renderer.hpp"
 #include "util/file.hpp"
 
 #include <ranges>
@@ -43,7 +43,7 @@ void ImageManager::destroy_image(ImageHandle handle) noexcept
   _pool.free(handle);
 }
 
-auto ImageManager::extent(std::string_view path) noexcept -> vec2
+auto ImageManager::extent(std::string_view path) noexcept -> float2
 {
   if (!_image_extents.contains(path.data()))
   {

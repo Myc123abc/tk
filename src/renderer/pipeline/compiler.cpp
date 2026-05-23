@@ -1,6 +1,6 @@
 #include "compiler.hpp"
 #include "util/error_handling.hpp"
-#include "../../core.hpp"
+#include "../core.hpp"
 
 #include <utf8.h>
 
@@ -365,7 +365,7 @@ void Compiler::CompileResult::get_vertex_input_layout(ID3D12ShaderReflection* sh
 
   _input_element_descs.reserve(desc.InputParameters);
   _input_param_names.reserve(desc.InputParameters);
-  for (auto i : std::views::iota(0u, desc.InputParameters))
+  for (auto i = 0; i < desc.InputParameters; ++i)
   {
     auto param_desc = D3D12_SIGNATURE_PARAMETER_DESC{};
     shader_reflection->GetInputParameterDesc(i, &param_desc);
@@ -401,7 +401,7 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
 
   // get bound resources
   root_params.reserve(desc.BoundResources);
-  for (auto i : std::views::iota(0u, desc.BoundResources))
+  for (auto i = 0; i < desc.BoundResources; ++i)
   {
     auto resource_desc = D3D12_SHADER_INPUT_BIND_DESC{};
     err_if(shader_reflection->GetResourceBindingDesc(i, &resource_desc), "failed to get bound resource");

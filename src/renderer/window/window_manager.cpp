@@ -1,7 +1,7 @@
 #include "window_manager.hpp"
 #include "util/error_handling.hpp"
 #include "../../ui/ui_context.hpp"
-#include "../renderer/renderer.hpp"
+#include "../renderer.hpp"
 #include "monitor.hpp"
 #include "compositor.hpp"
 
@@ -123,8 +123,8 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   static auto& wnd_mgr = WindowManager::instance();
   static auto& windows = wnd_mgr._windows;
 
-  static auto last_cursor_pos                    = vec2i{};
-  static auto left_button_down_window_cursor_pos = vec2i{};
+  static auto last_cursor_pos                    = int2{};
+  static auto left_button_down_window_cursor_pos = int2{};
   static auto left_button_down_resize_type       = ResizeType{};
   static auto left_button_down                   = false;
 
@@ -206,7 +206,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
 
     // only moving in cursor valid areas
     if (!window._move_from_maximize &&
-      std::ranges::any_of(window._move_invalid_areas, [](auto rect) { return point_in_with_bounding(left_button_down_window_cursor_pos, rect); }))
+      std::ranges::any_of(window._move_invalid_areas, [](auto rect) { return rect.contains_bounding(left_button_down_window_cursor_pos); }))
       break;
 
     left_button_down_resize_type = window.get_resize_type(left_button_down_window_cursor_pos);
@@ -237,7 +237,8 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     {
       // limit cursor move area
       auto rect = get_virtual_workarea_rect();
-      ClipCursor(&rect);
+      auto rc = rect.to_RECT();
+      ClipCursor(&rc);
 
       // moving
       if (left_button_down_resize_type == ResizeType::none)
@@ -309,13 +310,13 @@ void WindowManager::update_cursor() noexcept
   }
 }
 
-void WindowManager::resize_blur_window(HWND handle, RECT rect) noexcept
+void WindowManager::resize_blur_window(HWND handle, Rect rect) noexcept
 {
   if (_windows.contains(handle))
     _windows[handle].resize_blur_window(rect);
 }
 
-void WindowManager::update_monitor(HWND handle, vec2 cursor_pos, vec2i& left_button_down_window_cusor_pos) noexcept
+void WindowManager::update_monitor(HWND handle, float2 cursor_pos, int2& left_button_down_window_cusor_pos) noexcept
 {
   auto& window  = _windows[handle];
   auto  monitor = Monitor{ handle };
@@ -350,7 +351,9 @@ auto WindowManager::create_fullscreen_window() noexcept -> HWND
 {
   assert(!_fullscreen_window._handle);
   auto rect = get_virtual_screen_rect();
-  _fullscreen_window.init_auxiliary(0, 0, rect.right - rect.left, rect.bottom - rect.top);
+  auto width  = rect.right  - rect.left;
+  auto height = rect.bottom - rect.top;
+  _fullscreen_window.init_auxiliary(0, 0, width, height);
   return _fullscreen_window._handle;
 }
 

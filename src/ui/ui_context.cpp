@@ -1,7 +1,7 @@
 #include "ui_context.hpp"
 #include "util/error_handling.hpp"
 #include "../renderer/window/window_manager.hpp"
-#include "../renderer/renderer/renderer.hpp"
+#include "../renderer/renderer.hpp"
 #include "../util/hash.hpp"
 #include "image_manager.hpp"
 #include "text_engine.hpp"
@@ -47,10 +47,13 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
     _wnd_names.emplace(handle, name);
     _wnd_ctx = &_wnd_ctxs[name.data()];
     _wnd_ctx->can_be_closed = is_closed;
+    _wnd = g_wnd_mgr.get_window(_wnd_ctx->handle);
   }
   else 
+  {
     _wnd_ctx = &_wnd_ctxs[name.data()];
-  _wnd = g_wnd_mgr.get_window(_wnd_ctx->handle);
+    _wnd = g_wnd_mgr.get_window(_wnd_ctx->handle);
+  }
   _wnd_ctx->is_called = true;
 
   update_window_config(cfg);
@@ -166,15 +169,17 @@ void UIContext::render() noexcept
   // process window render datas
   for (auto& wnd_ctx : _wnd_ctxs | std::views::values)
   {
-    auto        handle = wnd_ctx.handle;
-    auto        data   = &wnd_ctx.frame_data;
-    auto const& wnd    = *g_wnd_mgr.get_window(handle);
+    auto handle = wnd_ctx.handle;
+    auto data   = &wnd_ctx.frame_data;
 
-    if (!wnd.is_resizing())
+    _wnd = g_wnd_mgr.get_window(handle);
+
+    if (!_wnd->is_resizing())
     {
-      data->add_scissor_rect(wnd.content_rect());
-      if (!wnd.is_fullscreen() && !wnd.is_maximized())
-        window_shadow_wireframe_process(wnd_ctx, wnd, wnd.shadow_rect());
+      data->add_scissor_rect(_wnd->content_rect());
+      if (!_wnd->is_fullscreen() && !_wnd->is_maximized())
+        window_shadow_wireframe_process(wnd_ctx, *_wnd, _wnd->shadow_rect());
+      data->build_render_cmds();
       g_renderer.submit({ handle, data });
     }
     else
@@ -184,11 +189,12 @@ void UIContext::render() noexcept
         wnd_ctx.need_clear = false;
         g_renderer.submit({ handle });
       }
-      data->add_scissor_rect(wnd.rect());
-      window_shadow_wireframe_process(wnd_ctx, wnd, wnd.real_rect());
-      data->set_window_pos(wnd.real_pos());
-      if (wnd.cfg().backdrop.style != ui::BackdropStyle::none)
-        g_renderer.submit({ _fullscreen_window, data, handle, wnd.rect() });
+      data->set_window_pos(_wnd->real_pos());
+      data->add_scissor_rect(_wnd->rect());
+      window_shadow_wireframe_process(wnd_ctx, *_wnd, _wnd->real_rect());
+      data->build_render_cmds();
+      if (_wnd->cfg().backdrop.style != ui::BackdropStyle::none)
+        g_renderer.submit({ _fullscreen_window, data, handle, _wnd->rect() });
       else
         g_renderer.submit({ _fullscreen_window, data });
     }
@@ -249,7 +255,7 @@ void UIContext::postprocess_render() noexcept
   if (_btn_state.id)
   {
     auto pos = get_cursor_pos();
-    if (!point_in(get_cursor_pos(), _btn_state.left_top, _btn_state.right_bottom))
+    if (!Rect{ _btn_state.left_top, _btn_state.right_bottom }.contains(get_cursor_pos()))
       _btn_state.move_out = true;
   }
 
@@ -262,16 +268,16 @@ void UIContext::postprocess_render() noexcept
   tp          = now;
 }
 
-void UIContext::window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer::Window const& wnd, RECT scissor_rect) noexcept
+void UIContext::window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer::Window const& wnd, Rect scissor_rect) noexcept
 {
   auto const& cfg = wnd.cfg();
   if (!cfg.display_window_shadow && !cfg.wireframe_color)
     return;
 
   auto data = &wnd_ctx.frame_data;
-  auto col  = vec4{};
+  auto col  = float4{};
 
-  auto get_wireframe_color = [&] -> std::optional<vec4>
+  auto get_wireframe_color = [&] -> std::optional<float4>
   {
     if (cfg.wireframe_color)
     {
@@ -295,7 +301,7 @@ void UIContext::window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer
   data->set_window_shadow(scissor_rect, wnd.real_extent(), wnd.shadow_thickness(), {}, cfg.display_window_shadow ? 5 : 0, 15, get_wireframe_color());
 }
 
-void UIContext::add_mouse_left_button_state(size_t id, vec2 left_top, vec2 right_bottom) noexcept
+void UIContext::add_mouse_left_button_state(size_t id, float2 left_top, float2 right_bottom) noexcept
 {
   check_draw();
   if (!_btn_state.id)
@@ -312,7 +318,7 @@ auto UIContext::is_cursor_move_out(size_t id) noexcept -> bool
   return _btn_state.id != id ? false : _btn_state.move_out;
 }
 
-void UIContext::render_on(int x, int y, std::move_only_function<void()>&& func) noexcept
+void UIContext::render_on(float x, float y, std::move_only_function<void()>&& func) noexcept
 {
   assert(func);
   auto org_pos = g_ui_ctx.get_render_pos();
@@ -321,7 +327,7 @@ void UIContext::render_on(int x, int y, std::move_only_function<void()>&& func) 
   g_ui_ctx.set_render_pos(org_pos.x - Window_Shadow_Thickness, org_pos.y - Window_Shadow_Thickness);
 }
 
-auto UIContext::is_hover_on(size_t id, vec2 left_top, vec2 right_bottom) noexcept -> bool
+auto UIContext::is_hover_on(size_t id, float2 left_top, float2 right_bottom) noexcept -> bool
 {
   if (ui::is_hover_on(left_top, right_bottom))
   {
@@ -504,7 +510,7 @@ void UIContext::update_keys() noexcept
   }
 }
 
-auto UIContext::get_key(Key key) noexcept -> KeyState
+auto UIContext::get_key(Key key) noexcept -> Flag<KeyState>
 {
   using enum KeyState;
 
@@ -519,27 +525,19 @@ auto UIContext::get_key(Key key) noexcept -> KeyState
   return ctx.state;
 }
 
-auto UIContext::image(std::string_view path, vec2 left_top, vec2 right_bottom, uint8_t alpha) noexcept -> bool
+auto UIContext::image(std::string_view path, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept -> bool
 {
   check_draw();
 
   if (g_img_mgr.try_load(path))
   {
-    auto offset = get_render_pos();
-    left_top     += offset;
-    right_bottom += offset;
-    
-    auto scale = _wnd->scale();
-    left_top     *= scale;
-    right_bottom *= scale;
-
     frame_data()->add_image(g_img_mgr.handle(path), left_top, right_bottom, alpha);
     return true;
   }
   return false;
 }
 
-auto UIContext::text(std::string_view text, vec2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> vec2
+auto UIContext::text(std::string_view text, float2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> float2
 {
   if (text.empty()) return {};
 

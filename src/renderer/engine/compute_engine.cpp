@@ -1,9 +1,9 @@
 #include "compute_engine.hpp"
 #include "../resource/descriptor_heap_manager.hpp"
-#include "../renderer/pipeline/pipeline_system.hpp"
+#include "../pipeline/pipeline_system.hpp"
 #include "../resource/shader_type.hpp"
 #include "graphics_engine.hpp"
-#include "../renderer/context.hpp"
+#include "../context.hpp"
 
 #include <assert.h>
 #include <ranges>
@@ -49,6 +49,12 @@ auto get_gauss_weights(float sigma) noexcept
 
 namespace tk::renderer {
 
+void ComputeEngine::destroy() noexcept
+{
+  for (auto const& img : _blur_tmp_images) g_img_mgr.destroy(img.img);
+  Engine::destroy();
+}
+
 auto ComputeEngine::get_tmp_img() noexcept -> std::pair<Image*, uint32_t>
 {
   Image*   tmp_img{};
@@ -57,14 +63,14 @@ auto ComputeEngine::get_tmp_img() noexcept -> std::pair<Image*, uint32_t>
       it != _blur_tmp_images.end())
   {
     it->in_use = true;
-    tmp_img    = &it->img;
+    tmp_img    = g_img_mgr.get(it->img);
     idx        = it - _blur_tmp_images.begin();
   }
   else
   {
     auto& res = _blur_tmp_images.emplace_back();
     res.in_use = true;
-    tmp_img    = &res.img;
+    tmp_img    = g_img_mgr.get(res.img);
     idx        = _blur_tmp_images.size() - 1;
   }
   return { tmp_img, idx };
@@ -103,7 +109,7 @@ void ComputeEngine::blur(Image& src, Image& dst, float sigma, uint32_t blur_coun
   g_ctx.set_compute_root_signature(horizontal_pipe->root_signature);
   g_ctx.set_compute_constants(horizontal_pipe->root_param_idx("constants"), constants);
 
-  for (auto i : std::views::iota(0u, blur_count))
+  for (auto i = 0; i < blur_count; ++i)
   {
     g_ctx.set_pipe(horizontal_pipe->pipe_state.Get());
     dst.set_state(cmd(), ImageState::non_pixel);

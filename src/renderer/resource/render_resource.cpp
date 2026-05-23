@@ -14,14 +14,10 @@ namespace tk::renderer {
 
 void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
 {
-  // create offscreen images
+  // create images
   for (auto& frame : _frames)
-    frame.image.init(width, height, Render_Target_Format, ImageType::rtv);
-  
-  // create depth test image
-  _dsv_image.init(width, height, ImageFormat::d24_s8, ImageType::dsv);
-  _mask_image.init(width, height, ImageFormat::r8_unorm, ImageType::rtv | ImageType::srv);
-  _tmp_image.init(width, height, Render_Target_Format, ImageType::rtv | ImageType::srv);
+    frame.image = g_img_mgr.create(width, height, Render_Target_Format, ImageType::rtv);
+  _dsv_image  = g_img_mgr.create(width, height, ImageFormat::d24_s8, ImageType::dsv);
 
   // create swapchain
   ComPtr<IDXGISwapChain1> swapchain;
@@ -59,7 +55,7 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
 
   // get image from swapchain backbuffers
   for (auto [i, frame] : _frames | std::views::enumerate)
-    frame.swapchain_image.init(_swapchain.Get(), i);
+    frame.swapchain_image = g_img_mgr.create(_swapchain.Get(), i);
 
   // create command allocator and list
   for (auto& frame : _frames)
@@ -74,13 +70,11 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
 void RenderResource::destroy() noexcept
 {
   CloseHandle(_swapchain_waitable_obj);
-  _tmp_image.destroy();
-  _mask_image.destroy();
-  _dsv_image.destroy();
+  g_img_mgr.destroy(_dsv_image);
   for (auto& frame : _frames)
   {
-    frame.image.destroy();
-    frame.swapchain_image.destroy();
+    g_img_mgr.destroy(frame.image);
+    g_img_mgr.destroy(frame.swapchain_image);
     frame.buffer.destroy();
   }
 }
@@ -94,11 +88,11 @@ void RenderResource::resize(uint32_t width, uint32_t height) noexcept
   // reset swapchain relatation resources
   for (auto& frame : _frames)
   {
-    frame.swapchain_image.destroy();
-    frame.image.destroy();
+    g_img_mgr[frame.image].destroy();;
+    g_img_mgr[frame.swapchain_image].destroy();
   }
   _comp_visual->SetContent(nullptr);
-  _dsv_image.destroy();
+  g_img_mgr[_dsv_image].destroy();
 
   // resize swapchain
   err_if(_swapchain->ResizeBuffers(Frame_Count, width, height, DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT | DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING),
@@ -113,12 +107,10 @@ void RenderResource::resize(uint32_t width, uint32_t height) noexcept
   // recreate images
   for (auto [i, frame] : _frames | std::views::enumerate)
   {
-    frame.swapchain_image.resize(_swapchain.Get(), i);
-    frame.image.resize(width, height);
+    g_img_mgr[frame.swapchain_image].resize(_swapchain.Get(), i);
+    g_img_mgr[frame.image].resize(width, height);
   }
-  _dsv_image.resize(width, height);
-  _mask_image.resize(width, height);
-  _tmp_image.resize(width, height);
+  g_img_mgr[_dsv_image].resize(width, height);
 }
 
 void RenderResource::wait_frame_complete() noexcept
@@ -145,13 +137,7 @@ void RenderResource::render_begin() noexcept
   // bind heaps
   g_desc_heap_mgr.bind_heaps(cmd);
 
-  // set render target image clear render target image
-  set_render_target();
-  clear_render_target();
-
-  // set viewport
-  auto viewport = CD3DX12_VIEWPORT{ 0.f, 0.f, static_cast<float>(frame.image.width()), static_cast<float>(frame.image.height()) };
-  cmd->RSSetViewports(1, &viewport);
+  render_target()->clear_render_target(g_graphics_engine.cmd());
 }
 
 void RenderResource::render_end() noexcept
@@ -161,10 +147,10 @@ void RenderResource::render_end() noexcept
   auto  cmd             = g_graphics_engine.cmd();
 
   // copy offscreen image to swapchain backbuffer
-	copy(cmd, frame.image, swapchain_image);
+	copy(cmd, g_img_mgr[frame.image], g_img_mgr[swapchain_image]);
 
   // set to present state
-  swapchain_image.set_state(cmd, ImageState::present);
+  g_img_mgr[swapchain_image].set_state(cmd, ImageState::present);
 
 	// submit graphics commands to graphics engine
 	frame.fence_value = g_graphics_engine.submit();
@@ -185,22 +171,6 @@ void RenderResource::present(bool vsync) const noexcept
     err_if(res == DXGI_ERROR_DEVICE_HUNG, "failed to present, device hung");
     err_if(true, "failed to present : {}", static_cast<uint32_t>(res));
   }
-}
-
-void RenderResource::set_render_target() noexcept
-{
-  auto rtv = render_target()->rtv().cpu_handle();
-  g_graphics_engine.cmd()->OMSetRenderTargets(1, &rtv, false, nullptr);
-}
-
-void RenderResource::clear_render_target() noexcept
-{
-  render_target()->clear_render_target(g_graphics_engine.cmd());
-}
-
-void RenderResource::clear_depth_stencil() noexcept
-{
-  depth_stencil()->clear_depth_stencil(g_graphics_engine.cmd());
 }
 
 void FrameBuffer::init() noexcept

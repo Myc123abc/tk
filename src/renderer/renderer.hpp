@@ -1,7 +1,8 @@
 #pragma once
 
-#include "../resource/render_resource.hpp"
-#include "../../ui/image_manager.hpp"
+#include "resource/render_resource.hpp"
+#include "../ui/image_manager.hpp"
+#include "util/rect.hpp"
 
 #include <functional>
 #include <deque>
@@ -25,7 +26,7 @@ public:
     HWND           handle{};
     ui::FrameData* frame_data{};
     HWND           blur_host_window{};
-    RECT           blur_window_rect{};
+    Rect           blur_window_rect{};
   };
   void submit(RenderInfo const& info) noexcept { _render_infos.emplace_back(info); }
 
@@ -40,7 +41,12 @@ public:
 
   void clear_blur_resize_data() noexcept { _blur_host_window = {}; _blur_window_rect = {}; }
 
+  auto descriptor_idx(ui::ImageHandle handle) noexcept { return g_img_mgr[_images[handle]].srv().index(); }
+
 private:
+  void init_images() noexcept;
+  void destroy_images() noexcept;
+
   void preprocess_render()  noexcept;
   void upload_images() noexcept;
 
@@ -60,17 +66,19 @@ private:
 
   std::unordered_map<HWND, HWND> _show_blur_wnds;
   HWND                           _blur_host_window{};
-  RECT                           _blur_window_rect{};
+  Rect                           _blur_window_rect{};
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                           Image
 ////////////////////////////////////////////////////////////////////////////////
 
-private:
-  std::unordered_map<ui::ImageHandle, Image>  _images;
-  std::unordered_map<ui::ImageHandle, Bitmap> _bitmaps;
-  std::unordered_map<ui::ImageHandle, Image>  _upload_images;
-  std::vector<ui::ImageHandle>                _pending_mipmap_image_handles;
+  std::unordered_map<ui::ImageHandle, ImageHandle> _images;
+  std::unordered_map<ui::ImageHandle, Bitmap>      _bitmaps;
+  std::unordered_map<ui::ImageHandle, ImageHandle> _upload_images;
+  std::vector<ui::ImageHandle>                     _pending_mipmap_image_handles;
+
+  ImageHandle _discard_image;
+  ImageHandle _composite_image;
 )
 
 }
