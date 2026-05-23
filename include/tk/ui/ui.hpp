@@ -269,16 +269,6 @@ void discard_beg(std::function<void()> func) noexcept;
 /// discard operation over
 void discard_end() noexcept;
 
-/// union operation begin
-void union_beg() noexcept;
-
-/**
- * union operation end
- * @param color
- * @param thickness
- */
-void union_end(Color color, float thickness) noexcept;
-
 ////////////////////////////////////////////////////////////////////////////////
 ///                            Geometry
 ////////////////////////////////////////////////////////////////////////////////
@@ -397,7 +387,17 @@ void path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept;
  * @param color
  * @param thickness
  */
-void path_end(bool close = {}, Color color = {}, float thickness = {}) noexcept;
+void path_end(bool close = true, Color color = {}, float thickness = {}) noexcept;
+
+/// start collecting closed shapes for a union boolean operation
+void union_beg() noexcept;
+
+/**
+ * draw union result of collected closed shapes
+ * @param color
+ * @param thickness
+ */
+void union_end(Color color = {}, float thickness = {}) noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                               Widget
@@ -498,17 +498,18 @@ enum class Key
 #undef X
 };
 
-Flag(KeyState,
+enum class KeyState
+{
   idle      = 0b0000,
   down      = 0b0001,
   down_idle = 0b0011,
   press     = 0b0101,
   up        = 0b1000,
-)
+};
 
 struct GetKeyResult
 {
-  KeyState state{};
+  Flag<KeyState> state{};
 
   constexpr operator bool() const noexcept
   {
@@ -516,7 +517,7 @@ struct GetKeyResult
            state == KeyState::press;
   }
 
-  auto has_down() const noexcept { return has_flag(state, KeyState::down); }
+  auto has_down() const noexcept { return state.contains(KeyState::down); }
 
   auto is_uppercase() const noexcept -> bool;
   auto is_lowercase() const noexcept -> bool { return !is_uppercase(); }

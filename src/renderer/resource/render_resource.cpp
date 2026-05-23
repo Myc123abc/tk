@@ -14,12 +14,10 @@ namespace tk::renderer {
 
 void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
 {
-  // create offscreen images
+  // create images
   for (auto& frame : _frames)
     frame.image = g_img_mgr.create(width, height, Render_Target_Format, ImageType::rtv);
-  
-  // create depth test image
-  _dsv_image = g_img_mgr.create(width, height, ImageFormat::d24_s8, ImageType::dsv);
+  _dsv_image  = g_img_mgr.create(width, height, ImageFormat::d24_s8, ImageType::dsv);
 
   // create swapchain
   ComPtr<IDXGISwapChain1> swapchain;
@@ -139,13 +137,7 @@ void RenderResource::render_begin() noexcept
   // bind heaps
   g_desc_heap_mgr.bind_heaps(cmd);
 
-  // set render target image clear render target image
-  set_render_target();
-  clear_render_target();
-
-  // set viewport
-  auto viewport = CD3DX12_VIEWPORT{ 0.f, 0.f, static_cast<float>(g_img_mgr[frame.image].width()), static_cast<float>(g_img_mgr[frame.image].height()) };
-  cmd->RSSetViewports(1, &viewport);
+  render_target()->clear_render_target(g_graphics_engine.cmd());
 }
 
 void RenderResource::render_end() noexcept
@@ -181,37 +173,13 @@ void RenderResource::present(bool vsync) const noexcept
   }
 }
 
-void RenderResource::set_render_target() noexcept
-{
-  auto rtv = render_target()->rtv().cpu_handle();
-  g_graphics_engine.cmd()->OMSetRenderTargets(1, &rtv, false, nullptr);
-}
-
-void RenderResource::clear_render_target() noexcept
-{
-  render_target()->clear_render_target(g_graphics_engine.cmd());
-}
-
-void RenderResource::clear_depth_stencil() noexcept
-{
-  depth_stencil()->clear_depth_stencil(g_graphics_engine.cmd());
-}
-
 void FrameBuffer::init() noexcept
 {
-  _cmds.init(Buffer_Init_Size, true);
-  _path_cmds.init(Buffer_Init_Size, true);
-  _cmd_idxs.init(Buffer_Init_Size, true);
-  _tiles.init(Buffer_Init_Size, true);
+  _vertices_indices_buffer.init(Vertices_Indices_Buffer_Size, false);
 }
 
 void FrameBuffer::upload(ID3D12GraphicsCommandList1* cmd, ui::FrameData const* data) noexcept
 {
-  _cmds.append_range(data->cmds());
-  _path_cmds.append_range(data->path_cmds());
-  _cmd_idxs.append_range(data->cmd_idxs());
-  _tiles.append_range(data->gpu_tiles());
-#if 0
   auto vertices_offset = _vertices_indices_buffer.append_range(data->vertices());
   auto indices_offset  = _vertices_indices_buffer.append_range(data->indices());
 
@@ -234,7 +202,6 @@ void FrameBuffer::upload(ID3D12GraphicsCommandList1* cmd, ui::FrameData const* d
   index_buffer_view.SizeInBytes    = indices_offset;
   index_buffer_view.Format         = DXGI_FORMAT_R16_UINT;
   cmd->IASetIndexBuffer(&index_buffer_view);
-#endif
 }
 
 }

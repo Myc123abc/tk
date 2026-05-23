@@ -40,23 +40,23 @@ struct dx12_traits<ImageType::dsv>
   static constexpr auto state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 };
 
-constexpr auto dx12_resource_flags(ImageType type) noexcept
+constexpr auto dx12_resource_flags(Flag<ImageType> type) noexcept
 {
   using enum ImageType;
   auto flags = D3D12_RESOURCE_FLAG_NONE;
-  if (has_flag(type, uav)) flags |= dx12_traits<uav>::flag;
-  if (has_flag(type, rtv)) flags |= dx12_traits<rtv>::flag;
-  if (has_flag(type, dsv)) flags |= dx12_traits<dsv>::flag;
+  if (type.contains(uav)) flags |= dx12_traits<uav>::flag;
+  if (type.contains(rtv)) flags |= dx12_traits<rtv>::flag;
+  if (type.contains(dsv)) flags |= dx12_traits<dsv>::flag;
   return flags;
 }
 
-constexpr auto dx12_resource_states(ImageType type) noexcept
+constexpr auto dx12_resource_states(Flag<ImageType> type) noexcept
 {
   using enum ImageType;
   auto states = D3D12_RESOURCE_STATE_COMMON;
-  if (has_flag(type, uav)) states |= dx12_traits<uav>::state;
-  if (has_flag(type, rtv)) states |= dx12_traits<rtv>::state;
-  if (has_flag(type, dsv)) states |= dx12_traits<dsv>::state;
+  if (type.contains(uav)) states |= dx12_traits<uav>::state;
+  if (type.contains(rtv)) states |= dx12_traits<rtv>::state;
+  if (type.contains(dsv)) states |= dx12_traits<dsv>::state;
   return states;
 }
 
@@ -73,7 +73,7 @@ void Image::destroy() noexcept
   _desc.dsv.release();
 }
 
-void Image::init(uint32_t width , uint32_t height, ImageFormat format, ImageType type, bool use_mipmap) noexcept
+void Image::init(uint width , uint height, ImageFormat format, Flag<ImageType> type, bool use_mipmap) noexcept
 {
   auto device = g_core.device();
 
@@ -100,16 +100,16 @@ void Image::init(uint32_t width , uint32_t height, ImageFormat format, ImageType
 
   auto clear_value = D3D12_CLEAR_VALUE{};
   clear_value.Format = texture_desc.Format;
-  if (has_flag(_type, ImageType::dsv))
+  if (_type.contains(ImageType::dsv))
     clear_value.DepthStencil.Depth = 1.f;
-  auto clear_value_ptr = (has_flag(_type, ImageType::rtv) | has_flag(_type, ImageType::dsv)) ? &clear_value : nullptr;
+  auto clear_value_ptr = (_type.any(ImageType::rtv, ImageType::dsv)) ? &clear_value : nullptr;
   err_if(device->CreateCommittedResource(&heap_properties, D3D12_HEAP_FLAG_NONE, &texture_desc, _state, clear_value_ptr, IID_PPV_ARGS(_handle.ReleaseAndGetAddressOf())),
           "failed to create image");
 
   create_descriptor(use_mipmap);
 }
 
-void Image::init(IDXGISwapChain1* swapchain, uint32_t index) noexcept
+void Image::init(IDXGISwapChain1* swapchain, uint index) noexcept
 {
   err_if(swapchain->GetBuffer(index, IID_PPV_ARGS(_handle.ReleaseAndGetAddressOf())),
          "failed to get descriptor");
@@ -124,7 +124,7 @@ void Image::init(IDXGISwapChain1* swapchain, uint32_t index) noexcept
   create_descriptor();
 }
 
-// void Image::init(ImageType type, HANDLE handle, uint32_t width, uint32_t height) noexcept
+// void Image::init(ImageType type, HANDLE handle, uint width, uint height) noexcept
 // {
 //   _state  = dx12_resource_state(type);
 //   _width  = width;
@@ -175,23 +175,23 @@ void Image::create_descriptor(bool use_mipmap) noexcept
   };
 
   // first initialize image, get descriptor handle
-  if (has_flag(_type, ImageType::srv) && !_desc.srv.is_valid())
+  if (_type.contains(ImageType::srv) && !_desc.srv.is_valid())
     _desc.srv = g_desc_heap_mgr.pop_handle(DescriptorHeapType::cbv_srv_uav, create_shader_resource_view);
-  if (has_flag(_type, ImageType::uav) && !_desc.uav.is_valid())
+  if (_type.contains(ImageType::uav) && !_desc.uav.is_valid())
     _desc.uav = g_desc_heap_mgr.pop_handle(DescriptorHeapType::cbv_srv_uav, create_unordered_access_view);
-  if (has_flag(_type, ImageType::rtv) && !_desc.rtv.is_valid())
+  if (_type.contains(ImageType::rtv) && !_desc.rtv.is_valid())
     _desc.rtv = g_desc_heap_mgr.pop_handle(DescriptorHeapType::rtv, create_render_target_view);
-  if (has_flag(_type, ImageType::dsv) && !_desc.dsv.is_valid())
+  if (_type.contains(ImageType::dsv) && !_desc.dsv.is_valid())
     _desc.dsv = g_desc_heap_mgr.pop_handle(DescriptorHeapType::dsv, create_depth_stencil_view);
 
   // create descriptor
-  if (has_flag(_type, ImageType::srv))
+  if (_type.contains(ImageType::srv))
     create_shader_resource_view();
-  if (has_flag(_type, ImageType::uav))
+  if (_type.contains(ImageType::uav))
     create_unordered_access_view();
-  if (has_flag(_type, ImageType::rtv))
+  if (_type.contains(ImageType::rtv))
     create_render_target_view();
-  if (has_flag(_type, ImageType::dsv))
+  if (_type.contains(ImageType::dsv))
     create_depth_stencil_view();
 
   // // create mipmap uavs for generate mipmap
@@ -200,7 +200,7 @@ void Image::create_descriptor(bool use_mipmap) noexcept
   //   // get count of mipmap images
   //   auto count = _handle->GetDesc().MipLevels;
   //   _mipmap_uavs.reserve(count);
-  //   for (auto i : std::views::iota(1u, count))
+  //   for (auto i = 1; i < count; ++i)
   //   {
   //     // pop descriptor handle
   //     auto handle = g_desc_heap_mgr.pop_handle(DescriptorHeapType::cbv_srv_uav);
@@ -228,7 +228,7 @@ void Image::create_descriptor(bool use_mipmap) noexcept
 
 void Image::clear(ID3D12GraphicsCommandList1* cmd, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) const noexcept
 {
-  err_if(!has_flag(_type, ImageType::uav), "clear operator only use on uav");
+  err_if(!_type.contains(ImageType::uav), "clear operator only use on uav");
   float values[4]{};
   auto rect = D3D12_RECT{};
   rect.right  = _width;
@@ -236,25 +236,34 @@ void Image::clear(ID3D12GraphicsCommandList1* cmd, D3D12_CPU_DESCRIPTOR_HANDLE c
   cmd->ClearUnorderedAccessViewFloat(gpu_handle, cpu_handle, _handle.Get(), values, 1, &rect);
 }
 
-void Image::clear_render_target(ID3D12GraphicsCommandList1* cmd, std::optional<RECT> rect) noexcept
+void Image::clear_render_target(ID3D12GraphicsCommandList1* cmd, std::optional<Rect> rect) noexcept
 {
-  err_if(!has_flag(_type, ImageType::rtv), "clear render target only use on rtv");
+  err_if(!_type.contains(ImageType::rtv), "clear render target only use on rtv");
   set_state(cmd, ImageState::render_target);
   float constexpr clear_color[4]{};
   if (rect)
-    cmd->ClearRenderTargetView(_desc.rtv.cpu_handle(), clear_color, 1, &rect.value());
+  {
+    auto rc = rect->to_RECT();
+    cmd->ClearRenderTargetView(_desc.rtv.cpu_handle(), clear_color, 1, &rc);
+  }
   else
     cmd->ClearRenderTargetView(_desc.rtv.cpu_handle(), clear_color, 0, nullptr);
 }
 
-void Image::clear_depth_stencil(ID3D12GraphicsCommandList1* cmd) noexcept
+void Image::clear_depth_stencil(ID3D12GraphicsCommandList1* cmd, std::optional<Rect> rect) noexcept
 {
-  err_if(!has_flag(_type, ImageType::dsv), "clear depth stencil only use on dsv");
+  err_if(!_type.contains(ImageType::dsv), "clear depth stencil only use on dsv");
   set_state(cmd, ImageState::depth_write);
-  cmd->ClearDepthStencilView(dsv().cpu_handle(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.f, 0, 0, nullptr);
+  if (rect)
+  {
+    auto rc = rect->to_RECT();
+    cmd->ClearDepthStencilView(dsv().cpu_handle(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.f, 0, 1, &rc);
+  }
+  else
+    cmd->ClearDepthStencilView(dsv().cpu_handle(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.f, 0, 0, nullptr);
 }
 
-auto Image::per_pixel_size() const noexcept -> uint32_t
+auto Image::per_pixel_size() const noexcept -> uint
 {
   switch (_format)
   {
@@ -311,8 +320,8 @@ void copy(
   LONG                        right,
   LONG                        bottom,
   Image&                      dst,
-  uint32_t                    x,
-  uint32_t                    y) noexcept
+  uint                        x,
+  uint                        y) noexcept
 {
   src.set_state(cmd, ImageState::copy_src);
   dst.set_state(cmd, ImageState::copy_dst);

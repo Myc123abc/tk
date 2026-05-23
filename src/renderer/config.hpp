@@ -4,7 +4,7 @@ namespace tk::renderer {
 
 constexpr auto Frame_Count = 2;
 
-constexpr auto Buffer_Init_Size = 1024;
+constexpr auto Vertices_Indices_Buffer_Size = 1024;
 
 constexpr auto CBV_SRV_UAV_Heap_Size = 256;
 constexpr auto RTV_Heap_Size         = 256;
@@ -19,5 +19,8 @@ constexpr auto Window_Min_Height                 = 50;
 constexpr auto Image_Pool_Init_Capacity = 32;
 
 constexpr auto Mouse_Left_Down_Press_Start_Time = 400;
+
+constexpr auto Default_Image_Init_Width  = 512;
+constexpr auto Default_Image_Init_Height = 512;
 
 }

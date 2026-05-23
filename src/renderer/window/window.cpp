@@ -1,5 +1,5 @@
 #include "window.hpp"
-#include "../renderer/renderer.hpp"
+#include "../renderer.hpp"
 #include "window_manager.hpp"
 #include "../../ui/ui_context.hpp"
 #include "../config.hpp"
@@ -319,14 +319,12 @@ void Window::resize(ResizeType type, int dx, int dy) noexcept
     _resizing = true;
     auto ctx = g_ui_ctx.get_window_context(_handle);
     ctx->need_clear = true;
-    ctx->switch_frame_data();
   }
 }
 
 void Window::resize_end() noexcept
 {
   _resizing = false;
-  g_ui_ctx.get_window_context(_handle)->switch_frame_data();
   g_ui_ctx.clear_fullscreen_window();
   g_renderer.resize_window_resource(_handle, real_width(), real_height());
   g_renderer.clear_blur_resize_data();

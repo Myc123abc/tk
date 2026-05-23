@@ -1,12 +1,11 @@
 #include "pipeline_system.hpp"
-#include "../../core.hpp"
+#include "../core.hpp"
+#include "../resource/render_resource.hpp"
 #include "util/error_handling.hpp"
-#include "../../resource/shader_type.hpp"
-
-#include <ranges>
+#include "../resource/shader_type.hpp"
 
 namespace tk::renderer {
-
+  
 void PipelineSystem::init() noexcept
 {
   g_compiler.init();
@@ -15,12 +14,9 @@ void PipelineSystem::init() noexcept
 
   auto res = generate_root_signature(
   {
-    { constants,         "constants",  0, 0, false, sizeof(Constants) },
-    { structured_buffer, "cmds",       0, 0                           },
-    { structured_buffer, "cmd_idxs",   0, 1,                          },
-    { structured_buffer, "tiles",      0, 2,                          },
-    { structured_buffer, "path_cmds",  0, 3                           },
-    { textures,          "images",     1, 0,                          },
+    { constants, "constants",  0, 0, false, sizeof(Constants) },
+    { texture,   "image",      0, 0, true                     },
+    { texture,   "mask_image", 0, 1, true                     },
   }, true, true);
 
   auto info = PipelineCreateInfo{};
@@ -29,8 +25,27 @@ void PipelineSystem::init() noexcept
   info.graphics.ps             = "ps";
   info.includes                = { "assets/shader/ui" };
   info.graphics.rtv_format     = RenderResource::Render_Target_Format;
+  info.graphics.blend          = BlendState::Default();
   info.root_signature_result   = res;
   _pipes.emplace(PipelineType::ui, info);
+
+  info.shader = "assets/shader/ui/composite_write.hlsl";
+  _pipes.emplace(PipelineType::composite_write, info);
+
+  info.graphics.stencil = {};
+  info.shader = "assets/shader/ui/window_shadow.hlsl";
+  _pipes.emplace(PipelineType::window_shadow, info);
+
+  info.shader = "assets/shader/ui/discard_draw.hlsl";
+  _pipes.emplace(PipelineType::discard_draw, info);
+
+  info.shader = "assets/shader/ui/mask_write.hlsl";
+  info.graphics.rtv_format = ImageFormat::r8_unorm;
+  info.graphics.blend      = BlendState::Max();
+  _pipes.emplace(PipelineType::mask_write_max, info);
+
+  info.graphics.blend = BlendState::Add();
+  _pipes.emplace(PipelineType::mask_write_add, info);
 
   info.graphics.stencil = {};
   info.shader = "assets/shader/ui/window_shadow.hlsl";
@@ -53,7 +68,7 @@ auto PipelineSystem::find_root_param(std::span<CD3DX12_ROOT_PARAMETER1> params) 
   {
     auto const& cur_params = pair.second;
     if (cur_params.size() != params.size()) return false;
-    for (auto i : std::views::iota(0u, cur_params.size()))
+    for (auto i = 0; i < cur_params.size(); ++i)
     {
       if (memcmp(&cur_params[i], &params[i], sizeof(CD3DX12_ROOT_PARAMETER1)))
         return false;
@@ -96,10 +111,12 @@ void PipelineSystem::Pipeline::init_graphics(PipelineCreateInfo const& info) noe
   // depth and stencil setting  
   auto depth_stencil_desc = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
   depth_stencil_desc.DepthEnable           = false;
+  depth_stencil_desc.DepthWriteMask        = D3D12_DEPTH_WRITE_MASK_ZERO;
   depth_stencil_desc.DepthBoundsTestEnable = false;
   if (info.graphics.use_depth_test)
   {
-    depth_stencil_desc.DepthEnable = true;
+    depth_stencil_desc.DepthEnable    = true;
+    depth_stencil_desc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
 
     // check feature support
     auto options = D3D12_FEATURE_DATA_D3D12_OPTIONS2{};

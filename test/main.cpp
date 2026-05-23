@@ -52,14 +52,14 @@ public:
     ui::path_line_to(_pts[1]);
     ui::path_quad_bezier_to(_pts[8], _pts[2]);
     ui::path_line_to(_pts[3]);
-    ui::path_end(true);
+    ui::path_end();
 
     ui::path_begin(_pts[7]);
     ui::path_quad_bezier_to(_pts[9], _pts[4]);
     ui::path_line_to(_pts[5]);
     if (_pts[6] != _pts[5])
       ui::path_line_to(_pts[6]);
-    ui::path_end(true);
+    ui::path_end();
 
     ui::union_end(color, thickness);
 
@@ -87,7 +87,7 @@ private:
   std::string            _name;
   std::string            _lerp_name;
   std::vector<LerpPoint> _lerp_pts;
-  std::vector<float2>      _pts{};
+  std::vector<float2>    _pts{};
   bool                   _paused{ true };
 };
 
@@ -168,55 +168,55 @@ void test_path_draw() noexcept
   ui::path_begin(pos);
   ui::path_line_to({ pos.x + 100, pos.y + 100 });
   ui::path_line_to({ pos.x + 50, pos.y + 75 });
-  ui::path_end(0xff0000ff, 0, true);
+  ui::path_end(true, 0xff0000ff, 0);
 
   pos.x += 110;
   ui::path_begin(pos);
   ui::path_line_to({ pos.x + 100, pos.y + 100 });
   ui::path_line_to({ pos.x + 50, pos.y + 75 });
-  ui::path_end(0xff0000ff, 1, true);
+  ui::path_end(true, 0xff0000ff, 1);
 
   pos.x += 110;
   ui::path_begin(pos);
   ui::path_line_to({ pos.x + 100, pos.y + 100 });
   ui::path_line_to({ pos.x + 50, pos.y + 75 });
-  ui::path_end(0xff0000ff, 1, false);
+  ui::path_end(false, 0xff0000ff, 1);
 
   pos = float2{ 10, 10 };
   pos.y += 110;
   ui::path_begin({ pos.x + 50, pos.y + 25 });
   ui::path_arc_to({ pos.x + 50, pos.y + 50 }, { pos.x + 25, pos.y + 50 }, false);
-  ui::path_end(0xff0000ff, 0, false);
+  ui::path_end(false, 0xff0000ff, 0);
 
   pos.x += 110;
   ui::path_begin({ pos.x + 15, pos.y + 85 });
   ui::path_line_to({ pos.x + 40, pos.y + 35 });
   ui::path_arc_to({ pos.x + 60, pos.y + 35 }, { pos.x + 80, pos.y + 35 }, false);
   ui::path_line_to({ pos.x + 105, pos.y + 85 });
-  ui::path_end(0xff0000ff, 3, false);
+  ui::path_end(false, 0xff0000ff, 3);
 
   pos.x += 110;
   ui::path_begin({ pos.x + 50, pos.y + 25 });
   ui::path_arc_to({ pos.x + 50, pos.y + 50 }, { pos.x + 25, pos.y + 50 }, false);
-  ui::path_end(0xff0000ff, 3, false);
+  ui::path_end(false, 0xff0000ff, 3);
 
   pos = float2{ 10, 10 };
   pos.y += 110 * 2;
   ui::path_begin(pos);
   ui::path_line_to({ pos.x, pos.y + 100 });
   ui::path_quad_bezier_to({ pos.x + 100, pos.y + 50 }, pos);
-  ui::path_end(0xff0000ff, 0, false);
+  ui::path_end(false, 0xff0000ff, 0);
 
   pos.x += 110;
   ui::path_begin(pos);
   ui::path_line_to({ pos.x, pos.y + 100 });
   ui::path_quad_bezier_to({ pos.x + 100, pos.y + 50 }, pos);
-  ui::path_end(0xff0000ff, 3, false);
+  ui::path_end(false, 0xff0000ff, 3);
 
   pos.x += 110;
   ui::path_begin({ pos.x, pos.y + 100 });
   ui::path_quad_bezier_to({ pos.x + 100, pos.y + 50 }, pos);
-  ui::path_end(0xff0000ff, 3, false);
+  ui::path_end(false, 0xff0000ff, 3);
 
   pos = float2{ 10, 10 };
   pos.y += 110 * 3;
@@ -225,7 +225,7 @@ void test_path_draw() noexcept
   ui::path_line_to({ pos.x + 50, pos.y + 40 });
   ui::path_line_to({ pos.x + 100, pos.y + 100 });
   ui::path_line_to({ pos.x, pos.y + 100 });
-  ui::path_end(0xff0000ff, 0, true);
+  ui::path_end(true, 0xff0000ff, 0);
 
   pos.x += 110;
   ui::path_begin(pos);
@@ -233,7 +233,7 @@ void test_path_draw() noexcept
   ui::path_line_to({ pos.x + 50, pos.y + 40 });
   ui::path_line_to({ pos.x + 100, pos.y + 100 });
   ui::path_line_to({ pos.x, pos.y + 100 });
-  ui::path_end(0xff0000ff, 3, true);
+  ui::path_end(true, 0xff0000ff, 3);
 
   pos.x += 110;
   ui::path_begin(pos);
@@ -241,23 +241,23 @@ void test_path_draw() noexcept
   ui::path_line_to({ pos.x + 50, pos.y + 40 });
   ui::path_line_to({ pos.x + 100, pos.y + 100 });
   ui::path_line_to({ pos.x, pos.y + 100 });
-  ui::path_end(0xff0000ff, 3, false);
+  ui::path_end(false, 0xff0000ff, 3);
 
   pos = float2{ 10, 10 };
   pos.y += 110 * 4;
   ui::path_begin(pos);
   ui::path_cubic_bezier_to({ pos.x + 50, pos.y }, { pos.x + 100, pos.y + 100 }, { pos.x + 50, pos.y + 100 });
-  ui::path_end(0xff0000ff, 0, true);
+  ui::path_end(true, 0xff0000ff, 0);
 
   pos.x += 110;
   ui::path_begin(pos);
   ui::path_cubic_bezier_to({ pos.x + 50, pos.y }, { pos.x + 100, pos.y + 100 }, { pos.x + 50, pos.y + 100 });
-  ui::path_end(0xff0000ff, 3, true);
+  ui::path_end(true, 0xff0000ff, 3);
 
   pos.x += 110;
   ui::path_begin(pos);
   ui::path_cubic_bezier_to({ pos.x + 50, pos.y }, { pos.x + 100, pos.y + 100 }, { pos.x + 50, pos.y + 100 });
-  ui::path_end(0xff0000ff, 3, false);
+  ui::path_end(false, 0xff0000ff, 3);
 
   pos = float2{ 10, 10 };
   pos.y += 110 * 5;
@@ -265,7 +265,7 @@ void test_path_draw() noexcept
   ui::path_line_to({ pos.x + 100, pos.y });
   ui::path_arc_to({ pos.x + 50, pos.y + 50 }, { pos.x + 100, pos.y + 100 }, false);
   ui::path_line_to({ pos.x, pos.y + 100 });
-  ui::path_end(0x00ffffff, 3, true);
+  ui::path_end(true, 0x00ffffff, 3);
 }
 
 inline auto img1 = "assets/image/test.jpg";
@@ -355,6 +355,7 @@ int main()
     if (!wnd1_is_closed)
     {
       ui::begin("wnd1", 50, 50, 200, 200, &wnd1_is_closed, cfg);
+
       if (ui::get_key(ui::Key::F11))
       {
         if (ui::is_fullscreen_window())
@@ -379,6 +380,13 @@ int main()
       // line_draw_test();
       // test_path_draw();
       // test_discard(fmt);
+      
+      ui::discard_beg([]{ ui::rectangle({70, 70}, {300, 90});});
+      ui::union_beg();
+      ui::circle({50, 50}, 40);
+      ui::circle({90, 90}, 40);
+      ui::union_end(0xff0000ff, 3);
+      ui::discard_end();
 
       ui::end();
     }

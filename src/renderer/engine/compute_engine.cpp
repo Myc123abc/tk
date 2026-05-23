@@ -1,9 +1,9 @@
 #include "compute_engine.hpp"
 #include "../resource/descriptor_heap_manager.hpp"
-#include "../renderer/pipeline/pipeline_system.hpp"
+#include "../pipeline/pipeline_system.hpp"
 #include "../resource/shader_type.hpp"
 #include "graphics_engine.hpp"
-#include "../renderer/context.hpp"
+#include "../context.hpp"
 
 #include <assert.h>
 #include <ranges>
@@ -109,7 +109,7 @@ void ComputeEngine::blur(Image& src, Image& dst, float sigma, uint32_t blur_coun
   g_ctx.set_compute_root_signature(horizontal_pipe->root_signature);
   g_ctx.set_compute_constants(horizontal_pipe->root_param_idx("constants"), constants);
 
-  for (auto i : std::views::iota(0u, blur_count))
+  for (auto i = 0; i < blur_count; ++i)
   {
     g_ctx.set_pipe(horizontal_pipe->pipe_state.Get());
     dst.set_state(cmd(), ImageState::non_pixel);

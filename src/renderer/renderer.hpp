@@ -1,7 +1,8 @@
 #pragma once
 
-#include "../resource/render_resource.hpp"
-#include "../../ui/image_manager.hpp"
+#include "resource/render_resource.hpp"
+#include "../ui/image_manager.hpp"
+#include "util/rect.hpp"
 
 #include <functional>
 #include <deque>
@@ -43,6 +44,9 @@ public:
   auto descriptor_idx(ui::ImageHandle handle) noexcept { return g_img_mgr[_images[handle]].srv().index(); }
 
 private:
+  void init_images() noexcept;
+  void destroy_images() noexcept;
+
   void preprocess_render()  noexcept;
   void upload_images() noexcept;
 
@@ -72,6 +76,9 @@ private:
   std::unordered_map<ui::ImageHandle, Bitmap>      _bitmaps;
   std::unordered_map<ui::ImageHandle, ImageHandle> _upload_images;
   std::vector<ui::ImageHandle>                     _pending_mipmap_image_handles;
+
+  ImageHandle _discard_image;
+  ImageHandle _composite_image;
 )
 
 }

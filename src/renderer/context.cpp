@@ -12,6 +12,7 @@ void Context::set_cmd(ID3D12GraphicsCommandList1* cmd) noexcept
   _graphics_constants_root_param_idx = {};
   _compute_constants_root_param_idx  = {};
   _primitive_topology                = {};
+  _viewport                          = {};
   _scissor_rect                      = {};
   _stencil_value                     = {};
   _render_target                     = {};
@@ -58,17 +59,25 @@ void Context::set_primitive_topology(D3D_PRIMITIVE_TOPOLOGY primitive_topology) 
   }
 }
 
+void Context::set_viewport(Rect rect) noexcept
+{
+  if (_viewport.replace(rect))
+  {
+    auto vp = CD3DX12_VIEWPORT{ rect.left, rect.top, rect.width(), rect.height() };
+    _cmd->RSSetViewports(1, &vp);
+  }
+}
+
 void Context::set_scissor_rect(Rect rect) noexcept
 {
-  if (rect != _scissor_rect)
+  if (_scissor_rect.replace(rect))
   {
-    _scissor_rect = rect;
     auto rc = rect.to_RECT();
     _cmd->RSSetScissorRects(1, &rc);
   }
 }
 
-void Context::set_stencil_value(uint32_t value) noexcept
+void Context::set_stencil_value(uint value) noexcept
 {
   if (!_stencil_value || _stencil_value.value() != value)
   {
@@ -77,22 +86,22 @@ void Context::set_stencil_value(uint32_t value) noexcept
   }
 }
 
-void Context::draw(uint32_t count) const noexcept
+void Context::draw(uint count) const noexcept
 {
   _cmd->DrawInstanced(3 * count, 1, 0, 0);
 }
 
-void Context::draw(uint32_t start_idx, uint32_t size) const noexcept
+void Context::draw(uint start_idx, uint size) const noexcept
 {
   _cmd->DrawIndexedInstanced(size, 1, start_idx, 0, 0);
 }
 
-void Context::dispatch(uint32_t x, uint32_t y, uint32_t z) const noexcept
+void Context::dispatch(uint x, uint y, uint z) const noexcept
 {
   _cmd->Dispatch(x, y, z);
 }
 
-void Context::set_graphics_descriptor(uint32_t root_param_idx, D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept
+void Context::set_graphics_descriptor(uint root_param_idx, D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept
 {
   if (!_graphics_descriptors.contains(root_param_idx))
   {
@@ -106,7 +115,7 @@ void Context::set_graphics_descriptor(uint32_t root_param_idx, D3D12_GPU_DESCRIP
   }
 }
 
-void Context::set_compute_descriptor(uint32_t root_param_idx, D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept
+void Context::set_compute_descriptor(uint root_param_idx, D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept
 {
   if (!_compute_descriptors.contains(root_param_idx))
   {
@@ -122,19 +131,35 @@ void Context::set_compute_descriptor(uint32_t root_param_idx, D3D12_GPU_DESCRIPT
 
 void Context::set_render_target(Image* render_tareget_image, Image* depth_stencil_image) noexcept
 {
-  assert(render_tareget_image);
-  render_tareget_image->set_state(_cmd, ImageState::render_target);
-  auto rtv = render_tareget_image->rtv().cpu_handle();
+  auto rtv = render_tareget_image ? render_tareget_image->rtv().cpu_handle() : D3D12_CPU_DESCRIPTOR_HANDLE{};
   auto dsv = depth_stencil_image ? depth_stencil_image->dsv().cpu_handle() : D3D12_CPU_DESCRIPTOR_HANDLE{};
-  assert(rtv.ptr);
-  if (rtv.ptr != _render_target.ptr || dsv.ptr != _depth_stencil.ptr)
+  if (render_tareget_image)
   {
-    if (dsv.ptr)
-      _cmd->OMSetRenderTargets(1, &rtv, false, &dsv);
-    else
-      _cmd->OMSetRenderTargets(1, &rtv, false, nullptr);
-    _render_target = rtv;
-    _depth_stencil = dsv;
+    render_tareget_image->set_state(_cmd, ImageState::render_target);
+    assert(rtv.ptr);
+    if (!_render_target || rtv.ptr != _render_target->ptr ||
+        !_depth_stencil || dsv.ptr != _depth_stencil->ptr)
+    {
+      if (depth_stencil_image)
+        _cmd->OMSetRenderTargets(1, &rtv, false, &dsv);
+      else
+        _cmd->OMSetRenderTargets(1, &rtv, false, nullptr);
+      _render_target = rtv;     
+      _depth_stencil = dsv;
+    }
+  }
+  else
+  {
+    if (_render_target  ||
+        !_depth_stencil || dsv.ptr != _depth_stencil->ptr)
+    {
+      if (depth_stencil_image)
+        _cmd->OMSetRenderTargets(0, nullptr, false, &dsv);
+      else
+        std::unreachable();
+      _render_target = rtv;
+      _depth_stencil = dsv;
+    }
   }
 }
 

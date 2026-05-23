@@ -1,7 +1,7 @@
 #include "ui_context.hpp"
 #include "util/error_handling.hpp"
 #include "../renderer/window/window_manager.hpp"
-#include "../renderer/renderer/renderer.hpp"
+#include "../renderer/renderer.hpp"
 #include "../util/hash.hpp"
 #include "image_manager.hpp"
 #include "text_engine.hpp"
@@ -15,24 +15,15 @@ auto is_caps_locked() noexcept -> bool
   return GetKeyState(VK_CAPITAL) & 0b1;
 }
 
-void WindowContext::switch_frame_data() noexcept
-{
-  if (_frame_data_ptr == &g_ui_ctx._fullscreen_frame_data)
-    _frame_data_ptr = &_frame_data;
-  else
-    _frame_data_ptr = &g_ui_ctx._fullscreen_frame_data;
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 ///                             UIContext
 ////////////////////////////////////////////////////////////////////////////////
 
 void UIContext::init() noexcept
 {
-  auto [handle, w, h] = g_wnd_mgr.create_fullscreen_window();
-  _fullscreen_window = handle;
-  _fullscreen_frame_data.init(w, h);
+  _fullscreen_window = g_wnd_mgr.create_fullscreen_window();
   g_text_engine.init();
+  FrameData::init();
 }
 
 void UIContext::destroy() noexcept
@@ -57,7 +48,6 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
     _wnd_ctx = &_wnd_ctxs[name.data()];
     _wnd_ctx->can_be_closed = is_closed;
     _wnd = g_wnd_mgr.get_window(_wnd_ctx->handle);
-    _wnd_ctx->frame_data()->init(_wnd->real_width(), _wnd->real_height());
   }
   else 
   {
@@ -80,7 +70,7 @@ void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint3
     set_render_pos(0, 0);
 
   _wnd->clear_move_invalid_areas();
-  _wnd_ctx->frame_data()->clear();
+  _wnd_ctx->frame_data.clear();
   if (_wnd->is_fullscreen())
     _wnd->add_move_invalid_area({ 0, 0, static_cast<LONG>(_wnd->width()), static_cast<LONG>(_wnd->height()) });
 }
@@ -179,15 +169,17 @@ void UIContext::render() noexcept
   // process window render datas
   for (auto& wnd_ctx : _wnd_ctxs | std::views::values)
   {
-    auto        handle = wnd_ctx.handle;
-    auto        data   = wnd_ctx.frame_data();
-    auto const& wnd    = *g_wnd_mgr.get_window(handle);
+    auto handle = wnd_ctx.handle;
+    auto data   = &wnd_ctx.frame_data;
 
-    if (!wnd.is_resizing())
+    _wnd = g_wnd_mgr.get_window(handle);
+
+    if (!_wnd->is_resizing())
     {
-      data->build_ui_render_call(wnd.content_rect(), wnd.content_pos());
-      if (!wnd.is_fullscreen() && !wnd.is_maximized())
-        window_shadow_wireframe_process(wnd_ctx, wnd, wnd.shadow_rect());
+      data->add_scissor_rect(_wnd->content_rect());
+      if (!_wnd->is_fullscreen() && !_wnd->is_maximized())
+        window_shadow_wireframe_process(wnd_ctx, *_wnd, _wnd->shadow_rect());
+      data->build_render_cmds();
       g_renderer.submit({ handle, data });
     }
     else
@@ -197,10 +189,12 @@ void UIContext::render() noexcept
         wnd_ctx.need_clear = false;
         g_renderer.submit({ handle });
       }
-      data->build_ui_render_call(wnd.rect(), wnd.pos());
-      window_shadow_wireframe_process(wnd_ctx, wnd, wnd.real_rect());
-      if (wnd.cfg().backdrop.style != ui::BackdropStyle::none)
-        g_renderer.submit({ _fullscreen_window, data, handle, wnd.rect() });
+      data->set_window_pos(_wnd->real_pos());
+      data->add_scissor_rect(_wnd->rect());
+      window_shadow_wireframe_process(wnd_ctx, *_wnd, _wnd->real_rect());
+      data->build_render_cmds();
+      if (_wnd->cfg().backdrop.style != ui::BackdropStyle::none)
+        g_renderer.submit({ _fullscreen_window, data, handle, _wnd->rect() });
       else
         g_renderer.submit({ _fullscreen_window, data });
     }
@@ -280,7 +274,7 @@ void UIContext::window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer
   if (!cfg.display_window_shadow && !cfg.wireframe_color)
     return;
 
-  auto data = wnd_ctx.frame_data();
+  auto data = &wnd_ctx.frame_data;
   auto col  = float4{};
 
   auto get_wireframe_color = [&] -> std::optional<float4>
@@ -304,7 +298,7 @@ void UIContext::window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer
     return {};
   };
 
-  data->build_window_shadow_render_call(scissor_rect, wnd.is_resizing() ? wnd.real_pos() : float2{}, wnd.real_extent(), wnd.shadow_thickness(), {}, cfg.display_window_shadow ? 5 : 0, 15, get_wireframe_color());
+  data->set_window_shadow(scissor_rect, wnd.real_extent(), wnd.shadow_thickness(), {}, cfg.display_window_shadow ? 5 : 0, 15, get_wireframe_color());
 }
 
 void UIContext::add_mouse_left_button_state(size_t id, float2 left_top, float2 right_bottom) noexcept
@@ -516,7 +510,7 @@ void UIContext::update_keys() noexcept
   }
 }
 
-auto UIContext::get_key(Key key) noexcept -> KeyState
+auto UIContext::get_key(Key key) noexcept -> Flag<KeyState>
 {
   using enum KeyState;
 
@@ -537,21 +531,6 @@ auto UIContext::image(std::string_view path, float2 left_top, float2 right_botto
 
   if (g_img_mgr.try_load(path))
   {
-    auto offset = get_render_pos();
-    left_top     += offset;
-    right_bottom += offset;
-    
-    auto scale = _wnd->scale();
-    left_top     *= scale;
-    right_bottom *= scale;
-
-    if (_wnd->is_resizing())
-    {
-      offset = _wnd->real_pos();
-      left_top     += offset;
-      right_bottom += offset;
-    }
-
     frame_data()->add_image(g_img_mgr.handle(path), left_top, right_bottom, alpha);
     return true;
   }

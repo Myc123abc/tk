@@ -1,15 +1,15 @@
 #include "renderer.hpp"
-#include "../core.hpp"
-#include "../engine/graphics_engine.hpp"
-#include "../engine/compute_engine.hpp"
-#include "../engine/copy_engine.hpp"
+#include "core.hpp"
+#include "engine/graphics_engine.hpp"
+#include "engine/compute_engine.hpp"
+#include "engine/copy_engine.hpp"
 #include "util/error_handling.hpp"
-#include "../resource/descriptor_heap_manager.hpp"
+#include "resource/descriptor_heap_manager.hpp"
 #include "pipeline/pipeline_system.hpp"
-#include "../window/window_manager.hpp"
+#include "window/window_manager.hpp"
 #include "context.hpp"
-#include "../resource/shader_type.hpp"
-#include "../../ui/ui_context.hpp"
+#include "resource/shader_type.hpp"
+#include "config.hpp"
 
 #include <dwmapi.h>
 
@@ -27,6 +27,40 @@ void Renderer::init() noexcept
   g_graphics_engine.init();
   g_comp_engine.init();
   g_copy_engine.init(); 
+
+  init_images();  
+}
+
+void Renderer::init_images() noexcept
+{
+  //
+  // ui use, write image for normal shapes rendering
+  //
+  ui::Write_Image_Handle = ui::g_img_mgr.create_image(1, 1, ImageFormat::bgra8_unorm);
+
+  auto white = 0xffffffff;
+  auto bitmap = Bitmap{};
+  bitmap.init(1, 1, 4, &white);
+  
+  g_copy_engine.acquire_slot();
+  g_copy_engine.copy({ bitmap }, { g_img_mgr.get(_images[ui::Write_Image_Handle]) });
+  auto fence_value = g_copy_engine.submit_slot();
+  g_graphics_engine.wait(g_copy_engine, fence_value);
+
+  //
+  // discard image, composite image for discard operation
+  //
+  _discard_image   = g_img_mgr.create(Default_Image_Init_Width, Default_Image_Init_Height, ImageFormat::r8_unorm,                ImageType::rtv | ImageType::srv);
+  _composite_image = g_img_mgr.create(Default_Image_Init_Width, Default_Image_Init_Height, RenderResource::Render_Target_Format, ImageType::rtv | ImageType::srv);
+}  
+
+void Renderer::destroy_images() noexcept
+{
+  for (auto const& img : _upload_images) g_img_mgr.destroy(img.second);
+  for (auto const& img : _images) g_img_mgr.destroy(img.second);
+
+  g_img_mgr.destroy(_discard_image);
+  g_img_mgr.destroy(_composite_image);
 }
 
 void Renderer::render() noexcept
@@ -41,8 +75,7 @@ void Renderer::destroy() noexcept
   while (!_frame_render_complete_funcs.empty())
     message_process();
 
-  for (auto const& img : _upload_images) g_img_mgr.destroy(img.second);
-  for (auto const& img : _images) g_img_mgr.destroy(img.second);
+  destroy_images();
 
   // destroy render resources
   g_graphics_engine.destroy();
@@ -75,7 +108,6 @@ void Renderer::resize_window_resource(HWND handle, uint32_t width, uint32_t heig
 {
   err_if(!_res.contains(handle), "failed to destroy window render resource, it's unexist");
   _res[handle].resize(width, height);
-  ui::g_ui_ctx.get_window_context(handle)->frame_data()->init(width, height);
 }
 
 void Renderer::create_image(ui::ImageHandle handle, uint32_t width, uint32_t height, ImageFormat format) noexcept
@@ -243,53 +275,140 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
 {
   if (!frame_data) return;
 
+  assert(frame_data->check());
+
   auto cmd = g_graphics_engine.cmd();
 
   g_ctx.set_cmd(cmd);
 
-  auto& frame = res.current_frame();
-  frame.buffer.clear().upload(cmd, frame_data);
+  res.current_frame().buffer.clear().upload(cmd, frame_data);
 
-  for (auto const& call : frame_data->render_calls())
+  auto constants = Constants
   {
-    using Type = ui::RenderCallType;
-    switch (call.type)
-    {
-      case Type::ui:
-        g_ctx.graphics_pipe_set(PipelineType::ui, call.scissor_rect, "constants", Constants
-        {
-          .render_target_extent = res.render_target()->extent(),
-          .window_extent        = frame_data->window_extent(),
-          .window_pos           = call.window_pos,
-          .tile_size            = frame_data->tile_size(),
-          .tile_count           = frame_data->tile_count(),
-        },
-        {
-          { "cmds",      frame.buffer.cmds_gpu_handle()                                    },
-          { "path_cmds", frame.buffer.path_cmds_gpu_handle()                               },
-          { "cmd_idxs",  frame.buffer.cmd_idxs_gpu_handle()                                },
-          { "tiles",     frame.buffer.tiles_gpu_handle( )                                  },
-          { "images",    g_desc_heap_mgr.first_gpu_handle(DescriptorHeapType::cbv_srv_uav) },
-        });
-        g_ctx.draw(2);
-        break;
+    .render_target_extent = res.render_target()->extent(),
+    .window_pos           = frame_data->window_pos(),
+  };
 
-      case Type::window_shadow:
-        g_ctx.graphics_pipe_set(PipelineType::window_shadow, call.scissor_rect, "constants", Constants
-        {
-          .render_target_extent = res.render_target()->extent(),
-          .window_extent        = call.window_shadow.window_extent,
-          .window_pos           = call.window_pos,
-          .shadow_thickness     = call.window_shadow.shadow_thickness,
-          .shadow_radius        = call.window_shadow.radius,
-          .shadow_color         = call.window_shadow.color,
-          .shadow_softness      = call.window_shadow.softness,
-          .wireframe_color      = call.window_shadow.wireframe_color ? call.window_shadow.wireframe_color.value() : float4{},
-          .draw_wireframe       = call.window_shadow.wireframe_color.has_value(),
-        });
-        g_ctx.draw(2);
-        break;
+  auto clear_resize_render_target = [this, cmd](ImageHandle& handle, Rect rect)
+  {
+    auto& img = g_img_mgr[handle];
+    if (rect.width() > img.width() || rect.height() > img.height())
+    {
+      add_frame_render_complete_func([handle] { g_img_mgr.destroy(handle); });
+      handle = g_img_mgr.create(rect.width(), rect.height(), img);
     }
+    g_img_mgr[handle].clear_render_target(cmd);
+  };
+
+  auto graphics_draw = [&](ui::RenderCmd const& cmd, PipelineType type, Image* rt, Image* ds, Rect scissor, std::vector<PipelineDescriptorInfo> const& descs = {})
+  {
+    constants.render_target_extent = rt->extent();
+    g_ctx.graphics_draw(GraphicsDrawInfo
+    {
+      .pipe_info = GraphicsPipeSetInfo
+      {
+        .type           = type,
+        .viewport       = rt->rect(),
+        .scissor        = scissor,
+        .constants_name = "Constants",
+        .constants      = constants,
+        .descs          = descs,
+      },
+      .render_target = rt,
+      .depth_stencil = ds,
+      .idx_beg       = cmd.ui.idx_beg,
+      .idx_cnt       = cmd.ui.idx_size,
+    });
+  };
+
+  Rect discard_mask_rc, discard_composite_rc;
+
+  auto rt = res.render_target();
+  auto ds = res.depth_stencil();
+
+  for (auto const& render_cmd : frame_data->render_cmds())
+  {
+    using Type = ui::RenderCmdType;
+    switch (render_cmd.type)
+    {
+    case Type::ui:
+      graphics_draw(render_cmd, PipelineType::ui, rt, {}, render_cmd.ui.scissor_rect,
+      {
+        { "image", g_img_mgr[_images[render_cmd.ui.image_handle]].srv().gpu_handle() },
+      });
+      break;
+
+    case Type::clear_discard_image:
+      assert(render_cmd.clear_rect);
+      discard_mask_rc = render_cmd.clear_rect.value();
+      clear_resize_render_target(_discard_image, discard_mask_rc);
+      break;
+
+    case Type::clear_composite_image:
+      assert(render_cmd.clear_rect);
+      discard_composite_rc = render_cmd.clear_rect.value();
+      clear_resize_render_target(_composite_image, discard_composite_rc);
+      break;
+
+    case Type::discard_write:
+      constants.mask_offset = -discard_mask_rc.pos();
+      graphics_draw(render_cmd, PipelineType::mask_write_max, g_img_mgr.get(_discard_image), {}, { 0, 0, discard_mask_rc.extent() });
+      break;
+
+    case Type::discard_draw_composite:
+      constants.composite_offset = -discard_composite_rc.pos();
+      graphics_draw(render_cmd, PipelineType::composite_write, g_img_mgr.get(_composite_image), {}, { 0, 0, discard_composite_rc.extent() },
+      {
+        { "image", g_img_mgr[_images[render_cmd.ui.image_handle]].srv().gpu_handle() },
+      });
+      break;
+
+    case Type::discard_composite:
+    {
+      auto& discard_img   = g_img_mgr[_discard_image];
+      auto& composite_img = g_img_mgr[_composite_image];
+
+      constants.mask_offset      = -discard_mask_rc.pos();
+      constants.mask_extent      = discard_img.extent();
+      constants.composite_offset = -discard_composite_rc.pos();
+      constants.composite_extent = composite_img.extent();
+
+      discard_img.set_state(cmd, ImageState::pixel);
+      composite_img.set_state(cmd, ImageState::pixel);
+
+      graphics_draw(render_cmd, PipelineType::discard_draw, rt, {}, render_cmd.ui.scissor_rect,
+      {
+        { "image",      composite_img.srv().gpu_handle() },
+        { "mask_image", discard_img.srv().gpu_handle()   },
+      });
+    }
+    break;
+    }
+  }
+
+  auto const& window_shadow_info = frame_data->window_shadow_info();
+  if (window_shadow_info)
+  {
+    g_ctx.graphics_pipe_set(GraphicsPipeSetInfo
+    {
+      .type           = PipelineType::window_shadow,
+      .viewport       = res.render_target()->rect(),
+      .scissor        = window_shadow_info->scissor_rect,
+      .constants_name = "constants",
+      .constants      = Constants
+      {
+        .render_target_extent = constants.render_target_extent,
+        .window_extent        = window_shadow_info->window_extent,
+        .window_pos           = frame_data->window_pos(),
+        .shadow_thickness     = window_shadow_info->shadow_thickness,
+        .shadow_radius        = window_shadow_info->radius,
+        .shadow_color         = window_shadow_info->color,
+        .shadow_softness      = window_shadow_info->softness,
+        .wireframe_color      = window_shadow_info->wireframe_color ? window_shadow_info->wireframe_color.value() : float4{},
+        .draw_wireframe       = window_shadow_info->wireframe_color.has_value(),
+      }
+    });
+    g_ctx.draw(2);
   }
 }
 
@@ -323,7 +442,7 @@ void Renderer::generate_mipmap() noexcept
     auto src_width  = img.width();
     auto src_height = img.height();
 
-    for (auto i : std::views::iota(0u, img.mipmap_uavs().size()))
+    for (auto i = 0; i < img.mipmap_uavs().size(); ++i)
     {
       constants.texel_size = float2{ 1.0 / src_width, 1.0 / src_height };
       constants.mip_level  = i;

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../../../util/singleton.hpp"
-#include "../../resource/render_resource.hpp"
+#include "../../util/singleton.hpp"
+#include "../resource/image.hpp"
 #include "compiler.hpp"
 
 #include <span>
@@ -12,8 +12,16 @@ enum class PipelineType
 {
   ui,
   window_shadow,
+
   blur_horizontal_pass,
   blur_vertical_pass,
+
+  mask_write_max,
+  mask_write_add,
+
+  composite_write,
+
+  discard_draw,
 };
 
 enum class StencilOp
@@ -88,7 +96,8 @@ struct BlendState
   BlendOp op_alpha;
 
   static auto Default() noexcept -> BlendState { return { Blend::src_alpha, Blend::inv_src_alpha, BlendOp::add, Blend::one, Blend::inv_src_alpha, BlendOp::add }; }
-  static auto Max() noexcept -> BlendState { return { Blend::one, Blend::one, BlendOp::max, Blend::one, Blend::one, BlendOp::max }; }
+  static auto Max()     noexcept -> BlendState { return { Blend::one,       Blend::one,           BlendOp::max, Blend::one, Blend::one,           BlendOp::max }; }
+  static auto Add()     noexcept -> BlendState { return { Blend::one,       Blend::one,           BlendOp::add, Blend::one, Blend::one,           BlendOp::add }; }
 };
 
 struct PipelineCreateInfo

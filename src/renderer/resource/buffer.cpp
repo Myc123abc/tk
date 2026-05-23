@@ -1,7 +1,7 @@
 #include "buffer.hpp"
 #include "util/error_handling.hpp"
 #include "../core.hpp"
-#include "../renderer/renderer.hpp"
+#include "../renderer.hpp"
 #include "../../util/align.hpp"
 
 #include <directx/d3dx12.h>
