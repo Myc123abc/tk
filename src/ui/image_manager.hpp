@@ -16,14 +16,14 @@ Singleton(ImageManager, g_img_mgr,
 private:
   struct ImageInfo
   {
-    uint32_t width{};
-    uint32_t height{};
-    bool     has_mipmap{};
+    uint width{};
+    uint height{};
+    bool has_mipmap{};
 
     auto extent() const noexcept -> float2 { return { width, height }; }
 
     ImageInfo() noexcept = default;
-    ImageInfo(uint32_t width, uint32_t height, bool has_mipmap) noexcept
+    ImageInfo(uint width, uint height, bool has_mipmap) noexcept
       : width(width), height(height), has_mipmap(has_mipmap) {}
   };
 
@@ -33,7 +33,7 @@ public:
 
   void destroy() noexcept;
 
-  auto create_image(uint32_t width, uint32_t height, renderer::ImageFormat format) noexcept -> ImageHandle;
+  auto create_image(uint width, uint height, renderer::ImageFormat format) noexcept -> ImageHandle;
   void destroy_image(ImageHandle handle) noexcept;
 
   auto try_load(std::string_view path) noexcept -> bool;
@@ -48,7 +48,7 @@ public:
   void update() noexcept;
 
 private:
-  void load(std::string_view path, uint32_t width, uint32_t height, void* data, bool use_mipmap = false) noexcept;
+  void load(std::string_view path, uint width, uint height, void* data, bool use_mipmap = false) noexcept;
 
 private:
   PoolType                                     _pool;

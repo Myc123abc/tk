@@ -543,23 +543,23 @@ auto UIContext::text(std::string_view text, float2 pos, float size, Color inner_
 
   check_draw();
 
-  auto res = g_text_engine.parse(text);
+  auto res = g_text_engine.parse(text, style);
 
   // text use single glyph shape property and multiple glyph boxs which share the shape property
-  auto values = std::vector<float>{};
-  values.emplace_back(res.glyph_atlas_index);
-  values.emplace_back(inner_color.r);
-  values.emplace_back(inner_color.g);
-  values.emplace_back(inner_color.b);
-  values.emplace_back(inner_color.a);
-  values.emplace_back(outer_color.r);
-  values.emplace_back(outer_color.g);
-  values.emplace_back(outer_color.b);
-  values.emplace_back(outer_color.a);
-  values.emplace_back(.05f); // outline width, TODO: can be set by user
+  // auto values = std::vector<float>{};
+  // values.emplace_back(res.glyph_atlas_index);
+  // values.emplace_back(inner_color.r);
+  // values.emplace_back(inner_color.g);
+  // values.emplace_back(inner_color.b);
+  // values.emplace_back(inner_color.a);
+  // values.emplace_back(outer_color.r);
+  // values.emplace_back(outer_color.g);
+  // values.emplace_back(outer_color.b);
+  // values.emplace_back(outer_color.a);
+  // values.emplace_back(.05f); // outline width, TODO: can be set by user
   // add_shape_property(ShapeProperty::Type::glyph, {}, {}, values);
 
-  return res.extent;
+  return {};
 }
 
 }

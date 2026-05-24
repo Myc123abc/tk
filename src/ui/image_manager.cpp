@@ -18,7 +18,7 @@ void ImageManager::destroy() noexcept
   for (auto handle : _images) _pool.free(handle);
 }
 
-auto ImageManager::create_image(uint32_t width, uint32_t height, ImageFormat format) noexcept -> ImageHandle
+auto ImageManager::create_image(uint width, uint height, ImageFormat format) noexcept -> ImageHandle
 {
   auto handle = _pool.alloc();
   _images.emplace(handle);
@@ -105,7 +105,7 @@ auto ImageManager::try_load(std::string_view path) noexcept -> bool
   return true;
 }
 
-void ImageManager::load(std::string_view path, uint32_t width, uint32_t height, void* data, bool use_mipmap) noexcept
+void ImageManager::load(std::string_view path, uint width, uint height, void* data, bool use_mipmap) noexcept
 {
   assert(!_loaded_images.contains(path.data()));
 
