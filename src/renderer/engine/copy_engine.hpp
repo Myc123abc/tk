@@ -1,22 +1,49 @@
 #pragma once
 
 #include "slots.hpp"
-#include "../resource/image.hpp"
+#include "../resource/image_manager.hpp"
 #include "../resource/buffer.hpp"
+#include "util/variant.hpp"
 
 namespace tk::renderer {
+
+struct MultiBitmapCopyInfo
+{
+  BitmapView bitmap; 
+  uint2      pos;
+};
 
 class UploadBuffer
 {
 public:
-  void add_images(std::vector<Image*> const& images, std::vector<Bitmap> const& bitmaps) noexcept;
   void upload(ID3D12GraphicsCommandList1* cmd) noexcept;
 
+  void add_image(ImageHandle image, Bitmap&& bitmap) noexcept
+  {
+    auto& info = _infos.emplace_back();
+    info.image = image;
+    info.data  = std::move(bitmap);
+  }
+
+  void add_image(ImageHandle image, std::vector<MultiBitmapCopyInfo>&& infos) noexcept
+  {
+    auto& info = _infos.emplace_back();
+    info.image = image;
+    info.data  = std::move(MultiBitmapCopy{ std::move(infos) });
+  }
+
+  auto empty() const noexcept { return _infos.empty(); }
+
 private:
+  struct MultiBitmapCopy
+  {
+    std::vector<MultiBitmapCopyInfo> infos;
+  };
+
   struct Info
   {
-    D3D12_SUBRESOURCE_DATA data{};
-    Image*                 image{};
+    ImageHandle                      image{};
+    Variant<Bitmap, MultiBitmapCopy> data{};
   };
 
   Buffer            _buffer;
@@ -29,12 +56,24 @@ public:
   {
     Engine::init(D3D12_COMMAND_LIST_TYPE_COPY);
     _slots.init(this);
+    _slots.acquire_slot();
   }
 
-  void acquire_slot() noexcept;
-  auto submit_slot() noexcept -> uint64_t;
+  void copy(Bitmap&& bitmap, ImageHandle image) noexcept
+  {
+    auto slot = _slots.slot();
+    assert(slot && _slots.is_idle(slot));
+    slot->data.add_image(image, std::move(bitmap));
+  }
 
-  void copy(std::vector<Bitmap> const& bitmaps, std::vector<Image*> const& images) noexcept;
+  void copy(std::vector<MultiBitmapCopyInfo>&& infos, ImageHandle img) noexcept
+  {
+    auto slot = _slots.slot();
+    assert(slot && _slots.is_idle(slot));
+    slot->data.add_image(img, std::move(infos));
+  }
+
+  void update() noexcept;
 
 private:
   Slots<D3D12_COMMAND_LIST_TYPE_COPY, UploadBuffer> _slots;

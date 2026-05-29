@@ -1007,11 +1007,11 @@ void FrameData::_add_image(ImageHandle handle, float2 left_top, float2 right_bot
 
 void FrameData::discard_beg(std::function<void()> func) noexcept
 {
-  auto cmd_idx = _draw_cmds.size();
+  _discard_beg_idx = _draw_cmds.size();
   _draw_cmds.emplace_back().type = DrawCmd::Type::discard_beg;
   auto beg = _draw_cmds.size();
   func();
-  _draw_cmds[cmd_idx].discard_beg.count = static_cast<uint>(_draw_cmds.size() - beg);
+  _draw_cmds[_discard_beg_idx].discard_beg.count = static_cast<uint>(_draw_cmds.size() - beg);
 }
 
 void FrameData::_discard_beg(uint count, uint& idx) noexcept
@@ -1039,7 +1039,11 @@ void FrameData::_discard_beg(uint count, uint& idx) noexcept
 
 void FrameData::discard_end() noexcept
 {
-  _draw_cmds.emplace_back().type = DrawCmd::Type::discard_end;
+  // if not have any discard targets, remove the discard operation
+  if (_draw_cmds[_discard_beg_idx].discard_beg.count + _discard_beg_idx == _draw_cmds.size() - 1)
+    _draw_cmds.erase(_draw_cmds.begin() + _discard_beg_idx, _draw_cmds.end());
+  else
+    _draw_cmds.emplace_back().type = DrawCmd::Type::discard_end;
 }
 
 void FrameData::_discard_end() noexcept

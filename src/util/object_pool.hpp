@@ -49,7 +49,7 @@ private:
   uint32_t _generation{};
 };
 
-template <typename T, uint16_t BlockCapacity>
+template <typename T, uint16_t BlockCapacity = 32>
 requires (BlockCapacity > 0)                                     &&
          (BlockCapacity <= std::numeric_limits<uint16_t>::max()) &&
          std::is_nothrow_constructible_v<T>                      &&

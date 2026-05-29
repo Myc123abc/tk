@@ -1,17 +1,18 @@
 #pragma once
 
 #include "ui/ui.hpp"
-#include "image_manager.hpp"
-
-#include <string>
-#include <unordered_set>
-#include <unordered_map>
-
 #include "util/base.hpp"
+#include "config.hpp"
+#include "../renderer/resource/image_manager.hpp"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include <hb.h>
+
+#include <string>
+#include <unordered_set>
+#include <unordered_map>
+#include <memory_resource>
 
 namespace tk::ui {
 
@@ -25,6 +26,21 @@ requires(T t)
   t.find(typename T::key_type{});
   t.begin();
   t.end();
+};
+
+struct SDFBitmap
+{
+  std::pmr::vector<uint8> data;
+  uint2                   extent{};
+  uint                    unicode{ std::numeric_limits<uint32_t>::max() };
+  FontStyle               style{};
+  float                   left_offset{};
+  float                   up_offset{};
+
+  auto to_bitmap_view() const noexcept -> renderer::BitmapView
+  {
+    return { data.data(), extent.x, extent.y, extent.x };
+  }
 };
 
 class TextEngine;
@@ -42,6 +58,8 @@ public:
   {
     return FT_Get_Char_Index(_face, unicode);
   }
+
+  auto generate_sdf_bitmap(uint glyph_idx, uint unicode, FontStyle style) const noexcept -> SDFBitmap;
 
 private:
   std::string _name;
@@ -128,21 +146,21 @@ public:
   };
   auto parse(std::string_view text, FontStyle style) noexcept -> ParseResult;
 
+  void upload_uncached_glyphs() noexcept;
+
 private:
   auto split_text(std::u32string_view text, FontStyle style) noexcept -> std::vector<std::pair<std::u32string_view, Font*>>;
   auto find_font(uint unicode, FontStyle style) noexcept -> Font*;
-  void upload_uncached_glyphs(std::u32string_view text, FontStyle style) noexcept;
+  void add_uncached_glyphs(std::u32string_view text, FontStyle style) noexcept;
+  auto find_glyph(uint unicode, FontStyle style) noexcept -> std::optional<std::pair<Font*, uint>>;
 
   template <MapType Map>
-  static auto has(Map& map, uint unicode, FontStyle style) noexcept
-  {
-    return map.contains(style) ? map[style].contains(unicode) : false;
-  }
+  static auto has(Map& map, uint unicode, FontStyle style) noexcept { return map.contains(style) ? map[style].contains(unicode) : false; }
+  auto glyph_infos_has(uint unicode, FontStyle style)     noexcept { return has(_glyph_infos, unicode, style);     }
+  auto missing_glyphs_has(uint unicode, FontStyle style)  noexcept { return has(_missing_glyphs, unicode, style);  }
+  auto uncached_glyphs_has(uint unicode, FontStyle style) noexcept { return has(_uncached_glyphs, unicode, style); }
 
-  auto glyph_infos_has(uint unicode, FontStyle style) noexcept
-  {
-    return has(_glyph_infos, unicode, style);
-  }
+  auto calc_glyph_pos(float2 extent) noexcept -> std::pair<uint, float2>;
 
 private:
   template <typename T>
@@ -155,15 +173,28 @@ private:
   FT_Library   _ft{};
   hb_buffer_t* _hb_buf{};
 
-  std::unordered_set<ImageHandle>                _glyph_atlas;
-  FontStyleMap<std::vector<Font>>                _fonts;
-  std::vector<std::pair<FontStyle, std::string>> _cached_texts_with_missing_glyphs;
-  FontStyleMap<TextMap<ParseResult>>             _cached_text_advances;
-  FontStyleMap<std::unordered_set<uint>>         _missing_glyphs;
-  FontStyleMap<UnicodeMap<GlyphInfo>>            _glyph_infos;
-
+  std::vector<ImageHandle>                         _glyph_atlas;
+  FontStyleMap<std::vector<Font>>                  _fonts;
+  std::vector<std::pair<FontStyle, std::string>>   _cached_texts_with_missing_glyphs;
+  FontStyleMap<TextMap<ParseResult>>               _cached_text_advances;
+  FontStyleMap<std::unordered_set<uint>>           _missing_glyphs;
+  FontStyleMap<UnicodeMap<GlyphInfo>>              _glyph_infos;
+  FontStyleMap<UnicodeMap<std::pair<Font*, uint>>> _uncached_glyphs;
+  
+  std::unordered_map<uint, std::vector<std::pair<SDFBitmap, float2>>> _pending_copy_glyphs;
+  
   float _max_ascender{};
   float _max_height{};
+
+  struct MemmoryPool
+  {
+  private:
+    std::pmr::monotonic_buffer_resource _pool;
+
+  public:
+    template <typename T>
+    auto vector() noexcept { return std::pmr::vector<T>{ &_pool }; }
+  } _mem_pool;
 )
 
 }

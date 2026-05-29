@@ -1,7 +1,6 @@
 #pragma once
 
 #include "resource/render_resource.hpp"
-#include "../ui/image_manager.hpp"
 #include "util/rect.hpp"
 
 #include <functional>
@@ -35,20 +34,13 @@ public:
   void resize_window_resource(HWND handle, uint32_t width, uint32_t height) noexcept;
   void show_blur_window(HWND handle, HWND blur_handle) noexcept { _show_blur_wnds.emplace(handle, blur_handle); }
 
-  void create_image(ui::ImageHandle handle, uint32_t width, uint32_t height, ImageFormat format) noexcept;
-  void destroy_image(ui::ImageHandle handle) noexcept;
-  void upload_image(ui::ImageHandle handle, uint32_t width, uint32_t height, Bitmap const& bitmap, bool use_mipmap = false) noexcept;
-
   void clear_blur_resize_data() noexcept { _blur_host_window = {}; _blur_window_rect = {}; }
-
-  auto descriptor_idx(ui::ImageHandle handle) noexcept { return g_img_mgr[_images[handle]].srv().index(); }
 
 private:
   void init_images() noexcept;
   void destroy_images() noexcept;
 
   void preprocess_render()  noexcept;
-  void upload_images() noexcept;
 
   void process_render() noexcept;
   void render(RenderResource& res, ui::FrameData const* frame_data) noexcept;
@@ -67,15 +59,6 @@ private:
   std::unordered_map<HWND, HWND> _show_blur_wnds;
   HWND                           _blur_host_window{};
   Rect                           _blur_window_rect{};
-
-////////////////////////////////////////////////////////////////////////////////
-///                           Image
-////////////////////////////////////////////////////////////////////////////////
-
-  std::unordered_map<ui::ImageHandle, ImageHandle> _images;
-  std::unordered_map<ui::ImageHandle, Bitmap>      _bitmaps;
-  std::unordered_map<ui::ImageHandle, ImageHandle> _upload_images;
-  std::vector<ui::ImageHandle>                     _pending_mipmap_image_handles;
 
   ImageHandle _discard_image;
   ImageHandle _composite_image;

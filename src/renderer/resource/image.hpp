@@ -3,9 +3,9 @@
 #include "descriptor_heap_manager.hpp"
 #include "util/flag.hpp"
 #include "util/base.hpp"
-#include "../../util/object_pool.hpp"
-#include "../config.hpp"
+#include "../../util/align.hpp"
 #include "util/rect.hpp"
+#include "buffer.hpp"
 
 #include <dxgi1_6.h>
 #include <directx/d3dx12.h>
@@ -35,7 +35,6 @@ enum class ImageFormat
   d24_s8      = DXGI_FORMAT_D24_UNORM_S8_UINT,
 };
 
-
 enum class ImageState
 {
   copy_src      = D3D12_RESOURCE_STATE_COPY_SOURCE,
@@ -54,6 +53,20 @@ enum class ImageState
 ///                             Bitmap
 ////////////////////////////////////////////////////////////////////////////////
 
+struct BitmapView
+{
+  void const* data{};
+  uint        width{};
+  uint        height{};
+  uint        row_pitch{};
+};
+
+template <typename T>
+concept BitmapType = requires(T const& t)
+{
+  { t.to_bitmap_view() } -> std::same_as<BitmapView>;
+};
+
 struct Bitmap
 {
   void* data{};
@@ -61,19 +74,33 @@ struct Bitmap
   uint  height{};
   uint  channel{};
   uint  row_pitch{};
-  uint  size{};
   uint  x{};
   uint  y{};
+  bool  can_free{};
 
-  void init(uint width, uint height, uint channel, void* data = nullptr) noexcept
+  Bitmap() = default;
+
+  template <BitmapType T>
+  Bitmap(T const& bitmap) noexcept
+    : data(bitmap.data), width(bitmap.width), height(bitmap.height), row_pitch(bitmap.row_pitch) {}
+
+  Bitmap(uint width, uint height, uint channel, void* data = nullptr, bool can_free = false) noexcept
+    : data(data), width(width), height(height), channel(channel), row_pitch(width * channel), can_free(can_free) {}
+
+  void init(uint width, uint height, uint channel, void* data = nullptr, bool can_free = false) noexcept
   {
-    this->data    = data;
-    this->width   = width;
-    this->height  = height;
-    this->channel = channel;
-    row_pitch     = width * channel;
-    size          = row_pitch * height;
+    this->data     = data;
+    this->width    = width;
+    this->height   = height;
+    this->channel  = channel;
+    row_pitch      = width * channel;
+    this->can_free = can_free;
   }
+
+  auto to_bitmap_view() const noexcept -> BitmapView
+  {
+    return { data, width, height, row_pitch };
+  };
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -148,45 +175,6 @@ private:
   // std::vector<DescriptorHandle>          _mipmap_uavs;
 };
 
-using ImagePoolType = ObjectPool<Image, Image_Pool_Init_Capacity>;
-using ImageHandle = ImagePoolType::Handle;
-
-Singleton(ImageManager, g_img_mgr,
-public:
-  auto create(uint width , uint height, ImageFormat format, Flag<ImageType> types, bool use_mipmap = false) noexcept
-  {
-    auto handle = _pool.alloc();
-    _pool[handle].init(width, height, format, types, use_mipmap);
-    return handle;
-  }
-
-  auto create(IDXGISwapChain1* swapchain, uint index) noexcept
-  {
-    auto handle = _pool.alloc();
-    _pool[handle].init(swapchain, index);
-    return handle;
-  }
-
-  auto create(float width, float height, Image const& src) noexcept
-  {
-    auto handle = _pool.alloc();
-    _pool[handle].init(width, height, src);
-    return handle;
-  }
-
-  auto destroy(ImageHandle handle) noexcept
-  {
-    _pool[handle].destroy();
-    _pool.free(handle);
-  }
-
-  auto& operator[](ImageHandle handle) noexcept { return _pool[handle]; }
-  auto get(ImageHandle handle) noexcept { return _pool.get(handle); }
-
-private:
-  ImagePoolType _pool;
-)
-
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Copy Operations
 ////////////////////////////////////////////////////////////////////////////////
@@ -210,13 +198,38 @@ inline void copy(ID3D12GraphicsCommandList1* cmd, Image& src, Image& dst) noexce
 inline void copy(
   ID3D12GraphicsCommandList1* cmd,
   Image&                      image,
-  ID3D12Resource*             upload_heap,
+  Buffer&                     upload_heap,
   uint                        offset,
   D3D12_SUBRESOURCE_DATA&     data
 ) noexcept
 {
   image.set_state(cmd, cmd->GetType() == D3D12_COMMAND_LIST_TYPE_COPY ? ImageState::common : ImageState::copy_dst);
-  UpdateSubresources(cmd, image.handle(), upload_heap, offset, 0, 1, &data);
+  UpdateSubresources(cmd, image.handle(), upload_heap.handle(), offset, 0, 1, &data);
+}
+
+inline void copy(
+  ID3D12GraphicsCommandList1* cmd,
+  Buffer&                     src,
+  Image&                      dst,
+  uint                        src_offset,
+  BitmapView const&           bitmap,
+  uint2                       pos
+) noexcept
+{
+  dst.set_state(cmd, cmd->GetType() == D3D12_COMMAND_LIST_TYPE_COPY ? ImageState::common : ImageState::copy_dst);
+
+  auto footprint = D3D12_PLACED_SUBRESOURCE_FOOTPRINT{};
+  footprint.Offset             = src_offset;
+  footprint.Footprint.Width    = bitmap.width;
+  footprint.Footprint.Height   = bitmap.height;
+  footprint.Footprint.Depth    = 1;
+  footprint.Footprint.RowPitch = align(bitmap.row_pitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+  footprint.Footprint.Format   = static_cast<DXGI_FORMAT>(dst.format());
+
+  auto src_loc = CD3DX12_TEXTURE_COPY_LOCATION{ src.handle(), footprint };
+  auto dst_loc = CD3DX12_TEXTURE_COPY_LOCATION{ dst.handle() };
+
+  cmd->CopyTextureRegion(&dst_loc, pos.x, pos.y, 0, &src_loc, nullptr);
 }
 
 void copy(

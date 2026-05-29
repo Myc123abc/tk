@@ -2,12 +2,14 @@
 
 #include "../util/flag.hpp"
 #include "../util/base.hpp"
+#include "../util/variant.hpp"
 #include "tween.hpp"
 
 #include <windows.h>
 
 #include <string_view>
 #include <optional>
+#include <expected>
 
 namespace tk::ui {
 
@@ -149,6 +151,18 @@ void reset_tween(std::string_view name) noexcept;
  */
 auto image_extent(std::string_view path) noexcept -> float2;
 
+namespace ImageLoadError {
+struct unexist{};
+struct loading{};
+struct decode_failed{ std::string_view msg; };
+
+using Type = Variant<
+  unexist,
+  loading,
+  decode_failed
+>;
+}
+
 /**
  * display image
  * @param path
@@ -157,13 +171,14 @@ auto image_extent(std::string_view path) noexcept -> float2;
  * @param alpha
  * @return false if image is unexist, or loading, or load failed
  */
-auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8_t alpha = 0xff) noexcept -> bool;
+auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8_t alpha = 0xff) noexcept -> std::expected<void, ImageLoadError::Type>;
 
 /**
  * load image
  * @param path
+ * @return false if image is unexist, or loading, or load failed
  */
-void load_image(std::string_view path) noexcept;
+auto load_image(std::string_view path) noexcept -> std::expected<void, ImageLoadError::Type>;
 
 /**
  * load font

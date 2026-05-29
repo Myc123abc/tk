@@ -33,6 +33,15 @@ struct Rect : Replaceable
     bottom(static_cast<float>(right_bottom.y)) {}
 
   Rect(RECT rc) noexcept : left(rc.left), top(rc.top), right(rc.right), bottom(rc.bottom) {}
+  Rect(HWND hwnd) noexcept
+  {
+    auto rc = RECT{};
+    GetWindowRect(hwnd, &rc);
+    left   = rc.left;
+    top    = rc.top;
+    right  = rc.right;
+    bottom = rc.bottom;
+  }
 
   template <Numeric X, Numeric Y, Vec2 Ext>
   Rect(X x, Y y, Ext ext) : left(x), top(y), right(x + ext.x), bottom(y + ext.y) {}

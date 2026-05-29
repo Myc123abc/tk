@@ -3,7 +3,6 @@
 #include "../renderer/window/window_manager.hpp"
 #include "../renderer/renderer.hpp"
 #include "../util/hash.hpp"
-#include "image_manager.hpp"
 #include "text_engine.hpp"
 
 using namespace tk::renderer;
@@ -29,7 +28,6 @@ void UIContext::init() noexcept
 void UIContext::destroy() noexcept
 {
   g_text_engine.destroy();
-  g_img_mgr.destroy();
   close_window();
   g_wnd_mgr.close_fullscreen_window();
 }
@@ -160,6 +158,7 @@ void UIContext::restore_fullscreen_window() noexcept
 void UIContext::preprocess_render() noexcept
 {
   close_window();
+  g_text_engine.upload_uncached_glyphs();
 }
 
 void UIContext::render() noexcept
@@ -433,8 +432,7 @@ void UIContext::remove_tween(size_t id) noexcept
 
 void UIContext::reset_tween(size_t id) noexcept
 {
-  err_if(!_tweens.contains(id), "reset an unexist color tween");
-  _tweens[id].reset();
+  if (_tweens.contains(id)) _tweens[id].reset();
 }
 
 auto UIContext::ping_pong(bool b, size_t id, double duration, Tween::Ease ease) noexcept -> double
@@ -525,16 +523,17 @@ auto UIContext::get_key(Key key) noexcept -> Flag<KeyState>
   return ctx.state;
 }
 
-auto UIContext::image(std::string_view path, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept -> bool
+auto UIContext::image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha) noexcept -> std::expected<void, ImageLoadError::Type>
 {
   check_draw();
 
-  if (g_img_mgr.try_load(path))
+  auto res = g_img_mgr.try_load(path);
+  if (res)
   {
-    frame_data()->add_image(g_img_mgr.handle(path), left_top, right_bottom, alpha);
-    return true;
+    frame_data()->add_image(res.value(), left_top, right_bottom, alpha);
+    return {};
   }
-  return false;
+  return std::unexpected(res.error());
 }
 
 auto UIContext::text(std::string_view text, float2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> float2

@@ -8,6 +8,7 @@
 #include <functional>
 #include <mutex>
 #include <algorithm>
+#include <cassert>
 
 namespace tk {
 
@@ -72,7 +73,7 @@ private:
 
     ~Thread() noexcept
     {
-      _thread.detach();
+      _thread.join();
     }
 
     Thread(Thread&&) = default;
@@ -110,6 +111,7 @@ private:
 private:
   void enqueue(std::function<void()> f) noexcept
   {
+    assert(!_exit.load(std::memory_order_acquire));
     {
       std::lock_guard lock(_mutex);
       _tasks.emplace(std::move(f));

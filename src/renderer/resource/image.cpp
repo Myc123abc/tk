@@ -357,11 +357,12 @@ void copy(
 
 void copy(Bitmap const& src, Bitmap const& dst) noexcept
 {
+  assert(src.channel == dst.channel);
   auto src_data = reinterpret_cast<std::byte*>(src.data);
   auto dst_data = reinterpret_cast<std::byte*>(dst.data);
   for (auto i = 0; i < dst.height; ++i)
   {
-    memcpy(dst_data, src_data, src.width * 4);
+    memcpy(dst_data, src_data, src.width * src.channel);
     src_data += src.row_pitch;
     dst_data += dst.row_pitch;
   }

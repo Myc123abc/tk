@@ -69,15 +69,15 @@ auto image_extent(std::string_view path) noexcept -> float2
   return g_img_mgr.extent(path);
 }
 
-auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept -> bool
+auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept -> std::expected<void, ImageLoadError::Type>
 {
   adjust_pos(left_top, right_bottom);
   return g_ui_ctx.image(path, left_top, right_bottom, alpha);
 }
 
-void load_image(std::string_view path) noexcept
+auto load_image(std::string_view path) noexcept -> std::expected<void, ImageLoadError::Type>
 {
-  g_img_mgr.try_load(path);
+  return g_img_mgr.try_load(path).transform([](auto&&) {});
 }
 
 void load_font(std::string_view path) noexcept

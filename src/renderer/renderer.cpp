@@ -13,8 +13,6 @@
 
 #include <dwmapi.h>
 
-#include <stb_image.h>
-
 #include <ranges>
 
 namespace tk::renderer {
@@ -33,32 +31,19 @@ void Renderer::init() noexcept
 
 void Renderer::init_images() noexcept
 {
-  //
   // ui use, write image for normal shapes rendering
-  //
-  ui::Write_Image_Handle = ui::g_img_mgr.create_image(1, 1, ImageFormat::bgra8_unorm);
+  ui::Write_Image_Handle = g_img_mgr.create(1, 1, ImageFormat::bgra8_unorm, ImageType::srv);
+  static auto white = 0xffffffff;
+  g_copy_engine.copy({ 1, 1, 4, &white }, ui::Write_Image_Handle);
 
-  auto white = 0xffffffff;
-  auto bitmap = Bitmap{};
-  bitmap.init(1, 1, 4, &white);
-  
-  g_copy_engine.acquire_slot();
-  g_copy_engine.copy({ bitmap }, { g_img_mgr.get(_images[ui::Write_Image_Handle]) });
-  auto fence_value = g_copy_engine.submit_slot();
-  g_graphics_engine.wait(g_copy_engine, fence_value);
-
-  //
   // discard image, composite image for discard operation
-  //
   _discard_image   = g_img_mgr.create(Default_Image_Init_Width, Default_Image_Init_Height, ImageFormat::r8_unorm,                ImageType::rtv | ImageType::srv);
   _composite_image = g_img_mgr.create(Default_Image_Init_Width, Default_Image_Init_Height, RenderResource::Render_Target_Format, ImageType::rtv | ImageType::srv);
 }  
 
 void Renderer::destroy_images() noexcept
 {
-  for (auto const& img : _upload_images) g_img_mgr.destroy(img.second);
-  for (auto const& img : _images) g_img_mgr.destroy(img.second);
-
+  g_img_mgr.destroy(ui::Write_Image_Handle);
   g_img_mgr.destroy(_discard_image);
   g_img_mgr.destroy(_composite_image);
 }
@@ -82,6 +67,8 @@ void Renderer::destroy() noexcept
   g_comp_engine.destroy();
   g_copy_engine.destroy();
   for (auto& res : _res | std::views::values) res.destroy();
+
+  g_img_mgr.destroy();
 }
 
 void Renderer::create_window_resource(HWND handle, uint32_t width, uint32_t height) noexcept
@@ -108,43 +95,6 @@ void Renderer::resize_window_resource(HWND handle, uint32_t width, uint32_t heig
 {
   err_if(!_res.contains(handle), "failed to destroy window render resource, it's unexist");
   _res[handle].resize(width, height);
-}
-
-void Renderer::create_image(ui::ImageHandle handle, uint32_t width, uint32_t height, ImageFormat format) noexcept
-{
-  assert(!_images.contains(handle));
-  _images.emplace(handle, g_img_mgr.create(width, height, format, ImageType::srv));
-}
-
-void Renderer::destroy_image(ui::ImageHandle handle) noexcept
-{
-  if (_upload_images.contains(handle))
-  {
-    assert(_bitmaps.contains(handle));
-
-    // not upload yet, remove upload image
-    _upload_images.erase(handle);
-    _bitmaps.erase(handle);
-  }
-  else if (_images.contains(handle))
-  {
-    // already uploaded, release image resource
-    add_frame_render_complete_func([image = _images[handle]] { g_img_mgr.destroy(image); });
-    _images.erase(handle);
-  }
-}
-
-void Renderer::upload_image(ui::ImageHandle handle, uint32_t width, uint32_t height, Bitmap const& bitmap, bool use_mipmap) noexcept
-{
-  // create image resource
-  auto h = g_img_mgr.create(bitmap.width, bitmap.height, ImageFormat::rgba8_unorm, ImageType::srv, use_mipmap);
-
-  // store image and bitmap for upload
-  _upload_images[handle] = h;
-  _bitmaps[handle]       = bitmap;
-
-  if (use_mipmap)
-    _pending_mipmap_image_handles.emplace_back(handle);
 }
 
 void Renderer::add_frame_render_complete_func(std::move_only_function<void()>&& func) noexcept
@@ -174,7 +124,7 @@ void Renderer::message_process() noexcept
 
 void Renderer::preprocess_render() noexcept
 {
-  upload_images();
+  g_copy_engine.update();
   g_comp_engine.update();
 
   if (_blur_host_window)
@@ -182,42 +132,6 @@ void Renderer::preprocess_render() noexcept
     DwmFlush();
     g_wnd_mgr.resize_blur_window(_blur_host_window, _blur_window_rect);
     clear_blur_resize_data();
-  }
-}
-
-void Renderer::upload_images() noexcept
-{
-  if (!_upload_images.empty())
-  {
-    assert(_upload_images.size() == _bitmaps.size());
-
-    // upload images by copy engine
-    g_copy_engine.acquire_slot();
-    g_copy_engine.copy(
-      _bitmaps
-        | std::views::values
-        | std::ranges::to<std::vector<Bitmap>>(),
-      _upload_images
-        | std::views::values
-        | std::views::transform([](auto img) { return g_img_mgr.get(img); })
-        | std::ranges::to<std::vector<Image*>>());
-    auto fence_value = g_copy_engine.submit_slot();
-
-    // wait upload images complete before rendering
-    g_graphics_engine.wait(g_copy_engine, fence_value);
-    // also wait for compute engine if need to generate mipamp
-    if (!_pending_mipmap_image_handles.empty())
-      g_comp_engine.wait(g_copy_engine, fence_value);
-
-    // move upload images to images
-    for (auto [idx, img] : _upload_images)
-      _images[idx] = img;
-
-    // free bitmaps
-    for (auto const& bitmap : _bitmaps | std::views::values) stbi_image_free(bitmap.data);
-
-    _upload_images.clear();
-    _bitmaps.clear();
   }
 }
 
@@ -334,7 +248,7 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
     case Type::ui:
       graphics_draw(render_cmd, PipelineType::ui, rt, {}, render_cmd.ui.scissor_rect,
       {
-        { "image", g_img_mgr[_images[render_cmd.ui.image_handle]].srv().gpu_handle() },
+        { "image", g_img_mgr[render_cmd.ui.image_handle].srv().gpu_handle() },
       });
       break;
 
@@ -359,7 +273,7 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
       constants.composite_offset = -discard_composite_rc.pos();
       graphics_draw(render_cmd, PipelineType::composite_write, g_img_mgr.get(_composite_image), {}, { 0, 0, discard_composite_rc.extent() },
       {
-        { "image", g_img_mgr[_images[render_cmd.ui.image_handle]].srv().gpu_handle() },
+        { "image", g_img_mgr[render_cmd.ui.image_handle].srv().gpu_handle() },
       });
       break;
 

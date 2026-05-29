@@ -68,7 +68,7 @@ public:
   void reset_tween(size_t id) noexcept;
   auto ping_pong(bool b, size_t id, double duration, Tween::Ease ease = {}) noexcept -> double;
 
-  auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept -> bool;
+  auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha) noexcept -> std::expected<void, ImageLoadError::Type>;
   auto text(std::string_view text, float2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> float2;
 
   void fullscreen_window() noexcept;

@@ -59,4 +59,17 @@ inline void debug(std::format_string<T...> const fmt, T&&... args) noexcept
 #endif
 }
 
+inline void warn_if(bool b, std::string_view msg) noexcept
+{
+  if (b) [[unlikely]]
+    warn(msg);
+}
+
+template <typename... T>
+inline void warn_if(bool b, std::format_string<T...> const fmt, T&&... args) noexcept
+{
+  if (b) [[unlikely]]
+    warn(fmt, std::forward<T>(args)...);
+}
+
 }

@@ -2,7 +2,7 @@
 
 #include "ui/ui.hpp"
 #include "../renderer/resource/shader_type.hpp"
-#include "image_manager.hpp"
+#include "../renderer/resource/image_manager.hpp"
 #include "util/rect.hpp"
 #include "util/flag.hpp"
 
@@ -80,6 +80,7 @@ public:
     _window_shadow_info            = {};
     _build_mode                    = {};
     _using_discard_shapes          = {};
+    _discard_beg_idx               = {};
     _discard_vtx_beg               = {};
     _clear_composite_image_cmd_idx = {};
   }
@@ -373,6 +374,7 @@ private:
   };
   Flag<BuildMode> _build_mode;
 
+  uint _discard_beg_idx{};
   bool _using_discard_shapes{};
   uint _discard_vtx_beg{};
   uint _clear_composite_image_cmd_idx{};

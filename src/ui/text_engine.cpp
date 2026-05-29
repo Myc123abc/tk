@@ -1,7 +1,8 @@
 #include "text_engine.hpp"
 #include "util/error_handling.hpp"
-#include "image_manager.hpp"
+#include "../renderer/resource/image_manager.hpp"
 #include "missing-glyph-sdf-bitmap.hpp"
+#include "../renderer/engine/copy_engine.hpp"
 
 #include <hb-ft.h>
 #include <utf8.h>
@@ -50,18 +51,37 @@ void Font::destroy() const noexcept
   check(FT_Done_Face(_face), "failed to destroy font");
 }
 
+auto Font::generate_sdf_bitmap(uint glyph_idx, uint unicode, FontStyle style) const noexcept -> SDFBitmap
+{
+  assert(glyph_idx);
+  check(FT_Load_Glyph(_face, glyph_idx, FT_LOAD_RENDER), "failed to load glyph with render");
+  auto glyph = _face->glyph;
+  check(FT_Render_Glyph(glyph, FT_RENDER_MODE_SDF), "failed to render sdf bitmap");
+  auto ft_bitmap = _face->glyph->bitmap;
+  auto bitmap = SDFBitmap{};
+  bitmap.extent      = { ft_bitmap.width, ft_bitmap.rows };
+  bitmap.unicode     = unicode;
+  bitmap.style       = style;
+  bitmap.left_offset = glyph->bitmap_left;
+  bitmap.up_offset   = -glyph->bitmap_top;
+  bitmap.data = g_text_engine._mem_pool.vector<uint8>();
+  bitmap.data.resize(bitmap.extent.x * bitmap.extent.y);
+  memcpy(bitmap.data.data(), ft_bitmap.buffer, bitmap.data.size());
+  return bitmap;
+}
+
 void TextEngine::init() noexcept
 {
   check(FT_Init_FreeType(&_ft), "failed to initialize freetype");
   _hb_buf = hb_buffer_create();
 
   // create the first glyph atlas
-  _glyph_atlas.emplace(g_img_mgr.create_image(Glyph_Atlas_Width, Glyph_Atlas_Height, ImageFormat::r8_unorm));
+  _glyph_atlas.emplace_back(g_img_mgr.create(Glyph_Atlas_Width, Glyph_Atlas_Height, ImageFormat::r8_unorm, ImageType::srv));
 }
 
 void TextEngine::destroy() const noexcept
 {
-  for (auto handle : _glyph_atlas) g_img_mgr.destroy_image(handle);
+  for (auto handle : _glyph_atlas) g_img_mgr.destroy(handle);
   for (auto const& font : _fonts | std::views::values | std::views::join) font.destroy();
 
   hb_buffer_destroy(_hb_buf);
@@ -144,7 +164,7 @@ auto TextEngine::parse(std::string_view text, FontStyle style) noexcept -> Parse
   // cached calculate result
   cached_text_advances.emplace(text.data(), res);
 
-  upload_uncached_glyphs(res.text, style);
+  add_uncached_glyphs(res.text, style);
 
   return std::move(res);
 }
@@ -193,9 +213,88 @@ auto TextEngine::find_font(uint unicode, FontStyle style) noexcept -> Font*
   return it == fonts->second.end() ? nullptr : &*it;
 }
 
-void TextEngine::upload_uncached_glyphs(std::u32string_view text, FontStyle style) noexcept
+void TextEngine::add_uncached_glyphs(std::u32string_view text, FontStyle style) noexcept
 {
+  for (auto ch : text)
+  {
+    if (!glyph_infos_has(ch, style) && !missing_glyphs_has(ch, style) && !uncached_glyphs_has(ch, style))
+    {
+      if (auto res = find_glyph(ch, style))
+        _uncached_glyphs[style].emplace(ch, res.value());
+      else
+        _missing_glyphs[style].emplace(ch);
+    }
+  }
+}
 
+auto TextEngine::find_glyph(uint unicode, FontStyle style) noexcept -> std::optional<std::pair<Font*, uint>>
+{
+  // promise unicode is not generated sdf bitmap
+  assert(!glyph_infos_has(unicode, style));
+  for (auto& font : _fonts[style])
+    if (auto glyphs_idx = font.find_glyph(unicode))
+      return std::make_pair(&font, glyphs_idx);
+  return {};
+}
+
+auto TextEngine::calc_glyph_pos(float2 extent) noexcept -> std::pair<uint, float2>
+{
+  check(extent.x > Glyph_Atlas_Width || extent.y > Glyph_Atlas_Height,
+        "too big glyph sdf bitmap, cannot be stored in glyph atlas");
+
+  static float2 current_pos{};
+  static float  current_line_max_glyph_height{};
+  static uint   current_glyph_atlas_idx{};
+  
+  while (true)
+  {
+    auto max_pos = current_pos + extent;
+
+    if (max_pos.x <= Glyph_Atlas_Width && max_pos.y <= Glyph_Atlas_Height)
+    {
+      auto pos = current_pos;
+      current_pos.x = max_pos.x;
+      current_line_max_glyph_height = std::max(current_line_max_glyph_height, extent.y);
+      return { current_glyph_atlas_idx, pos };
+    }
+
+    if (max_pos.x > Glyph_Atlas_Width)
+    {
+      current_pos.x = {};
+      current_pos.y += current_line_max_glyph_height;
+      current_line_max_glyph_height = {};
+      continue;
+    }
+
+    ++current_glyph_atlas_idx;
+    // TODO: _new_glyph_atlas = true;
+    _glyph_atlas.emplace_back(g_img_mgr.create(Glyph_Atlas_Width, Glyph_Atlas_Height, ImageFormat::r8_unorm, ImageType::srv));
+    current_pos                   = {};
+    current_line_max_glyph_height = {};
+  }
+}
+
+void TextEngine::upload_uncached_glyphs() noexcept
+{
+  if (_uncached_glyphs.empty()) return;
+
+  for (auto const& [style, infos] : _uncached_glyphs)
+  {
+    for (auto const& [unicode, pair] : infos)
+    {
+      auto [font, glyph_idx] = pair;
+      auto bitmap = font->generate_sdf_bitmap(glyph_idx, unicode, style);
+      auto [glyph_atlas_idx, cpy_pos] = calc_glyph_pos(bitmap.extent);
+      _pending_copy_glyphs[glyph_atlas_idx].emplace_back(std::move(bitmap), cpy_pos);
+    }
+  }
+  _uncached_glyphs.clear();
+
+  for (auto const& [glyph_atlas_idx, bitmaps] : _pending_copy_glyphs)
+  {
+  }
+
+  _pending_copy_glyphs.clear();
 }
 
 }

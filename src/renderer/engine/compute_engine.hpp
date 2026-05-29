@@ -1,7 +1,7 @@
 #pragma once
 
 #include "slots.hpp"
-#include "../resource/image.hpp"
+#include "../resource/image_manager.hpp"
 
 #include <deque>
 #include <vector>

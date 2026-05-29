@@ -39,7 +39,6 @@ public:
   void remove_blur_window(HWND handle) noexcept;
   void resize_blur_window(HWND handle, Rect rect) noexcept;
 
-  auto get_window_z_orders() const noexcept -> std::vector<HWND>;
   auto get_cursor_on_window() noexcept -> HWND;
 
   auto is_normal_cursor() const noexcept { return _cursor_type == ResizeType::none; }

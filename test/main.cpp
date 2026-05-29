@@ -273,6 +273,7 @@ inline auto img2 = "assets/image/test.png";
 
 void test_discard(uint32_t fmt) noexcept
 {
+  auto _ = std::expected<void, ui::ImageLoadError::Type>{};
   ui::discard_beg([]{ ui::circle({ 50, 50 }, 25); });
   auto r = fmt % 7;
   switch (r)
@@ -282,45 +283,70 @@ void test_discard(uint32_t fmt) noexcept
     break;
   
   case 1:
-    ui::image(img1, {}, { 100, 100 }, 0x44);
+    _ = ui::image(img1, {}, { 100, 100 }, 0x44);
     break;
   
   case 2:
-    ui::image(img1, {}, { 50, 50 });
-    ui::image(img1, { 50, 50 }, { 100, 100 });
+    _ = ui::image(img1, {}, { 50, 50 });
+    _ = ui::image(img1, { 50, 50 }, { 100, 100 });
     break;
   
   case 3:
     ui::rectangle({}, { 50, 50 }, 0xffffffff);
-    ui::image(img1, { 50, 50 }, { 100, 100 });
+    _ = ui::image(img1, { 50, 50 }, { 100, 100 });
     break;
   
   case 4:
-    ui::image(img1, {}, { 50, 50 });
+    _ = ui::image(img1, {}, { 50, 50 });
     ui::rectangle({ 50, 50 }, {}, 0xffffffff);
     break;
   
   case 5:
     ui::rectangle({}, { 50, 50 }, 0xffff00ff);
-    ui::image(img1, { 25, 25 }, { 70, 75 });
+    _ = ui::image(img1, { 25, 25 }, { 70, 75 });
     ui::rectangle({ 50, 50 }, {}, 0xffffffff);
     break;
   
   case 6:
-    ui::image(img1, {}, { 50, 50 });
+    _ = ui::image(img1, {}, { 50, 50 });
     ui::rectangle({ 25, 25 }, { 70, 75 }, 0xffff00ff);
-    ui::image(img1, { 50, 50 }, { 100, 100 });
+    _ = ui::image(img1, { 50, 50 }, { 100, 100 });
     break;
   }
   ui::discard_end();
+}
+
+auto load_image(std::string_view path) noexcept
+{
+  if (auto res = ui::load_image(path); !res)
+  {
+    res.error().visit(
+      [](ui::ImageLoadError::loading) { info("loading {}", img2); },
+      [](ui::ImageLoadError::unexist) { warn("unexist image {}", img2); },
+      [](ui::ImageLoadError::decode_failed const& err) { warn("decode failed of image {} : {}", img2, err.msg); }
+    );
+  }
+}
+
+auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8_t alpha = 0xff) noexcept -> std::expected<void, ui::ImageLoadError::Type>
+{
+  return ui::image(path, left_top, right_bottom, alpha).or_else([](ui::ImageLoadError::Type err)
+  {
+    err.visit(
+      [](ui::ImageLoadError::loading) { info("loading {}", img2); },
+      [](ui::ImageLoadError::unexist) { warn("unexist image {}", img2); },
+      [](ui::ImageLoadError::decode_failed const& err) { warn("decode failed of image {} : {}", img2, err.msg); }
+    );
+    return std::expected<void, ui::ImageLoadError::Type>{ std::unexpected(err) };
+  });
 }
 
 int main()
 {
   tk::init();
 
-  ui::load_image(img1);
-  ui::load_image(img2);
+  load_image(img1);
+  load_image(img2);
 
   ui::load_font("assets/font/NotoSansJP-Regular.ttf");
   ui::load_font("assets/font/NotoSansSC-Regular.ttf");
@@ -339,8 +365,6 @@ int main()
 
   auto wnd1_is_closed = false;
   auto wnd2_is_closed = true;
-
-  auto is_loaded = false;
 
   auto cfg = ui::WindowConfig{};
   cfg.display_title_bar             = true;
@@ -432,20 +456,19 @@ int main()
       ui::rectangle(p, p + float2{ progress, 3 }, 0x0000ffff);
 
       // image
+      auto res = std::expected<void, ui::ImageLoadError::Type>{};
       if (loop_trigger)
       {
         auto img_ext = ui::image_extent(img2);
         auto ext = wnd_ext - p2;
         auto scale = std::max(img_ext.x / ext.x, img_ext.y / ext.y);
         img_ext /= scale;
-        if (is_loaded = ui::image(img2, p2, p2 + img_ext); !is_loaded)
-          info("loading {}", img2);
+        res = image(img2, p2, p2 + img_ext);
       }
-      if (is_loaded) loop_trigger.update();
+      if (res) loop_trigger.update();
 
       ui::discard_beg([]{ ui::circle({50,50}, 50); });
-      if (!ui::image(img1, {}, wnd_ext, 0x44))
-        info("loading {}", img1);
+      res = image(img1, {}, wnd_ext, 0x44);
       ui::discard_end();
 
       // circle point
@@ -455,7 +478,7 @@ int main()
 
       auto text_pos = p2 + float2{ 0, 10 };
       auto text_ext = ui::text("Hello, World!", text_pos, 32, 0xffff00ff);
-      // ui::rectangle(text_pos, text_ext, 0x00ff00ff, 1);
+      ui::rectangle(text_pos, text_ext, 0x00ff00ff, 1);
 
       if (ui::button("blur onoff", 50, 50, 50, 50, 0x0000ffff, 0x00ff00ff))
       {

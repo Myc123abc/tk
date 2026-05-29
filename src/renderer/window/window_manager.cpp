@@ -541,28 +541,24 @@ void WindowManager::update_monitors() noexcept
   update_fullscreen_window();
 }
 
-auto WindowManager::get_window_z_orders() const noexcept -> std::vector<HWND>
-{
-  auto handles = std::vector<HWND>();
-  handles.reserve(_windows.size());
-
-  auto top = GetTopWindow(nullptr);
-  while (top)
-  {
-    if (_windows.contains(top)) handles.emplace_back(top);
-    top = GetWindow(top, GW_HWNDNEXT);
-  }
-
-  return handles;
-}
-
 auto WindowManager::get_cursor_on_window() noexcept -> HWND
 {
-  auto z_orders   = g_wnd_mgr.get_window_z_orders();
-  auto cursor_pos = get_cursor_pos();
-  if (auto it = std::ranges::find_if(z_orders, [&](auto handle) { return _windows[handle].contains_point(cursor_pos); });
-      it != z_orders.end())
-    return *it;
+  auto pos = get_cursor_pos();
+  for (auto top = GetTopWindow(nullptr); top; top = GetWindow(top, GW_HWNDNEXT))
+  {
+    if (!IsWindowVisible(top) || !Rect{ top }.contains(pos))
+      continue;
+
+    auto ex_style = static_cast<DWORD>(GetWindowLongPtrW(top, GWL_EXSTYLE));
+    if (top == _fullscreen_window._handle || _blur_windows.contains(top) || (ex_style & WS_EX_TRANSPARENT))
+      continue;
+
+    if (_windows.contains(top))
+      return top;
+
+    return {};
+  }
+
   return {};
 }
 
