@@ -98,7 +98,8 @@ void DescriptorHeapManager::DescriptorHeap::reserve(uint32_t capacity) noexcept
     auto size = _handles.size();
 
     // destroy old heap
-    g_renderer.add_frame_render_complete_func([_ = _heap] {});
+    // TODO: resource expand only happend in graphics rendering now
+    g_renderer.add_frame_render_complete_func([_ = _heap] {}, EngineType::graihcs);
 
     // create new bigger one
     auto heap_desc = D3D12_DESCRIPTOR_HEAP_DESC{};
@@ -117,6 +118,12 @@ void DescriptorHeapManager::DescriptorHeap::reserve(uint32_t capacity) noexcept
 auto DescriptorHeapManager::DescriptorHeap::usable_handle_count() const noexcept -> uint32_t
 {
   return std::ranges::count_if(_handles, [](auto const& slot) { return slot.used; });
+}
+
+void DescriptorHeapManager::DescriptorHeap::set(DescriptorHandle handle, std::function<void()> recreate_descriptor_func) noexcept
+{
+  assert(handle.is_valid() && _handles.size() > handle.index());
+  _handles[handle.index()].recreate_descriptor = recreate_descriptor_func;
 }
 
 void DescriptorHeapManager::init() noexcept

@@ -21,36 +21,46 @@ void PipelineSystem::init() noexcept
 
   auto info = PipelineCreateInfo{};
   info.shader                  = "assets/shader/ui/ui.hlsl";
-  info.graphics.vs             = "vs";
-  info.graphics.ps             = "ps";
   info.includes                = { "assets/shader/ui" };
-  info.graphics.rtv_format     = RenderResource::Render_Target_Format;
-  info.graphics.blend          = BlendState::Default();
   info.root_signature_result   = res;
+
+  info.info = PipelineCreateInfo::Graphics{};
+  auto& graphics = info.info.get<PipelineCreateInfo::Graphics>();
+  graphics.vs             = "vs";
+  graphics.ps             = "ps";
+  graphics.rtv_format     = RenderResource::Render_Target_Format;
+  graphics.blend          = BlendState::Default();
   _pipes.emplace(PipelineType::ui, info);
 
   info.shader = "assets/shader/ui/composite_write.hlsl";
   _pipes.emplace(PipelineType::composite_write, info);
 
-  info.graphics.stencil = {};
   info.shader = "assets/shader/ui/window_shadow.hlsl";
+  graphics.stencil = {};
   _pipes.emplace(PipelineType::window_shadow, info);
 
   info.shader = "assets/shader/ui/discard_draw.hlsl";
   _pipes.emplace(PipelineType::discard_draw, info);
 
   info.shader = "assets/shader/ui/mask_write.hlsl";
-  info.graphics.rtv_format = ImageFormat::r8_unorm;
-  info.graphics.blend      = BlendState::Max();
+  graphics.rtv_format = ImageFormat::r8_unorm;
+  graphics.blend      = BlendState::Max();
   _pipes.emplace(PipelineType::mask_write_max, info);
 
-  info.graphics.blend = BlendState::Add();
+  graphics.blend = BlendState::Add();
   _pipes.emplace(PipelineType::mask_write_add, info);
 
-  info.graphics.stencil = {};
   info.shader = "assets/shader/ui/window_shadow.hlsl";
-  info.graphics.blend = BlendState::Default();
+  graphics.blend = BlendState::Default();
   _pipes.emplace(PipelineType::window_shadow, info);
+
+  info.shader                = "assets/shader/mipmap.hlsl";
+  info.includes              = {};
+  info.root_signature_result = {};
+  info.info = PipelineCreateInfo::Compute{};
+  auto& compute = info.info.get<PipelineCreateInfo::Compute>();
+  compute.cs = "main";
+  _pipes.emplace(PipelineType::mipmap, info);
 
   // res = generate_root_signature(
   // {
@@ -81,7 +91,8 @@ auto PipelineSystem::find_root_param(std::span<CD3DX12_ROOT_PARAMETER1> params) 
 
 void PipelineSystem::Pipeline::init_graphics(PipelineCreateInfo const& info) noexcept
 {
-  auto compile_result = g_compiler.compile(info.shader, info.graphics.vs, info.graphics.ps, info.includes, info.root_signature_result, info.volatile_descs);
+  auto const& graphics = info.info.get<PipelineCreateInfo::Graphics>();
+  auto compile_result = g_compiler.compile(info.shader, graphics.vs, graphics.ps, info.includes, info.root_signature_result, info.volatile_descs);
   
   if (auto res = g_pipe_sys.find_root_param(compile_result.root_params))
     root_signature = res;
@@ -93,7 +104,7 @@ void PipelineSystem::Pipeline::init_graphics(PipelineCreateInfo const& info) noe
   
   auto render_target_formats = D3D12_RT_FORMAT_ARRAY{};
   render_target_formats.NumRenderTargets = 1;
-  render_target_formats.RTFormats[0]     = static_cast<DXGI_FORMAT>(info.graphics.rtv_format);
+  render_target_formats.RTFormats[0]     = static_cast<DXGI_FORMAT>(graphics.rtv_format);
   
   stream.pRootSignature        = root_signature;
   stream.InputLayout           = compile_result.input_layout_desc;
@@ -113,7 +124,7 @@ void PipelineSystem::Pipeline::init_graphics(PipelineCreateInfo const& info) noe
   depth_stencil_desc.DepthEnable           = false;
   depth_stencil_desc.DepthWriteMask        = D3D12_DEPTH_WRITE_MASK_ZERO;
   depth_stencil_desc.DepthBoundsTestEnable = false;
-  if (info.graphics.use_depth_test)
+  if (graphics.use_depth_test)
   {
     depth_stencil_desc.DepthEnable    = true;
     depth_stencil_desc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
@@ -125,23 +136,23 @@ void PipelineSystem::Pipeline::init_graphics(PipelineCreateInfo const& info) noe
     err_if(!options.DepthBoundsTestSupported, "unsupport depth bounds test");
     depth_stencil_desc.DepthBoundsTestEnable = true;
   }
-  if (info.graphics.stencil)
+  if (graphics.stencil)
   {
-    auto stencil = info.graphics.stencil.value();
+    auto stencil = graphics.stencil.value();
     depth_stencil_desc.StencilEnable = true;
     depth_stencil_desc.FrontFace.StencilPassOp = static_cast<D3D12_STENCIL_OP>(stencil.op);
     depth_stencil_desc.FrontFace.StencilFunc   = static_cast<D3D12_COMPARISON_FUNC>(stencil.comp);
     depth_stencil_desc.BackFace = depth_stencil_desc.FrontFace;
   }
-  if (info.graphics.use_depth_test || info.graphics.stencil)
+  if (graphics.use_depth_test || graphics.stencil)
     stream.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
   stream.DepthStencilState = depth_stencil_desc;
   
   auto  blend_state = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
   auto& rt          = blend_state.RenderTarget[0];
-  if (rt.BlendEnable = info.graphics.blend.has_value(); rt.BlendEnable)
+  if (rt.BlendEnable = graphics.blend.has_value(); rt.BlendEnable)
   {
-    auto blend = info.graphics.blend.value();
+    auto blend = graphics.blend.value();
     rt.SrcBlend       = static_cast<D3D12_BLEND>(blend.src);
     rt.DestBlend      = static_cast<D3D12_BLEND>(blend.dst);
     rt.BlendOp        = static_cast<D3D12_BLEND_OP>(blend.op);
@@ -149,8 +160,8 @@ void PipelineSystem::Pipeline::init_graphics(PipelineCreateInfo const& info) noe
     rt.DestBlendAlpha = static_cast<D3D12_BLEND>(blend.dst_alpha);
     rt.BlendOpAlpha   = static_cast<D3D12_BLEND_OP>(blend.op_alpha);
   }
-  if (info.graphics.stencil)
-    rt.RenderTargetWriteMask = info.graphics.stencil->write_color ? D3D12_COLOR_WRITE_ENABLE_ALL : 0;
+  if (graphics.stencil)
+    rt.RenderTargetWriteMask = graphics.stencil->write_color ? D3D12_COLOR_WRITE_ENABLE_ALL : 0;
   else
     rt.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
   stream.BlendState = blend_state;
@@ -162,7 +173,8 @@ void PipelineSystem::Pipeline::init_graphics(PipelineCreateInfo const& info) noe
 
 void PipelineSystem::Pipeline::init_compute(PipelineCreateInfo const& info) noexcept
 {
-  auto compile_result = g_compiler.compile(info.shader, info.compute.cs, info.includes, info.root_signature_result, info.volatile_descs);
+  auto const& compute = info.info.get<PipelineCreateInfo::Compute>();
+  auto compile_result = g_compiler.compile(info.shader, compute.cs, info.includes, info.root_signature_result, info.volatile_descs);
   if (auto res = g_pipe_sys.find_root_param(compile_result.root_params))
     root_signature = res;
   else

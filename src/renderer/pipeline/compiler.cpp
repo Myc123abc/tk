@@ -114,7 +114,7 @@ auto create_root_signature(std::span<CD3DX12_ROOT_PARAMETER1> root_params, bool 
   sampler_desc.AddressW       = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
   sampler_desc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
   sampler_desc.MaxLOD         = D3D12_FLOAT32_MAX;
-  if (!is_graphics)
+  if (is_graphics)
     sampler_desc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; 
 
   auto flag           = is_graphics ? D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT : D3D12_ROOT_SIGNATURE_FLAG_NONE;
@@ -329,7 +329,7 @@ auto Compiler::compile(
   {
     auto reflection = compile_result.get_shader_reflection(comp_res.Get());
     compile_result.get_root_parameters(reflection.Get(), true, volatile_descs);
-    compile_result.root_signature = create_root_signature(compile_result.root_params, false, false);
+    compile_result.root_signature = create_root_signature(compile_result.root_params, compile_result._has_sampler, false);
   }
   else
   {

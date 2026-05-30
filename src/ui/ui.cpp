@@ -77,7 +77,7 @@ auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8_t 
 
 auto load_image(std::string_view path) noexcept -> std::expected<void, ImageLoadError::Type>
 {
-  return g_img_mgr.try_load(path).transform([](auto&&) {});
+  return g_img_mgr.try_load(path, {}, {}).transform([](auto&&) {});
 }
 
 void load_font(std::string_view path) noexcept

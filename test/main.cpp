@@ -345,8 +345,8 @@ int main()
 {
   tk::init();
 
-  load_image(img1);
-  load_image(img2);
+  // load_image(img1);
+  // load_image(img2);
 
   ui::load_font("assets/font/NotoSansJP-Regular.ttf");
   ui::load_font("assets/font/NotoSansSC-Regular.ttf");
@@ -457,19 +457,19 @@ int main()
 
       // image
       auto res = std::expected<void, ui::ImageLoadError::Type>{};
-      if (loop_trigger)
-      {
-        auto img_ext = ui::image_extent(img2);
-        auto ext = wnd_ext - p2;
-        auto scale = std::max(img_ext.x / ext.x, img_ext.y / ext.y);
-        img_ext /= scale;
-        res = image(img2, p2, p2 + img_ext);
-      }
-      if (res) loop_trigger.update();
+      // if (loop_trigger)
+      // {
+      //   auto img_ext = ui::image_extent(img2);
+      //   auto ext = wnd_ext - p2;
+      //   auto scale = std::max(img_ext.x / ext.x, img_ext.y / ext.y);
+      //   img_ext /= scale;
+      //   res = image(img2, p2, p2 + img_ext);
+      // }
+      // if (res) loop_trigger.update();
 
-      ui::discard_beg([]{ ui::circle({50,50}, 50); });
-      res = image(img1, {}, wnd_ext, 0x44);
-      ui::discard_end();
+      // ui::discard_beg([]{ ui::circle({50,50}, 50); });
+      // res = image(img1, {}, wnd_ext, 0x44);
+      // ui::discard_end();
 
       // circle point
       auto size = ui::window_drawable_extent();

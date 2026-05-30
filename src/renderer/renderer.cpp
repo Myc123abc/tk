@@ -71,7 +71,7 @@ void Renderer::destroy() noexcept
   g_img_mgr.destroy();
 }
 
-void Renderer::create_window_resource(HWND handle, uint32_t width, uint32_t height) noexcept
+void Renderer::create_window_resource(HWND handle, uint width, uint height) noexcept
 {
   err_if(_res.contains(handle), "failed to create window render resource, it's already exist");
   auto res = RenderResource{};
@@ -86,23 +86,27 @@ void Renderer::destroy_window_resource(HWND handle, HWND blur_handle) noexcept
   {
     res.destroy();
     g_wnd_mgr.destroy_window(handle, blur_handle);
-  });
+  }, EngineType::graihcs);
   _res.erase(handle);
   _destroied_windows.emplace(handle);
 }
 
-void Renderer::resize_window_resource(HWND handle, uint32_t width, uint32_t height) noexcept
+void Renderer::resize_window_resource(HWND handle, uint width, uint height) noexcept
 {
   err_if(!_res.contains(handle), "failed to destroy window render resource, it's unexist");
   _res[handle].resize(width, height);
 }
 
-void Renderer::add_frame_render_complete_func(std::move_only_function<void()>&& func) noexcept
+void Renderer::add_frame_render_complete_func(std::move_only_function<void()>&& func, Flag<EngineType> flag) noexcept
 {
-  auto last_fence_values = std::vector<std::pair<Engine&, uint64_t>>
-  {
-    { g_graphics_engine, g_graphics_engine.signal() },
-  };
+  auto last_fence_values = std::vector<std::pair<Engine&, uint64_t>>{};
+  if (flag.contains(EngineType::graihcs))
+    last_fence_values.emplace_back(g_graphics_engine, g_graphics_engine.signal());
+  if (flag.contains(EngineType::copy))
+    last_fence_values.emplace_back(g_copy_engine, g_copy_engine.signal());
+  if (flag.contains(EngineType::compute))
+    last_fence_values.emplace_back(g_comp_engine, g_comp_engine.signal());
+
   _frame_render_complete_funcs.emplace_back([func = std::move(func), last_fence_values = std::move(last_fence_values)]() mutable
   {
     for (auto [engine, last_fence_value] : last_fence_values)
@@ -138,8 +142,6 @@ void Renderer::preprocess_render() noexcept
 void Renderer::process_render() noexcept
 {  
   preprocess_render();
-
-  generate_mipmap();
 
   for (auto [handle, data, blur_host_window, blur_window_rect] : _render_infos)
   {
@@ -208,7 +210,7 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
     auto& img = g_img_mgr[handle];
     if (rect.width() > img.width() || rect.height() > img.height())
     {
-      add_frame_render_complete_func([handle] { g_img_mgr.destroy(handle); });
+      add_frame_render_complete_func([handle] { g_img_mgr.destroy(handle); }, EngineType::graihcs);
       handle = g_img_mgr.create(rect.width(), rect.height(), img);
     }
     g_img_mgr[handle].clear_render_target(cmd);
@@ -330,65 +332,6 @@ void Renderer::postprocess_render() noexcept
 {
   _destroied_windows.clear();
   _render_windows.clear();
-}
-
-void Renderer::generate_mipmap() noexcept
-{
-#if 0
-  if (_pending_mipmap_image_handles.empty()) return;
-
-  g_comp_engine.acquire_slot();
-
-  auto cmd = g_comp_engine.cmd();
-  _mipmap_pipeline.bind(cmd);
-
-  // generate mipmaps of images
-  struct MipmapGenerationCostant
-  {
-    float2 texel_size{};
-    uint32_t  mip_level{};
-  };
-  auto constants = MipmapGenerationCostant{};
-  for (auto const& handle : _pending_mipmap_image_handles)
-  {
-    auto const& img = _images[handle];
-
-    auto src_width  = img.width();
-    auto src_height = img.height();
-
-    for (auto i = 0; i < img.mipmap_uavs().size(); ++i)
-    {
-      constants.texel_size = float2{ 1.0 / src_width, 1.0 / src_height };
-      constants.mip_level  = i;
-
-      _mipmap_pipeline.set_constants(cmd, "constants", constants);
-      _mipmap_pipeline.set_descriptors(cmd,
-      {
-        { "src", img.gpu_handle()                  },
-        { "dst", img.mipmap_uavs()[i].gpu_handle() },
-      });
-
-      auto dst_width  = std::max(1u, src_width  >> 1);
-      auto dst_height = std::max(1u, src_height >> 1);
-
-      cmd->Dispatch(((dst_width + 7) / 8), ((dst_height + 7) / 8), 1);
-
-      src_width  = dst_width;
-      src_height = dst_height;
-    }
-  }
-
-  // wait mipmap generation complete
-  g_graphics_engine.wait(g_comp_engine, g_comp_engine.submit_slot());
-
-  // release mipmap uavs after generation complete
-  add_frame_render_complete_func([this, handles = std::move(_pending_mipmap_image_handles)]
-  {
-    for (auto const& handle : handles)
-      _images[handle].release_mipmap_uavs();
-  });
-  _pending_mipmap_image_handles.clear();
-#endif
 }
 
 }

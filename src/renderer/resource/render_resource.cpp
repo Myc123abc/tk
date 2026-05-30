@@ -12,7 +12,7 @@ using namespace Microsoft::WRL;
 
 namespace tk::renderer {
 
-void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
+void RenderResource::init(HWND handle, uint width, uint height) noexcept
 {
   // create images
   for (auto& frame : _frames)
@@ -69,6 +69,9 @@ void RenderResource::init(HWND handle, uint32_t width, uint32_t height) noexcept
 
 void RenderResource::destroy() noexcept
 {
+  // g_graphics_engine.signal();
+  // WaitForSingleObjectEx(g_graphics_engine.set_event_on_completion(), INFINITE, false);
+
   CloseHandle(_swapchain_waitable_obj);
   g_img_mgr.destroy(_dsv_image);
   for (auto& frame : _frames)
@@ -79,7 +82,7 @@ void RenderResource::destroy() noexcept
   }
 }
 
-void RenderResource::resize(uint32_t width, uint32_t height) noexcept
+void RenderResource::resize(uint width, uint height) noexcept
 {
   // wait gpu complete
   g_graphics_engine.signal();
@@ -169,7 +172,7 @@ void RenderResource::present(bool vsync) const noexcept
   {
     res = g_core.device()->GetDeviceRemovedReason();
     err_if(res == DXGI_ERROR_DEVICE_HUNG, "failed to present, device hung");
-    err_if(true, "failed to present : {}", static_cast<uint32_t>(res));
+    err_if(true, "failed to present : {}", static_cast<uint>(res));
   }
 }
 

@@ -71,17 +71,30 @@ void Image::destroy() noexcept
   _desc.uav.release();
   _desc.rtv.release();
   _desc.dsv.release();
+  release_mipmap_descs();
+}
+
+void Image::release_mipmap_descs() noexcept
+{
+  for (auto& uav : _mipmap_descs) uav.release(); 
+  _mipmap_descs.clear();
 }
 
 void Image::init(uint width , uint height, ImageFormat format, Flag<ImageType> type, bool use_mipmap) noexcept
 {
+  // not consider mipmap image can be resized
+  assert(_mipmap_descs.empty());
+
   auto device = g_core.device();
 
   _width  = width;
   _height = height;
   _format = static_cast<DXGI_FORMAT>(format);
   _type   = type;
-  _state  = dx12_resource_states(type);
+  if (_states.empty())
+    _states.emplace_back(dx12_resource_states(type));
+  else
+    _states[0] = dx12_resource_states(type);
 
   // create image
   auto texture_desc = D3D12_RESOURCE_DESC{};
@@ -103,7 +116,7 @@ void Image::init(uint width , uint height, ImageFormat format, Flag<ImageType> t
   if (_type.contains(ImageType::dsv))
     clear_value.DepthStencil.Depth = 1.f;
   auto clear_value_ptr = (_type.any(ImageType::rtv, ImageType::dsv)) ? &clear_value : nullptr;
-  err_if(device->CreateCommittedResource(&heap_properties, D3D12_HEAP_FLAG_NONE, &texture_desc, _state, clear_value_ptr, IID_PPV_ARGS(_handle.ReleaseAndGetAddressOf())),
+  err_if(device->CreateCommittedResource(&heap_properties, D3D12_HEAP_FLAG_NONE, &texture_desc, _states[0], clear_value_ptr, IID_PPV_ARGS(_handle.ReleaseAndGetAddressOf())),
           "failed to create image");
 
   create_descriptor(use_mipmap);
@@ -111,6 +124,7 @@ void Image::init(uint width , uint height, ImageFormat format, Flag<ImageType> t
 
 void Image::init(IDXGISwapChain1* swapchain, uint index) noexcept
 {
+  assert(_mipmap_descs.empty());
   err_if(swapchain->GetBuffer(index, IID_PPV_ARGS(_handle.ReleaseAndGetAddressOf())),
          "failed to get descriptor");
   DXGI_SWAP_CHAIN_DESC1 desc{};
@@ -120,6 +134,8 @@ void Image::init(IDXGISwapChain1* swapchain, uint index) noexcept
   _height = desc.Height;
   _format = desc.Format;
   _type   = ImageType::rtv;
+
+  if (_states.empty()) _states.emplace_back();
 
   create_descriptor();
 }
@@ -133,13 +149,14 @@ void Image::init(IDXGISwapChain1* swapchain, uint index) noexcept
 //   create_descriptor();
 // }
 
-void Image::set_state(ID3D12GraphicsCommandList1* cmd, ImageState state) noexcept
+void Image::set_state(ID3D12GraphicsCommandList1* cmd, ImageState state, uint subresource) noexcept
 {
   auto transition_state = static_cast<D3D12_RESOURCE_STATES>(state);
-  if (_state == transition_state) return;
-  auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_handle.Get(), _state, transition_state);
+  auto& stat = subresource == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES ? _states[0] : _states[subresource];
+  if (stat == transition_state) return;
+  auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_handle.Get(), stat, transition_state, subresource);
   cmd->ResourceBarrier(1, &barrier);
-  _state = transition_state;
+  stat = transition_state;
 }
 
 void Image::create_descriptor(bool use_mipmap) noexcept
@@ -194,36 +211,56 @@ void Image::create_descriptor(bool use_mipmap) noexcept
   if (_type.contains(ImageType::dsv))
     create_depth_stencil_view();
 
-  // // create mipmap uavs for generate mipmap
-  // if (use_mipmap)
-  // {
-  //   // get count of mipmap images
-  //   auto count = _handle->GetDesc().MipLevels;
-  //   _mipmap_uavs.reserve(count);
-  //   for (auto i = 1; i < count; ++i)
-  //   {
-  //     // pop descriptor handle
-  //     auto handle = g_desc_heap_mgr.pop_handle(DescriptorHeapType::cbv_srv_uav);
+  // create mipmap uavs for generate mipmap
+  if (use_mipmap)
+  {
+    assert(_mipmap_descs.empty());
 
-  //     // create mipmap uav func
-  //     auto create_mipmap_uav = [this, i, handle = handle.cpu_handle()]
-  //     {
-  //       auto desc               = D3D12_UNORDERED_ACCESS_VIEW_DESC{};
-  //       desc.Format             = _format;
-  //       desc.ViewDimension      = D3D12_UAV_DIMENSION_TEXTURE2D;
-  //       desc.Texture2D.MipSlice = i;
-  //       device->CreateUnorderedAccessView(_handle.Get(), nullptr, &desc, handle);
-  //     };
+    // get count of mipmap images
+    auto count = _handle->GetDesc().MipLevels;
+    _mipmap_descs.reserve(count);
+
+    // create first mipmap descriptor as srv
+    _states.emplace_back(static_cast<D3D12_RESOURCE_STATES>(ImageState::common));
+    auto handle = g_desc_heap_mgr.pop_handle(DescriptorHeapType::cbv_srv_uav);
+    _mipmap_descs.emplace_back(handle);
+    auto create_shader_resource_view = [&, handle = _mipmap_descs[0].cpu_handle()]
+    {
+      auto srv_desc = D3D12_SHADER_RESOURCE_VIEW_DESC{};
+      srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+      srv_desc.Format                  = _format;
+      srv_desc.ViewDimension           = D3D12_SRV_DIMENSION_TEXTURE2D;
+      srv_desc.Texture2D.MipLevels     = 1;
+      device->CreateShaderResourceView(_handle.Get(), &srv_desc, handle);
+    };
+    create_shader_resource_view();
+    g_desc_heap_mgr.set(handle, std::move(create_shader_resource_view));
+
+    for (auto i = 1; i < count; ++i)
+    {
+      // pop descriptor handle
+      auto handle = g_desc_heap_mgr.pop_handle(DescriptorHeapType::cbv_srv_uav);
+
+      // create mipmap uav func
+      auto create_mipmap_uav = [this, i, handle = handle.cpu_handle()]
+      {
+        auto desc               = D3D12_UNORDERED_ACCESS_VIEW_DESC{};
+        desc.Format             = _format;
+        desc.ViewDimension      = D3D12_UAV_DIMENSION_TEXTURE2D;
+        desc.Texture2D.MipSlice = i;
+        device->CreateUnorderedAccessView(_handle.Get(), nullptr, &desc, handle);
+      };
       
-  //     // create uav
-  //     create_mipmap_uav();
+      // create uav
+      create_mipmap_uav();
 
-  //     // store creatation func to descriptor handle avoid dynamic expand handle invalidation
-  //     handle.set(std::move(create_mipmap_uav));
+      // store creatation func to descriptor handle avoid dynamic expand handle invalidation
+      g_desc_heap_mgr.set(handle, std::move(create_mipmap_uav));
 
-  //     _mipmap_uavs.emplace_back(std::move(handle));
-  //   }
-  // }
+      _mipmap_descs.emplace_back(std::move(handle));
+      _states.emplace_back(static_cast<D3D12_RESOURCE_STATES>(ImageState::common));
+    }
+  }
 }
 
 void Image::clear(ID3D12GraphicsCommandList1* cmd, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) const noexcept
@@ -367,12 +404,5 @@ void copy(Bitmap const& src, Bitmap const& dst) noexcept
     dst_data += dst.row_pitch;
   }
 }
-
-// void Image::release_mipmap_uavs() noexcept
-// {
-//   assert(!_mipmap_uavs.empty());
-//   for (auto& uav : _mipmap_uavs) uav.release(); 
-//   _mipmap_uavs.clear();
-// }
 
 }

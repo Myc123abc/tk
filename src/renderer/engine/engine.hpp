@@ -21,7 +21,6 @@ public:
   Engine& operator=(Engine&&)      = delete;
 
   auto signal() noexcept -> uint64;
-  [[nodiscard]]
   auto submit() noexcept -> uint64;
 
   auto fence_completed_value() const noexcept { return _fence->GetCompletedValue(); }

@@ -38,6 +38,16 @@ struct GraphicsDrawInfo
   uint                   idx_cnt{};
 };
 
+template <typename T>
+requires std::is_trivially_copyable_v<T> && (sizeof(T) % 4 == 0) && (sizeof(T) <= 256)
+struct ComputePipeSetInfo
+{
+  PipelineType                        type;
+  std::string_view                    constants_name;
+  T                                   constants;
+  std::vector<PipelineDescriptorInfo> descs;
+};
+
 Singleton(Context, g_ctx,
 public:
   void set_cmd(ID3D12GraphicsCommandList1* cmd) noexcept;
@@ -68,6 +78,9 @@ public:
 
   template <typename T>
   void graphics_draw(GraphicsDrawInfo<T> const& info) noexcept;
+
+  template <typename T>
+  void compute_pipe_set(ComputePipeSetInfo<T> const& info) noexcept;
 
 private:
   using DescMapType = std::unordered_map<uint, D3D12_GPU_DESCRIPTOR_HANDLE>;
@@ -125,7 +138,7 @@ void Context::set_compute_constants(uint root_param_idx, T const& constants)
 template <typename T>
 void Context::graphics_pipe_set(GraphicsPipeSetInfo<T> const& info) noexcept
 {
-  auto pipe = g_pipe_sys.pipe(info.type);
+  auto const& pipe = g_pipe_sys.pipe(info.type);
   set_pipe(pipe->pipe_state.Get());
   set_graphics_root_signature(pipe->root_signature);
   set_primitive_topology(pipe->primive_topology);
@@ -142,6 +155,17 @@ void Context::graphics_draw(GraphicsDrawInfo<T> const& info) noexcept
   set_render_target(info.render_target, info.depth_stencil);
   graphics_pipe_set(info.pipe_info);
   draw(info.idx_beg, info.idx_cnt);
+}
+
+template <typename T>
+void Context::compute_pipe_set(ComputePipeSetInfo<T> const& info) noexcept
+{
+  auto const& pipe = g_pipe_sys.pipe(info.type);
+  set_pipe(pipe->pipe_state.Get());
+  set_compute_root_signature(pipe->root_signature);
+  set_compute_constants(pipe->root_param_idx(info.constants_name), info.constants);
+  for (auto const& [name, handle] : info.descs)
+    set_compute_descriptor(pipe->root_param_idx(name), handle);
 }
 
 }

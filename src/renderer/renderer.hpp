@@ -10,6 +10,13 @@
 
 namespace tk::renderer {
 
+enum class EngineType
+{
+  graihcs,
+  copy,
+  compute,
+};
+
 Singleton(Renderer, g_renderer,
 public:
   void init() noexcept;
@@ -18,7 +25,7 @@ public:
   void render() noexcept;
 
   void message_process() noexcept;
-  void add_frame_render_complete_func(std::move_only_function<void()>&& func) noexcept;
+  void add_frame_render_complete_func(std::move_only_function<void()>&& func, Flag<EngineType> flag) noexcept;
 
   struct RenderInfo
   {
@@ -29,9 +36,9 @@ public:
   };
   void submit(RenderInfo const& info) noexcept { _render_infos.emplace_back(info); }
 
-  void create_window_resource(HWND handle, uint32_t width, uint32_t height) noexcept;
+  void create_window_resource(HWND handle, uint width, uint height) noexcept;
   void destroy_window_resource(HWND handle, HWND blur_handle) noexcept;
-  void resize_window_resource(HWND handle, uint32_t width, uint32_t height) noexcept;
+  void resize_window_resource(HWND handle, uint width, uint height) noexcept;
   void show_blur_window(HWND handle, HWND blur_handle) noexcept { _show_blur_wnds.emplace(handle, blur_handle); }
 
   void clear_blur_resize_data() noexcept { _blur_host_window = {}; _blur_window_rect = {}; }
@@ -44,7 +51,6 @@ private:
 
   void process_render() noexcept;
   void render(RenderResource& res, ui::FrameData const* frame_data) noexcept;
-  void generate_mipmap() noexcept;
 
   void postprocess_render() noexcept;
 

@@ -1,6 +1,7 @@
 #include "copy_engine.hpp"
 #include "../resource/image.hpp"
 #include "graphics_engine.hpp"
+#include "compute_engine.hpp"
 
 #include <algorithm>
 
@@ -95,6 +96,8 @@ void CopyEngine::update() noexcept
 
   // wait copy complete before rendering
   g_graphics_engine.wait(g_copy_engine, fence_value);
+  // TODO: set resource tracking judge whether wait for compute engine like generate mipmap
+  g_comp_engine.wait(g_copy_engine, fence_value);
 }
 
 }

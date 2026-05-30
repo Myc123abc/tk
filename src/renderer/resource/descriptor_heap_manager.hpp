@@ -42,9 +42,7 @@ private:
 };
 
 Singleton(DescriptorHeapManager, g_desc_heap_mgr,
-
   friend class DescriptorHandle;
-
 public:
   class DescriptorHeap
   {
@@ -67,6 +65,8 @@ public:
     auto usable_handle_count() const noexcept -> uint32_t;
 
     auto size() const noexcept { return _handles.size(); }
+    
+    void set(DescriptorHandle handle, std::function<void()> recreate_descriptor_func) noexcept;
 
   private:
     struct DescriptorSlot
@@ -95,6 +95,8 @@ public:
   auto usable_handle_count(DescriptorHeapType type) noexcept { return _heaps[type].usable_handle_count(); }
 
   auto first_gpu_handle(DescriptorHeapType type) noexcept { return _heaps[type]._heap->GetGPUDescriptorHandleForHeapStart(); }
+
+  void set(DescriptorHandle handle, std::function<void()> recreate_descriptor_func) noexcept { _heaps[handle._type].set(handle, recreate_descriptor_func); }
 
 private:
   std::unordered_map<DescriptorHeapType, DescriptorHeap> _heaps;

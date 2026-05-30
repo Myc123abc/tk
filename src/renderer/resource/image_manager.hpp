@@ -15,12 +15,7 @@ using ImageHandle   = ImagePoolType::Handle;
 
 Singleton(ImageManager, g_img_mgr,
 public:
-  auto create(uint width , uint height, ImageFormat format, Flag<ImageType> types, bool use_mipmap = false) noexcept
-  {
-    auto handle = _pool.alloc();
-    _pool[handle].init(width, height, format, types, use_mipmap);
-    return handle;
-  }
+  auto create(uint width , uint height, ImageFormat format, Flag<ImageType> types, bool use_mipmap = false) noexcept -> ImageHandle;
 
   auto create(IDXGISwapChain1* swapchain, uint index) noexcept
   {
@@ -51,11 +46,11 @@ public:
   auto get(ImageHandle handle) noexcept { return _pool.get(handle); }
 
   auto extent(std::string_view path) noexcept -> float2;
-  auto try_load(std::string_view path) noexcept -> std::expected<ImageHandle, ui::ImageLoadError::Type>;
+  auto try_load(std::string_view path, uint w, uint h) noexcept -> std::expected<ImageHandle, ui::ImageLoadError::Type>;
   void update() noexcept;
 
 private:
-  void load(std::string_view path, uint width, uint height, void* data) noexcept;
+  void load(std::string_view path, uint width, uint height, void* data, bool use_mipmap) noexcept;
 
 private:
   ImagePoolType _pool;
@@ -65,6 +60,7 @@ private:
     void*       data{};
     int         w{}, h{};
     std::string err_msg;
+    bool        use_mipmap{};
   };
   std::unordered_map<std::string, Task<LoadResult>> _load_tasks;
   std::unordered_map<std::string, ImageHandle>      _loaded_images;

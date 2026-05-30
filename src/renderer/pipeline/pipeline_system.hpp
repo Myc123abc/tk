@@ -3,6 +3,7 @@
 #include "../../util/singleton.hpp"
 #include "../resource/image.hpp"
 #include "compiler.hpp"
+#include "util/variant.hpp"
 
 #include <span>
 
@@ -22,6 +23,8 @@ enum class PipelineType
   composite_write,
 
   discard_draw,
+
+  mipmap,
 };
 
 enum class StencilOp
@@ -107,23 +110,22 @@ struct PipelineCreateInfo
   std::optional<RootSignatureResult>   root_signature_result;
   std::unordered_set<std::string_view> volatile_descs;
 
-  union
+  struct Graphics
   {
-    struct
-    {
-      std::string_view            vs;
-      std::string_view            ps;
-      ImageFormat                 rtv_format;
-      bool                        use_depth_test{};
-      std::optional<BlendState>   blend{};
-      std::optional<StencilState> stencil{};
-    } graphics;
-
-    struct
-    {
-      std::string_view cs;
-    } compute;
+    std::string_view            vs;
+    std::string_view            ps;
+    ImageFormat                 rtv_format;
+    bool                        use_depth_test{};
+    std::optional<BlendState>   blend{};
+    std::optional<StencilState> stencil{};
   };
+
+  struct Compute
+  {
+    std::string_view cs;
+  };
+
+  Variant<std::monostate, Graphics, Compute> info;
 };
 
 Singleton(PipelineSystem, g_pipe_sys,
@@ -145,10 +147,11 @@ private:
 
     Pipeline(PipelineCreateInfo const& info) noexcept
     {
-      if (info.graphics.vs.empty())
-        init_compute(info);
-      else
-        init_graphics(info);
+      info.info.visit(
+        [&](PipelineCreateInfo::Graphics) { init_graphics(info); },
+        [&](PipelineCreateInfo::Compute) { init_compute(info); },
+        VariantUnreachableCase
+      );
     }
 
     void init_graphics(PipelineCreateInfo const& info) noexcept;

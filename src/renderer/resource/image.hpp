@@ -124,7 +124,7 @@ public:
 
   void destroy() noexcept;
 
-  void set_state(ID3D12GraphicsCommandList1* cmd, ImageState state) noexcept;
+  void set_state(ID3D12GraphicsCommandList1* cmd, ImageState state, uint subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES) noexcept;
 
   void resize(uint width, uint height) noexcept { if (!_handle.Get() || _width != width || _height != height) init(width, height, static_cast<ImageFormat>(_format), _type); }
   void resize(IDXGISwapChain1* swapchain, uint index) noexcept { init(swapchain, index); }
@@ -144,13 +144,13 @@ public:
 
   auto readback(ID3D12GraphicsCommandList1* cmd, RECT rect) noexcept -> std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, Bitmap>;
 
-  auto srv() const noexcept { return _desc.srv; }
-  auto uav() const noexcept { return _desc.uav; }
-  auto rtv() const noexcept { return _desc.rtv; }
-  auto dsv() const noexcept { return _desc.dsv; }
-  // auto& mipmap_uavs() const noexcept { return _mipmap_uavs; }
+  auto  srv()          const noexcept { return _desc.srv;     }
+  auto  uav()          const noexcept { return _desc.uav;     }
+  auto  rtv()          const noexcept { return _desc.rtv;     }
+  auto  dsv()          const noexcept { return _desc.dsv;     }
+  auto& mipmap_descs() const noexcept { return _mipmap_descs; }
 
-  // void release_mipmap_uavs() noexcept;
+  void release_mipmap_descs() noexcept;
 
 private:
   void create_descriptor(bool use_mipmap = false) noexcept;
@@ -161,7 +161,7 @@ private:
   uint                                   _height{};
   DXGI_FORMAT                            _format{};
   Flag<ImageType>                        _type{};
-  D3D12_RESOURCE_STATES                  _state{};
+  std::vector<D3D12_RESOURCE_STATES>     _states{};
 
   struct Descriptors
   {
@@ -172,7 +172,7 @@ private:
   };
   Descriptors _desc;
 
-  // std::vector<DescriptorHandle>          _mipmap_uavs;
+  std::vector<DescriptorHandle> _mipmap_descs;
 };
 
 ////////////////////////////////////////////////////////////////////////////////

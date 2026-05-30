@@ -4,9 +4,9 @@
 #include "../resource/shader_type.hpp"
 #include "graphics_engine.hpp"
 #include "../context.hpp"
+#include "../renderer.hpp"
 
 #include <assert.h>
-#include <ranges>
 
 using namespace tk::renderer;
 
@@ -57,6 +57,8 @@ void ComputeEngine::destroy() noexcept
 
 auto ComputeEngine::get_tmp_img() noexcept -> std::pair<Image*, uint32_t>
 {
+  // refactoring code
+  assert(false);
   Image*   tmp_img{};
   uint32_t idx{};
   if (auto it = std::ranges::find(_blur_tmp_images, false, &BlurTmpImage::in_use);
@@ -78,6 +80,9 @@ auto ComputeEngine::get_tmp_img() noexcept -> std::pair<Image*, uint32_t>
 
 void ComputeEngine::blur(Image& src, Image& dst, float sigma, uint32_t blur_count) noexcept
 {
+  // refactoring code
+  assert(false);
+
   // copy image
   g_graphics_engine.acquire_slot();
   g_graphics_engine.copy(src, dst);
@@ -102,8 +107,8 @@ void ComputeEngine::blur(Image& src, Image& dst, float sigma, uint32_t blur_coun
   else
     tmp_img->resize(width, height);
 
-  auto horizontal_pipe = g_pipe_sys.pipe(PipelineType::blur_horizontal_pass);
-  auto vertical_pipe   = g_pipe_sys.pipe(PipelineType::blur_vertical_pass);
+  auto const& horizontal_pipe = g_pipe_sys.pipe(PipelineType::blur_horizontal_pass);
+  auto const& vertical_pipe   = g_pipe_sys.pipe(PipelineType::blur_vertical_pass);
 
   g_ctx.set_cmd(cmd());
   g_ctx.set_compute_root_signature(horizontal_pipe->root_signature);
@@ -131,6 +136,9 @@ void ComputeEngine::blur(Image& src, Image& dst, float sigma, uint32_t blur_coun
 
 void ComputeEngine::update() noexcept
 {
+  generate_mipmaps();
+
+#if 0
   auto finish_value = fence_completed_value();
   for (auto it = _used_blur_tmp_images.begin(); it != _used_blur_tmp_images.end();)
   {
@@ -150,6 +158,81 @@ void ComputeEngine::update() noexcept
     else
       ++it;
   }
+#endif
+}
+
+void ComputeEngine::generate_mipmaps() noexcept
+{
+  if (_mipmap_images.empty()) return;
+
+  // TODO: need use slot, because not this mipmap can be used in current frame
+  reset_cmd();
+
+  auto cmd = Engine::cmd();
+
+  g_desc_heap_mgr.bind_heaps(cmd);
+
+  g_ctx.set_cmd(cmd);
+
+  struct MipmapConstant
+  {
+    float2 texel_size;
+    uint   mip_level{};
+  };
+
+  for (auto handle : _mipmap_images)
+  {
+    auto& img = g_img_mgr[handle];
+    auto src_w = img.width();
+    auto src_h = img.height();
+
+    assert(!img.mipmap_descs().empty());
+    auto const& src_desc = img.mipmap_descs()[0];
+    img.set_state(cmd, ImageState::non_pixel, 0);
+
+    for (auto i = 1u; i < img.mipmap_descs().size(); ++i)
+    {
+      // TODO: should i reset mipmap resources' state to srv?
+      img.set_state(cmd, ImageState::compute_rw, i);
+      g_ctx.compute_pipe_set(ComputePipeSetInfo
+      {
+        .type           = PipelineType::mipmap,
+        .constants_name = "constants",
+        .constants      = MipmapConstant
+        {
+          .texel_size = float2{ 1.0 / src_w, 1.0 / src_h },
+          .mip_level  = i,
+        },
+        .descs =
+        {
+          { "src", src_desc.gpu_handle()              },
+          { "dst", img.mipmap_descs()[i].gpu_handle() },
+        }
+      });
+
+      auto dst_w = std::max(1u, img.width()  >> 1);
+      auto dst_h = std::max(1u, img.height() >> 1);
+
+      g_ctx.dispatch((dst_w + 7) / 8,  (dst_h + 7) / 8, 1);
+
+      src_w = dst_w;
+      src_h = dst_h;
+    }
+  }
+
+  submit();
+
+  // TODO: do i need to wait for graphics_engines? or set resource tracking when be used in rendering?
+  // TODO: remove after use slot
+  g_graphics_engine.wait(g_comp_engine);
+  
+  // release mipmap uavs after generation complete
+  g_renderer.add_frame_render_complete_func([this, handles = std::move(_mipmap_images)]
+  {
+    for (auto const& handle : handles) g_img_mgr[handle].release_mipmap_descs();
+  }, EngineType::compute);
+
+  _mipmap_images.clear();
 }
 
 }

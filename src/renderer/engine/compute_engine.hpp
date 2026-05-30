@@ -18,11 +18,13 @@ public:
 
   void destroy() noexcept;
 
+  void add_generate_mipmap_image(ImageHandle handle) noexcept { _mipmap_images.emplace_back(handle); }
   void blur(Image& src, Image& dst, float sigma, uint32_t blur_count) noexcept;
 
   void update() noexcept;
 
 private:
+  void generate_mipmaps() noexcept;
   auto get_tmp_img() noexcept -> std::pair<Image*, uint32_t>;
 
 private:
@@ -35,6 +37,8 @@ private:
   };
   std::vector<BlurTmpImage>                 _blur_tmp_images;
   std::deque<std::pair<uint32_t, uint64_t>> _used_blur_tmp_images;
+
+  std::vector<ImageHandle> _mipmap_images;
 )
 
 }

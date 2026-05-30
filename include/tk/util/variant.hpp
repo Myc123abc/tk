@@ -76,4 +76,11 @@ struct IgnoreVariantCase
 };
 inline constexpr IgnoreVariantCase VariantDefaultCase;
 
+struct UnreachableVariantCase
+{
+  template <typename T>
+  constexpr void operator()(T&&)  const noexcept { std::unreachable(); }
+};
+inline constexpr UnreachableVariantCase VariantUnreachableCase;
+
 }

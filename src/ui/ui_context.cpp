@@ -527,7 +527,7 @@ auto UIContext::image(std::string_view path, float2 left_top, float2 right_botto
 {
   check_draw();
 
-  auto res = g_img_mgr.try_load(path);
+  auto res = g_img_mgr.try_load(path, right_bottom.x - left_top.x, right_bottom.y - left_top.y);
   if (res)
   {
     frame_data()->add_image(res.value(), left_top, right_bottom, alpha);

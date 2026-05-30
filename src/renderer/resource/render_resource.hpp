@@ -45,10 +45,10 @@ public:
 
   static constexpr auto Render_Target_Format = ImageFormat::bgra8_unorm;
 
-  void init(HWND handle, uint32_t width, uint32_t height) noexcept;
+  void init(HWND handle, uint width, uint height) noexcept;
   void destroy() noexcept;
 
-  void resize(uint32_t width, uint32_t height) noexcept;
+  void resize(uint width, uint height) noexcept;
 
   void wait_frame_complete() noexcept;
 
@@ -67,7 +67,7 @@ private:
     ImageHandle                                    image;
     ImageHandle                                    swapchain_image;
     FrameBuffer                                    buffer;
-    uint64_t                                       fence_value{};
+    uint64                                         fence_value{};
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> cmd_alloc;
   };
 
@@ -79,7 +79,7 @@ private:
   Microsoft::WRL::ComPtr<IDCompositionTarget> _comp_target;
   Microsoft::WRL::ComPtr<IDCompositionVisual> _comp_visual;
 
-  uint32_t                                    _frame_index{};
+  uint                                        _frame_index{};
 };
 
 }
