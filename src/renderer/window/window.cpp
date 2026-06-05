@@ -10,7 +10,7 @@ using namespace tk::ui;
 
 namespace tk::renderer {
 
-void Window::init(int x, int y, uint32_t width, uint32_t height, ui::Backdrop const& backdrop) noexcept
+void Window::init(int x, int y, uint width, uint height, ui::Backdrop const& backdrop) noexcept
 {
   auto monitor = Monitor{ { x, y, static_cast<LONG>(x + width), static_cast<LONG>(y + height) } };
 
@@ -68,7 +68,7 @@ void Window::update_blur_window(ui::Backdrop const& backdrop) noexcept
   _blur_res.update(backdrop);
 }
 
-void Window::init_auxiliary(int x, int y, uint32_t width, uint32_t height) noexcept
+void Window::init_auxiliary(int x, int y, uint width, uint height) noexcept
 {
   _x      = x;
   _y      = y;

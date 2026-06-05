@@ -13,14 +13,14 @@ using namespace tk::renderer;
 
 namespace {
 
-auto to_64_bits(uint32_t x, uint32_t y) noexcept
+auto to_64_bits(uint x, uint y) noexcept
 {
-  return static_cast<uint64_t>(x) << 32 | y;
+  return static_cast<uint64>(x) << 32 | y;
 }
 
-auto to_32_bits(uint64_t x) noexcept -> std::pair<uint32_t, uint32_t>
+auto to_32_bits(uint64 x) noexcept -> std::pair<uint, uint>
 {
-  return { static_cast<uint32_t>(x >> 32), static_cast<uint32_t>(x & 0xffffffff) };
+  return { static_cast<uint>(x >> 32), static_cast<uint>(x & 0xffffffff) };
 }
 
 void set_cursor(ResizeType type) noexcept
@@ -357,7 +357,7 @@ auto WindowManager::create_fullscreen_window() noexcept -> HWND
   return _fullscreen_window._handle;
 }
 
-auto WindowManager::create_window(int x, int y, uint32_t width, uint32_t height, ui::Backdrop const& backdrop) noexcept -> HWND
+auto WindowManager::create_window(int x, int y, uint width, uint height, ui::Backdrop const& backdrop) noexcept -> HWND
 {
   // init window and set handle
   auto window = Window{};

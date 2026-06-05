@@ -54,9 +54,16 @@ void PipelineSystem::init() noexcept
   graphics.blend = BlendState::Default();
   _pipes.emplace(PipelineType::window_shadow, info);
 
+
+  res = generate_root_signature(
+  {
+    { constants,  "constants", 0, 0, false, sizeof(float2) },
+    { texture,    "src",       0, 0, true,                 },
+    { rw_texture, "dst",       0, 0, true,                 },
+  }, false, true);
   info.shader                = "assets/shader/mipmap.hlsl";
   info.includes              = {};
-  info.root_signature_result = {};
+  info.root_signature_result = res;
   info.info = PipelineCreateInfo::Compute{};
   auto& compute = info.info.get<PipelineCreateInfo::Compute>();
   compute.cs = "main";

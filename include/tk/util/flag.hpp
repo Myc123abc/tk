@@ -62,6 +62,11 @@ public:
       return _flag != rhs._flag;
   }
 
+  constexpr auto empty() const noexcept -> bool
+  {
+    return static_cast<U>(_flag) == 0;
+  }
+
   constexpr auto contains(Flag flag) const noexcept -> bool
   {
     return (static_cast<U>(_flag) & static_cast<U>(flag._flag)) != 0;

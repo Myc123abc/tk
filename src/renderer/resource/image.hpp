@@ -20,7 +20,6 @@ namespace tk::renderer {
 
 enum class ImageType
 {
-  none = 0,
   srv  = 1 << 0,
   uav  = 1 << 1,
   rtv  = 1 << 2,
@@ -113,20 +112,36 @@ public:
   Image()                            = default;
   ~Image()                           = default;
   Image(Image const&)                = delete;
-  Image(Image&&) noexcept            = delete;
   Image& operator=(Image const&)     = delete;
-  Image& operator=(Image&&) noexcept = delete;
+
+  Image(Image&& img) noexcept { *this = std::move(img); }
+  Image& operator=(Image&& img) noexcept
+  {
+    _handle.Swap(img._handle);
+    _width  = img._width;
+    _height = img._height;
+    _format = img._format;
+    _types  = img._types;
+    _states = img._states;
+    img._states.clear();
+    _desc         = std::move(img._desc);
+    _mipmap_descs = std::move(img._mipmap_descs);
+    img._mipmap_descs.clear();
+    return *this;
+  }
 
   void init(uint width , uint height, ImageFormat format, Flag<ImageType> type, bool use_mipmap = false) noexcept;
   void init(IDXGISwapChain1* swapchain, uint index) noexcept;
   // void init(ImageType type, HANDLE handle, uint width, uint height) noexcept;
-  void init(float width, float height, Image const& src) noexcept { init(width, height, static_cast<ImageFormat>(src._format), src._type); }
+  void init(float width, float height, Image const& src) noexcept { init(width, height, static_cast<ImageFormat>(src._format), src._types); }
+
+  void generate_mipmap() noexcept;
 
   void destroy() noexcept;
 
   void set_state(ID3D12GraphicsCommandList1* cmd, ImageState state, uint subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES) noexcept;
 
-  void resize(uint width, uint height) noexcept { if (!_handle.Get() || _width != width || _height != height) init(width, height, static_cast<ImageFormat>(_format), _type); }
+  void resize(uint width, uint height) noexcept { if (!_handle.Get() || _width != width || _height != height) init(width, height, static_cast<ImageFormat>(_format), _types); }
   void resize(IDXGISwapChain1* swapchain, uint index) noexcept { init(swapchain, index); }
 
   void clear(ID3D12GraphicsCommandList1* cmd, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) const noexcept;
@@ -135,6 +150,7 @@ public:
 
   auto handle() const noexcept { return _handle.Get();                     }
   auto format() const noexcept { return static_cast<ImageFormat>(_format); }
+  auto types()  const noexcept { return _types;                            }
   auto width()  const noexcept { return _width;                            }
   auto height() const noexcept { return _height;                           }
   auto extent() const noexcept { return uint2{ _width, _height };          }
@@ -154,13 +170,14 @@ public:
 
 private:
   void create_descriptor(bool use_mipmap = false) noexcept;
+  void create_mipmap_descs() noexcept;
 
 private:
   Microsoft::WRL::ComPtr<ID3D12Resource> _handle;
   uint                                   _width{};
   uint                                   _height{};
   DXGI_FORMAT                            _format{};
-  Flag<ImageType>                        _type{};
+  Flag<ImageType>                        _types{};
   std::vector<D3D12_RESOURCE_STATES>     _states{};
 
   struct Descriptors
@@ -172,7 +189,7 @@ private:
   };
   Descriptors _desc;
 
-  std::vector<DescriptorHandle> _mipmap_descs;
+  std::vector<std::pair<DescriptorHandle, DescriptorHandle>> _mipmap_descs;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -195,42 +212,20 @@ inline void copy(ID3D12GraphicsCommandList1* cmd, Image& src, Image& dst) noexce
   copy(cmd, src, 0, 0, src.width(), src.height(), dst);
 }
 
-inline void copy(
+void copy(
   ID3D12GraphicsCommandList1* cmd,
   Image&                      image,
   Buffer&                     upload_heap,
   uint                        offset,
-  D3D12_SUBRESOURCE_DATA&     data
-) noexcept
-{
-  image.set_state(cmd, cmd->GetType() == D3D12_COMMAND_LIST_TYPE_COPY ? ImageState::common : ImageState::copy_dst);
-  UpdateSubresources(cmd, image.handle(), upload_heap.handle(), offset, 0, 1, &data);
-}
+  D3D12_SUBRESOURCE_DATA&     data) noexcept;
 
-inline void copy(
+void copy(
   ID3D12GraphicsCommandList1* cmd,
   Buffer&                     src,
   Image&                      dst,
   uint                        src_offset,
   BitmapView const&           bitmap,
-  uint2                       pos
-) noexcept
-{
-  dst.set_state(cmd, cmd->GetType() == D3D12_COMMAND_LIST_TYPE_COPY ? ImageState::common : ImageState::copy_dst);
-
-  auto footprint = D3D12_PLACED_SUBRESOURCE_FOOTPRINT{};
-  footprint.Offset             = src_offset;
-  footprint.Footprint.Width    = bitmap.width;
-  footprint.Footprint.Height   = bitmap.height;
-  footprint.Footprint.Depth    = 1;
-  footprint.Footprint.RowPitch = align(bitmap.row_pitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
-  footprint.Footprint.Format   = static_cast<DXGI_FORMAT>(dst.format());
-
-  auto src_loc = CD3DX12_TEXTURE_COPY_LOCATION{ src.handle(), footprint };
-  auto dst_loc = CD3DX12_TEXTURE_COPY_LOCATION{ dst.handle() };
-
-  cmd->CopyTextureRegion(&dst_loc, pos.x, pos.y, 0, &src_loc, nullptr);
-}
+  uint2                       pos) noexcept;
 
 void copy(
   ID3D12GraphicsCommandList1* cmd,

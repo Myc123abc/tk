@@ -27,6 +27,20 @@ class DescriptorHandle
 {
   friend class DescriptorHeapManager;
 public:
+  DescriptorHandle()                                   = default;
+  ~DescriptorHandle()                                  = default;
+  DescriptorHandle(DescriptorHandle const&)            = default;
+  DescriptorHandle& operator=(DescriptorHandle const&) = default;
+
+  DescriptorHandle(DescriptorHandle&& desc) noexcept { *this = std::move(desc); }
+  DescriptorHandle& operator=(DescriptorHandle&& desc) noexcept
+  {
+    _index = desc._index;
+    _type  = desc._type;
+    desc._index = -1;
+    return *this;
+  }
+
   auto cpu_handle() const noexcept -> D3D12_CPU_DESCRIPTOR_HANDLE;
   auto gpu_handle() const noexcept -> D3D12_GPU_DESCRIPTOR_HANDLE;
 
@@ -56,13 +70,13 @@ public:
     DescriptorHeap& operator=(DescriptorHeap const&) = delete;
     DescriptorHeap& operator=(DescriptorHeap&&)      = delete;
 
-    void init(DescriptorHeapType type, uint32_t capacity) noexcept;
+    void init(DescriptorHeapType type, uint capacity) noexcept;
 
     auto pop_handle(std::function<void()> recreate_descriptor_func) noexcept -> DescriptorHandle;
 
-    void reserve(uint32_t capacity) noexcept;
+    void reserve(uint capacity) noexcept;
 
-    auto usable_handle_count() const noexcept -> uint32_t;
+    auto usable_handle_count() const noexcept -> uint;
 
     auto size() const noexcept { return _handles.size(); }
     
@@ -88,7 +102,7 @@ public:
 
   void bind_heaps(ID3D12GraphicsCommandList1* cmd) noexcept;
 
-  void reserve(DescriptorHeapType type, uint32_t capacity) noexcept { _heaps[type].reserve(capacity); }
+  void reserve(DescriptorHeapType type, uint capacity) noexcept { _heaps[type].reserve(capacity); }
 
   auto size(DescriptorHeapType type) noexcept { return _heaps[type].size(); }
 

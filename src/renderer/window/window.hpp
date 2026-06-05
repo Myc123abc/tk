@@ -38,16 +38,16 @@ public:
   Window& operator=(Window const&) = default;
   Window& operator=(Window&&)      = default;
 
-  void init(int x, int y, uint32_t width, uint32_t height, ui::Backdrop const& backdrop) noexcept;
-  void init_auxiliary(int x, int y, uint32_t width, uint32_t height) noexcept;
+  void init(int x, int y, uint width, uint height, ui::Backdrop const& backdrop) noexcept;
+  void init_auxiliary(int x, int y, uint width, uint height) noexcept;
   void destroy() const noexcept;
   
   auto shadow_thickness() const noexcept -> LONG { return Window_Shadow_Thickness * _scale; }
   auto resize_thickness() const noexcept -> LONG { return Window_Resize_Thickness * _scale; }
   auto real_x()      const noexcept -> int      { return _x      - shadow_thickness();     }
   auto real_y()      const noexcept -> int      { return _y      - shadow_thickness();     }
-  auto real_width()  const noexcept -> uint32_t { return _width  + shadow_thickness() * 2; }
-  auto real_height() const noexcept -> uint32_t { return _height + shadow_thickness() * 2; }
+  auto real_width()  const noexcept -> uint { return _width  + shadow_thickness() * 2; }
+  auto real_height() const noexcept -> uint { return _height + shadow_thickness() * 2; }
   auto real_rect()   const noexcept { return Rect{ _rect.left   - shadow_thickness(),
                                                    _rect.top    - shadow_thickness(),
                                                    _rect.right  + shadow_thickness(),
@@ -149,8 +149,8 @@ public:
 private:
   int                  _x{};
   int                  _y{};
-  uint32_t             _width{};
-  uint32_t             _height{};
+  uint                 _width{};
+  uint                 _height{};
   HWND                 _handle{};
   float                _scale{ 1.f };
   bool                 _fullscreen{};

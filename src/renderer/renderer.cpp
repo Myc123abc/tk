@@ -86,7 +86,7 @@ void Renderer::destroy_window_resource(HWND handle, HWND blur_handle) noexcept
   {
     res.destroy();
     g_wnd_mgr.destroy_window(handle, blur_handle);
-  }, EngineType::graihcs);
+  }, EngineType::graphics);
   _res.erase(handle);
   _destroied_windows.emplace(handle);
 }
@@ -99,8 +99,8 @@ void Renderer::resize_window_resource(HWND handle, uint width, uint height) noex
 
 void Renderer::add_frame_render_complete_func(std::move_only_function<void()>&& func, Flag<EngineType> flag) noexcept
 {
-  auto last_fence_values = std::vector<std::pair<Engine&, uint64_t>>{};
-  if (flag.contains(EngineType::graihcs))
+  auto last_fence_values = std::vector<std::pair<Engine&, uint64>>{};
+  if (flag.contains(EngineType::graphics))
     last_fence_values.emplace_back(g_graphics_engine, g_graphics_engine.signal());
   if (flag.contains(EngineType::copy))
     last_fence_values.emplace_back(g_copy_engine, g_copy_engine.signal());
@@ -210,7 +210,7 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
     auto& img = g_img_mgr[handle];
     if (rect.width() > img.width() || rect.height() > img.height())
     {
-      add_frame_render_complete_func([handle] { g_img_mgr.destroy(handle); }, EngineType::graihcs);
+      add_frame_render_complete_func([handle] { g_img_mgr.destroy(handle); }, EngineType::graphics);
       handle = g_img_mgr.create(rect.width(), rect.height(), img);
     }
     g_img_mgr[handle].clear_render_target(cmd);

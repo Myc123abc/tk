@@ -30,7 +30,7 @@ public:
   static LRESULT CALLBACK blur_wnd_proc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param) noexcept;
 
   auto create_fullscreen_window() noexcept -> HWND;
-  auto create_window(int x, int y, uint32_t width, uint32_t height, ui::Backdrop const& backdrop) noexcept -> HWND;
+  auto create_window(int x, int y, uint width, uint height, ui::Backdrop const& backdrop) noexcept -> HWND;
   void close_window(HWND handle) noexcept;
   void close_fullscreen_window() const noexcept;
   void destroy_window(HWND handle, HWND blur_handle) const noexcept;

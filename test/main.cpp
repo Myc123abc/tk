@@ -93,11 +93,11 @@ private:
 
 struct FrameRate
 {
-  float    deltas[60]{};
-  uint32_t idx{};
-  float    accum{};
-  uint32_t cnt{};
-  float    fps{};
+  float deltas[60]{};
+  uint  idx{};
+  float accum{};
+  uint  cnt{};
+  float fps{};
 
   void update() noexcept
   {
@@ -114,7 +114,7 @@ struct FrameRate
     idx = (idx + 1) % _countof(deltas);
 
     // get delta cnt
-    cnt = std::min(cnt + 1, static_cast<uint32_t>(_countof(deltas)));
+    cnt = std::min(cnt + 1, static_cast<uint>(_countof(deltas)));
 
     // calc fps
     fps = accum > 0.f ? 1.f / (accum / cnt) : std::numeric_limits<float>::max();
@@ -271,7 +271,7 @@ void test_path_draw() noexcept
 inline auto img1 = "assets/image/test.jpg";
 inline auto img2 = "assets/image/test.png";
 
-void test_discard(uint32_t fmt) noexcept
+void test_discard(uint fmt) noexcept
 {
   auto _ = std::expected<void, ui::ImageLoadError::Type>{};
   ui::discard_beg([]{ ui::circle({ 50, 50 }, 25); });
@@ -328,7 +328,7 @@ auto load_image(std::string_view path) noexcept
   }
 }
 
-auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8_t alpha = 0xff) noexcept -> std::expected<void, ui::ImageLoadError::Type>
+auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha = 0xff) noexcept -> std::expected<void, ui::ImageLoadError::Type>
 {
   return ui::image(path, left_top, right_bottom, alpha).or_else([](ui::ImageLoadError::Type err)
   {
@@ -345,8 +345,8 @@ int main()
 {
   tk::init();
 
-  // load_image(img1);
-  // load_image(img2);
+  load_image(img1);
+  load_image(img2);
 
   ui::load_font("assets/font/NotoSansJP-Regular.ttf");
   ui::load_font("assets/font/NotoSansSC-Regular.ttf");
@@ -457,19 +457,20 @@ int main()
 
       // image
       auto res = std::expected<void, ui::ImageLoadError::Type>{};
-      // if (loop_trigger)
-      // {
-      //   auto img_ext = ui::image_extent(img2);
-      //   auto ext = wnd_ext - p2;
-      //   auto scale = std::max(img_ext.x / ext.x, img_ext.y / ext.y);
-      //   img_ext /= scale;
-      //   res = image(img2, p2, p2 + img_ext);
-      // }
-      // if (res) loop_trigger.update();
+      if (loop_trigger)
+      {
+        auto img_ext = ui::image_extent(img2);
+        auto ext = wnd_ext - p2;
+        auto scale = std::max(img_ext.x / ext.x, img_ext.y / ext.y);
+        img_ext /= scale;
+        res = image(img2, p2, p2 + img_ext);
+      }
+      if (res) loop_trigger.update();
 
-      // ui::discard_beg([]{ ui::circle({50,50}, 50); });
-      // res = image(img1, {}, wnd_ext, 0x44);
-      // ui::discard_end();
+      ui::discard_beg([]{ ui::circle({50,50}, 50); });
+      // res = image(img1, {}, wnd_ext, 0x44, ui::ImageConfig::blur(5, 5));
+      res = image(img1, {}, wnd_ext, 0x44);
+      ui::discard_end();
 
       // circle point
       auto size = ui::window_drawable_extent();

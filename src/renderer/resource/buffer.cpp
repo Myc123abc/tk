@@ -11,12 +11,12 @@ using namespace tk::renderer;
 
 namespace {
 
-auto calculate_capacity(uint32_t old_capacity, uint32_t need_capacity)
+auto calculate_capacity(uint old_capacity, uint need_capacity)
 {
   auto factor = (old_capacity < 256 * 1024)      ? 2.0 :
                 (old_capacity < 8 * 1024 * 1024) ? 1.5 : 1.25;
 
-  auto capacity = static_cast<uint32_t>(old_capacity * factor);
+  auto capacity = static_cast<uint>(old_capacity * factor);
   if (old_capacity < need_capacity) capacity = need_capacity;
 
   // Round up to 256 bytes
@@ -33,7 +33,7 @@ auto calculate_capacity(uint32_t old_capacity, uint32_t need_capacity)
 
 namespace tk::renderer {
 
-void Buffer::init(uint32_t size, bool use_descriptor) noexcept
+void Buffer::init(uint size, bool use_descriptor) noexcept
 {
   _size     = {};
   _capacity = align(size, 8);
@@ -72,7 +72,7 @@ void Buffer::init(uint32_t size, bool use_descriptor) noexcept
     create_descriptor();
 }
 
-auto Buffer::append(void const* data, uint32_t size) noexcept -> uint32_t
+auto Buffer::append(void const* data, uint size) noexcept -> uint
 {
   // promise aligment
   size = align(size, 4);
@@ -85,8 +85,7 @@ auto Buffer::append(void const* data, uint32_t size) noexcept -> uint32_t
   else
   {
     // add old buffer for destroy
-    // TODO: buffer only use graphics rendering now
-    g_renderer.add_frame_render_complete_func([_ = _handle] {}, EngineType::graihcs);
+    g_renderer.add_frame_render_complete_func([_ = _handle] {}, EngineType::graphics);
 
     // temporary copy old data
     auto old_data = std::vector<std::byte>(_size);

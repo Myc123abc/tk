@@ -17,7 +17,7 @@ namespace {
 auto dx12_descriptor_size(DescriptorHeapType type) noexcept
 {
   using enum DescriptorHeapType;
-  auto static map = std::unordered_map<DescriptorHeapType, uint32_t>
+  auto static map = std::unordered_map<DescriptorHeapType, uint>
   {
     { cbv_srv_uav, CBV_SRV_UAV_Size },
     { rtv,         RTV_Size         },
@@ -56,7 +56,7 @@ auto DescriptorHandle::gpu_handle() const noexcept -> D3D12_GPU_DESCRIPTOR_HANDL
   return handle;
 }
 
-void DescriptorHeapManager::DescriptorHeap::init(DescriptorHeapType type, uint32_t capacity) noexcept
+void DescriptorHeapManager::DescriptorHeap::init(DescriptorHeapType type, uint capacity) noexcept
 {
   _type = type;
 
@@ -91,15 +91,17 @@ auto DescriptorHeapManager::DescriptorHeap::pop_handle(std::function<void()> rec
   return it->handle;
 }
 
-void DescriptorHeapManager::DescriptorHeap::reserve(uint32_t capacity) noexcept
+void DescriptorHeapManager::DescriptorHeap::reserve(uint capacity) noexcept
 {
   if (capacity > _handles.size())
   {
     auto size = _handles.size();
 
     // destroy old heap
-    // TODO: resource expand only happend in graphics rendering now
-    g_renderer.add_frame_render_complete_func([_ = _heap] {}, EngineType::graihcs);
+    g_renderer.add_frame_render_complete_func([_ = _heap] {},
+      _type == DescriptorHeapType::cbv_srv_uav
+        ? EngineType::graphics | EngineType::compute
+        : EngineType::graphics);
 
     // create new bigger one
     auto heap_desc = D3D12_DESCRIPTOR_HEAP_DESC{};
@@ -115,7 +117,7 @@ void DescriptorHeapManager::DescriptorHeap::reserve(uint32_t capacity) noexcept
   }
 }
 
-auto DescriptorHeapManager::DescriptorHeap::usable_handle_count() const noexcept -> uint32_t
+auto DescriptorHeapManager::DescriptorHeap::usable_handle_count() const noexcept -> uint
 {
   return std::ranges::count_if(_handles, [](auto const& slot) { return slot.used; });
 }

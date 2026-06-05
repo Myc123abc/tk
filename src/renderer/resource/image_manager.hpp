@@ -49,8 +49,11 @@ public:
   auto try_load(std::string_view path, uint w, uint h) noexcept -> std::expected<ImageHandle, ui::ImageLoadError::Type>;
   void update() noexcept;
 
+  auto blur(ImageHandle handle, float2 ext, uint radius, float sigma) noexcept -> ImageHandle;
+
 private:
   void load(std::string_view path, uint width, uint height, void* data, bool use_mipmap) noexcept;
+  auto find_tmp_image(uint width, uint height, ImageFormat fmt, Flag<ImageType> types) noexcept -> uint;
 
 private:
   ImagePoolType _pool;
@@ -62,10 +65,28 @@ private:
     std::string err_msg;
     bool        use_mipmap{};
   };
+  struct ImageInfo
+  {
+    uint2 extent;
+    bool  use_mipmap{};
+  };
   std::unordered_map<std::string, Task<LoadResult>> _load_tasks;
   std::unordered_map<std::string, ImageHandle>      _loaded_images;
-  std::unordered_map<std::string, uint2>            _image_extents;
+  std::unordered_map<std::string, ImageInfo>        _image_infos;
   std::unordered_map<std::string, std::string>      _decoded_failed_images;
+
+  struct TmpImage
+  {
+    ImageHandle img;
+    bool        is_used{};
+  };
+  std::vector<TmpImage> _tmp_imgs;
+  struct BlurImage
+  {
+    ImageHandle img;
+    size_t      hash{};
+  };
+  std::unordered_map<ImageHandle, BlurImage> _blur_imgs;
 )
 
 }

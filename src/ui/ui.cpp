@@ -69,10 +69,10 @@ auto image_extent(std::string_view path) noexcept -> float2
   return g_img_mgr.extent(path);
 }
 
-auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept -> std::expected<void, ImageLoadError::Type>
+auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha, std::optional<ImageConfig> cfg) noexcept -> std::expected<void, ImageLoadError::Type>
 {
   adjust_pos(left_top, right_bottom);
-  return g_ui_ctx.image(path, left_top, right_bottom, alpha);
+  return g_ui_ctx.image(path, left_top, right_bottom, alpha, cfg);
 }
 
 auto load_image(std::string_view path) noexcept -> std::expected<void, ImageLoadError::Type>
@@ -104,7 +104,7 @@ auto get_cursor_pos() noexcept -> float2
 ///                             Window
 ////////////////////////////////////////////////////////////////////////////////
 
-void begin(std::string_view name, int x, int y, uint32_t width, uint32_t height, bool* is_closed, WindowConfig const& cfg) noexcept
+void begin(std::string_view name, int x, int y, uint width, uint height, bool* is_closed, WindowConfig const& cfg) noexcept
 {
 	g_ui_ctx.begin(name, x, y, width, height, is_closed, cfg);
 }
@@ -344,7 +344,7 @@ void reset_tween(std::string_view name) noexcept
   g_ui_ctx.reset_tween(g_ui_ctx.get_id(name));
 }
 
-auto button(size_t id, float x, float y, uint32_t width, uint32_t height) noexcept-> ButtonState
+auto button(size_t id, float x, float y, uint width, uint height) noexcept-> ButtonState
 {
   g_ui_ctx.check_draw();
 
@@ -376,7 +376,7 @@ auto button(size_t id, float x, float y, uint32_t width, uint32_t height) noexce
   return { is_hovered && ui::is_click_on(left_top, right_bottom), is_hovered, is_move_out };
 }
 
-auto button(std::string_view name, float x, float y, uint32_t width, uint32_t height) noexcept-> ButtonState
+auto button(std::string_view name, float x, float y, uint width, uint height) noexcept-> ButtonState
 {
   return button(g_ui_ctx.generic_id(name), x, y, width, height);
 }
@@ -385,8 +385,8 @@ auto button(
   std::string_view name,
   float            x,
   float            y,
-  uint32_t         width,
-  uint32_t         height,
+  uint             width,
+  uint             height,
   Color            button_color,
   Color            button_hover_color) noexcept-> ButtonState
 {
@@ -399,14 +399,14 @@ auto button(
   std::string_view                               name,
   float                                          x,
   float                                          y,
-  uint32_t                                       width,
-  uint32_t                                       height,
+  uint                                           width,
+  uint                                           height,
   Color                                          button_color,
   Color                                          button_hover_color,
   std::optional<Color>                           mouse_down_color,
-  std::function<void(uint32_t, uint32_t, Color)> icon_update_func,
-  uint32_t                                       icon_width,
-  uint32_t                                       icon_height,
+  std::function<void(uint, uint, Color)>         icon_update_func,
+  uint                                           icon_width,
+  uint                                           icon_height,
   Color                                          icon_color,
   Color                                          icon_hover_color) noexcept-> ButtonState
 {

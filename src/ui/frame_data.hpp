@@ -110,131 +110,143 @@ public:
       discard_end,
     } type{};
 
-    struct
-    {
-      float2 left_top{};
-      float2 right_bottom{};
-      Color  color{};
-      float  thickness{};
-    } add_rect{};
+    DrawCmd() noexcept {}
+    DrawCmd(Type type) noexcept : type(type) {}
 
-    struct
+    union Data
     {
-      float2 p0{};
-      float2 p1{};
-      float2 p2{};
-      Color  color{};
-      float  thickness{};
-    } add_triangle{};
+      Data() noexcept {}
 
-    struct
-    {
-      float2 center{};
-      float  radius{};
-      Color  color{};
-      float  thickness{};
-    } add_circle{};
+      struct
+      {
+        float2 left_top;
+        float2 right_bottom;
+        Color  color;
+        float  thickness;
+      } add_rect;
 
-    struct
-    {
-      float2 p0{};
-      float2 p1{};
-      Color  color{};
-      float  thickness{};
-    } add_line{};
+      struct
+      {
+        float2 p0{};
+        float2 p1{};
+        float2 p2{};
+        Color  color{};
+        float  thickness{};
+      } add_triangle;
 
-    struct
-    {
-      float2 center{};
-      float2 p0{};
-      float2 p1{};
-      Color  color{};
-      float  thickness{};
-    } add_arc{};
+      struct
+      {
+        float2 center{};
+        float  radius{};
+        Color  color{};
+        float  thickness{};
+      } add_circle;
 
-    struct
-    {
-      float2 p0{};
-      float2 p1{};
-      float2 p2{};
-      Color  color{};
-      float  thickness{};
-    } add_quad_bezier{};
+      struct
+      {
+        float2 p0{};
+        float2 p1{};
+        Color  color{};
+        float  thickness{};
+      } add_line;
 
-    struct
-    {
-      float2 p0{};
-      float2 p1{};
-      float2 p2{};
-      float2 p3{};
-      Color  color{};
-      float  thickness{};
-    } add_cubic_bezier{};
+      struct
+      {
+        float2 center{};
+        float2 p0{};
+        float2 p1{};
+        Color  color{};
+        float  thickness{};
+      } add_arc;
 
-    struct
-    {
-      ImageHandle handle{};
-      float2      left_top{};
-      float2      right_bottom{};
-      uint8_t     alpha{};
-    } add_image{};
+      struct
+      {
+        float2 p0{};
+        float2 p1{};
+        float2 p2{};
+        Color  color{};
+        float  thickness{};
+      } add_quad_bezier;
 
-    struct
-    {
-      float2 p0{};
-    } path_begin{};
+      struct
+      {
+        float2 p0{};
+        float2 p1{};
+        float2 p2{};
+        float2 p3{};
+        Color  color{};
+        float  thickness{};
+      } add_cubic_bezier;
 
-    struct
-    {
-      float2 p{};
-    } add_path_line_to{};
+      struct
+      {
+        ImageHandle handle{};
+        float2      left_top{};
+        float2      right_bottom{};
+        uint8       alpha{};
+        float2      uv0{};
+        float2      uv1{};
+        float2      uv2{};
+        float2      uv3{};
+      } add_image;
 
-    struct
-    {
-      float2 center{};
-      float2 p1{};
-      bool   ccw{};
-    } add_path_arc_to{};
+      struct
+      {
+        float2 p0{};
+      } path_begin;
 
-    struct
-    {
-      float2 p1{};
-      float2 p2{};
-    } add_path_quad_bezier_to{};
+      struct
+      {
+        float2 p{};
+      } add_path_line_to;
 
-    struct
-    {
-      float2 p1{};
-      float2 p2{};
-      float2 p3{};
-    } add_path_cubic_bezier_to{};
+      struct
+      {
+        float2 center{};
+        float2 p1{};
+        bool   ccw{};
+      } add_path_arc_to;
 
-    struct
-    {
-      bool  close{};
-      Color color{};
-      float thickness{};
-    } path_end{};
+      struct
+      {
+        float2 p1{};
+        float2 p2{};
+      } add_path_quad_bezier_to;
 
-    struct
-    {
-      Color color{};
-      float thickness{};
-    } union_end{};
+      struct
+      {
+        float2 p1{};
+        float2 p2{};
+        float2 p3{};
+      } add_path_cubic_bezier_to;
 
-    struct
-    {
-      Rect rect{};
-    } add_scissor_rect{};
+      struct
+      {
+        bool  close{};
+        Color color{};
+        float thickness{};
+      } path_end;
 
-    struct
-    {
-      uint count{};
-    } discard_beg{};
+      struct
+      {
+        Color color{};
+        float thickness{};
+      } union_end;
 
-    struct
-    {
-    } discard_end{};
+      struct
+      {
+        Rect rect{};
+      } add_scissor_rect;
+
+      struct
+      {
+        uint count{};
+      } discard_beg;
+
+      struct
+      {
+      } discard_end;
+    } data;
   };
 
   void add_rect(float2 left_top, float2 right_bottom, Color color, float thickness) noexcept;
@@ -244,7 +256,7 @@ public:
   void add_arc(float2 center, float2 p0, float2 p1, Color color, float thickness) noexcept;
   void add_quad_bezier(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
   void add_cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept;
-  void add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept;
+  void add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8 alpha, std::span<float2> uvs) noexcept;
 
   void path_begin(float2 p0) noexcept;
   void add_path_line_to(float2 p) noexcept;
@@ -269,7 +281,7 @@ private:
   void _add_arc(float2 center, float2 p0, float2 p1, Color color, float thickness) noexcept;
   void _add_quad_bezier(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
   void _add_cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept;
-  void _add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept;
+  void _add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8 alpha, float2 uv0, float2 uv1, float2 uv2, float2 uv3) noexcept;
 
   void _path_begin(float2 p0) noexcept;
   void _add_path_line_to(float2 p) noexcept { if (_points.back() != p) _points.emplace_back(p); }

@@ -7,7 +7,7 @@ void GraphicsEngine::acquire_slot() noexcept
   _slots.acquire_slot();
 }
 
-auto GraphicsEngine::submit_slot() noexcept -> uint64_t
+auto GraphicsEngine::submit_slot() noexcept -> uint64
 {
   for (auto [src, dst] : _cpy_imgs)
     renderer::copy(cmd(), *src, *dst);

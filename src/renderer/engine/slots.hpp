@@ -29,8 +29,7 @@ public:
     _engine->reset_cmd(_slot->cmd_alloc.Get());
   }
 
-  [[nodiscard]]
-  auto submit_slot() noexcept -> uint64_t
+  auto submit_slot() noexcept -> uint64
   {
     assert(_slot && is_idle(_slot));
     _slot->fence_value = _engine->submit(); 
@@ -43,7 +42,7 @@ private:
   struct Slot
   {
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> cmd_alloc;
-    uint64_t                                       fence_value{};
+    uint64                                         fence_value{};
     DataType                                       data;
 
     Slot() noexcept

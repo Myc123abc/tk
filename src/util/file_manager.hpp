@@ -56,9 +56,9 @@ public:
 private:
   enum class FileStatus
   {
-    unexist = 0b00,
-    exist   = 0b01,
-    loaded  = 0b10,
+    unexist = 1 << 0,
+    exist   = 1 << 1,
+    loaded  = 1 << 2,
   };
 
   struct FileInfo

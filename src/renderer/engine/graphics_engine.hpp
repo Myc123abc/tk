@@ -16,7 +16,7 @@ public:
   void copy(Image& src, Image& dst) noexcept { _cpy_imgs.emplace_back(&src, &dst); }
 
   void acquire_slot() noexcept;
-  auto submit_slot() noexcept -> uint64_t;
+  auto submit_slot() noexcept -> uint64;
 
 private:
   Slots<D3D12_COMMAND_LIST_TYPE_DIRECT>  _slots;

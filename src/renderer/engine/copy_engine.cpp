@@ -2,6 +2,7 @@
 #include "../resource/image.hpp"
 #include "graphics_engine.hpp"
 #include "compute_engine.hpp"
+#include "../renderer.hpp"
 
 #include <algorithm>
 
@@ -86,18 +87,33 @@ void CopyEngine::update() noexcept
 {
   auto slot = _slots.slot();
 
-  // only process when have copy infos
-  if (slot->data.empty()) return;
+  auto& [upload_buf, copy_moved_imgs] = slot->data;
 
-  // copy run, and acquire slot for next use
-  _slots.slot()->data.upload(cmd());
+  auto cmd = Engine::cmd();
+
+  if (!upload_buf.empty()) upload_buf.upload(cmd);
+
+  for (auto& [src, dst_h] : copy_moved_imgs)
+  // FIXME: 
+  // [info]  loading assets/image/test.png
+  // D3D12 ERROR: ID3D12CommandList::ResourceBarrier: D3D12_RESOURCE_STATES has invalid flags for copy command list. [ RESOURCE_MANIPULATION ERROR #537: RESOURCE_BARRIER_INVALID_COMMAND_LIST_TYPE]
+    renderer::copy(cmd, src, g_img_mgr[dst_h]);
+  
   auto fence_value = _slots.submit_slot();
   _slots.acquire_slot();
 
   // wait copy complete before rendering
   g_graphics_engine.wait(g_copy_engine, fence_value);
-  // TODO: set resource tracking judge whether wait for compute engine like generate mipmap
-  g_comp_engine.wait(g_copy_engine, fence_value);
+
+  if (!copy_moved_imgs.empty())
+  {
+    g_comp_engine.wait(g_copy_engine, fence_value);
+    g_renderer.add_frame_render_complete_func([imgs = std::move(copy_moved_imgs)] mutable
+    {
+      for (auto& [img, _] : imgs) img.destroy();
+    }, EngineType::graphics | EngineType::copy);
+    copy_moved_imgs.clear();
+  }
 }
 
 }

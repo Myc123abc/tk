@@ -32,7 +32,7 @@ struct SDFBitmap
 {
   std::pmr::vector<uint8> data;
   uint2                   extent{};
-  uint                    unicode{ std::numeric_limits<uint32_t>::max() };
+  uint                    unicode{ std::numeric_limits<uint>::max() };
   FontStyle               style{};
   float                   left_offset{};
   float                   up_offset{};
@@ -112,14 +112,14 @@ struct GlyphInfo
   //   };
   // }
 
-  // static auto get_indices(uint16_t& index) noexcept -> std::vector<uint16_t>
+  // static auto get_indices(uint16& index) noexcept -> std::vector<uint16>
   // {
   //   auto idx = index;
   //   index += 4;
   //   return
   //   {
-  //     static_cast<uint16_t>(idx + 0), static_cast<uint16_t>(idx + 1), static_cast<uint16_t>(idx + 2),
-  //     static_cast<uint16_t>(idx + 2), static_cast<uint16_t>(idx + 1), static_cast<uint16_t>(idx + 3),
+  //     static_cast<uint16>(idx + 0), static_cast<uint16>(idx + 1), static_cast<uint16>(idx + 2),
+  //     static_cast<uint16>(idx + 2), static_cast<uint16>(idx + 1), static_cast<uint16>(idx + 3),
   //   };
   // }
 

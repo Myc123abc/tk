@@ -159,7 +159,7 @@ private:
   
     auto root_param_idx(std::string_view name) noexcept { return _root_param_idxs[name.data()]; }
   private:
-    std::unordered_map<std::string, uint32_t> _root_param_idxs;
+    std::unordered_map<std::string, uint> _root_param_idxs;
   };
   std::unordered_map<PipelineType, Pipeline> _pipes;
   std::vector<std::pair<Microsoft::WRL::ComPtr<ID3D12RootSignature>, std::vector<CD3DX12_ROOT_PARAMETER1>>> _root_signatures;

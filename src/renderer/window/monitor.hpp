@@ -43,7 +43,7 @@ private:
     _rect      = info.rcMonitor;
     _work_rect = info.rcWork;
 
-    uint32_t dpi_x, dpi_y;
+    uint dpi_x, dpi_y;
     GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &dpi_x, &dpi_y);
     assert(dpi_x == dpi_y);
     _scale = dpi_x / 96.f;

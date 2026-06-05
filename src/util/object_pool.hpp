@@ -1,23 +1,23 @@
 #pragma once
 
 #include "util/error_handling.hpp"
+#include "util/base.hpp"
 
 #include <array>
 #include <vector>
 #include <memory>
 #include <assert.h>
-#include <algorithm>
 
 namespace tk {
 
-template <typename T, uint16_t BlockCapacity>
-requires (BlockCapacity > 0)                                     &&
-         (BlockCapacity <= std::numeric_limits<uint16_t>::max()) &&
-         std::is_nothrow_constructible_v<T>                      &&
+template <typename T, uint16 BlockCapacity>
+requires (BlockCapacity > 0)                                   &&
+         (BlockCapacity <= std::numeric_limits<uint16>::max()) &&
+         std::is_nothrow_constructible_v<T>                    &&
          std::is_nothrow_destructible_v<T>
 class ObjectPool;
 
-template <typename T, uint16_t BlockCapacity>
+template <typename T, uint16 BlockCapacity>
 class [[nodiscard]] ObjectPoolHandle
 {
   friend class ObjectPool<T, BlockCapacity>;
@@ -33,25 +33,25 @@ public:
   constexpr bool operator==(ObjectPoolHandle const&) const noexcept = default;
 
 private:
-  constexpr ObjectPoolHandle(uint16_t block_idx, uint16_t slot_idx, uint32_t generation) noexcept
+  constexpr ObjectPoolHandle(uint16 block_idx, uint16 slot_idx, uint generation) noexcept
     : _block_idx(block_idx), _slot_idx(slot_idx), _generation(generation) {}
 
   constexpr auto pack() const noexcept
   {
-    return static_cast<uint64_t>(_generation) << 32 |
-           static_cast<uint64_t>(_slot_idx)   << 16 |
-           static_cast<uint64_t>(_block_idx);
+    return static_cast<uint64>(_generation) << 32 |
+           static_cast<uint64>(_slot_idx)   << 16 |
+           static_cast<uint64>(_block_idx);
   }
 
 private:
-  uint16_t _block_idx{};
-  uint16_t _slot_idx{};
-  uint32_t _generation{};
+  uint16 _block_idx{};
+  uint16 _slot_idx{};
+  uint   _generation{};
 };
 
-template <typename T, uint16_t BlockCapacity = 32>
+template <typename T, uint16 BlockCapacity = 32>
 requires (BlockCapacity > 0)                                     &&
-         (BlockCapacity <= std::numeric_limits<uint16_t>::max()) &&
+         (BlockCapacity <= std::numeric_limits<uint16>::max()) &&
          std::is_nothrow_constructible_v<T>                      &&
          std::is_nothrow_destructible_v<T>
 class ObjectPool
@@ -61,15 +61,12 @@ public:
 
   ObjectPool() noexcept
   {
-    _blocks.emplace_back(std::make_unique<Block>());
+    allocate_block();
   }
 
   ~ObjectPool() noexcept
   {
-    err_if(std::ranges::any_of(_blocks, [](auto const& block)
-    {
-      return std::ranges::any_of(*block, [](auto const& slot) { return slot.alive; });
-    }), "[ObjectPool] Failed to destruct ObjectPool. Still have objects are undestroied");
+    err_if(_alive_count != 0, "[ObjectPool] Failed to destruct ObjectPool. Still have objects are undestroied");
   }
 
   ObjectPool(ObjectPool const&)            = delete;
@@ -78,43 +75,44 @@ public:
   ObjectPool& operator=(ObjectPool&&)      = delete;
 
   [[nodiscard]]
-  auto alloc() noexcept
+  auto alloc() noexcept -> Handle
   {
-    // create new one if free list is empty
-    if (_free_list.empty())
+    if (_free_head != InvalidFreeSlot)
     {
-      auto slot = get_slot(_block_idx, _slot_idx);
-      assert(!slot->alive && !slot->generation);
-      new (&slot->obj) T{};
-      slot->alive      = true;
-      slot->generation = 1;
-      auto handle = Handle{ _block_idx, _slot_idx, slot->generation };
-      if (++_slot_idx == BlockCapacity)
-      {
-        _slot_idx = 0;
-        _blocks.emplace_back(std::make_unique<Block>());
-        err_if(_block_idx + 1 == std::numeric_limits<uint16_t>::max(),
-          "[ObjectPool] Failed to allocate new block, exceed the max block capacity");
-        ++_block_idx;
-      }
-      return handle;
+      auto [block_idx, slot_idx] = unpack_slot_index(_free_head);
+      auto slot = get_slot(block_idx, slot_idx);
+      assert(!slot->alive && slot->generation);
+      _free_head = slot->next_free;
+      std::construct_at(slot->get());
+      slot->alive     = true;
+      slot->next_free = InvalidFreeSlot;
+      ++_alive_count;
+      return Handle{ static_cast<uint16>(block_idx), static_cast<uint16>(slot_idx), slot->generation };
     }
 
-    // use free list
-    auto& free_slot = _free_list.back(); 
-    _free_list.pop_back();
-    auto slot = get_slot(free_slot.block_idx, free_slot.slot_idx);
-    assert(!slot->alive && slot->generation);
-    new (&slot->obj) T{};
-    slot->alive = true;
-    return Handle{ free_slot.block_idx, free_slot.slot_idx, slot->generation };
+    if (_block_idx == _blocks.size())
+      allocate_block();
+
+    auto block_idx = _block_idx;
+    auto slot_idx  = _slot_idx;
+    auto slot      = get_slot(block_idx, slot_idx);
+    assert(!slot->alive && !slot->generation);
+    std::construct_at(slot->get());
+    slot->alive      = true;
+    slot->generation = 1;
+    slot->next_free  = InvalidFreeSlot;
+    ++_alive_count;
+
+    advance_alloc_cursor();
+    return Handle{ static_cast<uint16>(block_idx), static_cast<uint16>(slot_idx), slot->generation };
   }
 
   [[nodiscard]]
   auto get(Handle handle) noexcept -> T*
   {
+    assert(handle.valid());
     auto slot = get_slot(handle._block_idx, handle._slot_idx);
-    assert(handle.valid() && slot->alive && slot->generation == handle._generation);
+    assert(slot->alive && slot->generation == handle._generation);
     return slot->get();
   }
 
@@ -126,8 +124,9 @@ public:
   [[nodiscard]]
   auto get(Handle handle) const noexcept -> T const*
   {
+    assert(handle.valid());
     auto slot = get_slot(handle._block_idx, handle._slot_idx);
-    assert(handle.valid() && slot->alive && slot->generation == handle._generation);
+    assert(slot->alive && slot->generation == handle._generation);
     return slot->get();
   }
 
@@ -138,19 +137,53 @@ public:
 
   void free(Handle& handle) noexcept
   {
+    assert(handle.valid());
     auto slot = get_slot(handle._block_idx, handle._slot_idx);
-    assert(handle.valid() && slot->alive && slot->generation == handle._generation);
-    slot->get()->~T();
+    assert(slot->alive && slot->generation == handle._generation);
+    std::destroy_at(slot->get());
     slot->alive = false;
     ++slot->generation;
     err_if(slot->generation == std::numeric_limits<decltype(slot->generation)>::max(),
       "[ObjectPool] Failed to destroy object, exceed the max slot generation");
-    _free_list.emplace_back(handle._block_idx, handle._slot_idx);
+    slot->next_free = _free_head;
+    _free_head = pack_slot_index(handle._block_idx, handle._slot_idx);
+    --_alive_count;
     handle = {};
   }
 
 private:
-  auto get_slot(uint16_t block_idx, uint16_t slot_idx) const noexcept
+  static constexpr auto InvalidFreeSlot = std::numeric_limits<uint>::max();
+
+  static constexpr auto pack_slot_index(uint16 block_idx, uint16 slot_idx) noexcept -> uint
+  {
+    return static_cast<uint>(block_idx) << 16 | slot_idx;
+  }
+
+  static constexpr auto unpack_slot_index(uint slot_index) noexcept
+  {
+    return std::pair{
+      static_cast<uint16>(slot_index >> 16),
+      static_cast<uint16>(slot_index & std::numeric_limits<uint16>::max())
+    };
+  }
+
+  void allocate_block() noexcept
+  {
+    err_if(_blocks.size() > std::numeric_limits<uint16>::max(),
+      "[ObjectPool] Failed to allocate new block, exceed the max block capacity");
+    _blocks.emplace_back(std::make_unique<Block>());
+  }
+
+  void advance_alloc_cursor() noexcept
+  {
+    if (++_slot_idx == BlockCapacity)
+    {
+      _slot_idx = 0;
+      ++_block_idx;
+    }
+  }
+
+  auto get_slot(size_t block_idx, uint16 slot_idx) const noexcept
   {
     assert(block_idx < _blocks.size() && slot_idx < BlockCapacity);
     return &(*_blocks[block_idx])[slot_idx];
@@ -160,7 +193,8 @@ private:
   struct Slot
   {
     alignas(T) std::byte obj[sizeof(T)];
-    uint32_t             generation{};
+    uint                 generation{};
+    uint                 next_free{ InvalidFreeSlot };
     bool                 alive{};
 
     auto get() noexcept -> T*
@@ -176,28 +210,23 @@ private:
 
   using Block = std::array<Slot, BlockCapacity>;
 
-  struct FreeSlot
-  {
-    uint16_t block_idx{};
-    uint16_t slot_idx{};
-  };
-
   std::vector<std::unique_ptr<Block>> _blocks;
-  std::vector<FreeSlot>               _free_list;
-  uint16_t                            _block_idx{};
-  uint16_t                            _slot_idx{};
+  uint                                _free_head{ InvalidFreeSlot };
+  size_t                              _alive_count{};
+  size_t                              _block_idx{};
+  uint16                              _slot_idx{};
 };
 
 }
 
 namespace std {
 
-template <typename T, uint16_t BlockCapacity>
+template <typename T, tk::uint16 BlockCapacity>
 struct hash<tk::ObjectPoolHandle<T, BlockCapacity>>
 {
   auto operator()(tk::ObjectPoolHandle<T, BlockCapacity> const& h) const noexcept -> size_t
   {
-    return std::hash<uint64_t>{}(h.pack());
+    return std::hash<tk::uint64>{}(h.pack());
   }
 };
 

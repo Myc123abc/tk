@@ -1,7 +1,6 @@
 struct Constants
 {
   float2 texel_size;
-  uint   mip_level;
 };
 
 ConstantBuffer<Constants> constants : register(b0);
@@ -13,9 +12,9 @@ RWTexture2D<float4>       dst       : register(u0);
 void main(uint3 id : SV_DispatchThreadID)
 {
   uint width, height, mip_level_count;
-  src.GetDimensions(constants.mip_level, width, height, mip_level_count);
+  src.GetDimensions(0, width, height, mip_level_count);
 
-  uint2 pos = id.xy * 2.0;
+  uint2 pos = id.xy * 2;
 
   float4 color = 0;
   uint   count = 0;
@@ -30,7 +29,7 @@ void main(uint3 id : SV_DispatchThreadID)
       if (p.x < width && p.y < height)
       {
         float2 uv = (float2(p) + 0.5) * constants.texel_size;
-        color += src.SampleLevel(g_sampler, uv, constants.mip_level);
+        color += src.SampleLevel(g_sampler, uv, 0);
         ++count;
       }
     }

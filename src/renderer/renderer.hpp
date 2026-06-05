@@ -12,9 +12,9 @@ namespace tk::renderer {
 
 enum class EngineType
 {
-  graihcs,
-  copy,
-  compute,
+  graphics = 1 << 0,
+  copy     = 1 << 1,
+  compute  = 1 << 2,
 };
 
 Singleton(Renderer, g_renderer,

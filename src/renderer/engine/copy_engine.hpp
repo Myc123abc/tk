@@ -63,20 +63,37 @@ public:
   {
     auto slot = _slots.slot();
     assert(slot && _slots.is_idle(slot));
-    slot->data.add_image(image, std::move(bitmap));
+    slot->data.upload_buf.add_image(image, std::move(bitmap));
   }
 
   void copy(std::vector<MultiBitmapCopyInfo>&& infos, ImageHandle img) noexcept
   {
     auto slot = _slots.slot();
     assert(slot && _slots.is_idle(slot));
-    slot->data.add_image(img, std::move(infos));
+    slot->data.upload_buf.add_image(img, std::move(infos));
+  }
+
+  void copy(Image&& src, ImageHandle dst) noexcept
+  {
+    auto slot = _slots.slot();
+    assert(slot && _slots.is_idle(slot));
+    slot->data.copy_moved_imgs.emplace_back(std::move(src), dst);
   }
 
   void update() noexcept;
 
 private:
-  Slots<D3D12_COMMAND_LIST_TYPE_COPY, UploadBuffer> _slots;
+  struct CopyMovedImage
+  {
+    Image       src;
+    ImageHandle dst;
+  };
+  struct SlotData
+  {
+    UploadBuffer                upload_buf;
+    std::vector<CopyMovedImage> copy_moved_imgs;
+  };
+  Slots<D3D12_COMMAND_LIST_TYPE_COPY, SlotData> _slots;
 )
 
 }

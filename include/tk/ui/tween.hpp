@@ -1,10 +1,10 @@
 #pragma once
 
 #include "common.hpp"
+#include "../util/base.hpp"
 
-#include <algorithm>
 #include <functional>
-#include <assert.h>
+#include <algorithm>
 
 namespace tk::ui {
 
@@ -114,7 +114,7 @@ public:
   LoopTrigger& operator=(LoopTrigger const&) = delete;
   LoopTrigger& operator=(LoopTrigger&&)      = delete;
 
-  void init(uint32_t dur, bool b) noexcept
+  void init(uint dur, bool b) noexcept
   {
     _dur  = dur;
     _time = {};
@@ -134,9 +134,9 @@ public:
   constexpr operator bool() const noexcept { return _b; }
 
 private:
-  uint32_t _dur{};
-  double   _time{};
-  bool     _b{};
+  uint   _dur{};
+  double _time{};
+  bool   _b{};
 };
 
 }

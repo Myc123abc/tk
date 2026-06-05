@@ -92,9 +92,9 @@ private:
   DescMapType                                _graphics_descriptors;
   DescMapType                                _compute_descriptors;
   uint                                       _graphics_constants_root_param_idx{};
-  std::vector<uint8_t>                       _graphics_constants;
+  std::vector<uint8>                         _graphics_constants;
   uint                                       _compute_constants_root_param_idx{};
-  std::vector<uint8_t>                       _compute_constants;
+  std::vector<uint8>                         _compute_constants;
   D3D_PRIMITIVE_TOPOLOGY                     _primitive_topology{};
   Rect                                       _viewport{};
   Rect                                       _scissor_rect{};

@@ -4,7 +4,7 @@
 #include "../resource/image_manager.hpp"
 
 #include <deque>
-#include <vector>
+#include <unordered_set>
 
 namespace tk::renderer {
 
@@ -18,14 +18,14 @@ public:
 
   void destroy() noexcept;
 
-  void add_generate_mipmap_image(ImageHandle handle) noexcept { _mipmap_images.emplace_back(handle); }
-  void blur(Image& src, Image& dst, float sigma, uint32_t blur_count) noexcept;
+  void add_generate_mipmap_image(ImageHandle handle) noexcept { _mipmap_images.emplace(handle); }
+  void blur(Image& src, Image& dst, float sigma, uint blur_count) noexcept;
 
   void update() noexcept;
 
 private:
-  void generate_mipmaps() noexcept;
-  auto get_tmp_img() noexcept -> std::pair<Image*, uint32_t>;
+  void generate_mipmaps(ID3D12GraphicsCommandList1* cmd) noexcept;
+  auto get_tmp_img() noexcept -> std::pair<Image*, uint>;
 
 private:
   Slots<D3D12_COMMAND_LIST_TYPE_COMPUTE> _slots;
@@ -35,10 +35,9 @@ private:
     ImageHandle img;
     bool        in_use{};
   };
-  std::vector<BlurTmpImage>                 _blur_tmp_images;
-  std::deque<std::pair<uint32_t, uint64_t>> _used_blur_tmp_images;
-
-  std::vector<ImageHandle> _mipmap_images;
+  std::vector<BlurTmpImage>           _blur_tmp_images;
+  std::deque<std::pair<uint, uint64>> _used_blur_tmp_images;
+  std::unordered_set<ImageHandle>     _mipmap_images;
 )
 
 }

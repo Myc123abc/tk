@@ -21,8 +21,8 @@ public:
   auto& access() noexcept { return _buf[_idx.load(std::memory_order_acquire)];                               }
 
 private:
-  std::atomic_uint32_t _idx{};
-  std::array<T, 2>     _buf{};
+  std::atomic_uint _idx{};
+  std::array<T, 2> _buf{};
 };
 
 }

@@ -10,17 +10,17 @@ namespace tk::renderer {
 class Buffer
 {
 public:
-  void init(uint32_t size, bool use_descriptor) noexcept;
+  void init(uint size, bool use_descriptor) noexcept;
 
   void destroy() noexcept { _descriptor_handle.release(); }
 
   void clear() noexcept { _size = {}; }
 
-  auto append(void const* data, uint32_t size) noexcept -> uint32_t;
+  auto append(void const* data, uint size) noexcept -> uint;
 
   template <std::ranges::range T>
   requires std::ranges::sized_range<T> && std::ranges::contiguous_range<T>
-  auto append_range(T&& values) noexcept -> uint32_t
+  auto append_range(T&& values) noexcept -> uint
   {
     return append(std::ranges::data(values), std::ranges::size(values) * sizeof(std::ranges::range_value_t<T>));
   }
@@ -34,9 +34,9 @@ public:
 private:
   Microsoft::WRL::ComPtr<ID3D12Resource> _handle;
   DescriptorHandle                       _descriptor_handle;
-  uint8_t*                               _data{};
-  uint32_t                               _capacity{};
-  uint32_t                               _size{};
+  uint8*                                 _data{};
+  uint                                   _capacity{};
+  uint                                   _size{};
 };
 
 }

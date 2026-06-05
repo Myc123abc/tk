@@ -32,7 +32,7 @@ void UIContext::destroy() noexcept
   g_wnd_mgr.close_fullscreen_window();
 }
 
-void UIContext::begin(std::string_view name, int x, int y, uint32_t width, uint32_t height, bool* is_closed, WindowConfig const& cfg) noexcept
+void UIContext::begin(std::string_view name, int x, int y, uint width, uint height, bool* is_closed, WindowConfig const& cfg) noexcept
 {
   err_if(_call_begin, "begin is called but end not be called");
   _call_begin = true;
@@ -368,13 +368,13 @@ void UIContext::add_title_bar() noexcept
 
   // minimize button
   if (button("tk::ui::title_bar_minimize_button", w - btn_width * 3, 0, btn_width, btn_height, background_color, btn_hovered_color, btn_mouse_down_color,
-    [] (uint32_t width, uint32_t height, Color col) { ui::line({ 0, height / 2 }, { width, height / 2 }, col, 1); },
+    [] (uint width, uint height, Color col) { ui::line({ 0, height / 2 }, { width, height / 2 }, col, 1); },
     icon_width, icon_height, 0x395063ff, 0x395063ff))
     _wnd->minimize();
 
   // maximize / restore button
   if (button("tk::ui::title_bar_maximize_restore_button", w - btn_width * 2, 0, btn_width, btn_height, background_color, btn_hovered_color, btn_mouse_down_color,
-    [&] (uint32_t width, uint32_t height, Color col)
+    [&] (uint width, uint height, Color col)
     {
       if (_wnd->is_maximized())
       {
@@ -393,7 +393,7 @@ void UIContext::add_title_bar() noexcept
 
   // close button
   if (button("tk::ui::title_bar_close_button", w - btn_width, 0, btn_width, btn_height, background_color, close_btn_hovered_color, close_btn_mouse_down_color,
-    [] (uint32_t width, uint32_t height, Color col)
+    [] (uint width, uint height, Color col)
     {
       ui::line({}, { width, height }, col);
       ui::line({ width, 0 }, { 0, height }, col);
@@ -523,14 +523,28 @@ auto UIContext::get_key(Key key) noexcept -> Flag<KeyState>
   return ctx.state;
 }
 
-auto UIContext::image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha) noexcept -> std::expected<void, ImageLoadError::Type>
+auto UIContext::image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha, std::optional<ImageConfig> cfg) noexcept -> std::expected<void, ImageLoadError::Type>
 {
   check_draw();
 
   auto res = g_img_mgr.try_load(path, right_bottom.x - left_top.x, right_bottom.y - left_top.y);
   if (res)
   {
-    frame_data()->add_image(res.value(), left_top, right_bottom, alpha);
+    auto img = res.value();
+    auto uvs = std::vector<float2>{ { 0, 0 }, { 1, 0 }, { 1, 1 }, { 0, 1 }, };
+    if (cfg)
+    {
+      if (cfg->cfg.is<ImageConfig::Blur>())
+      {
+        auto ext  = right_bottom - left_top;
+        auto blur = cfg->cfg.get<ImageConfig::Blur>();
+        img = g_img_mgr.blur(img, ext, blur.radius, blur.sigma);
+        uvs[2]   = ext / g_img_mgr[img].extent();
+        uvs[1].x = uvs[2].x;
+        uvs[3].y = uvs[2].y;
+      }
+    }
+    frame_data()->add_image(img, left_top, right_bottom, alpha, uvs);
     return {};
   }
   return std::unexpected(res.error());

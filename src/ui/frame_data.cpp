@@ -110,9 +110,8 @@ auto FrameData::calc_circle_segment_count(float radius) noexcept -> float
 
 void FrameData::add_rect(float2 left_top, float2 right_bottom, Color color, float thickness) noexcept
 {
-  auto& cmd = _draw_cmds.emplace_back();
-  cmd.type = DrawCmd::Type::add_rect;
-  cmd.add_rect = { left_top, right_bottom, color, thickness };
+  auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::add_rect);
+  cmd.data.add_rect = { left_top, right_bottom, color, thickness };
 }
 
 void FrameData::_add_rect(float2 left_top, float2 right_bottom, Color color, float thickness) noexcept
@@ -144,21 +143,20 @@ void FrameData::add_rect(float2 left_top, float2 right_bottom, Color color) noex
   vertices[1] = { { right_bottom.x, left_top.y }, {}, color };
   vertices[2] = { right_bottom, {}, color };
   vertices[3] = { { left_top.x, right_bottom.y }, {}, color };
-  indices[0]  = static_cast<uint16_t>(_vertex_beg + 0);
-  indices[1]  = static_cast<uint16_t>(_vertex_beg + 1);
-  indices[2]  = static_cast<uint16_t>(_vertex_beg + 2);
-  indices[3]  = static_cast<uint16_t>(_vertex_beg + 0);
-  indices[4]  = static_cast<uint16_t>(_vertex_beg + 2);
-  indices[5]  = static_cast<uint16_t>(_vertex_beg + 3);
+  indices[0]  = static_cast<uint16>(_vertex_beg + 0);
+  indices[1]  = static_cast<uint16>(_vertex_beg + 1);
+  indices[2]  = static_cast<uint16>(_vertex_beg + 2);
+  indices[3]  = static_cast<uint16>(_vertex_beg + 0);
+  indices[4]  = static_cast<uint16>(_vertex_beg + 2);
+  indices[5]  = static_cast<uint16>(_vertex_beg + 3);
 
   expand_end();
 }
 
 void FrameData::add_triangle(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept
 {
-  auto& cmd = _draw_cmds.emplace_back();
-  cmd.type = DrawCmd::Type::add_triangle;
-  cmd.add_triangle = { p0, p1, p2, color, thickness };
+  auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::add_triangle);
+  cmd.data.add_triangle = { p0, p1, p2, color, thickness };
 }
 
 void FrameData::_add_triangle(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept
@@ -179,9 +177,8 @@ void FrameData::_add_triangle(float2 p0, float2 p1, float2 p2, Color color, floa
 
 void FrameData::add_circle(float2 center, float radius, Color color, float thickness) noexcept
 {
-  auto& cmd = _draw_cmds.emplace_back();
-  cmd.type = DrawCmd::Type::add_circle;
-  cmd.add_circle = { center, radius, color, thickness };
+  auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::add_circle);
+  cmd.data.add_circle = { center, radius, color, thickness };
 }
 
 void FrameData::_add_circle(float2 center, float radius, Color color, float thickness) noexcept
@@ -202,9 +199,8 @@ void FrameData::_add_circle(float2 center, float radius, Color color, float thic
 
 void FrameData::add_line(float2 p0, float2 p1, Color color, float thickness) noexcept
 {
-  auto& cmd = _draw_cmds.emplace_back();
-  cmd.type = DrawCmd::Type::add_line;
-  cmd.add_line = { p0, p1, color, thickness };
+  auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::add_line);
+  cmd.data.add_line = { p0, p1, color, thickness };
 }
 
 void FrameData::_add_line(float2 p0, float2 p1, Color color, float thickness) noexcept
@@ -220,9 +216,8 @@ void FrameData::_add_line(float2 p0, float2 p1, Color color, float thickness) no
 
 void FrameData::add_arc(float2 center, float2 p0, float2 p1, Color color, float thickness) noexcept
 {
-  auto& cmd = _draw_cmds.emplace_back();
-  cmd.type = DrawCmd::Type::add_arc;
-  cmd.add_arc = { center, p0, p1, color, thickness };
+  auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::add_arc);
+  cmd.data.add_arc = { center, p0, p1, color, thickness };
 }
 
 void FrameData::_add_arc(float2 center, float2 p0, float2 p1, Color color, float thickness) noexcept
@@ -241,9 +236,8 @@ void FrameData::_add_arc(float2 center, float2 p0, float2 p1, Color color, float
 
 void FrameData::add_quad_bezier(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept
 {
-  auto& cmd = _draw_cmds.emplace_back();
-  cmd.type = DrawCmd::Type::add_quad_bezier;
-  cmd.add_quad_bezier = { p0, p1, p2, color, thickness };
+  auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::add_quad_bezier);
+  cmd.data.add_quad_bezier = { p0, p1, p2, color, thickness };
 }
 
 void FrameData::_add_quad_bezier(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept
@@ -259,9 +253,8 @@ void FrameData::_add_quad_bezier(float2 p0, float2 p1, float2 p2, Color color, f
 
 void FrameData::add_cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept
 {
-  auto& cmd = _draw_cmds.emplace_back();
-  cmd.type = DrawCmd::Type::add_cubic_bezier;
-  cmd.add_cubic_bezier = { p0, p1, p2, p3, color, thickness };
+  auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::add_cubic_bezier);
+  cmd.data.add_cubic_bezier = { p0, p1, p2, p3, color, thickness };
 }
 
 void FrameData::_add_cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept
@@ -277,9 +270,8 @@ void FrameData::_add_cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Co
 
 void FrameData::path_begin(float2 p0) noexcept
 {
-  auto& cmd = _draw_cmds.emplace_back();
-  cmd.type       = DrawCmd::Type::path_begin;
-  cmd.path_begin = { p0 };
+  auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::path_begin);
+  cmd.data.path_begin = { p0 };
 }
 
 void FrameData::_path_begin(float2 p0) noexcept
@@ -290,16 +282,14 @@ void FrameData::_path_begin(float2 p0) noexcept
 
 void FrameData::add_path_line_to(float2 p) noexcept
 {
-  auto& cmd = _draw_cmds.emplace_back();
-  cmd.type             = DrawCmd::Type::add_path_line_to;
-  cmd.add_path_line_to = { p };
+  auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::add_path_line_to);
+  cmd.data.add_path_line_to = { p };
 }
 
 void FrameData::add_path_arc_to(float2 center, float2 p1, bool ccw) noexcept
 {
-  auto& cmd = _draw_cmds.emplace_back();
-  cmd.type            = DrawCmd::Type::add_path_arc_to;
-  cmd.add_path_arc_to = { center, p1, ccw };
+  auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::add_path_arc_to);
+  cmd.data.add_path_arc_to = { center, p1, ccw };
 }
 
 void FrameData::_add_path_arc_to(float2 center, float2 p1, bool ccw) noexcept
@@ -321,9 +311,8 @@ void FrameData::_add_path_arc_to(float2 center, float2 p1, bool ccw) noexcept
 
 void FrameData::add_path_quad_bezier_to(float2 p1, float2 p2) noexcept
 {
-  auto& cmd = _draw_cmds.emplace_back();
-  cmd.type                    = DrawCmd::Type::add_path_quad_bezier_to;
-  cmd.add_path_quad_bezier_to = { p1, p2 };
+  auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::add_path_quad_bezier_to);
+  cmd.data.add_path_quad_bezier_to = { p1, p2 };
 }
 
 void FrameData::_add_path_quad_bezier_to(float2 p1, float2 p2) noexcept
@@ -334,9 +323,8 @@ void FrameData::_add_path_quad_bezier_to(float2 p1, float2 p2) noexcept
 
 void FrameData::add_path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept
 {
-  auto& cmd = _draw_cmds.emplace_back();
-  cmd.type                     = DrawCmd::Type::add_path_cubic_bezier_to;
-  cmd.add_path_cubic_bezier_to = { p1, p2, p3 };
+  auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::add_path_cubic_bezier_to);
+  cmd.data.add_path_cubic_bezier_to = { p1, p2, p3 };
 }
 
 void FrameData::_add_path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept
@@ -347,21 +335,19 @@ void FrameData::_add_path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexc
 
 void FrameData::path_end(bool close, Color color, float thickness) noexcept
 {
-  auto& cmd = _draw_cmds.emplace_back();
-  cmd.type     = DrawCmd::Type::path_end;
-  cmd.path_end = { close, color, thickness };
+  auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::path_end);
+  cmd.data.path_end = { close, color, thickness };
 }
 
 void FrameData::union_beg() noexcept
 {
-  _draw_cmds.emplace_back().type = DrawCmd::Type::union_beg;
+  _draw_cmds.emplace_back(DrawCmd::Type::union_beg);
 }
 
 void FrameData::union_end(Color color, float thickness) noexcept
 {
-  auto& cmd = _draw_cmds.emplace_back();
-  cmd.type      = DrawCmd::Type::union_end;
-  cmd.union_end = { color, thickness };
+  auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::union_end);
+  cmd.data.union_end = { color, thickness };
 }
 
 void FrameData::_path_end(bool close, Color color, float thickness) noexcept
@@ -465,24 +451,24 @@ void FrameData::_union_beg(uint& idx) noexcept
     {
     case DrawCmd::Type::add_rect:
       assert(_points.empty());
-      _points.emplace_back(cmd.add_rect.left_top);
-      _points.emplace_back(cmd.add_rect.right_bottom.x, cmd.add_rect.left_top.y);
-      _points.emplace_back(cmd.add_rect.right_bottom);
-      _points.emplace_back(cmd.add_rect.left_top.x, cmd.add_rect.right_bottom.y);
+      _points.emplace_back(cmd.data.add_rect.left_top);
+      _points.emplace_back(cmd.data.add_rect.right_bottom.x, cmd.data.add_rect.left_top.y);
+      _points.emplace_back(cmd.data.add_rect.right_bottom);
+      _points.emplace_back(cmd.data.add_rect.left_top.x, cmd.data.add_rect.right_bottom.y);
       add_current_path();
       break;
 
     case DrawCmd::Type::add_triangle:
       assert(_points.empty());
-      _points.emplace_back(cmd.add_triangle.p0);
-      _points.emplace_back(cmd.add_triangle.p1);
-      _points.emplace_back(cmd.add_triangle.p2);
+      _points.emplace_back(cmd.data.add_triangle.p0);
+      _points.emplace_back(cmd.data.add_triangle.p1);
+      _points.emplace_back(cmd.data.add_triangle.p2);
       add_current_path();
       break;
 
     case DrawCmd::Type::add_circle:
       assert(_points.empty());
-      path_arc_to(cmd.add_circle.center, cmd.add_circle.radius - .5f, 0, std::numbers::pi_v<float> * 2.f);
+      path_arc_to(cmd.data.add_circle.center, cmd.data.add_circle.radius - .5f, 0, std::numbers::pi_v<float> * 2.f);
       if (!_points.empty())
         _points.pop_back();
       add_current_path();
@@ -490,39 +476,39 @@ void FrameData::_union_beg(uint& idx) noexcept
 
     case DrawCmd::Type::path_begin:
       _points.clear();
-      _path_begin(cmd.path_begin.p0);
+      _path_begin(cmd.data.path_begin.p0);
       break;
 
     case DrawCmd::Type::add_path_line_to:
       if (!_points.empty())
-        _add_path_line_to(cmd.add_path_line_to.p);
+        _add_path_line_to(cmd.data.add_path_line_to.p);
       break;
 
     case DrawCmd::Type::add_path_arc_to:
       if (!_points.empty())
-        _add_path_arc_to(cmd.add_path_arc_to.center, cmd.add_path_arc_to.p1, cmd.add_path_arc_to.ccw);
+        _add_path_arc_to(cmd.data.add_path_arc_to.center, cmd.data.add_path_arc_to.p1, cmd.data.add_path_arc_to.ccw);
       break;
 
     case DrawCmd::Type::add_path_quad_bezier_to:
       if (!_points.empty())
-        _add_path_quad_bezier_to(cmd.add_path_quad_bezier_to.p1, cmd.add_path_quad_bezier_to.p2);
+        _add_path_quad_bezier_to(cmd.data.add_path_quad_bezier_to.p1, cmd.data.add_path_quad_bezier_to.p2);
       break;
 
     case DrawCmd::Type::add_path_cubic_bezier_to:
       if (!_points.empty())
-        _add_path_cubic_bezier_to(cmd.add_path_cubic_bezier_to.p1, cmd.add_path_cubic_bezier_to.p2, cmd.add_path_cubic_bezier_to.p3);
+        _add_path_cubic_bezier_to(cmd.data.add_path_cubic_bezier_to.p1, cmd.data.add_path_cubic_bezier_to.p2, cmd.data.add_path_cubic_bezier_to.p3);
       break;
 
     case DrawCmd::Type::path_end:
-      if (cmd.path_end.close)
+      if (cmd.data.path_end.close)
         add_current_path();
       else
         _points.clear();
       break;
 
     case DrawCmd::Type::union_end:
-      union_color     = cmd.union_end.color;
-      union_thickness = cmd.union_end.thickness;
+      union_color     = cmd.data.union_end.color;
+      union_thickness = cmd.data.union_end.thickness;
       found_end       = true;
       break;
 
@@ -581,9 +567,9 @@ void FrameData::add_convex_poly_filled(Color color) noexcept
   auto outer_idx = _vertex_beg + 1;
   for (auto i = 2; i < pt_cnt; ++i)
   {
-    indices[0] = static_cast<uint16_t>(inner_idx);
-    indices[1] = static_cast<uint16_t>(inner_idx + ((i - 1) << 1));
-    indices[2] = static_cast<uint16_t>(inner_idx + (i << 1));
+    indices[0] = static_cast<uint16>(inner_idx);
+    indices[1] = static_cast<uint16>(inner_idx + ((i - 1) << 1));
+    indices[2] = static_cast<uint16>(inner_idx + (i << 1));
     indices += 3;
   }
 
@@ -601,12 +587,12 @@ void FrameData::add_convex_poly_filled(Color color) noexcept
     vertices[1] = { _points[i1] + dmp, {}, aa_col };
     vertices += 2;
 
-    indices[0] = static_cast<uint16_t>(inner_idx + (i1 << 1));
-    indices[1] = static_cast<uint16_t>(inner_idx + (i0 << 1));
-    indices[2] = static_cast<uint16_t>(outer_idx + (i0 << 1));
-    indices[3] = static_cast<uint16_t>(outer_idx + (i0 << 1));
-    indices[4] = static_cast<uint16_t>(outer_idx + (i1 << 1));
-    indices[5] = static_cast<uint16_t>(inner_idx + (i1 << 1));
+    indices[0] = static_cast<uint16>(inner_idx + (i1 << 1));
+    indices[1] = static_cast<uint16>(inner_idx + (i0 << 1));
+    indices[2] = static_cast<uint16>(outer_idx + (i0 << 1));
+    indices[3] = static_cast<uint16>(outer_idx + (i0 << 1));
+    indices[4] = static_cast<uint16>(outer_idx + (i1 << 1));
+    indices[5] = static_cast<uint16>(inner_idx + (i1 << 1));
     indices += 6;
   }
 
@@ -636,9 +622,9 @@ void FrameData::add_concave_poly_filled(Color color) noexcept
   while (triangulator.triangle_left() > 0)
   {
     triangulator.get_next_triangle(triangle);
-    idx[0] = static_cast<uint16_t>(vtx_inner_idx + (triangle[0] << 1));
-    idx[1] = static_cast<uint16_t>(vtx_inner_idx + (triangle[1] << 1));
-    idx[2] = static_cast<uint16_t>(vtx_inner_idx + (triangle[2] << 1));
+    idx[0] = static_cast<uint16>(vtx_inner_idx + (triangle[0] << 1));
+    idx[1] = static_cast<uint16>(vtx_inner_idx + (triangle[1] << 1));
+    idx[2] = static_cast<uint16>(vtx_inner_idx + (triangle[2] << 1));
     idx += 3;
   }
 
@@ -658,12 +644,12 @@ void FrameData::add_concave_poly_filled(Color color) noexcept
     vtx[1] = { _points[i1] + dm, {}, col_trans };
     vtx += 2;
 
-    idx[0] = static_cast<uint16_t>(vtx_inner_idx + (i1 << 1));
-    idx[1] = static_cast<uint16_t>(vtx_inner_idx + (i0 << 1));
-    idx[2] = static_cast<uint16_t>(vtx_outer_idx + (i0 << 1));
-    idx[3] = static_cast<uint16_t>(vtx_outer_idx + (i0 << 1));
-    idx[4] = static_cast<uint16_t>(vtx_outer_idx + (i1 << 1));
-    idx[5] = static_cast<uint16_t>(vtx_inner_idx + (i1 << 1));
+    idx[0] = static_cast<uint16>(vtx_inner_idx + (i1 << 1));
+    idx[1] = static_cast<uint16>(vtx_inner_idx + (i0 << 1));
+    idx[2] = static_cast<uint16>(vtx_outer_idx + (i0 << 1));
+    idx[3] = static_cast<uint16>(vtx_outer_idx + (i0 << 1));
+    idx[4] = static_cast<uint16>(vtx_outer_idx + (i1 << 1));
+    idx[5] = static_cast<uint16>(vtx_inner_idx + (i1 << 1));
     idx += 6;
   }
 
@@ -861,7 +847,7 @@ void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noex
       out_vtx[3] = _points[i2] - dm_out;
 
       uint vals[] = { idx2 + 1, idx1 + 1, idx1 + 2, idx1 + 2, idx2 + 2, idx2 + 1, idx2 + 1, idx1 + 1, idx1 + 0, idx1 + 0, idx2 + 0, idx2 + 1, idx2 + 2, idx1 + 2, idx1 + 3, idx1 + 3, idx2 + 3, idx2 + 2 };
-      for (auto v : vals) *idx++ = static_cast<uint16_t>(v);
+      for (auto v : vals) *idx++ = static_cast<uint16>(v);
 
       idx1 = idx2;
     }
@@ -898,7 +884,7 @@ void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noex
       out_vtx[1] = _points[i2] - dm;
 
       uint vals[] = { idx2 + 0, idx1 + 0, idx1 + 2, idx1 + 2, idx2 + 2, idx2 + 0, idx2 + 1, idx1 + 1, idx1 + 0, idx1 + 0, idx2 + 0, idx2 + 1 };
-      for (auto v : vals) *idx++ = static_cast<uint16_t>(v);
+      for (auto v : vals) *idx++ = static_cast<uint16>(v);
 
       idx1 = idx2;
     }
@@ -959,9 +945,8 @@ void FrameData::push_render_cmd_clear_rect(RenderCmdType type, std::optional<Rec
 
 void FrameData::add_scissor_rect(Rect rect) noexcept
 {
-  auto& cmd = _draw_cmds.emplace_back();
-  cmd.type = DrawCmd::Type::add_scissor_rect;
-  cmd.add_scissor_rect = { rect };
+  auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::add_scissor_rect);
+  cmd.data.add_scissor_rect = { rect };
 }
 
 void FrameData::_add_scissor_rect(Rect rect) noexcept
@@ -973,14 +958,14 @@ void FrameData::_add_scissor_rect(Rect rect) noexcept
   _render_cmd_rect_idxs.clear();
 }
 
-void FrameData::add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept
+void FrameData::add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8 alpha, std::span<float2> uvs) noexcept
 {
-  auto& cmd = _draw_cmds.emplace_back();
-  cmd.type = DrawCmd::Type::add_image;
-  cmd.add_image = { handle, left_top, right_bottom, alpha };
+  assert(uvs.size() == 4);
+  auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::add_image);
+  cmd.data.add_image = { handle, left_top, right_bottom, alpha, uvs[0], uvs[1], uvs[2], uvs[3] };
 }
 
-void FrameData::_add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8_t alpha) noexcept
+void FrameData::_add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8 alpha, float2 uv0, float2 uv1, float2 uv2, float2 uv3) noexcept
 {
   assert(!_using_discard_shapes);
   if (alpha == 0) return;
@@ -990,16 +975,16 @@ void FrameData::_add_image(ImageHandle handle, float2 left_top, float2 right_bot
 
   auto col = Color{ 1, 1, 1, static_cast<float>(alpha) / 255 };
   auto [vertices, indices] = expand_beg(4, 6);
-  vertices[0] = { left_top, {}, col };
-  vertices[1] = { { right_bottom.x, left_top.y }, { 1, 0 }, col };
-  vertices[2] = { right_bottom, { 1, 1 }, col };
-  vertices[3] = { { left_top.x, right_bottom.y }, { 0, 1 }, col };
-  indices[0]  = static_cast<uint16_t>(_vertex_beg + 0);
-  indices[1]  = static_cast<uint16_t>(_vertex_beg + 1);
-  indices[2]  = static_cast<uint16_t>(_vertex_beg + 2);
-  indices[3]  = static_cast<uint16_t>(_vertex_beg + 0);
-  indices[4]  = static_cast<uint16_t>(_vertex_beg + 2);
-  indices[5]  = static_cast<uint16_t>(_vertex_beg + 3);
+  vertices[0] = { left_top, uv0, col };
+  vertices[1] = { { right_bottom.x, left_top.y }, uv1, col };
+  vertices[2] = { right_bottom, uv2, col };
+  vertices[3] = { { left_top.x, right_bottom.y }, uv3, col };
+  indices[0]  = static_cast<uint16>(_vertex_beg + 0);
+  indices[1]  = static_cast<uint16>(_vertex_beg + 1);
+  indices[2]  = static_cast<uint16>(_vertex_beg + 2);
+  indices[3]  = static_cast<uint16>(_vertex_beg + 0);
+  indices[4]  = static_cast<uint16>(_vertex_beg + 2);
+  indices[5]  = static_cast<uint16>(_vertex_beg + 3);
   expand_end();
 
   push_render_cmd(type, handle);
@@ -1008,10 +993,10 @@ void FrameData::_add_image(ImageHandle handle, float2 left_top, float2 right_bot
 void FrameData::discard_beg(std::function<void()> func) noexcept
 {
   _discard_beg_idx = _draw_cmds.size();
-  _draw_cmds.emplace_back().type = DrawCmd::Type::discard_beg;
+  _draw_cmds.emplace_back(DrawCmd::Type::discard_beg);
   auto beg = _draw_cmds.size();
   func();
-  _draw_cmds[_discard_beg_idx].discard_beg.count = static_cast<uint>(_draw_cmds.size() - beg);
+  _draw_cmds[_discard_beg_idx].data.discard_beg.count = static_cast<uint>(_draw_cmds.size() - beg);
 }
 
 void FrameData::_discard_beg(uint count, uint& idx) noexcept
@@ -1040,10 +1025,10 @@ void FrameData::_discard_beg(uint count, uint& idx) noexcept
 void FrameData::discard_end() noexcept
 {
   // if not have any discard targets, remove the discard operation
-  if (_draw_cmds[_discard_beg_idx].discard_beg.count + _discard_beg_idx == _draw_cmds.size() - 1)
+  if (_draw_cmds[_discard_beg_idx].data.discard_beg.count + _discard_beg_idx == _draw_cmds.size() - 1)
     _draw_cmds.erase(_draw_cmds.begin() + _discard_beg_idx, _draw_cmds.end());
   else
-    _draw_cmds.emplace_back().type = DrawCmd::Type::discard_end;
+    _draw_cmds.emplace_back(DrawCmd::Type::discard_end);
 }
 
 void FrameData::_discard_end() noexcept
@@ -1069,59 +1054,68 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
   switch (cmd.type)
   {
   case Type::add_rect:
-    _add_rect(cmd.add_rect.left_top, cmd.add_rect.right_bottom, cmd.add_rect.color, cmd.add_rect.thickness);
+    _add_rect(cmd.data.add_rect.left_top, cmd.data.add_rect.right_bottom, cmd.data.add_rect.color, cmd.data.add_rect.thickness);
     break;
 
   case Type::add_triangle:
-    _add_triangle(cmd.add_triangle.p0, cmd.add_triangle.p1, cmd.add_triangle.p2, cmd.add_triangle.color, cmd.add_triangle.thickness);
+    _add_triangle(cmd.data.add_triangle.p0, cmd.data.add_triangle.p1, cmd.data.add_triangle.p2, cmd.data.add_triangle.color, cmd.data.add_triangle.thickness);
     break;
 
   case Type::add_circle:
-    _add_circle(cmd.add_circle.center, cmd.add_circle.radius, cmd.add_circle.color, cmd.add_circle.thickness);
+    _add_circle(cmd.data.add_circle.center, cmd.data.add_circle.radius, cmd.data.add_circle.color, cmd.data.add_circle.thickness);
     break;
 
   case Type::add_line:
-    _add_line(cmd.add_line.p0, cmd.add_line.p1, cmd.add_line.color, cmd.add_line.thickness);
+    _add_line(cmd.data.add_line.p0, cmd.data.add_line.p1, cmd.data.add_line.color, cmd.data.add_line.thickness);
     break;
 
   case Type::add_arc:
-    _add_arc(cmd.add_arc.center, cmd.add_arc.p0, cmd.add_arc.p1, cmd.add_arc.color, cmd.add_arc.thickness);
+    _add_arc(cmd.data.add_arc.center, cmd.data.add_arc.p0, cmd.data.add_arc.p1, cmd.data.add_arc.color, cmd.data.add_arc.thickness);
     break;
 
   case Type::add_quad_bezier:
-    _add_quad_bezier(cmd.add_quad_bezier.p0, cmd.add_quad_bezier.p1, cmd.add_quad_bezier.p2, cmd.add_quad_bezier.color, cmd.add_quad_bezier.thickness);
+    _add_quad_bezier(cmd.data.add_quad_bezier.p0, cmd.data.add_quad_bezier.p1, cmd.data.add_quad_bezier.p2, cmd.data.add_quad_bezier.color, cmd.data.add_quad_bezier.thickness);
     break;
 
   case Type::add_cubic_bezier:
-    _add_cubic_bezier(cmd.add_cubic_bezier.p0, cmd.add_cubic_bezier.p1, cmd.add_cubic_bezier.p2, cmd.add_cubic_bezier.p3, cmd.add_cubic_bezier.color, cmd.add_cubic_bezier.thickness);
+    _add_cubic_bezier(cmd.data.add_cubic_bezier.p0, cmd.data.add_cubic_bezier.p1, cmd.data.add_cubic_bezier.p2, cmd.data.add_cubic_bezier.p3, cmd.data.add_cubic_bezier.color, cmd.data.add_cubic_bezier.thickness);
     break;
 
   case Type::add_image:
-    _add_image(cmd.add_image.handle, cmd.add_image.left_top, cmd.add_image.right_bottom, cmd.add_image.alpha);
+    _add_image(
+      cmd.data.add_image.handle,
+      cmd.data.add_image.left_top,
+      cmd.data.add_image.right_bottom,
+      cmd.data.add_image.alpha,
+      cmd.data.add_image.uv0,
+      cmd.data.add_image.uv1,
+      cmd.data.add_image.uv2,
+      cmd.data.add_image.uv3
+    );
     break;
 
   case Type::path_begin:
-    _path_begin(cmd.path_begin.p0);
+    _path_begin(cmd.data.path_begin.p0);
     break;
 
   case Type::add_path_line_to:
-    _add_path_line_to(cmd.add_path_line_to.p);
+    _add_path_line_to(cmd.data.add_path_line_to.p);
     break;
 
   case Type::add_path_arc_to:
-    _add_path_arc_to(cmd.add_path_arc_to.center, cmd.add_path_arc_to.p1, cmd.add_path_arc_to.ccw);
+    _add_path_arc_to(cmd.data.add_path_arc_to.center, cmd.data.add_path_arc_to.p1, cmd.data.add_path_arc_to.ccw);
     break;
 
   case Type::add_path_quad_bezier_to:
-    _add_path_quad_bezier_to(cmd.add_path_quad_bezier_to.p1, cmd.add_path_quad_bezier_to.p2);
+    _add_path_quad_bezier_to(cmd.data.add_path_quad_bezier_to.p1, cmd.data.add_path_quad_bezier_to.p2);
     break;
 
   case Type::add_path_cubic_bezier_to:
-    _add_path_cubic_bezier_to(cmd.add_path_cubic_bezier_to.p1, cmd.add_path_cubic_bezier_to.p2, cmd.add_path_cubic_bezier_to.p3);
+    _add_path_cubic_bezier_to(cmd.data.add_path_cubic_bezier_to.p1, cmd.data.add_path_cubic_bezier_to.p2, cmd.data.add_path_cubic_bezier_to.p3);
     break;
 
   case Type::path_end:
-    _path_end(cmd.path_end.close, cmd.path_end.color, cmd.path_end.thickness);
+    _path_end(cmd.data.path_end.close, cmd.data.path_end.color, cmd.data.path_end.thickness);
     break;
 
   case Type::union_beg:
@@ -1132,11 +1126,11 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
     break;
 
   case Type::add_scissor_rect:
-    _add_scissor_rect(cmd.add_scissor_rect.rect);
+    _add_scissor_rect(cmd.data.add_scissor_rect.rect);
     break;
 
   case Type::discard_beg:
-    _discard_beg(cmd.discard_beg.count, idx);
+    _discard_beg(cmd.data.discard_beg.count, idx);
     break;
 
   case Type::discard_end:

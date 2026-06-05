@@ -391,7 +391,7 @@ void Compiler::CompileResult::get_vertex_input_layout(ID3D12ShaderReflection* sh
   }
 
   if (!_input_element_descs.empty())
-    input_layout_desc = D3D12_INPUT_LAYOUT_DESC{ _input_element_descs.data(), static_cast<uint32_t>(_input_element_descs.size()) };
+    input_layout_desc = D3D12_INPUT_LAYOUT_DESC{ _input_element_descs.data(), static_cast<uint>(_input_element_descs.size()) };
 }
 
 void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader_reflection, bool is_compute_shader, std::unordered_set<std::string_view> const& volatile_descs) noexcept

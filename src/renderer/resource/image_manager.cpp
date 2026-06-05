@@ -3,8 +3,11 @@
 
 #include "image_manager.hpp"
 #include "../../util/file_manager.hpp"
+#include "../../util/hash.hpp"
 #include "../engine/copy_engine.hpp"
 #include "../engine/compute_engine.hpp"
+
+#include <algorithm>
 
 using namespace tk::ui;
 
@@ -20,13 +23,13 @@ auto ImageManager::create(uint width , uint height, ImageFormat format, Flag<Ima
 
 auto ImageManager::extent(std::string_view path) noexcept -> float2
 {
-  if (!_image_extents.contains(path.data()))
+  if (!_image_infos.contains(path.data()))
   {
     int w, h;
     stbi_info(path.data(), &w, &h, nullptr);
-    _image_extents[path.data()] = { w, h };
+    _image_infos[path.data()] = { { w, h } };
   }
-  return _image_extents[path.data()];
+  return _image_infos[path.data()].extent;
 }
 
 auto ImageManager::try_load(std::string_view path, uint width, uint height) noexcept -> std::expected<ImageHandle, ImageLoadError::Type>
@@ -41,7 +44,27 @@ auto ImageManager::try_load(std::string_view path, uint width, uint height) noex
       return std::unexpected(ImageLoadError::decode_failed{ _decoded_failed_images[filename] });
   }
 
-  if (_loaded_images.contains(filename)) return _loaded_images[filename];
+  if (_loaded_images.contains(filename))
+  {
+    // generate mipmap if render size is too small
+    assert(_image_infos.contains(filename));
+    auto& info = _image_infos[filename];
+    if (!info.use_mipmap)
+    {
+      auto ratio_x = static_cast<float>(width)  / info.extent.x;
+      auto ratio_y = static_cast<float>(height) / info.extent.y;
+      if (ratio_x > 0 && ratio_y > 0 && (ratio_x <= 0.5 || ratio_y <= 0.5))
+      {
+        info.use_mipmap = true;
+        auto handle = _loaded_images[filename];
+        auto src    = std::move(_pool[handle]);
+        _pool[handle].generate_mipmap();
+        g_copy_engine.copy(std::move(src), handle);
+        g_comp_engine.add_generate_mipmap_image(handle);
+      }
+    }
+    return _loaded_images[filename];
+  }
 
   if (!g_file_mgr.exists(path)) return std::unexpected(ImageLoadError::unexist{});
 
@@ -98,10 +121,78 @@ void ImageManager::load(std::string_view path, uint width, uint height, void* da
   auto handle = create(width, height, ImageFormat::rgba8_unorm, ImageType::srv, use_mipmap);
   _loaded_images.emplace(path, handle);
 
-  if (!_image_extents.contains(path.data()))
-    _image_extents[path.data()] = { width, height };
+  if (!_image_infos.contains(path.data()))
+    _image_infos[path.data()] = { { width, height }, use_mipmap };
 
   g_copy_engine.copy({ width, height, 4, data, true }, handle);
+}
+
+auto ImageManager::blur(ImageHandle handle, float2 ext, uint radius, float sigma) noexcept -> ImageHandle
+{
+  auto hash = generic_hash(ext.x, ext.y, radius, sigma);
+
+  // find whether this image has blured image
+  if (!_blur_imgs.contains(handle))
+  {
+    // when not have blur image, create a blur image
+    auto fmt   = g_img_mgr[handle].format();
+    auto types = ImageType::srv | ImageType::uav;
+
+    auto& blur_img = _blur_imgs[handle];
+    blur_img.img  = create(ext.x, ext.y, fmt, types);
+    blur_img.hash = hash;
+
+    // find a temp image for blur generation
+    // TODO: when image not blur again, remeber remove the blur image resource
+    auto tmp_img_idx = find_tmp_image(ext.x, ext.y, fmt, types);
+
+    // TODO: submit to compute engine for blur generatation
+
+    return blur_img.img;
+  }
+
+  // when this image have the blur image, check whether the image size and blur setting are changed
+  auto& blur_img = _blur_imgs[handle];
+  if (blur_img.hash == hash)
+  {
+    // when is the same setting, so nothing need to do, the blur image should also be cached, directly use it
+    return blur_img.img;
+  }
+
+  // the blur setting is changed, need to regenerate the blur image
+  blur_img.hash = hash;
+  // TODO: delete old blur image and create new one
+  // TODO: regenerate blur image and submit to compute engine
+  return {};
+}
+
+auto ImageManager::find_tmp_image(uint width, uint height, ImageFormat fmt, Flag<ImageType> types) noexcept -> uint
+{
+  // have idle tmp images, find a suitable one
+  if (auto it = std::ranges::find_if(_tmp_imgs, [&](auto const& img)
+      {
+        if (img.is_used) return false;
+        auto const& tmp_img = g_img_mgr[img.img];
+        return tmp_img.width() >= width && tmp_img.height() >= height && tmp_img.format() == fmt && tmp_img.types() == types;
+      }); it != _tmp_imgs.end())
+  {
+    // find sutiable tmp image, use it
+    it->is_used = true;
+    return static_cast<uint>(std::distance(_tmp_imgs.begin(), it));
+  }
+
+  // reuse any idle tmp image by recreating it with the requested format/type
+  if (auto it = std::ranges::find_if(_tmp_imgs, [&](auto const& img) { return !img.is_used; });
+      it != _tmp_imgs.end())
+  {
+    it->is_used = true;
+    g_img_mgr[it->img].init(width, height, fmt, types);
+    return static_cast<uint>(std::distance(_tmp_imgs.begin(), it));
+  }
+
+  // otherwise, create a new one
+  _tmp_imgs.emplace_back(create(width, height, fmt, types), true);
+  return _tmp_imgs.size() - 1;
 }
 
 }

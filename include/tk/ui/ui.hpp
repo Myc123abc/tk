@@ -21,7 +21,7 @@ struct Color
 {
   Color() = default;
 
-  Color(uint32_t color) noexcept
+  Color(uint color) noexcept
   {
     r = static_cast<float>((color >> 24) & 0xFF) / 255;
     g = static_cast<float>((color >> 16) & 0xFF) / 255;
@@ -163,15 +163,28 @@ using Type = Variant<
 >;
 }
 
+struct ImageConfig
+{
+  struct Blur
+  {
+    uint  radius{};
+    float sigma{};
+  };
+  Variant<Blur> cfg;
+
+  static auto blur(uint radius, float sigma) noexcept { return ImageConfig{ Blur{ radius, sigma } }; }
+};
+
 /**
  * display image
  * @param path
  * @param left_top
  * @param right_bottom
  * @param alpha
+ * @param cfg can use for blur image
  * @return false if image is unexist, or loading, or load failed
  */
-auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8_t alpha = 0xff) noexcept -> std::expected<void, ImageLoadError::Type>;
+auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha = 0xff, std::optional<ImageConfig> cfg = {}) noexcept -> std::expected<void, ImageLoadError::Type>;
 
 /**
  * load image
@@ -232,7 +245,7 @@ auto text(std::string_view text, float2 pos, float size, Color inner_color, Colo
  *                  if you want to close the window, stop call the begin and end of this window
  * @param cfg window config
  */
-void begin(std::string_view name, int x, int y, uint32_t width, uint32_t height, bool* is_closed = {}, WindowConfig const& cfg = {}) noexcept;
+void begin(std::string_view name, int x, int y, uint width, uint height, bool* is_closed = {}, WindowConfig const& cfg = {}) noexcept;
 
 // end a window
 void end() noexcept;
@@ -439,7 +452,7 @@ struct ButtonState
  * @param height
  * @return button state
  */
-auto button(std::string_view name, float x, float y, uint32_t width, uint32_t height) noexcept-> ButtonState;
+auto button(std::string_view name, float x, float y, uint width, uint height) noexcept-> ButtonState;
 
 /**
  * normal button
@@ -456,8 +469,8 @@ auto button(
   std::string_view name,
   float            x,
   float            y,
-  uint32_t         width,
-  uint32_t         height,
+  uint             width,
+  uint             height,
   Color            button_color,
   Color            button_hover_color) noexcept-> ButtonState;
 
@@ -484,14 +497,14 @@ auto button(
   std::string_view                               name,
   float                                          x,
   float                                          y,
-  uint32_t                                       width,
-  uint32_t                                       height,
+  uint                                           width,
+  uint                                           height,
   Color                                          button_color,
   Color                                          button_hover_color,
   std::optional<Color>                           mouse_down_color,
-  std::function<void(uint32_t, uint32_t, Color)> icon_update_func,
-  uint32_t                                       icon_width,
-  uint32_t                                       icon_height,
+  std::function<void(uint, uint, Color)>         icon_update_func,
+  uint                                           icon_width,
+  uint                                           icon_height,
   Color                                          icon_color,
   Color                                          icon_hover_color) noexcept-> ButtonState;
 

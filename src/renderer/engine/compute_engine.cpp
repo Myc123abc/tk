@@ -55,12 +55,12 @@ void ComputeEngine::destroy() noexcept
   Engine::destroy();
 }
 
-auto ComputeEngine::get_tmp_img() noexcept -> std::pair<Image*, uint32_t>
+auto ComputeEngine::get_tmp_img() noexcept -> std::pair<Image*, uint>
 {
   // refactoring code
   assert(false);
-  Image*   tmp_img{};
-  uint32_t idx{};
+  Image* tmp_img{};
+  uint   idx{};
   if (auto it = std::ranges::find(_blur_tmp_images, false, &BlurTmpImage::in_use);
       it != _blur_tmp_images.end())
   {
@@ -78,7 +78,7 @@ auto ComputeEngine::get_tmp_img() noexcept -> std::pair<Image*, uint32_t>
   return { tmp_img, idx };
 }
 
-void ComputeEngine::blur(Image& src, Image& dst, float sigma, uint32_t blur_count) noexcept
+void ComputeEngine::blur(Image& src, Image& dst, float sigma, uint blur_count) noexcept
 {
   // refactoring code
   assert(false);
@@ -131,12 +131,36 @@ void ComputeEngine::blur(Image& src, Image& dst, float sigma, uint32_t blur_coun
     g_ctx.dispatch(width, ceil(height / 128.f), 1);
   }
 
-  _used_blur_tmp_images.emplace_back(idx, _slots.submit_slot());
+  auto v = _slots.submit_slot();
+  _used_blur_tmp_images.emplace_back(idx, v);
+  g_graphics_engine.wait(g_comp_engine, v);
 }
 
 void ComputeEngine::update() noexcept
 {
-  generate_mipmaps();
+  if (_mipmap_images.empty()) return;
+
+  auto cmd = Engine::cmd();
+
+  _slots.acquire_slot();
+  g_desc_heap_mgr.bind_heaps(cmd);
+  g_ctx.set_cmd(cmd);
+
+  generate_mipmaps(cmd);
+
+  auto fence_value = _slots.submit_slot();
+
+  g_graphics_engine.wait(g_comp_engine, fence_value);
+  
+  // release mipmap descs after generation complete
+  if (!_mipmap_images.empty())
+  {
+    g_renderer.add_frame_render_complete_func([this, handles = std::move(_mipmap_images)]
+    {
+      for (auto const& handle : handles) g_img_mgr[handle].release_mipmap_descs();
+    }, EngineType::compute);
+    _mipmap_images.clear();
+  }
 
 #if 0
   auto finish_value = fence_completed_value();
@@ -147,13 +171,6 @@ void ComputeEngine::update() noexcept
     {
       _blur_tmp_images[idx].in_use = false;
       it = _used_blur_tmp_images.erase(it);
-      // TODO: only compute engine finish then other engine can use, otherwise lead the error as follow sometimes:
-      // D4D12 ERROR: ID3D12CommandQueue::ExecuteCommandLists: Non-simultaneous-access Texture Resource
-      // (0x0000022ED17257F0:'Unnamed Object') is still referenced by write|transition_barrier GPU operations
-      // in-flight on another Command Queue (0x0000022ED0F99010:'Unnamed ID3D12CommandQueue Object').
-      // It is not safe to start read|write|transition_barrier GPU operations now on this Command Queue
-      // (0x0000022EC7ECEAE0:'Unnamed ID3D12CommandQueue Object'). This can result in race conditions and
-      // application instability. [ EXECUTION ERROR #1047: OBJECT_ACCESSED_WHILE_STILL_IN_USE]
     }
     else
       ++it;
@@ -161,39 +178,24 @@ void ComputeEngine::update() noexcept
 #endif
 }
 
-void ComputeEngine::generate_mipmaps() noexcept
+void ComputeEngine::generate_mipmaps(ID3D12GraphicsCommandList1* cmd) noexcept
 {
-  if (_mipmap_images.empty()) return;
-
-  // TODO: need use slot, because not this mipmap can be used in current frame
-  reset_cmd();
-
-  auto cmd = Engine::cmd();
-
-  g_desc_heap_mgr.bind_heaps(cmd);
-
-  g_ctx.set_cmd(cmd);
-
   struct MipmapConstant
   {
     float2 texel_size;
-    uint   mip_level{};
   };
 
   for (auto handle : _mipmap_images)
   {
-    auto& img = g_img_mgr[handle];
-    auto src_w = img.width();
-    auto src_h = img.height();
+    auto& img   = g_img_mgr[handle];
+    auto  src_w = img.width();
+    auto  src_h = img.height();
 
-    assert(!img.mipmap_descs().empty());
-    auto const& src_desc = img.mipmap_descs()[0];
-    img.set_state(cmd, ImageState::non_pixel, 0);
-
-    for (auto i = 1u; i < img.mipmap_descs().size(); ++i)
+    for (auto i = 0u; i < img.mipmap_descs().size(); ++i)
     {
-      // TODO: should i reset mipmap resources' state to srv?
-      img.set_state(cmd, ImageState::compute_rw, i);
+      img.set_state(cmd, ImageState::non_pixel, i);
+      img.set_state(cmd, ImageState::compute_rw, i + 1);
+      auto const& [srv, uav] = img.mipmap_descs()[i];
       g_ctx.compute_pipe_set(ComputePipeSetInfo
       {
         .type           = PipelineType::mipmap,
@@ -201,17 +203,16 @@ void ComputeEngine::generate_mipmaps() noexcept
         .constants      = MipmapConstant
         {
           .texel_size = float2{ 1.0 / src_w, 1.0 / src_h },
-          .mip_level  = i,
         },
         .descs =
         {
-          { "src", src_desc.gpu_handle()              },
-          { "dst", img.mipmap_descs()[i].gpu_handle() },
+          { "src", srv.gpu_handle() },
+          { "dst", uav.gpu_handle() },
         }
       });
 
-      auto dst_w = std::max(1u, img.width()  >> 1);
-      auto dst_h = std::max(1u, img.height() >> 1);
+      auto dst_w = std::max(1u, src_w >> 1);
+      auto dst_h = std::max(1u, src_h >> 1);
 
       g_ctx.dispatch((dst_w + 7) / 8,  (dst_h + 7) / 8, 1);
 
@@ -219,20 +220,6 @@ void ComputeEngine::generate_mipmaps() noexcept
       src_h = dst_h;
     }
   }
-
-  submit();
-
-  // TODO: do i need to wait for graphics_engines? or set resource tracking when be used in rendering?
-  // TODO: remove after use slot
-  g_graphics_engine.wait(g_comp_engine);
-  
-  // release mipmap uavs after generation complete
-  g_renderer.add_frame_render_complete_func([this, handles = std::move(_mipmap_images)]
-  {
-    for (auto const& handle : handles) g_img_mgr[handle].release_mipmap_descs();
-  }, EngineType::compute);
-
-  _mipmap_images.clear();
 }
 
 }

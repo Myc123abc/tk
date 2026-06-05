@@ -16,7 +16,7 @@ struct TriangulatorNode
   };
 
   Type              type{};
-  uint32_t          idx{};
+  uint              idx{};
   float2            pos;
   TriangulatorNode* next{};
   TriangulatorNode* prev{};
@@ -27,10 +27,10 @@ struct TriangulatorNode
 struct TriangulatorNodeSpan
 {
   TriangulatorNode** data{};
-  uint32_t           size{};
+  uint               size{};
 
   void push(TriangulatorNode* node) noexcept { data[size++] = node; }
-  void erase(uint32_t idx) noexcept
+  void erase(uint idx) noexcept
   {
     for (int i = size - 1; i >= 0; --i)
     {
@@ -46,8 +46,8 @@ struct TriangulatorNodeSpan
 
 struct Triangulator
 {
-  static auto estimate_triangle_cnt(uint32_t pt_cnt) noexcept { return (pt_cnt < 3) ? 0 : pt_cnt - 2; }
-  static auto estimate_buf_size(uint32_t pt_cnt) noexcept { return sizeof(TriangulatorNode) * pt_cnt + sizeof(TriangulatorNode*) * pt_cnt * 2; }
+  static auto estimate_triangle_cnt(uint pt_cnt) noexcept { return (pt_cnt < 3) ? 0 : pt_cnt - 2; }
+  static auto estimate_buf_size(uint pt_cnt) noexcept { return sizeof(TriangulatorNode) * pt_cnt + sizeof(TriangulatorNode*) * pt_cnt * 2; }
 
   void init(std::span<float2> points, void* buf) noexcept
   {
@@ -63,7 +63,7 @@ struct Triangulator
 
   auto triangle_left() const noexcept { return _triangles_left; }
 
-  auto get_next_triangle(uint32_t triangle[3]) noexcept
+  auto get_next_triangle(uint triangle[3]) noexcept
   {
     if (_ears.size == 0)
     {
@@ -214,7 +214,7 @@ private:
   }
 
 private:
-  uint32_t             _triangles_left{};
+  uint                 _triangles_left{};
   TriangulatorNode*    _nodes{};
   TriangulatorNodeSpan _ears{};
   TriangulatorNodeSpan _reflexs{};
