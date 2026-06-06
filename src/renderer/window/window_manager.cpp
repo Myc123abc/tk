@@ -141,7 +141,10 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
       if (window.is_moving())
         window.move_end();
       else if (window.is_resizing())
+      {
         window.resize_end();
+        g_wnd_mgr._resizing = false;
+      }
     }
   };
 
@@ -262,6 +265,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
       {
         if (!cfg.no_resize)
         {
+          g_wnd_mgr._resizing = true;
           auto offset = pos - last_cursor_pos;
           window.adjust_offset(left_button_down_resize_type, pos, offset.x, offset.y);
           window.resize(left_button_down_resize_type, offset.x, offset.y);
@@ -302,6 +306,7 @@ void WindowManager::update() noexcept
 
 void WindowManager::update_cursor() noexcept
 {
+  if (_resizing) return;
   if (g_ui_ctx.cursor_on_window = get_cursor_on_window(); g_ui_ctx.cursor_on_window)
   {
     auto const& cursor_on_window = _windows[g_ui_ctx.cursor_on_window];

@@ -66,6 +66,7 @@ private:
   std::unordered_map<HWND, Rect>   _window_change_size{};
   std::unordered_map<HWND, HWND>   _blur_windows;
   ResizeType                       _cursor_type{};
+  bool                             _resizing{};
 )
 
 }
