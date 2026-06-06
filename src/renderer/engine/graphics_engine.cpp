@@ -11,6 +11,8 @@ auto GraphicsEngine::submit_slot() noexcept -> uint64
 {
   for (auto [src, dst] : _cpy_imgs)
     renderer::copy(cmd(), *src, *dst);
+
+  _cpy_imgs.clear();
   return _slots.submit_slot();
 }
 

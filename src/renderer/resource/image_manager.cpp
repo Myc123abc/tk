@@ -56,11 +56,19 @@ auto ImageManager::try_load(std::string_view path, uint width, uint height) noex
       if (ratio_x > 0 && ratio_y > 0 && (ratio_x <= 0.5 || ratio_y <= 0.5))
       {
         info.use_mipmap = true;
-        auto handle = _loaded_images[filename];
-        auto src    = std::move(_pool[handle]);
-        _pool[handle].generate_mipmap();
-        g_copy_engine.copy(std::move(src), handle);
-        g_comp_engine.add_generate_mipmap_image(handle);
+        
+        // get current image handle
+        auto old_handle = _loaded_images[filename];
+        
+        // recreate an image with mipmap
+        auto const& old_img = _pool[old_handle];
+        auto new_handle = create(old_img.width(), old_img.height(), old_img.format(), old_img.types(), true);
+        _loaded_images[filename] = new_handle;
+
+        // for new image with mipmap, we need to copy the old image's content to new image
+        g_copy_engine.move(old_handle, new_handle);
+        // and generate mipmaps by compute engine
+        g_comp_engine.add_generate_mipmap_image(new_handle);
       }
     }
     return _loaded_images[filename];

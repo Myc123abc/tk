@@ -73,25 +73,25 @@ public:
     slot->data.upload_buf.add_image(img, std::move(infos));
   }
 
-  void copy(Image&& src, ImageHandle dst) noexcept
+  void move(ImageHandle src, ImageHandle dst) noexcept
   {
     auto slot = _slots.slot();
     assert(slot && _slots.is_idle(slot));
-    slot->data.copy_moved_imgs.emplace_back(std::move(src), dst);
+    slot->data.moved_imgs.emplace_back(src, dst);
   }
 
   void update() noexcept;
 
 private:
-  struct CopyMovedImage
+  struct MovedImage
   {
-    Image       src;
+    ImageHandle src;
     ImageHandle dst;
   };
   struct SlotData
   {
-    UploadBuffer                upload_buf;
-    std::vector<CopyMovedImage> copy_moved_imgs;
+    UploadBuffer            upload_buf;
+    std::vector<MovedImage> moved_imgs;
   };
   Slots<D3D12_COMMAND_LIST_TYPE_COPY, SlotData> _slots;
 )

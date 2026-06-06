@@ -84,6 +84,7 @@ void ComputeEngine::blur(Image& src, Image& dst, float sigma, uint blur_count) n
   assert(false);
 
   // copy image
+  // TODO: why not use copy engine
   g_graphics_engine.acquire_slot();
   g_graphics_engine.copy(src, dst);
   g_graphics_engine.submit_slot();

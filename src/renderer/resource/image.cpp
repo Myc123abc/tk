@@ -279,12 +279,6 @@ void Image::create_mipmap_descs() noexcept
   }
 }
 
-void Image::generate_mipmap() noexcept
-{
-  assert(_mipmap_descs.empty() && _types == ImageType::srv);
-  init(_width, _height, static_cast<ImageFormat>(_format), _types, true);
-}
-
 void Image::clear(ID3D12GraphicsCommandList1* cmd, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) const noexcept
 {
   err_if(!_types.contains(ImageType::uav), "clear operator only use on uav");

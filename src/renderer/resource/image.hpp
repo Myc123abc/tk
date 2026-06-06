@@ -3,7 +3,6 @@
 #include "descriptor_heap_manager.hpp"
 #include "util/flag.hpp"
 #include "util/base.hpp"
-#include "../../util/align.hpp"
 #include "util/rect.hpp"
 #include "buffer.hpp"
 
@@ -134,8 +133,6 @@ public:
   void init(IDXGISwapChain1* swapchain, uint index) noexcept;
   // void init(ImageType type, HANDLE handle, uint width, uint height) noexcept;
   void init(float width, float height, Image const& src) noexcept { init(width, height, static_cast<ImageFormat>(src._format), src._types); }
-
-  void generate_mipmap() noexcept;
 
   void destroy() noexcept;
 
