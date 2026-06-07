@@ -167,12 +167,12 @@ struct ImageConfig
 {
   struct Blur
   {
-    uint  radius{};
     float sigma{};
+    uint  cnt{};
   };
   Variant<Blur> cfg;
 
-  static auto blur(uint radius, float sigma) noexcept { return ImageConfig{ Blur{ radius, sigma } }; }
+  static auto blur(float sigma, uint cnt) noexcept { return ImageConfig{ Blur{ sigma, cnt } }; }
 };
 
 /**

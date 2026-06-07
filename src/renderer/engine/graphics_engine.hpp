@@ -1,7 +1,7 @@
 #pragma once
 
 #include "slots.hpp"
-#include "../resource/image.hpp"
+#include "../resource/image_manager.hpp"
 
 namespace tk::renderer {
 
@@ -13,14 +13,23 @@ public:
     _slots.init(this);
   }
 
-  void copy(Image& src, Image& dst) noexcept { _cpy_imgs.emplace_back(&src, &dst); }
+  void copy(ImageHandle src, ImageHandle dst, int right, int bottom, int left = {}, int top = {}, uint2 pos = {}) noexcept
+  { _cpy_imgs.emplace_back(src, int4{ left, top, right, bottom }, dst, pos); }
 
   void acquire_slot() noexcept;
   auto submit_slot() noexcept -> uint64;
 
 private:
   Slots<D3D12_COMMAND_LIST_TYPE_DIRECT>  _slots;
-  std::vector<std::pair<Image*, Image*>> _cpy_imgs{};
+
+  struct CopyImage
+  {
+    ImageHandle src;
+    int4        rect;
+    ImageHandle dst;
+    uint2       pos;
+  };
+  std::vector<CopyImage> _cpy_imgs;
 )
 
 }

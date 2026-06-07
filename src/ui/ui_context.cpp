@@ -538,7 +538,7 @@ auto UIContext::image(std::string_view path, float2 left_top, float2 right_botto
       {
         auto ext  = right_bottom - left_top;
         auto blur = cfg->cfg.get<ImageConfig::Blur>();
-        img = g_img_mgr.blur(img, ext, blur.radius, blur.sigma);
+        img = g_img_mgr.blur(img, ext, blur.sigma, blur.cnt);
         uvs[2]   = ext / g_img_mgr[img].extent();
         uvs[1].x = uvs[2].x;
         uvs[3].y = uvs[2].y;

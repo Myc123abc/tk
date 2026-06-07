@@ -468,8 +468,7 @@ int main()
       if (res) loop_trigger.update();
 
       ui::discard_beg([]{ ui::circle({50,50}, 50); });
-      // res = image(img1, {}, wnd_ext, 0x44, ui::ImageConfig::blur(5, 5));
-      res = image(img1, {}, wnd_ext, 0x44);
+      res = image(img1, {}, wnd_ext, 0x44, ui::ImageConfig::blur(5, 5));
       ui::discard_end();
 
       // circle point

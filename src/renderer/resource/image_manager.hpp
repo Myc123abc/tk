@@ -40,6 +40,8 @@ public:
   auto destroy() noexcept
   {
     for (auto handle : _loaded_images | std::views::values) destroy(handle);
+    for (auto handle : _tmp_imgs | std::views::keys) destroy(handle);
+    for (auto img : _blur_imgs | std::views::values) destroy(img.img);
   }
 
   auto& operator[](ImageHandle handle) noexcept { return _pool[handle]; }
@@ -49,11 +51,12 @@ public:
   auto try_load(std::string_view path, uint w, uint h) noexcept -> std::expected<ImageHandle, ui::ImageLoadError::Type>;
   void update() noexcept;
 
-  auto blur(ImageHandle handle, float2 ext, uint radius, float sigma) noexcept -> ImageHandle;
+  auto blur(ImageHandle handle, float2 ext, float sigma, uint cnt) noexcept -> ImageHandle;
+  void tmp_img_used_finish(ImageHandle handle) noexcept;
 
 private:
   void load(std::string_view path, uint width, uint height, void* data, bool use_mipmap) noexcept;
-  auto find_tmp_image(uint width, uint height, ImageFormat fmt, Flag<ImageType> types) noexcept -> uint;
+  auto find_tmp_image(uint width, uint height, ImageFormat fmt, Flag<ImageType> types) noexcept -> ImageHandle;
 
 private:
   ImagePoolType _pool;
@@ -75,12 +78,7 @@ private:
   std::unordered_map<std::string, ImageInfo>        _image_infos;
   std::unordered_map<std::string, std::string>      _decoded_failed_images;
 
-  struct TmpImage
-  {
-    ImageHandle img;
-    bool        is_used{};
-  };
-  std::vector<TmpImage> _tmp_imgs;
+  std::unordered_map<ImageHandle, bool> _tmp_imgs;
   struct BlurImage
   {
     ImageHandle img;

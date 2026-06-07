@@ -9,10 +9,14 @@ void GraphicsEngine::acquire_slot() noexcept
 
 auto GraphicsEngine::submit_slot() noexcept -> uint64
 {
-  for (auto [src, dst] : _cpy_imgs)
-    renderer::copy(cmd(), *src, *dst);
+  if (_cpy_imgs.empty()) return 0;
 
+  auto cmd = Engine::cmd();
+
+  for (auto [src, rect, dst, pos] : _cpy_imgs)
+    renderer::copy(cmd, g_img_mgr[src], rect.x, rect.y, rect.z, rect.w, g_img_mgr[dst], pos.x, pos.y);
   _cpy_imgs.clear();
+
   return _slots.submit_slot();
 }
 

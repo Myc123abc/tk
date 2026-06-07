@@ -5,6 +5,7 @@
 #include <immintrin.h>
 #include <assert.h>
 #include <cmath>
+#include <algorithm>
 
 namespace tk {
 
@@ -412,6 +413,26 @@ constexpr auto abs(float2 v) noexcept -> float2
 constexpr auto floor(float2 v) noexcept -> float2
 {
   return { std::floor(v.x), std::floor(v.y) };
+}
+
+template <Vec2 V>
+constexpr auto min(float2 lhs, V rhs) noexcept -> float2
+{
+  return
+  {
+    std::min(lhs.x, static_cast<float>(rhs.x)),
+    std::min(lhs.y, static_cast<float>(rhs.y))
+  };
+}
+
+template <Vec2 V>
+constexpr auto max(float2 lhs, V rhs) noexcept -> float2
+{
+  return
+  {
+    std::max(lhs.x, static_cast<float>(rhs.x)),
+    std::max(lhs.y, static_cast<float>(rhs.y))
+  };
 }
 
 }

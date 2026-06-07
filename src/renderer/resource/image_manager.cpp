@@ -135,26 +135,36 @@ void ImageManager::load(std::string_view path, uint width, uint height, void* da
   g_copy_engine.copy({ width, height, 4, data, true }, handle);
 }
 
-auto ImageManager::blur(ImageHandle handle, float2 ext, uint radius, float sigma) noexcept -> ImageHandle
+/*
+TODO:
+the blur image generate need to be async avoid block the main loop if gpu need spent too many time.
+and avoid the frame result not consistency like some controls are changed but image is still not blured,
+we need to build the state for per frame to verify whether all commands can run.
+*/
+auto ImageManager::blur(ImageHandle handle, float2 ext, float sigma, uint cnt) noexcept -> ImageHandle
 {
-  auto hash = generic_hash(ext.x, ext.y, radius, sigma);
+  auto const& src = g_img_mgr[handle];
+  ext = min(ext, src.extent());
+
+  auto hash = generic_hash(ext.x, ext.y, sigma, cnt);
 
   // find whether this image has blured image
   if (!_blur_imgs.contains(handle))
   {
     // when not have blur image, create a blur image
-    auto fmt   = g_img_mgr[handle].format();
+    auto fmt   = src.format();
     auto types = ImageType::srv | ImageType::uav;
 
     auto& blur_img = _blur_imgs[handle];
     blur_img.img  = create(ext.x, ext.y, fmt, types);
     blur_img.hash = hash;
 
-    // find a temp image for blur generation
+    // find a temp image for blur image generation
+    auto tmp_img = find_tmp_image(ext.x, ext.y, fmt, types);
     // TODO: when image not blur again, remeber remove the blur image resource
-    auto tmp_img_idx = find_tmp_image(ext.x, ext.y, fmt, types);
 
     // TODO: submit to compute engine for blur generatation
+    g_comp_engine.blur(handle, blur_img.img, tmp_img, ext, sigma, cnt);
 
     return blur_img.img;
   }
@@ -174,33 +184,42 @@ auto ImageManager::blur(ImageHandle handle, float2 ext, uint radius, float sigma
   return {};
 }
 
-auto ImageManager::find_tmp_image(uint width, uint height, ImageFormat fmt, Flag<ImageType> types) noexcept -> uint
+auto ImageManager::find_tmp_image(uint width, uint height, ImageFormat fmt, Flag<ImageType> types) noexcept -> ImageHandle
 {
   // have idle tmp images, find a suitable one
-  if (auto it = std::ranges::find_if(_tmp_imgs, [&](auto const& img)
+  if (auto it = std::ranges::find_if(_tmp_imgs, [&](auto const& pair)
       {
-        if (img.is_used) return false;
-        auto const& tmp_img = g_img_mgr[img.img];
+        if (pair.second) return false;
+        auto const& tmp_img = g_img_mgr[pair.first];
         return tmp_img.width() >= width && tmp_img.height() >= height && tmp_img.format() == fmt && tmp_img.types() == types;
       }); it != _tmp_imgs.end())
   {
     // find sutiable tmp image, use it
-    it->is_used = true;
-    return static_cast<uint>(std::distance(_tmp_imgs.begin(), it));
+    it->second = true;
+    return it->first;
   }
 
   // reuse any idle tmp image by recreating it with the requested format/type
-  if (auto it = std::ranges::find_if(_tmp_imgs, [&](auto const& img) { return !img.is_used; });
+  if (auto it = std::ranges::find_if(_tmp_imgs, [&](auto const& pair) { return !pair.second; });
       it != _tmp_imgs.end())
   {
-    it->is_used = true;
-    g_img_mgr[it->img].init(width, height, fmt, types);
-    return static_cast<uint>(std::distance(_tmp_imgs.begin(), it));
+    it->second = true;
+    g_img_mgr[it->first].init(width, height, fmt, types);
+    return it->first;
   }
 
   // otherwise, create a new one
-  _tmp_imgs.emplace_back(create(width, height, fmt, types), true);
-  return _tmp_imgs.size() - 1;
+  auto handle = create(width, height, fmt, types);
+  _tmp_imgs.emplace(handle, true);
+  return handle;
+}
+
+void ImageManager::tmp_img_used_finish(ImageHandle handle) noexcept
+{
+  assert(_tmp_imgs.contains(handle));
+  auto& is_used = _tmp_imgs[handle];
+  assert(is_used);
+  is_used = false;
 }
 
 }
