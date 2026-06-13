@@ -23,8 +23,8 @@ public:
   void update() noexcept;
 
 private:
-  void generate_mipmaps(ID3D12GraphicsCommandList1* cmd) noexcept;
-  void blur(ID3D12GraphicsCommandList1* cmd) noexcept;
+  void generate_mipmaps(Command const* cmd) noexcept;
+  void blur(Command const* cmd) noexcept;
 
 private:
   Slots<D3D12_COMMAND_LIST_TYPE_COMPUTE> _slots;

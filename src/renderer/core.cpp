@@ -50,15 +50,6 @@ auto Core::create_cmd_alloc(D3D12_COMMAND_LIST_TYPE type) const noexcept -> Micr
   return alloc;
 }
 
-auto Core::create_cmd(D3D12_COMMAND_LIST_TYPE type, ID3D12CommandAllocator* alloc) const noexcept -> Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList1>
-{
-  auto cmd = ComPtr<ID3D12GraphicsCommandList1>{};
-  err_if(_device->CreateCommandList(0, type, alloc, nullptr, IID_PPV_ARGS(&cmd)),
-          "failed to create command list");
-  err_if(cmd->Close(), "failed to close command list");
-  return cmd;
-}
-
 void Core::create_device_11on12() noexcept
 {
   // create command queue

@@ -1,18 +1,13 @@
 #include "image.hpp"
 #include "../core.hpp"
 #include "util/error_handling.hpp"
-#include "../../util/align.hpp"
+#include "command.hpp"
 
 using namespace tk;
 using namespace tk::renderer;
 using namespace Microsoft::WRL;
 
 namespace {
-
-auto copy_queue_compatible_state(ID3D12GraphicsCommandList1* cmd, ImageState state) noexcept -> ImageState
-{
-  return cmd->GetType() == D3D12_COMMAND_LIST_TYPE_COPY ? ImageState::common : state;
-}
 
 template<auto T>
 struct dx12_traits;
@@ -89,6 +84,11 @@ void Image::release_mipmap_descs() noexcept
   _mipmap_descs.clear();
 }
 
+void Image::resize(uint width, uint height) noexcept
+{
+  if (_width != width || _height != height) init(width, height, static_cast<ImageFormat>(_format), _types);
+}
+
 void Image::init(uint width , uint height, ImageFormat format, Flag<ImageType> type, bool use_mipmap) noexcept
 {
   // not consider mipmap image can be resized
@@ -124,7 +124,7 @@ void Image::init(uint width , uint height, ImageFormat format, Flag<ImageType> t
   clear_value.Format = texture_desc.Format;
   if (_types.contains(ImageType::dsv))
     clear_value.DepthStencil.Depth = 1.f;
-  auto clear_value_ptr = (_types.any(ImageType::rtv, ImageType::dsv)) ? &clear_value : nullptr;
+  auto clear_value_ptr = _types.any(ImageType::rtv, ImageType::dsv) ? &clear_value : nullptr;
   err_if(device->CreateCommittedResource(&heap_properties, D3D12_HEAP_FLAG_NONE, &texture_desc, _states[0], clear_value_ptr, IID_PPV_ARGS(_handle.ReleaseAndGetAddressOf())),
         "failed to create image");
 
@@ -158,13 +158,13 @@ void Image::init(IDXGISwapChain1* swapchain, uint index) noexcept
 //   create_descriptor();
 // }
 
-void Image::set_state(ID3D12GraphicsCommandList1* cmd, ImageState state, uint subresource) noexcept
+void Image::transform(Command const* cmd, ImageState state, uint subresource) noexcept
 {
   auto transition_state = static_cast<D3D12_RESOURCE_STATES>(state);
   auto& stat = subresource == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES ? _states[0] : _states[subresource];
   if (stat == transition_state) return;
   auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_handle.Get(), stat, transition_state, subresource);
-  cmd->ResourceBarrier(1, &barrier);
+  cmd->get()->ResourceBarrier(1, &barrier);
   stat = transition_state;
 }
 
@@ -279,41 +279,41 @@ void Image::create_mipmap_descs() noexcept
   }
 }
 
-void Image::clear(ID3D12GraphicsCommandList1* cmd, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) const noexcept
+void Image::clear(Command const* cmd, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) const noexcept
 {
   err_if(!_types.contains(ImageType::uav), "clear operator only use on uav");
   float values[4]{};
   auto rect = D3D12_RECT{};
   rect.right  = _width;
   rect.bottom = _height;
-  cmd->ClearUnorderedAccessViewFloat(gpu_handle, cpu_handle, _handle.Get(), values, 1, &rect);
+  cmd->get()->ClearUnorderedAccessViewFloat(gpu_handle, cpu_handle, _handle.Get(), values, 1, &rect);
 }
 
-void Image::clear_render_target(ID3D12GraphicsCommandList1* cmd, std::optional<Rect> rect) noexcept
+void Image::clear_render_target(Command const* cmd, std::optional<Rect> rect) noexcept
 {
   err_if(!_types.contains(ImageType::rtv), "clear render target only use on rtv");
-  set_state(cmd, ImageState::render_target);
+  transform(cmd, ImageState::render_target);
   float constexpr clear_color[4]{};
   if (rect)
   {
     auto rc = rect->to_RECT();
-    cmd->ClearRenderTargetView(_desc.rtv.cpu_handle(), clear_color, 1, &rc);
+    cmd->get()->ClearRenderTargetView(_desc.rtv.cpu_handle(), clear_color, 1, &rc);
   }
   else
-    cmd->ClearRenderTargetView(_desc.rtv.cpu_handle(), clear_color, 0, nullptr);
+    cmd->get()->ClearRenderTargetView(_desc.rtv.cpu_handle(), clear_color, 0, nullptr);
 }
 
-void Image::clear_depth_stencil(ID3D12GraphicsCommandList1* cmd, std::optional<Rect> rect) noexcept
+void Image::clear_depth_stencil(Command const* cmd, std::optional<Rect> rect) noexcept
 {
   err_if(!_types.contains(ImageType::dsv), "clear depth stencil only use on dsv");
-  set_state(cmd, ImageState::depth_write);
+  transform(cmd, ImageState::depth_write);
   if (rect)
   {
     auto rc = rect->to_RECT();
-    cmd->ClearDepthStencilView(dsv().cpu_handle(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.f, 0, 1, &rc);
+    cmd->get()->ClearDepthStencilView(dsv().cpu_handle(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.f, 0, 1, &rc);
   }
   else
-    cmd->ClearDepthStencilView(dsv().cpu_handle(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.f, 0, 0, nullptr);
+    cmd->get()->ClearDepthStencilView(dsv().cpu_handle(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.f, 0, 0, nullptr);
 }
 
 auto Image::per_pixel_size() const noexcept -> uint
@@ -326,135 +326,6 @@ auto Image::per_pixel_size() const noexcept -> uint
   default:
     err_if(true, "unsupport Image::per_pixel_size now for current format");
     std::unreachable();
-  }
-}
-
-auto Image::readback(ID3D12GraphicsCommandList1* cmd, RECT rect) noexcept -> std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, Bitmap>
-{
-  err_if(per_pixel_size() != 4, "readback only support rgba image now");
-
-  auto left = std::max(rect.left, 0l);
-  auto top  = std::max(rect.top, 0l);
-
-  // create bitmap view
-  auto view = Bitmap{};
-  view.x      = left;
-  view.y      = top;
-  view.width  = rect.right  - view.x;
-  view.height = rect.bottom - view.y;
-
-  // create readback buffer
-  auto readback_buffer = ComPtr<ID3D12Resource>{};
-  auto heap_properties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK);
-  view.row_pitch       = align(view.width * per_pixel_size(), D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
-  auto heap_desc       = CD3DX12_RESOURCE_DESC::Buffer(align(view.row_pitch * view.height, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT));
-  err_if(g_core.device()->CreateCommittedResource(&heap_properties, D3D12_HEAP_FLAG_NONE, &heap_desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&readback_buffer)),
-          "failed to create readback buffer");
-
-  // get pointer of readback buffer
-  auto range = D3D12_RANGE{ 0, heap_desc.Width };
-  err_if(readback_buffer->Map(0, &range, reinterpret_cast<void**>(&view.data)), "failed to map readback buffer to pointer");
-
-  // copy data from gpu to cpu
-  copy(cmd, *this, view.x, view.y, rect.right, rect.bottom, readback_buffer.Get());
-
-  return { readback_buffer, view };
-}
-
-////////////////////////////////////////////////////////////////////////////////
-///                             Copy Operations
-////////////////////////////////////////////////////////////////////////////////
-
-void copy(
-  ID3D12GraphicsCommandList1* cmd,
-  Image&                      src,
-  LONG                        left,
-  LONG                        top,
-  LONG                        right,
-  LONG                        bottom,
-  Image&                      dst,
-  uint                        x,
-  uint                        y) noexcept
-{
-  src.set_state(cmd, copy_queue_compatible_state(cmd, ImageState::copy_src));
-  dst.set_state(cmd, copy_queue_compatible_state(cmd, ImageState::copy_dst));
-  auto src_loc = CD3DX12_TEXTURE_COPY_LOCATION{ src.handle() };
-  auto dst_loc = CD3DX12_TEXTURE_COPY_LOCATION{ dst.handle() };
-  auto region_box = CD3DX12_BOX{ left, top, right, bottom };
-  cmd->CopyTextureRegion(&dst_loc, x, y, 0, &src_loc, &region_box);
-}
-
-void copy(
-  ID3D12GraphicsCommandList1* cmd,
-  Image&                      image,
-  Buffer&                     upload_heap,
-  uint                        offset,
-  D3D12_SUBRESOURCE_DATA&     data
-) noexcept
-{
-  image.set_state(cmd, copy_queue_compatible_state(cmd, ImageState::copy_dst));
-  UpdateSubresources(cmd, image.handle(), upload_heap.handle(), offset, 0, 1, &data);
-}
-
-void copy(
-  ID3D12GraphicsCommandList1* cmd,
-  Buffer&                     src,
-  Image&                      dst,
-  uint                        src_offset,
-  BitmapView const&           bitmap,
-  uint2                       pos
-) noexcept
-{
-  dst.set_state(cmd, copy_queue_compatible_state(cmd, ImageState::copy_dst));
-
-  auto footprint = D3D12_PLACED_SUBRESOURCE_FOOTPRINT{};
-  footprint.Offset             = src_offset;
-  footprint.Footprint.Width    = bitmap.width;
-  footprint.Footprint.Height   = bitmap.height;
-  footprint.Footprint.Depth    = 1;
-  footprint.Footprint.RowPitch = align(bitmap.row_pitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
-  footprint.Footprint.Format   = static_cast<DXGI_FORMAT>(dst.format());
-
-  auto src_loc = CD3DX12_TEXTURE_COPY_LOCATION{ src.handle(), footprint };
-  auto dst_loc = CD3DX12_TEXTURE_COPY_LOCATION{ dst.handle() };
-
-  cmd->CopyTextureRegion(&dst_loc, pos.x, pos.y, 0, &src_loc, nullptr);
-}
-
-void copy(
-  ID3D12GraphicsCommandList1* cmd,
-  Image&                      src,
-  LONG                        left,
-  LONG                        top,
-  LONG                        right,
-  LONG                        bottom,
-  ID3D12Resource*             readback_buffer) noexcept
-{
-  src.set_state(cmd, copy_queue_compatible_state(cmd, ImageState::copy_src));
-  auto src_loc    = CD3DX12_TEXTURE_COPY_LOCATION{ src.handle() };
-  auto region_box = CD3DX12_BOX{ left, top, right, bottom };
-
-  auto footprint = D3D12_PLACED_SUBRESOURCE_FOOTPRINT{};
-  footprint.Footprint.Width    = right - left;
-  footprint.Footprint.Height   = bottom - top;
-  footprint.Footprint.Depth    = 1;
-  footprint.Footprint.RowPitch = align(src.per_pixel_size() * footprint.Footprint.Width, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
-  footprint.Footprint.Format   = static_cast<DXGI_FORMAT>(src.format());
-  auto dst_loc = CD3DX12_TEXTURE_COPY_LOCATION{ readback_buffer, footprint };
-
-  cmd->CopyTextureRegion(&dst_loc, 0, 0, 0, &src_loc, &region_box);
-}
-
-void copy(Bitmap const& src, Bitmap const& dst) noexcept
-{
-  assert(src.channel == dst.channel);
-  auto src_data = reinterpret_cast<std::byte*>(src.data);
-  auto dst_data = reinterpret_cast<std::byte*>(dst.data);
-  for (auto i = 0; i < dst.height; ++i)
-  {
-    memcpy(dst_data, src_data, src.width * src.channel);
-    src_data += src.row_pitch;
-    dst_data += dst.row_pitch;
   }
 }
 

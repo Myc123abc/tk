@@ -14,7 +14,7 @@ public:
   }
 
   void copy(ImageHandle src, ImageHandle dst, int right, int bottom, int left = {}, int top = {}, uint2 pos = {}) noexcept
-  { _cpy_imgs.emplace_back(src, int4{ left, top, right, bottom }, dst, pos); }
+  { _cpy_imgs.emplace_back(src, Rect{ left, top, right, bottom }, dst, pos); }
 
   void acquire_slot() noexcept;
   auto submit_slot() noexcept -> uint64;
@@ -25,7 +25,7 @@ private:
   struct CopyImage
   {
     ImageHandle src;
-    int4        rect;
+    Rect        rect;
     ImageHandle dst;
     uint2       pos;
   };

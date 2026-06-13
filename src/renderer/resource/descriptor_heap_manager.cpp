@@ -3,6 +3,7 @@
 #include "../core.hpp"
 #include "../renderer.hpp"
 #include "../config.hpp"
+#include "command.hpp"
 
 #include <algorithm>
 #include <ranges>
@@ -136,10 +137,10 @@ void DescriptorHeapManager::init() noexcept
   _heaps[dsv].init(dsv, DSV_Size);
 }
 
-void DescriptorHeapManager::bind_heaps(ID3D12GraphicsCommandList1* cmd) noexcept
+void DescriptorHeapManager::bind_heaps(Command const* cmd) noexcept
 {
   auto descriptor_heaps = std::array<ID3D12DescriptorHeap*, 1>{ _heaps[DescriptorHeapType::cbv_srv_uav]._heap.Get() };
-  cmd->SetDescriptorHeaps(descriptor_heaps.size(), descriptor_heaps.data());
+  cmd->get()->SetDescriptorHeaps(descriptor_heaps.size(), descriptor_heaps.data());
 }
 
 }

@@ -32,14 +32,14 @@ void Renderer::init() noexcept
 void Renderer::init_images() noexcept
 {
   // ui use, write image for normal shapes rendering
-  ui::Write_Image_Handle = g_img_mgr.create(1, 1, ImageFormat::bgra8_unorm, ImageType::srv);
+  ui::Write_Image_Handle = g_img_mgr.create(1, 1, RenderResource::Render_Target_Format, ImageType::srv);
   static auto white = 0xffffffff;
   g_copy_engine.copy({ 1, 1, 4, &white }, ui::Write_Image_Handle);
 
   // discard image, composite image for discard operation
   _discard_image   = g_img_mgr.create(Default_Image_Init_Width, Default_Image_Init_Height, ImageFormat::r8_unorm,                ImageType::rtv | ImageType::srv);
   _composite_image = g_img_mgr.create(Default_Image_Init_Width, Default_Image_Init_Height, RenderResource::Render_Target_Format, ImageType::rtv | ImageType::srv);
-}  
+}
 
 void Renderer::destroy_images() noexcept
 {
@@ -199,9 +199,11 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
 
   res.current_frame().buffer.clear().upload(cmd, frame_data);
 
+  auto& rt_img = g_img_mgr[res.render_target()];
+
   auto constants = Constants
   {
-    .render_target_extent = res.render_target()->extent(),
+    .render_target_extent = rt_img.extent(),
     .window_pos           = frame_data->window_pos(),
   };
 
@@ -213,18 +215,19 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
       add_frame_render_complete_func([handle] { g_img_mgr.destroy(handle); }, EngineType::graphics);
       handle = g_img_mgr.create(rect.width(), rect.height(), img);
     }
-    g_img_mgr[handle].clear_render_target(cmd);
+    cmd->clear_render_target(handle);;
   };
 
-  auto graphics_draw = [&](ui::RenderCmd const& cmd, PipelineType type, Image* rt, Image* ds, Rect scissor, std::vector<PipelineDescriptorInfo> const& descs = {})
+  auto graphics_draw = [&](ui::RenderCmd const& cmd, PipelineType type, ImageHandle rt, ImageHandle ds, Rect scissor, std::vector<PipelineDescriptorInfo> const& descs = {})
   {
-    constants.render_target_extent = rt->extent();
+    auto& rt_img = g_img_mgr[rt];
+    constants.render_target_extent = rt_img.extent();
     g_ctx.graphics_draw(GraphicsDrawInfo
     {
       .pipe_info = GraphicsPipeSetInfo
       {
         .type           = type,
-        .viewport       = rt->rect(),
+        .viewport       = rt_img.rect(),
         .scissor        = scissor,
         .constants_name = "Constants",
         .constants      = constants,
@@ -268,12 +271,12 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
 
     case Type::discard_write:
       constants.mask_offset = -discard_mask_rc.pos();
-      graphics_draw(render_cmd, PipelineType::mask_write_max, g_img_mgr.get(_discard_image), {}, { 0, 0, discard_mask_rc.extent() });
+      graphics_draw(render_cmd, PipelineType::mask_write_max, _discard_image, {}, { 0, 0, discard_mask_rc.extent() });
       break;
 
     case Type::discard_draw_composite:
       constants.composite_offset = -discard_composite_rc.pos();
-      graphics_draw(render_cmd, PipelineType::composite_write, g_img_mgr.get(_composite_image), {}, { 0, 0, discard_composite_rc.extent() },
+      graphics_draw(render_cmd, PipelineType::composite_write, _composite_image, {}, { 0, 0, discard_composite_rc.extent() },
       {
         { "image", g_img_mgr[render_cmd.ui.image_handle].srv().gpu_handle() },
       });
@@ -289,8 +292,8 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
       constants.composite_offset = -discard_composite_rc.pos();
       constants.composite_extent = composite_img.extent();
 
-      discard_img.set_state(cmd, ImageState::pixel);
-      composite_img.set_state(cmd, ImageState::pixel);
+      cmd->transform(_discard_image, ImageState::pixel);
+      cmd->transform(_composite_image, ImageState::pixel);
 
       graphics_draw(render_cmd, PipelineType::discard_draw, rt, {}, render_cmd.ui.scissor_rect,
       {
@@ -308,7 +311,7 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
     g_ctx.graphics_pipe_set(GraphicsPipeSetInfo
     {
       .type           = PipelineType::window_shadow,
-      .viewport       = res.render_target()->rect(),
+      .viewport       = rt_img.rect(),
       .scissor        = window_shadow_info->scissor_rect,
       .constants_name = "constants",
       .constants      = Constants
@@ -333,5 +336,68 @@ void Renderer::postprocess_render() noexcept
   _destroied_windows.clear();
   _render_windows.clear();
 }
+
+// void copy(
+//   Command const*   cmd,
+//   ImageHandle      src,
+//   LONG             left,
+//   LONG             top,
+//   LONG             right,
+//   LONG             bottom,
+//   ID3D12Resource*  readback_buffer,
+//   uint sub) noexcept
+// {
+//   auto& img = g_img_mgr[src];
+
+//   img.transform(cmd, ImageState::copy_src);
+//   auto src_loc    = CD3DX12_TEXTURE_COPY_LOCATION{ img.handle(), sub };
+//   auto region_box = CD3DX12_BOX{ left, top, right, bottom };
+
+//   auto footprint = D3D12_PLACED_SUBRESOURCE_FOOTPRINT{};
+//   footprint.Footprint.Width    = right - left;
+//   footprint.Footprint.Height   = bottom - top;
+//   footprint.Footprint.Depth    = 1;
+//   footprint.Footprint.RowPitch = align(img.per_pixel_size() * footprint.Footprint.Width, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+//   footprint.Footprint.Format   = static_cast<DXGI_FORMAT>(img.format());
+//   auto dst_loc = CD3DX12_TEXTURE_COPY_LOCATION{ readback_buffer, footprint };
+
+//   cmd->get()->CopyTextureRegion(&dst_loc, 0, 0, 0, &src_loc, &region_box);
+// }
+
+// auto Renderer::readback(Command const* cmd, ImageHandle img_h, uint sub) noexcept -> ReadbackResult
+// {
+//   auto& img = g_img_mgr[img_h];
+//   err_if(img.per_pixel_size() != 4, "readback only support rgba image now");
+
+//   auto rect = img.rect();
+//   rect.right  = static_cast<uint>(rect.right)  >> sub;
+//   rect.bottom = static_cast<uint>(rect.bottom) >> sub;
+//   auto left = std::max(rect.left, 0.f);
+//   auto top  = std::max(rect.top, 0.f);
+
+//   // create bitmap view
+//   auto view = Bitmap{};
+//   view.x      = left;
+//   view.y      = top;
+//   view.width  = rect.right  - view.x;
+//   view.height = rect.bottom - view.y;
+
+//   // create readback buffer
+//   auto readback_buffer = ComPtr<ID3D12Resource>{};
+//   auto heap_properties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK);
+//   view.row_pitch       = align(view.width * img.per_pixel_size(), D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+//   auto heap_desc       = CD3DX12_RESOURCE_DESC::Buffer(align(view.row_pitch * view.height, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT));
+//   err_if(g_core.device()->CreateCommittedResource(&heap_properties, D3D12_HEAP_FLAG_NONE, &heap_desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&readback_buffer)),
+//           "failed to create readback buffer");
+
+//   // get pointer of readback buffer
+//   auto range = D3D12_RANGE{ 0, heap_desc.Width };
+//   err_if(readback_buffer->Map(0, &range, reinterpret_cast<void**>(&view.data)), "failed to map readback buffer to pointer");
+
+//   // copy data from gpu to cpu
+//   copy(cmd, img_h, view.x, view.y, rect.right, rect.bottom, readback_buffer.Get(), sub);
+
+//   return ReadbackResult{ readback_buffer, view };
+// }
 
 }

@@ -2,6 +2,7 @@
 #include "../core.hpp"
 #include "../engine/graphics_engine.hpp"
 #include "util/error_handling.hpp"
+#include "command.hpp"
 
 #include <directx/d3dx12.h>
 #include <windows.h>
@@ -31,7 +32,7 @@ void RenderResource::init(HWND handle, uint width, uint height) noexcept
   swapchain_desc.SampleDesc.Count = 1;
   swapchain_desc.Flags            = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT | DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
   swapchain_desc.AlphaMode        = DXGI_ALPHA_MODE_PREMULTIPLIED;
-  err_if(g_core.factory()->CreateSwapChainForComposition(g_graphics_engine.queue(), &swapchain_desc, nullptr, &swapchain),
+  err_if(g_core.factory()->CreateSwapChainForComposition(g_graphics_engine.queue()->get(), &swapchain_desc, nullptr, &swapchain),
           "failed to create swapchain for composition");
 
   // create composition
@@ -69,9 +70,6 @@ void RenderResource::init(HWND handle, uint width, uint height) noexcept
 
 void RenderResource::destroy() noexcept
 {
-  // g_graphics_engine.signal();
-  // WaitForSingleObjectEx(g_graphics_engine.set_event_on_completion(), INFINITE, false);
-
   CloseHandle(_swapchain_waitable_obj);
   g_img_mgr.destroy(_dsv_image);
   for (auto& frame : _frames)
@@ -140,20 +138,20 @@ void RenderResource::render_begin() noexcept
   // bind heaps
   g_desc_heap_mgr.bind_heaps(cmd);
 
-  render_target()->clear_render_target(g_graphics_engine.cmd());
+  cmd->clear_render_target(render_target());
 }
 
 void RenderResource::render_end() noexcept
 {
 	auto& frame           = current_frame();
-  auto& swapchain_image = _frames[_swapchain->GetCurrentBackBufferIndex()].swapchain_image;
+  auto  swapchain_image = _frames[_swapchain->GetCurrentBackBufferIndex()].swapchain_image;
   auto  cmd             = g_graphics_engine.cmd();
 
   // copy offscreen image to swapchain backbuffer
-	copy(cmd, g_img_mgr[frame.image], g_img_mgr[swapchain_image]);
+	cmd->copy(frame.image, swapchain_image);
 
   // set to present state
-  g_img_mgr[swapchain_image].set_state(cmd, ImageState::present);
+  cmd->transform(swapchain_image, ImageState::present);
 
 	// submit graphics commands to graphics engine
 	frame.fence_value = g_graphics_engine.submit();
@@ -178,23 +176,25 @@ void RenderResource::present(bool vsync) const noexcept
 
 void FrameBuffer::init() noexcept
 {
-  _vertices_indices_buffer.init(Vertices_Indices_Buffer_Size, false);
+  _vertices_indices_buffer = g_buf_pool.create(Buffer_Init_Size, false);
 }
 
-void FrameBuffer::upload(ID3D12GraphicsCommandList1* cmd, ui::FrameData const* data) noexcept
+void FrameBuffer::upload(Command const* cmd, ui::FrameData const* data) noexcept
 {
-  auto vertices_offset = _vertices_indices_buffer.append_range(data->vertices());
-  auto indices_offset  = _vertices_indices_buffer.append_range(data->indices());
+  auto& buf = g_buf_pool[_vertices_indices_buffer];
+
+  auto vertices_offset = buf.append_range(data->vertices());
+  auto indices_offset  = buf.append_range(data->indices());
 
   // get current buffer gpu address
-  auto address = _vertices_indices_buffer.gpu_address();
+  auto address = buf.gpu_address();
 
   // set vertex buffer view
   D3D12_VERTEX_BUFFER_VIEW vertex_buffer_view{};
   vertex_buffer_view.BufferLocation = address;
   vertex_buffer_view.StrideInBytes  = sizeof(Vertex);
   vertex_buffer_view.SizeInBytes    = vertices_offset;
-  cmd->IASetVertexBuffers(0, 1, &vertex_buffer_view);
+  cmd->get()->IASetVertexBuffers(0, 1, &vertex_buffer_view);
 
   // add vertices offset
   address += vertices_offset;
@@ -204,7 +204,7 @@ void FrameBuffer::upload(ID3D12GraphicsCommandList1* cmd, ui::FrameData const* d
   index_buffer_view.BufferLocation = address;
   index_buffer_view.SizeInBytes    = indices_offset;
   index_buffer_view.Format         = DXGI_FORMAT_R16_UINT;
-  cmd->IASetIndexBuffer(&index_buffer_view);
+  cmd->get()->IASetIndexBuffer(&index_buffer_view);
 }
 
 }

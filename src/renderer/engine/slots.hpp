@@ -14,8 +14,9 @@ class Slots
 public:
   void init(Engine* engine) noexcept { _engine = engine; }
 
-  void acquire_slot() noexcept
+  auto acquire_slot() noexcept
   {
+    auto need_init = false;
     if (auto it = std::ranges::find_if(_slots, [this](auto const& slot) { return is_idle(slot); });
         it != _slots.end())
     {
@@ -25,8 +26,10 @@ public:
     {
       _slots.emplace_back(Slot{});
       _slot = &_slots.back();
+      need_init = true;
     }
     _engine->reset_cmd(_slot->cmd_alloc.Get());
+    return need_init;
   }
 
   auto submit_slot() noexcept -> uint64
@@ -37,6 +40,12 @@ public:
   }
 
   auto slot() noexcept { return _slot; }
+
+  auto begin() noexcept { return _slots.begin(); }
+  auto end() noexcept { return _slots.end(); }
+
+  auto begin() const noexcept { return _slots.begin(); }
+  auto end() const noexcept { return _slots.end(); }
 
 private:
   struct Slot

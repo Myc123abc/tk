@@ -31,7 +31,6 @@ public:
   void init() noexcept;
 
   auto create_cmd_alloc(D3D12_COMMAND_LIST_TYPE type) const noexcept -> Microsoft::WRL::ComPtr<ID3D12CommandAllocator>;
-  auto create_cmd(D3D12_COMMAND_LIST_TYPE type, ID3D12CommandAllocator* alloc) const noexcept -> Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList1>;
   
   auto factory()     const noexcept { return _factory.Get();     }
   auto device()      const noexcept { return _device.Get();      }

@@ -2,6 +2,8 @@
 
 #include "descriptor_heap_manager.hpp"
 
+#include "../../util/object_pool.hpp"
+
 #include <d3d12.h>
 #include <wrl/client.h>
 
@@ -10,6 +12,13 @@ namespace tk::renderer {
 class Buffer
 {
 public:
+  Buffer()                         = default;
+  ~Buffer()                        = default;
+  Buffer(Buffer const&)            = delete;
+  Buffer(Buffer&&)                 = delete;
+  Buffer& operator=(Buffer const&) = delete;
+  Buffer& operator=(Buffer&&)      = delete;
+
   void init(uint size, bool use_descriptor) noexcept;
 
   void destroy() noexcept { _descriptor_handle.release(); }
@@ -38,5 +47,31 @@ private:
   uint                                   _capacity{};
   uint                                   _size{};
 };
+
+Singleton(BufferdPool, g_buf_pool,
+public:
+  using Pool   = ObjectPool<Buffer>;
+  using Handle = Pool::Handle;
+
+  auto create(uint size, bool use_descriptor) noexcept
+  {
+    auto h = _pool.alloc();
+    _pool[h].init(size, use_descriptor);
+    return h;
+  }
+
+  void destroy(Handle& h) noexcept
+  {
+    _pool[h].destroy();
+    _pool.free(h);
+  }
+
+  auto& operator[](Handle h) noexcept { return _pool[h]; }
+
+private:
+  Pool _pool;
+)
+
+using BufferHandle = BufferdPool::Handle;
 
 }

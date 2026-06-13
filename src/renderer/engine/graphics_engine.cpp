@@ -14,7 +14,7 @@ auto GraphicsEngine::submit_slot() noexcept -> uint64
   auto cmd = Engine::cmd();
 
   for (auto [src, rect, dst, pos] : _cpy_imgs)
-    renderer::copy(cmd, g_img_mgr[src], rect.x, rect.y, rect.z, rect.w, g_img_mgr[dst], pos.x, pos.y);
+    cmd->copy(src, rect, dst, pos);
   _cpy_imgs.clear();
 
   return _slots.submit_slot();

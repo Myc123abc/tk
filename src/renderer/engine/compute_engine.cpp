@@ -56,12 +56,12 @@ void ComputeEngine::destroy() noexcept
 
 void ComputeEngine::update() noexcept
 {
-  if (_mipmap_images.empty() || _blur_imgs.empty()) return;
+  if (_mipmap_images.empty() && _blur_imgs.empty()) return;
 
   auto cmd = Engine::cmd();
 
   _slots.acquire_slot();
-  g_desc_heap_mgr.bind_heaps(cmd);
+  cmd->bind_descriptor_heaps();
   g_ctx.set_cmd(cmd);
 
   generate_mipmaps(cmd);
@@ -95,9 +95,9 @@ void ComputeEngine::update() noexcept
   }
 }
 
-void ComputeEngine::generate_mipmaps(ID3D12GraphicsCommandList1* cmd) noexcept
+void ComputeEngine::generate_mipmaps(Command const* cmd) noexcept
 {
-  assert(!_mipmap_images.empty());
+  if (_mipmap_images.empty()) return;
 
   struct MipmapConstant
   {
@@ -110,10 +110,12 @@ void ComputeEngine::generate_mipmaps(ID3D12GraphicsCommandList1* cmd) noexcept
     auto  src_w = img.width();
     auto  src_h = img.height();
 
-    for (auto i = 0u; i < img.mipmap_descs().size(); ++i)
+    auto i = 0;
+    for (; i < img.mipmap_descs().size(); ++i)
     {
-      img.set_state(cmd, ImageState::non_pixel, i);
-      img.set_state(cmd, ImageState::compute_rw, i + 1);
+      // TODO: batch barriers
+      cmd->transform(handle, ImageState::non_pixel, i);
+      cmd->transform(handle, ImageState::compute_rw, i + 1);
       auto const& [srv, uav] = img.mipmap_descs()[i];
       g_ctx.compute_pipe_set(ComputePipeSetInfo
       {
@@ -138,12 +140,13 @@ void ComputeEngine::generate_mipmaps(ID3D12GraphicsCommandList1* cmd) noexcept
       src_w = dst_w;
       src_h = dst_h;
     }
+    cmd->transform(handle, ImageState::non_pixel, i);
   }
 }
 
-void ComputeEngine::blur(ID3D12GraphicsCommandList1* cmd) noexcept
+void ComputeEngine::blur(Command const* cmd) noexcept
 {
-  assert(!_blur_imgs.empty());
+  if (_blur_imgs.empty()) return;
 
   auto const& horizontal_pipe = g_pipe_sys.pipe(PipelineType::blur_horizontal_pass);
   auto const& vertical_pipe   = g_pipe_sys.pipe(PipelineType::blur_vertical_pass);
@@ -171,16 +174,16 @@ void ComputeEngine::blur(ID3D12GraphicsCommandList1* cmd) noexcept
 
     for (auto i = 0; i < cnt; ++i)
     {
-      dst.set_state(cmd, ImageState::non_pixel);
-      tmp.set_state(cmd, ImageState::compute_rw);
+      cmd->transform(dst_h, ImageState::non_pixel);
+      cmd->transform(tmp_h, ImageState::compute_rw);
 
       g_ctx.set_pipe(horizontal_pipe->pipe_state.Get());
       g_ctx.set_compute_descriptor(horizontal_pipe->root_param_idx("src"), dst.srv().gpu_handle());
       g_ctx.set_compute_descriptor(horizontal_pipe->root_param_idx("dst"), tmp.uav().gpu_handle());
       g_ctx.dispatch(ceil(ext.x / 128.f), ext.y, 1);
 
-      tmp.set_state(cmd, ImageState::non_pixel);
-      dst.set_state(cmd, ImageState::compute_rw);
+      cmd->transform(tmp_h, ImageState::non_pixel);
+      cmd->transform(dst_h, ImageState::compute_rw);
 
       g_ctx.set_pipe(vertical_pipe->pipe_state.Get());
       g_ctx.set_compute_descriptor(vertical_pipe->root_param_idx("src"), tmp.srv().gpu_handle());

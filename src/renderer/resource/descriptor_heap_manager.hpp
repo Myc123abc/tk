@@ -12,6 +12,8 @@
 
 namespace tk::renderer {
 
+class Command;
+
 inline auto RTV_Size         = 0u;
 inline auto CBV_SRV_UAV_Size = 0u;
 inline auto DSV_Size         = 0u;
@@ -100,7 +102,7 @@ public:
 
   auto pop_handle(DescriptorHeapType type, std::function<void()> recreate_descriptor_func = {}) noexcept { return _heaps[type].pop_handle(recreate_descriptor_func); }
 
-  void bind_heaps(ID3D12GraphicsCommandList1* cmd) noexcept;
+  void bind_heaps(Command const* cmd) noexcept;
 
   void reserve(DescriptorHeapType type, uint capacity) noexcept { _heaps[type].reserve(capacity); }
 

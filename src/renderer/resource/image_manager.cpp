@@ -3,7 +3,6 @@
 
 #include "image_manager.hpp"
 #include "../../util/file_manager.hpp"
-#include "../../util/hash.hpp"
 #include "../engine/copy_engine.hpp"
 #include "../engine/compute_engine.hpp"
 
@@ -57,18 +56,20 @@ auto ImageManager::try_load(std::string_view path, uint width, uint height) noex
       {
         info.use_mipmap = true;
         
-        // get current image handle
-        auto old_handle = _loaded_images[filename];
-        
-        // recreate an image with mipmap
-        auto const& old_img = _pool[old_handle];
-        auto new_handle = create(old_img.width(), old_img.height(), old_img.format(), old_img.types(), true);
+        // get current image
+        auto  handle = _loaded_images[filename];
+        auto& img    = _pool[handle];
+
+        // resource is using, need to recreate resource
+        auto new_handle = create(img.width(), img.height(), img.format(), img.types(), true);
         _loaded_images[filename] = new_handle;
 
         // for new image with mipmap, we need to copy the old image's content to new image
-        g_copy_engine.move(old_handle, new_handle);
-        // and generate mipmaps by compute engine
-        g_comp_engine.add_generate_mipmap_image(new_handle);
+        g_copy_engine.move(handle, new_handle);
+        handle = new_handle;
+
+        // then generate mipmaps
+        g_comp_engine.add_generate_mipmap_image(handle);
       }
     }
     return _loaded_images[filename];
@@ -129,59 +130,38 @@ void ImageManager::load(std::string_view path, uint width, uint height, void* da
   auto handle = create(width, height, ImageFormat::rgba8_unorm, ImageType::srv, use_mipmap);
   _loaded_images.emplace(path, handle);
 
-  if (!_image_infos.contains(path.data()))
+  if (_image_infos.contains(path.data()))
+    _image_infos[path.data()].use_mipmap = use_mipmap;
+  else
     _image_infos[path.data()] = { { width, height }, use_mipmap };
 
   g_copy_engine.copy({ width, height, 4, data, true }, handle);
 }
 
-/*
-TODO:
-the blur image generate need to be async avoid block the main loop if gpu need spent too many time.
-and avoid the frame result not consistency like some controls are changed but image is still not blured,
-we need to build the state for per frame to verify whether all commands can run.
-*/
 auto ImageManager::blur(ImageHandle handle, float2 ext, float sigma, uint cnt) noexcept -> ImageHandle
 {
-  auto const& src = g_img_mgr[handle];
+  auto const& src   = g_img_mgr[handle];
+  auto const  fmt   = src.format();
+  auto const  types = ImageType::srv | ImageType::uav;
+
   ext = min(ext, src.extent());
 
-  auto hash = generic_hash(ext.x, ext.y, sigma, cnt);
+  if (!_blur_imgs.contains(handle)) _blur_imgs[handle] = create(ext.x, ext.y, fmt, types);
 
-  // find whether this image has blured image
-  if (!_blur_imgs.contains(handle))
+  auto blur_img_h = _blur_imgs[handle];
+  auto tmp_img_h  = find_tmp_image(ext.x, ext.y, fmt, types);
+
+  auto const& blur_img = g_img_mgr[blur_img_h];
+  if (blur_img.width() < ext.x || blur_img.height() < ext.y)
   {
-    // when not have blur image, create a blur image
-    auto fmt   = src.format();
-    auto types = ImageType::srv | ImageType::uav;
-
-    auto& blur_img = _blur_imgs[handle];
-    blur_img.img  = create(ext.x, ext.y, fmt, types);
-    blur_img.hash = hash;
-
-    // find a temp image for blur image generation
-    auto tmp_img = find_tmp_image(ext.x, ext.y, fmt, types);
-    // TODO: when image not blur again, remeber remove the blur image resource
-
-    // TODO: submit to compute engine for blur generatation
-    g_comp_engine.blur(handle, blur_img.img, tmp_img, ext, sigma, cnt);
-
-    return blur_img.img;
+    // TODO: destroy old blur_img and create new one
   }
 
-  // when this image have the blur image, check whether the image size and blur setting are changed
-  auto& blur_img = _blur_imgs[handle];
-  if (blur_img.hash == hash)
-  {
-    // when is the same setting, so nothing need to do, the blur image should also be cached, directly use it
-    return blur_img.img;
-  }
+  // TODO: when image not blur again, remeber remove the blur image resource
 
-  // the blur setting is changed, need to regenerate the blur image
-  blur_img.hash = hash;
-  // TODO: delete old blur image and create new one
-  // TODO: regenerate blur image and submit to compute engine
-  return {};
+  g_comp_engine.blur(handle, blur_img_h, tmp_img_h, ext, sigma, cnt);
+
+  return blur_img_h;
 }
 
 auto ImageManager::find_tmp_image(uint width, uint height, ImageFormat fmt, Flag<ImageType> types) noexcept -> ImageHandle

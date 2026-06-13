@@ -7,6 +7,8 @@
 
 namespace tk::renderer {
 
+class Command;
+
 struct MultiBitmapCopyInfo
 {
   BitmapView bitmap; 
@@ -16,7 +18,10 @@ struct MultiBitmapCopyInfo
 class UploadBuffer
 {
 public:
-  void upload(ID3D12GraphicsCommandList1* cmd) noexcept;
+  void init() noexcept;
+  void destroy() noexcept;
+
+  void upload(Command* cmd) noexcept;
 
   void add_image(ImageHandle image, Bitmap&& bitmap) noexcept
   {
@@ -46,7 +51,7 @@ private:
     Variant<Bitmap, MultiBitmapCopy> data{};
   };
 
-  Buffer            _buffer;
+  BufferHandle      _buf;
   std::vector<Info> _infos;
 };
 
@@ -56,7 +61,13 @@ public:
   {
     Engine::init(D3D12_COMMAND_LIST_TYPE_COPY);
     _slots.init(this);
-    _slots.acquire_slot();
+    if (_slots.acquire_slot()) _slots.slot()->data.init();
+  }
+
+  void destroy() noexcept
+  {
+    Engine::destroy();
+    for (auto& slot : _slots) slot.data.destroy();
   }
 
   void copy(Bitmap&& bitmap, ImageHandle image) noexcept
@@ -92,6 +103,9 @@ private:
   {
     UploadBuffer            upload_buf;
     std::vector<MovedImage> moved_imgs;
+
+    void init() noexcept { upload_buf.init(); }
+    void destroy() noexcept { upload_buf.destroy(); }
   };
   Slots<D3D12_COMMAND_LIST_TYPE_COPY, SlotData> _slots;
 )

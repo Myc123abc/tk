@@ -15,7 +15,19 @@ namespace tk::renderer {
 ///                             Upload Buffer
 ////////////////////////////////////////////////////////////////////////////////
 
-void UploadBuffer::upload(ID3D12GraphicsCommandList1* cmd) noexcept
+void UploadBuffer::init() noexcept
+{
+  assert(!_buf);
+  _buf = g_buf_pool.create(Buffer_Init_Size, false);
+}
+
+void UploadBuffer::destroy() noexcept
+{
+  assert(_buf);
+  g_buf_pool.destroy(_buf);
+}
+
+void UploadBuffer::upload(Command* cmd) noexcept
 {
   if (_infos.empty()) return;
 
@@ -49,9 +61,10 @@ void UploadBuffer::upload(ID3D12GraphicsCommandList1* cmd) noexcept
   }
 
   // initialize buffer
+  auto& buf = g_buf_pool[_buf];
   auto size = std::ranges::fold_left(intermediate_sizes, 0, std::plus<>{});
-  if (_buffer.capacity() < size)
-    _buffer.init(size, false);
+  if (buf.capacity() < size)
+    buf.init(size, false);
 
   // copy bitmap data to image by upload buffer
   auto offset = uint{};
@@ -65,13 +78,13 @@ void UploadBuffer::upload(ID3D12GraphicsCommandList1* cmd) noexcept
         data.pData      = bitmap.data;
         data.RowPitch   = bitmap.row_pitch;
         data.SlicePitch = bitmap.row_pitch * bitmap.height;
-        copy(cmd, g_img_mgr[info.image], _buffer, offset, data);
+        cmd->copy(info.image, _buf, offset, data);
         if (bitmap.can_free) stbi_image_free(bitmap.data);
       },
       [&](MultiBitmapCopy const& cpys)
       {
         for (auto const& cpy : cpys.infos)
-          copy(cmd, _buffer, g_img_mgr[info.image], offset, cpy.bitmap, cpy.pos);
+          cmd->copy(_buf, info.image, offset, cpy.bitmap, cpy.pos);
       }
     );
     offset += intermediate_sizes[i];
@@ -90,21 +103,26 @@ void CopyEngine::update() noexcept
 
   auto& [upload_buf, moved_imgs] = slot->data;
 
+  if (upload_buf.empty() && moved_imgs.empty()) return;
+
   auto cmd = Engine::cmd();
 
   if (!upload_buf.empty()) upload_buf.upload(cmd);
 
-  for (auto& [src, dst] : moved_imgs)
-    renderer::copy(cmd, g_img_mgr[src], g_img_mgr[dst]);
+  for (auto [src, dst] : moved_imgs) cmd->copy(src, dst);
   
   auto fence_value = _slots.submit_slot();
 
   // wait copy complete before rendering
+  // TODO: only wait in necessary place
   g_graphics_engine.wait(g_copy_engine, fence_value);
+  g_comp_engine.wait(g_copy_engine, fence_value);
 
   if (!moved_imgs.empty())
   {
     g_comp_engine.wait(g_copy_engine, fence_value);
+    // TODO: only need to move image when this image is not be used in any engines,
+    // maybe i can add the ResourceTrack with fence_value with engine to track.
     g_renderer.add_frame_render_complete_func([imgs = std::move(moved_imgs)] mutable
     {
       for (auto& [img, _] : imgs) g_img_mgr.destroy(img);
@@ -112,7 +130,7 @@ void CopyEngine::update() noexcept
     moved_imgs.clear();
   }
 
-  _slots.acquire_slot();
+  if (_slots.acquire_slot()) _slots.slot()->data.init();
 }
 
 }

@@ -50,9 +50,9 @@ private:
 };
 
 template <typename T, uint16 BlockCapacity = 32>
-requires (BlockCapacity > 0)                                     &&
+requires (BlockCapacity > 0)                                   &&
          (BlockCapacity <= std::numeric_limits<uint16>::max()) &&
-         std::is_nothrow_constructible_v<T>                      &&
+         std::is_nothrow_constructible_v<T>                    &&
          std::is_nothrow_destructible_v<T>
 class ObjectPool
 {

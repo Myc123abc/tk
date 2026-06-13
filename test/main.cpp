@@ -318,24 +318,28 @@ void test_discard(uint fmt) noexcept
 
 auto load_image(std::string_view path) noexcept
 {
-  if (auto res = ui::load_image(path); !res)
+  // if (auto res = ui::load_image(path); !res)
+  auto res = ui::load_image(path);
+  while (!res)
   {
     res.error().visit(
-      [](ui::ImageLoadError::loading) { info("loading {}", img2); },
-      [](ui::ImageLoadError::unexist) { warn("unexist image {}", img2); },
-      [](ui::ImageLoadError::decode_failed const& err) { warn("decode failed of image {} : {}", img2, err.msg); }
+      [&](ui::ImageLoadError::loading) { info("loading {}", path); },
+      [&](ui::ImageLoadError::unexist) { warn("unexist image {}", path); },
+      [&](ui::ImageLoadError::decode_failed const& err) { warn("decode failed of image {} : {}", path, err.msg); }
     );
+    tk::update();
+    res = ui::load_image(path);
   }
 }
 
 auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha = 0xff) noexcept -> std::expected<void, ui::ImageLoadError::Type>
 {
-  return ui::image(path, left_top, right_bottom, alpha).or_else([](ui::ImageLoadError::Type err)
+  return ui::image(path, left_top, right_bottom, alpha).or_else([&](ui::ImageLoadError::Type err)
   {
     err.visit(
-      [](ui::ImageLoadError::loading) { info("loading {}", img2); },
-      [](ui::ImageLoadError::unexist) { warn("unexist image {}", img2); },
-      [](ui::ImageLoadError::decode_failed const& err) { warn("decode failed of image {} : {}", img2, err.msg); }
+      [&](ui::ImageLoadError::loading) { info("loading {}", path); },
+      [&](ui::ImageLoadError::unexist) { warn("unexist image {}", path); },
+      [&](ui::ImageLoadError::decode_failed const& err) { warn("decode failed of image {} : {}", path, err.msg); }
     );
     return std::expected<void, ui::ImageLoadError::Type>{ std::unexpected(err) };
   });
@@ -363,8 +367,8 @@ int main()
   auto circle_lerplocator = ui::Tween{};
   circle_lerplocator.init(250'000, ui::Tween::Mode::loop);
 
-  auto wnd1_is_closed = false;
-  auto wnd2_is_closed = true;
+  auto wnd1_is_closed = true;
+  auto wnd2_is_closed = false;
 
   auto cfg = ui::WindowConfig{};
   cfg.display_title_bar             = true;
@@ -468,7 +472,8 @@ int main()
       if (res) loop_trigger.update();
 
       ui::discard_beg([]{ ui::circle({50,50}, 50); });
-      res = image(img1, {}, wnd_ext, 0x44, ui::ImageConfig::blur(5, 5));
+      // res = image(img1, {}, wnd_ext, 0x44, ui::ImageConfig::blur(5, 5));
+      res = image(img1, {}, wnd_ext, 0x44);
       ui::discard_end();
 
       // circle point

@@ -55,8 +55,11 @@ void FileManager::destroy() noexcept
 {
   for (auto& info : _infos | std::views::values) 
   {
-    _pool[info.handle].destroy();
-    _pool.free(info.handle);
+    if (info.handle.valid())
+    {
+      _pool[info.handle].destroy();
+      _pool.free(info.handle);
+    }
   }
   _infos.clear();
 }

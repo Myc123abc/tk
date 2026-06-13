@@ -11,6 +11,8 @@
 
 namespace tk::renderer {
 
+class Command;
+
 class FrameBuffer
 {
 public:
@@ -18,19 +20,21 @@ public:
 
   void destroy() noexcept
   {
-    _vertices_indices_buffer.destroy();
+    g_buf_pool.destroy(_vertices_indices_buffer);
   }
 
   auto clear() noexcept -> FrameBuffer&
   {
-    _vertices_indices_buffer.clear();
+    g_buf_pool[_vertices_indices_buffer].clear();
     return *this;
   }
 
-  void upload(ID3D12GraphicsCommandList1* cmd, ui::FrameData const* data) noexcept;
+  void upload(Command const* cmd, ui::FrameData const* data) noexcept;
+
+  auto vertice_indices_buf_handle() const noexcept { return _vertices_indices_buffer; }
 
 private:
-  Buffer _vertices_indices_buffer;
+  BufferHandle _vertices_indices_buffer;
 };
 
 class RenderResource
@@ -43,7 +47,7 @@ public:
   RenderResource& operator=(RenderResource const&) = delete;
   RenderResource& operator=(RenderResource&&)      = delete;
 
-  static constexpr auto Render_Target_Format = ImageFormat::bgra8_unorm;
+  static constexpr auto Render_Target_Format = ImageFormat::rgba8_unorm;
 
   void init(HWND handle, uint width, uint height) noexcept;
   void destroy() noexcept;
@@ -57,9 +61,9 @@ public:
 
   void present(bool vsync) const noexcept;
 
-  auto& current_frame() noexcept { return _frames[_frame_index];                }
-  auto  render_target() noexcept { return g_img_mgr.get(current_frame().image); }
-  auto  depth_stencil() noexcept { return g_img_mgr.get(_dsv_image);            }
+  auto& current_frame() noexcept { return _frames[_frame_index]; }
+  auto  render_target() noexcept { return current_frame().image; }
+  auto  depth_stencil() noexcept { return _dsv_image;            }
 
 private:
   struct Frame

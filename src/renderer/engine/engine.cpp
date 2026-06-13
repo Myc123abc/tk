@@ -9,14 +9,11 @@ void Engine::init(D3D12_COMMAND_LIST_TYPE type) noexcept
   auto device = g_core.device();
 
   // create command queue
-  D3D12_COMMAND_QUEUE_DESC queue_desc{};
-  queue_desc.Type = type;
-  err_if(device->CreateCommandQueue(&queue_desc, IID_PPV_ARGS(&_queue)),
-          "failed to create command queue");
+  _queue.init(type);
   
   // create command allocator and list
   _cmd_alloc = g_core.create_cmd_alloc(type);
-  _cmd       = g_core.create_cmd(type, _cmd_alloc.Get());
+  _cmd       = g_cmd_pool.create(type, _cmd_alloc.Get());
 
   // create fence
   err_if(g_core.device()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence)),
@@ -25,24 +22,22 @@ void Engine::init(D3D12_COMMAND_LIST_TYPE type) noexcept
   err_if(!_fence_event, "failed to create win32 event");
 }
 
+// TODO: is this really need? because now I can trace resources to set fence value
 auto Engine::signal() noexcept -> uint64
 {
-  err_if(_queue->Signal(_fence.Get(), ++_fence_value), "failed to signal fence");
+  _queue.signal(_fence.Get(), ++_fence_value);
   return _fence_value;
 }
 
 auto Engine::submit() noexcept -> uint64
 {
-  auto cmds = { _cmd.Get() };
-  for (auto const& cmd : cmds)
-    err_if(cmd->Close(), "failed to close command list");
-  _queue->ExecuteCommandLists(cmds.size(), reinterpret_cast<ID3D12CommandList* const*>(cmds.begin()));
-  return signal();
+  _queue.submit(_fence.Get(), ++_fence_value, { _cmd });
+  return _fence_value;
 }
 
 void Engine::wait(Engine const& engine, std::optional<uint64> fence_value) const noexcept
 {
-  _queue->Wait(engine._fence.Get(), fence_value.value_or(engine._fence_value));
+  _queue.wait(engine._fence.Get(), fence_value.value_or(engine._fence_value));
 }
 
 auto Engine::set_event_on_completion() const noexcept -> HANDLE
@@ -56,13 +51,8 @@ void Engine::destroy() noexcept
   err_if(_fence->SetEventOnCompletion(signal(), _fence_event), "failed to set event on completion");
   WaitForSingleObjectEx(_fence_event, INFINITE, false);
   CloseHandle(_fence_event);
-}
-
-auto Engine::reset_cmd(ID3D12CommandAllocator* alloc) const noexcept -> ID3D12GraphicsCommandList1*
-{
-  err_if(alloc->Reset() == E_FAIL, "failed to reset command allocator");
-  err_if(_cmd->Reset(alloc, nullptr), "failed to reset command list");
-  return _cmd.Get();
+  g_cmd_pool.destroy(_cmd);
+  _queue.destroy();
 }
 
 }
