@@ -68,8 +68,6 @@ void CmdQueue::submit(ID3D12Fence* fence, uint64 value, std::initializer_list<Cm
   _queue->ExecuteCommandLists(cmd_lists.size(), reinterpret_cast<ID3D12CommandList* const*>(cmd_lists.data()));
 
   signal(fence, value);
-
-  // TODO: cmd store used resources, set fence value on these resources' track state
 }
 
 void CmdQueue::wait(ID3D12Fence* fence, uint64 value) const noexcept
@@ -184,6 +182,30 @@ void Command::upload(FrameBuffer& buf, ui::FrameData const* data) noexcept
 void Command::bind_descriptor_heaps() const noexcept
 {
   g_desc_heap_mgr.bind_heaps(this);
+}
+
+auto Command::needs_graphics_sync() const noexcept -> bool
+{
+  auto const& resources = g_cmd_pool.resource(_cmd);
+  return
+    std::ranges::any_of(resources.imgs, [](auto h) { return g_img_mgr[h].needs_graphics(); }) ||
+    std::ranges::any_of(resources.bufs, [](auto h) { return g_buf_pool[h].needs_graphics(); });
+}
+
+auto Command::needs_compute_sync() const noexcept -> bool
+{
+  auto const& resources = g_cmd_pool.resource(_cmd);
+  return
+    std::ranges::any_of(resources.imgs, [](auto h) { return g_img_mgr[h].needs_compute(); }) ||
+    std::ranges::any_of(resources.bufs, [](auto h) { return g_buf_pool[h].needs_compute(); });
+}
+
+auto Command::needs_copy_sync() const noexcept -> bool
+{
+  auto const& resources = g_cmd_pool.resource(_cmd);
+  return
+    std::ranges::any_of(resources.imgs, [](auto h) { return g_img_mgr[h].needs_copy(); }) ||
+    std::ranges::any_of(resources.bufs, [](auto h) { return g_buf_pool[h].needs_copy(); });
 }
 
 // void copy(Bitmap const& src, Bitmap const& dst) noexcept

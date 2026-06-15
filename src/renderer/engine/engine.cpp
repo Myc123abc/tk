@@ -22,7 +22,6 @@ void Engine::init(D3D12_COMMAND_LIST_TYPE type) noexcept
   err_if(!_fence_event, "failed to create win32 event");
 }
 
-// TODO: is this really need? because now I can trace resources to set fence value
 auto Engine::signal() noexcept -> uint64
 {
   _queue.signal(_fence.Get(), ++_fence_value);

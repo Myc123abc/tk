@@ -1,15 +1,15 @@
 #pragma once
 
 #include "descriptor_heap_manager.hpp"
-
 #include "../../util/object_pool.hpp"
+#include "resource_tack.hpp"
 
 #include <d3d12.h>
 #include <wrl/client.h>
 
 namespace tk::renderer {
 
-class Buffer
+class Buffer : public ResourceTrack
 {
 public:
   Buffer()                         = default;

@@ -41,6 +41,10 @@ public:
 
   void upload(FrameBuffer& buf, ui::FrameData const* data) noexcept;
   void bind_descriptor_heaps() const noexcept;
+  
+  auto needs_graphics_sync() const noexcept -> bool;
+  auto needs_compute_sync()  const noexcept -> bool;
+  auto needs_copy_sync()     const noexcept -> bool;
 
 private:
   ID3D12GraphicsCommandList1* _cmd{};
@@ -89,6 +93,8 @@ private:
 
     void clear() noexcept
     {
+      for (auto img : imgs) g_img_mgr[img].reset_resource_track();
+      for (auto buf : bufs) g_buf_pool[buf].reset_resource_track();
       imgs.clear();
       bufs.clear();
     }

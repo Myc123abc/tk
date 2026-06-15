@@ -1,10 +1,8 @@
 #pragma once
 
-#include "util/base.hpp"
-
 namespace tk::renderer {
 
-/// track which engines using this resource
+/// track which engines will use this resource
 class ResourceTrack
 {
 public:
@@ -15,16 +13,25 @@ public:
   ResourceTrack& operator=(ResourceTrack const&) = delete;
   ResourceTrack& operator=(ResourceTrack&&)      = delete;
 
-  auto graphics_used() const noexcept -> bool;
-  auto compute_used()  const noexcept -> bool;
-  auto copy_used()     const noexcept -> bool;
+  void graphics_will_use() noexcept { _graphics_will_use = true; }
+  void compute_will_use()  noexcept { _compute_will_use  = true; }
+  void copy_will_use()     noexcept { _copy_will_use     = true; }
 
-  auto engines_used() const noexcept { return graphics_used() || compute_used() || copy_used(); }
+  auto needs_graphics() const noexcept { return _graphics_will_use; }
+  auto needs_compute()  const noexcept { return _compute_will_use;  }
+  auto needs_copy()     const noexcept { return _copy_will_use;     }
+
+  void reset_resource_track() noexcept
+  {
+    _graphics_will_use = {};
+    _compute_will_use  = {};
+    _copy_will_use     = {};
+  }
 
 private:
-  uint64 graphics_fence_value{};
-  uint64 compute_fence_value{};
-  uint64 copy_fence_value{};
+  bool _graphics_will_use{};
+  bool _compute_will_use{};
+  bool _copy_will_use{};
 };
 
 }

@@ -75,6 +75,7 @@ public:
     auto slot = _slots.slot();
     assert(slot && _slots.is_idle(slot));
     slot->data.upload_buf.add_image(image, std::move(bitmap));
+    g_img_mgr[image].copy_will_use();
   }
 
   void copy(std::vector<MultiBitmapCopyInfo>&& infos, ImageHandle img) noexcept
@@ -82,6 +83,7 @@ public:
     auto slot = _slots.slot();
     assert(slot && _slots.is_idle(slot));
     slot->data.upload_buf.add_image(img, std::move(infos));
+    g_img_mgr[img].copy_will_use();
   }
 
   void move(ImageHandle src, ImageHandle dst) noexcept
@@ -89,6 +91,8 @@ public:
     auto slot = _slots.slot();
     assert(slot && _slots.is_idle(slot));
     slot->data.moved_imgs.emplace_back(src, dst);
+    g_img_mgr[src].copy_will_use();
+    g_img_mgr[dst].copy_will_use();
   }
 
   void update() noexcept;

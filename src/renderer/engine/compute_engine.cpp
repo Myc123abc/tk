@@ -68,17 +68,14 @@ void ComputeEngine::update() noexcept
   blur(cmd);
 
   auto fence_value = _slots.submit_slot();
-  g_graphics_engine.wait(g_comp_engine, fence_value);
+  if (cmd->needs_graphics_sync()) g_graphics_engine.wait(g_comp_engine, fence_value);
   
   // release mipmap descs after generation complete
   if (!_mipmap_images.empty())
-  {
     g_renderer.add_frame_render_complete_func([this, handles = std::move(_mipmap_images)]
     {
       for (auto const& handle : handles) g_img_mgr[handle].release_mipmap_descs();
     }, EngineType::compute);
-    _mipmap_images.clear();
-  }
 
   // mark tmp images are used finish after blur process is completely
   if (!_blur_imgs.empty())
@@ -89,7 +86,6 @@ void ComputeEngine::update() noexcept
     g_renderer.add_frame_render_complete_func([tmp_imgs = std::move(tmp_imgs)]
     {
       for (auto h : tmp_imgs) g_img_mgr.tmp_img_used_finish(h);
-    // TODO: make pre frame process can use gave fence values
     }, EngineType::compute);
     _blur_imgs.clear();
   }
@@ -113,7 +109,6 @@ void ComputeEngine::generate_mipmaps(Command const* cmd) noexcept
     auto i = 0;
     for (; i < img.mipmap_descs().size(); ++i)
     {
-      // TODO: batch barriers
       cmd->transform(handle, ImageState::non_pixel, i);
       cmd->transform(handle, ImageState::compute_rw, i + 1);
       auto const& [srv, uav] = img.mipmap_descs()[i];

@@ -14,7 +14,11 @@ public:
   }
 
   void copy(ImageHandle src, ImageHandle dst, int right, int bottom, int left = {}, int top = {}, uint2 pos = {}) noexcept
-  { _cpy_imgs.emplace_back(src, Rect{ left, top, right, bottom }, dst, pos); }
+  {
+    _cpy_imgs.emplace_back(src, Rect{ left, top, right, bottom }, dst, pos);
+    g_img_mgr[src].graphics_will_use();
+    g_img_mgr[dst].graphics_will_use();
+  }
 
   void acquire_slot() noexcept;
   auto submit_slot() noexcept -> uint64;

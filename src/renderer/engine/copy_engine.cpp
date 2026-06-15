@@ -113,22 +113,14 @@ void CopyEngine::update() noexcept
   
   auto fence_value = _slots.submit_slot();
 
-  // wait copy complete before rendering
-  // TODO: only wait in necessary place
-  g_graphics_engine.wait(g_copy_engine, fence_value);
-  g_comp_engine.wait(g_copy_engine, fence_value);
+  if (cmd->needs_graphics_sync()) g_graphics_engine.wait(g_copy_engine, fence_value);
+  if (cmd->needs_compute_sync()) g_comp_engine.wait(g_copy_engine, fence_value);
 
   if (!moved_imgs.empty())
-  {
-    g_comp_engine.wait(g_copy_engine, fence_value);
-    // TODO: only need to move image when this image is not be used in any engines,
-    // maybe i can add the ResourceTrack with fence_value with engine to track.
     g_renderer.add_frame_render_complete_func([imgs = std::move(moved_imgs)] mutable
     {
       for (auto& [img, _] : imgs) g_img_mgr.destroy(img);
-    }, EngineType::graphics | EngineType::copy);
-    moved_imgs.clear();
-  }
+    }, EngineType::copy);
 
   if (_slots.acquire_slot()) _slots.slot()->data.init();
 }

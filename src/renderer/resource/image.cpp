@@ -160,8 +160,14 @@ void Image::init(IDXGISwapChain1* swapchain, uint index) noexcept
 
 void Image::transform(Command const* cmd, ImageState state, uint subresource) noexcept
 {
-  auto transition_state = static_cast<D3D12_RESOURCE_STATES>(state);
   auto& stat = subresource == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES ? _states[0] : _states[subresource];
+  if (cmd->get()->GetType() == D3D12_COMMAND_LIST_TYPE_COPY)
+  {
+    stat = D3D12_RESOURCE_STATE_COMMON;
+    return;
+  }
+
+  auto transition_state = static_cast<D3D12_RESOURCE_STATES>(state);
   if (stat == transition_state) return;
   auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_handle.Get(), stat, transition_state, subresource);
   cmd->get()->ResourceBarrier(1, &barrier);

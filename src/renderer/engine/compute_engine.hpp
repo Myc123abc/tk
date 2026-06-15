@@ -17,8 +17,19 @@ public:
 
   void destroy() noexcept;
 
-  void add_generate_mipmap_image(ImageHandle handle) noexcept { _mipmap_images.emplace(handle); }
-  void blur(ImageHandle src, ImageHandle dst, ImageHandle tmp, float2 ext, float sigma, uint cnt) noexcept { _blur_imgs.emplace_back(src, dst, tmp, ext, sigma, cnt); }
+  void add_generate_mipmap_image(ImageHandle handle) noexcept
+  {
+    _mipmap_images.emplace(handle);
+    g_img_mgr[handle].compute_will_use();
+  }
+
+  void blur(ImageHandle src, ImageHandle dst, ImageHandle tmp, float2 ext, float sigma, uint cnt) noexcept
+  {
+    _blur_imgs.emplace_back(src, dst, tmp, ext, sigma, cnt);
+    g_img_mgr[src].compute_will_use();
+    g_img_mgr[dst].compute_will_use();
+    g_img_mgr[tmp].compute_will_use();
+  }
 
   void update() noexcept;
 

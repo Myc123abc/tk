@@ -933,6 +933,8 @@ void FrameData::push_render_cmd(RenderCmdType type, ImageHandle image_handle) no
     cmd.ui.image_handle = image_handle;
 
     _draw_index_beg = static_cast<uint>(_indices.size());
+
+    renderer::g_img_mgr[image_handle].graphics_will_use();
   }
 }
 

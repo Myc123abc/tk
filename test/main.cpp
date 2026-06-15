@@ -318,18 +318,12 @@ void test_discard(uint fmt) noexcept
 
 auto load_image(std::string_view path) noexcept
 {
-  // if (auto res = ui::load_image(path); !res)
-  auto res = ui::load_image(path);
-  while (!res)
-  {
+  if (auto res = ui::load_image(path); !res)
     res.error().visit(
       [&](ui::ImageLoadError::loading) { info("loading {}", path); },
       [&](ui::ImageLoadError::unexist) { warn("unexist image {}", path); },
       [&](ui::ImageLoadError::decode_failed const& err) { warn("decode failed of image {} : {}", path, err.msg); }
     );
-    tk::update();
-    res = ui::load_image(path);
-  }
 }
 
 auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha = 0xff) noexcept -> std::expected<void, ui::ImageLoadError::Type>
@@ -367,8 +361,8 @@ int main()
   auto circle_lerplocator = ui::Tween{};
   circle_lerplocator.init(250'000, ui::Tween::Mode::loop);
 
-  auto wnd1_is_closed = true;
-  auto wnd2_is_closed = false;
+  auto wnd1_is_closed = false;
+  auto wnd2_is_closed = true;
 
   auto cfg = ui::WindowConfig{};
   cfg.display_title_bar             = true;
