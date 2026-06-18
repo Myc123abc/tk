@@ -155,6 +155,7 @@ void RenderResource::render_end() noexcept
 
 	// submit graphics commands to graphics engine
 	frame.fence_value = g_graphics_engine.submit();
+  cmd->clear_resource_track();
 
   // move to next frame
   _frame_index = (_frame_index + 1) % Frame_Count;

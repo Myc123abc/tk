@@ -29,7 +29,23 @@ public:
 
   auto get() const noexcept { return _cmd; }
 
-  void transform(ImageHandle image, ImageState state, uint subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES) const noexcept;
+  template <typename... Spans>
+  void barrier(Spans&&... spans) const noexcept;
+
+  void transform(ImageHandle image, Flag<ImageState> states, uint subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES) const noexcept;
+  struct TransformInfo
+  {
+    ImageHandle      image;
+    Flag<ImageState> states;
+    uint             subresource{ D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES };
+  };
+
+  void transform(std::initializer_list<TransformInfo> infos) const noexcept;
+
+  template <std::ranges::input_range R>
+  requires std::convertible_to<std::ranges::range_value_t<R>, TransformInfo>
+  void transform(R&& range) const noexcept;
+
   void clear(ImageHandle image, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) const noexcept;
   void clear_render_target(ImageHandle image, std::optional<Rect> rect = {}) noexcept;
   void clear_depth_stencil(ImageHandle image, std::optional<Rect> rect = {}) noexcept;
@@ -45,6 +61,8 @@ public:
   auto needs_graphics_sync() const noexcept -> bool;
   auto needs_compute_sync()  const noexcept -> bool;
   auto needs_copy_sync()     const noexcept -> bool;
+
+  void clear_resource_track() const noexcept;
 
 private:
   ID3D12GraphicsCommandList1* _cmd{};
@@ -81,11 +99,15 @@ public:
   {
     auto& cmd = _pool[h];
     cmd.reinit(alloc);
-    _resources[cmd.get()].clear();
     return &cmd;
   }
 
 private:
+  void clear_resource_track(Command const* cmd) noexcept
+  {
+    _resources[cmd->get()].clear();
+  }
+
   struct Resource
   {
     std::unordered_set<ImageHandle>  imgs;
@@ -131,5 +153,29 @@ public:
 private:
   ID3D12CommandQueue* _queue{};
 };
+
+template <typename... Spans>
+void Command::barrier(Spans&&... spans) const noexcept
+{
+  auto size = (spans.size() + ...);
+  if (!size) return;
+  auto barriers = std::vector<D3D12_RESOURCE_BARRIER>{};
+  barriers.reserve(size);
+  (barriers.append_range(spans), ...);
+  _cmd->ResourceBarrier(barriers.size(), barriers.data());
+}
+
+template <std::ranges::input_range R>
+requires std::convertible_to<std::ranges::range_value_t<R>, Command::TransformInfo>
+void Command::transform(R&& range) const noexcept
+{
+  auto barriers = std::vector<D3D12_RESOURCE_BARRIER>{};
+  for (auto [image, states, subresource] : range)
+  {
+    barriers.append_range(g_img_mgr[image].transform(this, states, subresource));
+    g_cmd_pool.resource(_cmd).imgs.emplace(image);
+  };
+  barrier(barriers);
+}
 
 }

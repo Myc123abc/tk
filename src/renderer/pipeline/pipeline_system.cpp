@@ -5,6 +5,35 @@
 #include "../resource/shader_type.hpp"
 
 namespace tk::renderer {
+
+void PipelineSystem::create_graphics_pipeline(GraphicsPipelineInfo const& info) noexcept
+{
+  auto create_info = PipelineCreateInfo{};
+  create_info.shader                = info.shader;
+  create_info.includes              = info.includes;
+  create_info.root_signature_result = info.root_sign;
+
+  create_info.info = PipelineCreateInfo::Graphics{};
+  auto& graphics = create_info.info.get<PipelineCreateInfo::Graphics>();
+  graphics.vs         = info.vs;
+  graphics.ps         = info.ps;
+  graphics.rtv_format = info.rt_fmt;
+  graphics.blend      = info.blend;
+  _pipes.emplace(info.type, create_info);
+}
+
+void PipelineSystem::create_compute_pipeline(ComputePipelineInfo const& info) noexcept
+{
+  auto create_info = PipelineCreateInfo{};
+  create_info.shader                = info.shader;
+  create_info.includes              = info.includes;
+  create_info.root_signature_result = info.root_sign;
+
+  create_info.info = PipelineCreateInfo::Compute{};
+  auto& compute = create_info.info.get<PipelineCreateInfo::Compute>();
+  compute.cs = info.cs;
+  _pipes.emplace(info.type, create_info);
+}
   
 void PipelineSystem::init() noexcept
 {
@@ -12,71 +41,123 @@ void PipelineSystem::init() noexcept
 
   using enum DescriptorInfo::Type;
 
-  auto res = generate_root_signature(
+  auto ui_res = generate_root_signature(
   {
     { constants, "constants",  0, 0, false, sizeof(Constants) },
     { texture,   "image",      0, 0, true                     },
     { texture,   "mask_image", 0, 1, true                     },
   }, true, true);
+  auto image_scale_res = generate_root_signature(
+  {
+    { constants, "Constants", 0, 0, false, sizeof(float2) },
+    { texture,   "img",       0, 0, true                  },
+  }, true, true);
+  create_graphics_pipelines({
+  {
+    .type      = PipelineType::ui,
+    .shader    = "assets/shader/ui/ui.hlsl",
+    .vs        = "vs",
+    .ps        = "ps",
+    .includes  = { "assets/shader/ui" },
+    .rt_fmt    = RenderResource::Render_Target_Format,
+    .blend     = BlendState::Default(),
+    .root_sign = ui_res,
+  },
+  {
+    .type      = PipelineType::composite_write,
+    .shader    = "assets/shader/ui/composite_write.hlsl",
+    .vs        = "vs",
+    .ps        = "ps",
+    .includes  = { "assets/shader/ui" },
+    .rt_fmt    = RenderResource::Render_Target_Format,
+    .blend     = BlendState::Default(),
+    .root_sign = ui_res,
+  },
+  {
+    .type      = PipelineType::window_shadow,
+    .shader    = "assets/shader/ui/window_shadow.hlsl",
+    .vs        = "vs",
+    .ps        = "ps",
+    .includes  = { "assets/shader/ui" },
+    .rt_fmt    = RenderResource::Render_Target_Format,
+    .blend     = BlendState::Default(),
+    .root_sign = ui_res,
+  },
+  {
+    .type      = PipelineType::discard_draw,
+    .shader    = "assets/shader/ui/discard_draw.hlsl",
+    .vs        = "vs",
+    .ps        = "ps",
+    .includes  = { "assets/shader/ui" },
+    .rt_fmt    = RenderResource::Render_Target_Format,
+    .blend     = BlendState::Default(),
+    .root_sign = ui_res,
+  },
+  {
+    .type      = PipelineType::mask_write_max,
+    .shader    = "assets/shader/ui/mask_write.hlsl",
+    .vs        = "vs",
+    .ps        = "ps",
+    .includes  = { "assets/shader/ui" },
+    .rt_fmt    = ImageFormat::r8_unorm,
+    .blend     = BlendState::Max(),
+    .root_sign = ui_res,
+  },
+  {
+    .type      = PipelineType::mask_write_add,
+    .shader    = "assets/shader/ui/mask_write.hlsl",
+    .vs        = "vs",
+    .ps        = "ps",
+    .includes  = { "assets/shader/ui" },
+    .rt_fmt    = ImageFormat::r8_unorm,
+    .blend     = BlendState::Add(),
+    .root_sign = ui_res,
+  },
+  {
+    .type      = PipelineType::image_scale,
+    .shader    = "assets/shader/image_scale.hlsl",
+    .vs        = "vs",
+    .ps        = "ps",
+    .includes  = {},
+    .rt_fmt    = RenderResource::Render_Target_Format,
+    .blend     = {},
+    .root_sign = image_scale_res,
+  }});
 
-  auto info = PipelineCreateInfo{};
-  info.shader                  = "assets/shader/ui/ui.hlsl";
-  info.includes                = { "assets/shader/ui" };
-  info.root_signature_result   = res;
-
-  info.info = PipelineCreateInfo::Graphics{};
-  auto& graphics = info.info.get<PipelineCreateInfo::Graphics>();
-  graphics.vs             = "vs";
-  graphics.ps             = "ps";
-  graphics.rtv_format     = RenderResource::Render_Target_Format;
-  graphics.blend          = BlendState::Default();
-  _pipes.emplace(PipelineType::ui, info);
-
-  info.shader = "assets/shader/ui/composite_write.hlsl";
-  _pipes.emplace(PipelineType::composite_write, info);
-
-  info.shader = "assets/shader/ui/window_shadow.hlsl";
-  graphics.stencil = {};
-  _pipes.emplace(PipelineType::window_shadow, info);
-
-  info.shader = "assets/shader/ui/discard_draw.hlsl";
-  _pipes.emplace(PipelineType::discard_draw, info);
-
-  info.shader = "assets/shader/ui/mask_write.hlsl";
-  graphics.rtv_format = ImageFormat::r8_unorm;
-  graphics.blend      = BlendState::Max();
-  _pipes.emplace(PipelineType::mask_write_max, info);
-
-  graphics.blend = BlendState::Add();
-  _pipes.emplace(PipelineType::mask_write_add, info);
-
-  info.shader = "assets/shader/ui/window_shadow.hlsl";
-  graphics.blend = BlendState::Default();
-  _pipes.emplace(PipelineType::window_shadow, info);
-
-
-  res = generate_root_signature(
+  auto mipmap_res = generate_root_signature(
   {
     { constants,  "constants", 0, 0, false, sizeof(float2) },
     { texture,    "src",       0, 0, true,                 },
     { rw_texture, "dst",       0, 0, true,                 },
   }, false, true);
-  info.shader                = "assets/shader/mipmap.hlsl";
-  info.includes              = {};
-  info.root_signature_result = res;
-  info.info = PipelineCreateInfo::Compute{};
-  auto& compute = info.info.get<PipelineCreateInfo::Compute>();
-  compute.cs = "main";
-  _pipes.emplace(PipelineType::mipmap, info);
-
-  // res = generate_root_signature(
-  // {
-  //   { constants,  "constants", 0, 0, false, sizeof(BlurConstants) },
-  //   { texture,    "src",       0, 0, true                         },
-  //   { rw_texture, "dst",       0, 0, true                         },
-  // });
-  // _pipes.emplace(PipelineType::blur_horizontal_pass, Pipeline{ "assets/shader/blur.hlsl", "horizontal_pass", {}, res, {} });
-  // _pipes.emplace(PipelineType::blur_vertical_pass,   Pipeline{ "assets/shader/blur.hlsl", "vertical_pass",   {}, res, {} });
+  auto blur_res = generate_root_signature(
+  {
+    { constants,  "constants", 0, 0, false, sizeof(BlurConstants) },
+    { texture,    "src",       0, 0, true                         },
+    { rw_texture, "dst",       0, 0, true                         },
+  });
+  create_compute_pipelines({
+  {
+    .type      = PipelineType::mipmap,
+    .shader    = "assets/shader/mipmap.hlsl",
+    .cs        = "main",
+    .includes  = {},
+    .root_sign = mipmap_res,
+  },
+  {
+    .type      = PipelineType::blur_horizontal_pass,
+    .shader    = "assets/shader/blur.hlsl",
+    .cs        = "horizontal_pass",
+    .includes  = {},
+    .root_sign = blur_res,
+  },
+  {
+    .type      = PipelineType::blur_vertical_pass,
+    .shader    = "assets/shader/blur.hlsl",
+    .cs        = "vertical_pass",
+    .includes  = {},
+    .root_sign = blur_res,
+  }});
 }
 
 auto PipelineSystem::find_root_param(std::span<CD3DX12_ROOT_PARAMETER1> params) const noexcept -> ID3D12RootSignature*

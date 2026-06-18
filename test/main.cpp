@@ -281,32 +281,32 @@ void test_discard(uint fmt) noexcept
   case 0:
     ui::rectangle({}, { 100, 100 }, 0xffffffff);
     break;
-  
+
   case 1:
     _ = ui::image(img1, {}, { 100, 100 }, 0x44);
     break;
-  
+
   case 2:
     _ = ui::image(img1, {}, { 50, 50 });
     _ = ui::image(img1, { 50, 50 }, { 100, 100 });
     break;
-  
+
   case 3:
     ui::rectangle({}, { 50, 50 }, 0xffffffff);
     _ = ui::image(img1, { 50, 50 }, { 100, 100 });
     break;
-  
+
   case 4:
     _ = ui::image(img1, {}, { 50, 50 });
     ui::rectangle({ 50, 50 }, {}, 0xffffffff);
     break;
-  
+
   case 5:
     ui::rectangle({}, { 50, 50 }, 0xffff00ff);
     _ = ui::image(img1, { 25, 25 }, { 70, 75 });
     ui::rectangle({ 50, 50 }, {}, 0xffffffff);
     break;
-  
+
   case 6:
     _ = ui::image(img1, {}, { 50, 50 });
     ui::rectangle({ 25, 25 }, { 70, 75 }, 0xffff00ff);
@@ -402,7 +402,7 @@ int main()
       // line_draw_test();
       // test_path_draw();
       // test_discard(fmt);
-      
+
       ui::discard_beg([]{ ui::rectangle({70, 70}, {300, 90});});
       ui::union_beg();
       ui::circle({50, 50}, 40);
@@ -465,9 +465,13 @@ int main()
       }
       if (res) loop_trigger.update();
 
+      static auto blur_img_2 = false;
+
       ui::discard_beg([]{ ui::circle({50,50}, 50); });
-      // res = image(img1, {}, wnd_ext, 0x44, ui::ImageConfig::blur(5, 5));
-      res = image(img1, {}, wnd_ext, 0x44);
+      if (blur_img_2)
+        res = image(img1, {}, wnd_ext, 0x44, ui::ImageConfig::blur(5, 5));
+      else
+        res = image(img1, {}, wnd_ext, 0x44);
       ui::discard_end();
 
       // circle point
@@ -485,6 +489,7 @@ int main()
           cfg.backdrop.default_acrylic();
         else if (cfg.backdrop.style == ui::BackdropStyle::acrylic)
           cfg.backdrop.default_blur();
+        blur_img_2 = !blur_img_2;
       }
 
       ui::end();

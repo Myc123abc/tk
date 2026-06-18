@@ -50,14 +50,13 @@ constexpr auto dx12_resource_flags(Flag<ImageType> type) noexcept
   return flags;
 }
 
-constexpr auto dx12_resource_states(Flag<ImageType> type) noexcept
+constexpr auto dx12_initial_resource_state(Flag<ImageType> type) noexcept
 {
   using enum ImageType;
-  auto states = D3D12_RESOURCE_STATE_COMMON;
-  if (type.contains(uav)) states |= dx12_traits<uav>::state;
-  if (type.contains(rtv)) states |= dx12_traits<rtv>::state;
-  if (type.contains(dsv)) states |= dx12_traits<dsv>::state;
-  return states;
+  if (type.contains(dsv)) return dx12_traits<dsv>::state;
+  if (type.contains(rtv) && !type.contains(uav)) return dx12_traits<rtv>::state;
+  if (type.contains(uav) && !type.contains(rtv)) return dx12_traits<uav>::state;
+  return D3D12_RESOURCE_STATE_COMMON;
 }
 
 }
@@ -86,7 +85,7 @@ void Image::release_mipmap_descs() noexcept
 
 void Image::resize(uint width, uint height) noexcept
 {
-  if (_width != width || _height != height) init(width, height, static_cast<ImageFormat>(_format), _types);
+  if (!_handle.Get() || _width != width || _height != height) init(width, height, static_cast<ImageFormat>(_format), _types);
 }
 
 void Image::init(uint width , uint height, ImageFormat format, Flag<ImageType> type, bool use_mipmap) noexcept
@@ -101,9 +100,9 @@ void Image::init(uint width , uint height, ImageFormat format, Flag<ImageType> t
   _format = static_cast<DXGI_FORMAT>(format);
   _types  = type;
   if (_states.empty())
-    _states.emplace_back(dx12_resource_states(type));
+    _states.emplace_back(dx12_initial_resource_state(type));
   else
-    _states[0] = dx12_resource_states(type);
+    _states[0] = dx12_initial_resource_state(type);
 
   // create image
   auto texture_desc = D3D12_RESOURCE_DESC{};
@@ -158,20 +157,27 @@ void Image::init(IDXGISwapChain1* swapchain, uint index) noexcept
 //   create_descriptor();
 // }
 
-void Image::transform(Command const* cmd, ImageState state, uint subresource) noexcept
+auto Image::transform(Command const* cmd, Flag<ImageState> states, uint subresource) noexcept -> std::vector<D3D12_RESOURCE_BARRIER>
 {
-  auto& stat = subresource == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES ? _states[0] : _states[subresource];
-  if (cmd->get()->GetType() == D3D12_COMMAND_LIST_TYPE_COPY)
+  auto transition_state = cmd->get()->GetType() == D3D12_COMMAND_LIST_TYPE_COPY ? D3D12_RESOURCE_STATE_COMMON : static_cast<D3D12_RESOURCE_STATES>(states.value());
+  if (subresource == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES && _states.size() > 1)
   {
-    stat = D3D12_RESOURCE_STATE_COMMON;
-    return;
+    auto barriers = std::vector<D3D12_RESOURCE_BARRIER>();
+    barriers.reserve(_states.size());
+    for (auto i = 0; i < _states.size(); ++i)
+    {
+      if (_states[i] == transition_state) continue;
+      barriers.emplace_back(CD3DX12_RESOURCE_BARRIER::Transition(_handle.Get(), _states[i], transition_state, i));
+      _states[i] = transition_state;
+    }
+    return barriers;
   }
 
-  auto transition_state = static_cast<D3D12_RESOURCE_STATES>(state);
-  if (stat == transition_state) return;
+  auto& stat = subresource == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES ? _states[0] : _states[subresource];
+  if (stat == transition_state) return {};
   auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_handle.Get(), stat, transition_state, subresource);
-  cmd->get()->ResourceBarrier(1, &barrier);
   stat = transition_state;
+  return { barrier };
 }
 
 void Image::create_descriptor(bool use_mipmap) noexcept
@@ -298,7 +304,7 @@ void Image::clear(Command const* cmd, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3
 void Image::clear_render_target(Command const* cmd, std::optional<Rect> rect) noexcept
 {
   err_if(!_types.contains(ImageType::rtv), "clear render target only use on rtv");
-  transform(cmd, ImageState::render_target);
+  cmd->barrier(transform(cmd, ImageState::render_target));
   float constexpr clear_color[4]{};
   if (rect)
   {
@@ -312,7 +318,7 @@ void Image::clear_render_target(Command const* cmd, std::optional<Rect> rect) no
 void Image::clear_depth_stencil(Command const* cmd, std::optional<Rect> rect) noexcept
 {
   err_if(!_types.contains(ImageType::dsv), "clear depth stencil only use on dsv");
-  transform(cmd, ImageState::depth_write);
+  cmd->barrier(transform(cmd, ImageState::depth_write));
   if (rect)
   {
     auto rc = rect->to_RECT();

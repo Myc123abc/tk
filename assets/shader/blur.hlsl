@@ -22,14 +22,15 @@ void horizontal_pass(uint3 group_tid    : SV_GroupThreadID,
   uint2 extent;
   src.GetDimensions(extent.x, extent.y);
 
+  int radius = (int)constants.blur_radius;
   if (group_tid.x < constants.blur_radius)
   {
-    int x = max((int)dispatch_tid.x - constants.blur_radius, 0);
+    int x = max((int)dispatch_tid.x - radius, 0);
     g_cache[group_tid.x] = src[uint2(x, dispatch_tid.y)];
   }
   if (group_tid.x >= N - constants.blur_radius)
   {
-    int x = min((int)dispatch_tid.x + constants.blur_radius, extent.x - 1);
+    int x = min((int)dispatch_tid.x + radius, (int)extent.x - 1);
     g_cache[group_tid.x + 2 * constants.blur_radius] = src[uint2(x, dispatch_tid.y)];
   }
 
@@ -41,10 +42,10 @@ void horizontal_pass(uint3 group_tid    : SV_GroupThreadID,
   [unroll]
   for (int i = -g_max_blur_radius; i <= (int)g_max_blur_radius; ++i)
   {
-    if (abs(i) <= constants.blur_radius)
+    if (abs(i) <= radius)
     {
-      int k = group_tid.x + constants.blur_radius + i;
-      int v = i + constants.blur_radius;
+      int k = (int)group_tid.x + radius + i;
+      int v = i + radius;
       color += constants.weights[v / 4][v & 0x3] * g_cache[k];
     }
   }
@@ -58,14 +59,15 @@ void vertical_pass(uint3 group_tid    : SV_GroupThreadID,
   uint2 extent;
   src.GetDimensions(extent.x, extent.y);
 
+  int radius = (int)constants.blur_radius;
   if (group_tid.y < constants.blur_radius)
   {
-    int y = max((int)dispatch_tid.y - constants.blur_radius, 0);
+    int y = max((int)dispatch_tid.y - radius, 0);
     g_cache[group_tid.y] = src[uint2(dispatch_tid.x, y)];
   }
   if (group_tid.y >= N - constants.blur_radius)
   {
-    int y = min((int)dispatch_tid.y + constants.blur_radius, extent.y - 1);
+    int y = min((int)dispatch_tid.y + radius, (int)extent.y - 1);
     g_cache[group_tid.y + 2 * constants.blur_radius] = src[uint2(dispatch_tid.x, y)];
   }
 
@@ -77,10 +79,10 @@ void vertical_pass(uint3 group_tid    : SV_GroupThreadID,
   [unroll]
   for (int i = -g_max_blur_radius; i <= (int)g_max_blur_radius; ++i)
   {
-    if (abs(i) <= constants.blur_radius)
+    if (abs(i) <= radius)
     {
-      int k = group_tid.y + constants.blur_radius + i;
-      int v = i + constants.blur_radius;
+      int k = (int)group_tid.y + radius + i;
+      int v = i + radius;
       color += constants.weights[v / 4][v & 0x3] * g_cache[k];
     }
   }

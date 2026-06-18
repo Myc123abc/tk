@@ -297,9 +297,9 @@ auto Compiler::compile(
 
   if (!res)
   {
-    compile_result.get_root_parameters(vs_reflection.Get(), false, volatile_descs);
+    compile_result.get_root_parameters(vs_reflection.Get(), false, volatile_descs, true);
     auto ps_reflection = compile_result.get_shader_reflection(ps_res.Get());
-    compile_result.get_root_parameters(ps_reflection.Get(), false, volatile_descs);
+    compile_result.get_root_parameters(ps_reflection.Get(), false, volatile_descs, false);
     compile_result.root_signature = create_root_signature(compile_result.root_params, compile_result._has_sampler, true);
   }
   else
@@ -328,7 +328,7 @@ auto Compiler::compile(
   if (!res)
   {
     auto reflection = compile_result.get_shader_reflection(comp_res.Get());
-    compile_result.get_root_parameters(reflection.Get(), true, volatile_descs);
+    compile_result.get_root_parameters(reflection.Get(), true, volatile_descs, false);
     compile_result.root_signature = create_root_signature(compile_result.root_params, compile_result._has_sampler, false);
   }
   else
@@ -394,7 +394,7 @@ void Compiler::CompileResult::get_vertex_input_layout(ID3D12ShaderReflection* sh
     input_layout_desc = D3D12_INPUT_LAYOUT_DESC{ _input_element_descs.data(), static_cast<uint>(_input_element_descs.size()) };
 }
 
-void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader_reflection, bool is_compute_shader, std::unordered_set<std::string_view> const& volatile_descs) noexcept
+void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader_reflection, bool is_compute_shader, std::unordered_set<std::string_view> const& volatile_descs, bool is_vs) noexcept
 {
   auto desc = D3D12_SHADER_DESC{};
   shader_reflection->GetDesc(&desc);
@@ -452,7 +452,7 @@ void Compiler::CompileResult::get_root_parameters(ID3D12ShaderReflection* shader
       range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, num_descriptors, resource_desc.BindPoint, resource_desc.Space, range_flags);
       _ranges.emplace(range);
 
-      root_param.InitAsDescriptorTable(1, &_ranges.back(), is_compute_shader ? D3D12_SHADER_VISIBILITY_ALL : D3D12_SHADER_VISIBILITY_PIXEL);
+      root_param.InitAsDescriptorTable(1, &_ranges.back(), (is_compute_shader || is_vs) ? D3D12_SHADER_VISIBILITY_ALL : D3D12_SHADER_VISIBILITY_PIXEL);
       root_params.emplace_back(root_param);
       break;
     }

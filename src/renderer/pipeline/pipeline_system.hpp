@@ -25,6 +25,7 @@ enum class PipelineType
   discard_draw,
 
   mipmap,
+  image_scale,
 };
 
 enum class StencilOp
@@ -128,6 +129,27 @@ struct PipelineCreateInfo
   Variant<std::monostate, Graphics, Compute> info;
 };
 
+struct GraphicsPipelineInfo
+{
+  PipelineType                       type;
+  std::string_view                   shader;
+  std::string_view                   vs;
+  std::string_view                   ps;
+  std::vector<std::string_view>      includes;
+  ImageFormat                        rt_fmt;
+  std::optional<BlendState>          blend;
+  std::optional<RootSignatureResult> root_sign;
+};
+
+struct ComputePipelineInfo
+{
+  PipelineType                       type;
+  std::string_view                   shader;
+  std::string_view                   cs;
+  std::vector<std::string_view>      includes;
+  std::optional<RootSignatureResult> root_sign;
+};
+
 Singleton(PipelineSystem, g_pipe_sys,
 public:
   void init() noexcept;
@@ -135,6 +157,11 @@ public:
   auto pipe(PipelineType type) noexcept { return &_pipes[type]; }
 
 private:
+  void create_graphics_pipeline(GraphicsPipelineInfo const& info) noexcept;
+  void create_compute_pipeline(ComputePipelineInfo const& info) noexcept;
+  void create_graphics_pipelines(std::initializer_list<GraphicsPipelineInfo> infos) noexcept { for (auto const& info : infos) create_graphics_pipeline(info); }
+  void create_compute_pipelines(std::initializer_list<ComputePipelineInfo> infos) noexcept { for (auto const& info : infos) create_compute_pipeline(info); }
+
   auto find_root_param(std::span<CD3DX12_ROOT_PARAMETER1> params) const noexcept -> ID3D12RootSignature*;
 
   struct Pipeline

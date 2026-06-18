@@ -124,7 +124,8 @@ public:
 
   void destroy() noexcept;
 
-  void transform(Command const* cmd, ImageState state, uint subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES) noexcept;
+  [[nodiscard]]
+  auto transform(Command const* cmd, Flag<ImageState> states, uint subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES) noexcept -> std::vector<D3D12_RESOURCE_BARRIER>;
 
   void resize(uint width, uint height) noexcept;
   void resize(IDXGISwapChain1* swapchain, uint index) noexcept { init(swapchain, index); }

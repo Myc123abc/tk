@@ -36,6 +36,7 @@ public:
 private:
   void generate_mipmaps(Command const* cmd) noexcept;
   void blur(Command const* cmd) noexcept;
+  void image_scale() const noexcept;
 
 private:
   Slots<D3D12_COMMAND_LIST_TYPE_COMPUTE> _slots;

@@ -86,7 +86,7 @@ void Renderer::destroy_window_resource(HWND handle, HWND blur_handle) noexcept
   {
     res.destroy();
     g_wnd_mgr.destroy_window(handle, blur_handle);
-  }, EngineType::graphics);
+  }, EngineType::graphics | EngineType::compute | EngineType::copy);
   _res.erase(handle);
   _destroied_windows.emplace(handle);
 }
@@ -292,8 +292,10 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
       constants.composite_offset = -discard_composite_rc.pos();
       constants.composite_extent = composite_img.extent();
 
-      cmd->transform(_discard_image, ImageState::pixel);
-      cmd->transform(_composite_image, ImageState::pixel);
+      cmd->transform({
+        { _discard_image, ImageState::pixel },
+        { _composite_image, ImageState::pixel },
+      });
 
       graphics_draw(render_cmd, PipelineType::discard_draw, rt, {}, render_cmd.ui.scissor_rect,
       {

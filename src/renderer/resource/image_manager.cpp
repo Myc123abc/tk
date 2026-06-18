@@ -5,8 +5,10 @@
 #include "../../util/file_manager.hpp"
 #include "../engine/copy_engine.hpp"
 #include "../engine/compute_engine.hpp"
+#include "../renderer.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 using namespace tk::ui;
 
@@ -101,6 +103,24 @@ auto ImageManager::try_load(std::string_view path, uint width, uint height) noex
 
 void ImageManager::update() noexcept
 {
+  for (auto it = _blur_imgs.begin(); it != _blur_imgs.end();)
+  {
+    auto& info = it->second;
+    if (!info.used)
+    {
+      _destroy_blur_imgs.emplace_back(info.image);
+      it = _blur_imgs.erase(it);
+    }
+    else
+    {
+      info.used = false;
+      ++it;
+    }
+  }
+  if (!_destroy_blur_imgs.empty())
+    g_renderer.add_frame_render_complete_func([imgs = std::move(_destroy_blur_imgs)]
+      { for (auto img : imgs) g_img_mgr.destroy(img); }, EngineType::graphics | EngineType::compute);
+
   // check images whether loeaded
   for (auto it = _load_tasks.begin(); it != _load_tasks.end();)
   {
@@ -142,26 +162,52 @@ auto ImageManager::blur(ImageHandle handle, float2 ext, float sigma, uint cnt) n
 {
   auto const& src   = g_img_mgr[handle];
   auto const  fmt   = src.format();
-  auto const  types = ImageType::srv | ImageType::uav;
+  auto const  types = ImageType::srv | ImageType::uav | ImageType::rtv;
 
-  ext = min(ext, src.extent());
-
-  if (!_blur_imgs.contains(handle)) _blur_imgs[handle] = create(ext.x, ext.y, fmt, types);
-
-  auto blur_img_h = _blur_imgs[handle];
-  auto tmp_img_h  = find_tmp_image(ext.x, ext.y, fmt, types);
-
-  auto const& blur_img = g_img_mgr[blur_img_h];
-  if (blur_img.width() < ext.x || blur_img.height() < ext.y)
+  auto extent = uint2
   {
-    // TODO: destroy old blur_img and create new one
+    std::max(1u, static_cast<uint>(std::ceil(ext.x))),
+    std::max(1u, static_cast<uint>(std::ceil(ext.y))),
+  };
+
+  auto should_blur = false;
+  if (!_blur_imgs.contains(handle))
+  {
+    _blur_imgs[handle] =
+    {
+      .image  = create(extent.x, extent.y, fmt, types),
+      .extent = extent,
+      .sigma  = sigma,
+      .cnt    = cnt,
+      .used   = true,
+    };
+    should_blur = true;
   }
 
-  // TODO: when image not blur again, remeber remove the blur image resource
+  auto& info = _blur_imgs[handle];
+  info.used = true;
+  auto& blur_img = g_img_mgr[info.image];
+  if (blur_img.width() < extent.x || blur_img.height() < extent.y)
+  {
+    auto old_img = info.image;
+    info.image = create(extent.x, extent.y, fmt, types);
+    _destroy_blur_imgs.emplace_back(old_img);
+    should_blur = true;
+  }
 
-  g_comp_engine.blur(handle, blur_img_h, tmp_img_h, ext, sigma, cnt);
+  if (info.extent != extent || info.sigma != sigma || info.cnt != cnt)
+    should_blur = true;
 
-  return blur_img_h;
+  if (should_blur)
+  {
+    auto tmp_img_h = find_tmp_image(extent.x, extent.y, fmt, types);
+    info.extent = extent;
+    info.sigma  = sigma;
+    info.cnt    = cnt;
+    g_comp_engine.blur(handle, info.image, tmp_img_h, ext, sigma, cnt);
+  }
+
+  return info.image;
 }
 
 auto ImageManager::find_tmp_image(uint width, uint height, ImageFormat fmt, Flag<ImageType> types) noexcept -> ImageHandle

@@ -32,6 +32,11 @@ void Command::close() const noexcept
   err_if(_cmd->Close(), "failed to close command list");
 }
 
+void Command::clear_resource_track() const noexcept
+{
+  g_cmd_pool.clear_resource_track(this);
+}
+
 void CmdQueue::init(D3D12_COMMAND_LIST_TYPE type) noexcept
 {
   auto queue_desc = D3D12_COMMAND_QUEUE_DESC{};
@@ -85,9 +90,20 @@ auto CommandPool::resource(ID3D12GraphicsCommandList1* cmd) noexcept -> Resource
 ///                          command operations
 ////////////////////////////////////////////////////////////////////////////////
 
-void Command::transform(ImageHandle image, ImageState state, uint subresource) const noexcept
+void Command::transform(std::initializer_list<TransformInfo> infos) const noexcept
 {
-  g_img_mgr[image].transform(this, state, subresource);
+  auto barriers = std::vector<D3D12_RESOURCE_BARRIER>{};
+  for (auto [image, states, subresource] : infos)
+  {
+    barriers.append_range(g_img_mgr[image].transform(this, states, subresource));
+    g_cmd_pool.resource(_cmd).imgs.emplace(image);
+  };
+  barrier(barriers);
+}
+
+void Command::transform(ImageHandle image, Flag<ImageState> states, uint subresource) const noexcept
+{
+  barrier(g_img_mgr[image].transform(this, states, subresource));
   g_cmd_pool.resource(_cmd).imgs.emplace(image);
 }
 
@@ -114,8 +130,10 @@ void Command::copy(ImageHandle src, Rect rect, ImageHandle dst, uint2 pos) noexc
   auto& src_img = g_img_mgr[src];
   auto& dst_img = g_img_mgr[dst];
 
-  src_img.transform(this, ImageState::copy_src);
-  dst_img.transform(this, ImageState::copy_dst);
+  transform({
+    { src, ImageState::copy_src },
+    { dst, ImageState::copy_dst },
+  });
 
   auto src_loc = CD3DX12_TEXTURE_COPY_LOCATION{ src_img.handle() };
   auto dst_loc = CD3DX12_TEXTURE_COPY_LOCATION{ dst_img.handle() };
@@ -128,9 +146,6 @@ void Command::copy(ImageHandle src, Rect rect, ImageHandle dst, uint2 pos) noexc
     static_cast<LONG>(rect.bottom)
   };
   _cmd->CopyTextureRegion(&dst_loc, pos.x, pos.y, 0, &src_loc, &region_box);
-
-  g_cmd_pool.resource(_cmd).imgs.emplace(src);
-  g_cmd_pool.resource(_cmd).imgs.emplace(dst);
 }
 
 void Command::copy(ImageHandle src, ImageHandle dst) noexcept
@@ -140,12 +155,8 @@ void Command::copy(ImageHandle src, ImageHandle dst) noexcept
 
 void Command::copy(ImageHandle image_h, BufferHandle upload_heap, uint offset, D3D12_SUBRESOURCE_DATA& data) noexcept
 {
-  auto& img = g_img_mgr[image_h];
-
-  img.transform(this, ImageState::copy_dst);
-  UpdateSubresources(_cmd, img.handle(), g_buf_pool[upload_heap].handle(), offset, 0, 1, &data);
-
-  g_cmd_pool.resource(_cmd).imgs.emplace(image_h);
+  transform(image_h, ImageState::copy_dst);
+  UpdateSubresources(_cmd, g_img_mgr[image_h].handle(), g_buf_pool[upload_heap].handle(), offset, 0, 1, &data);
   g_cmd_pool.resource(_cmd).bufs.emplace(upload_heap);
 }
 
@@ -154,7 +165,7 @@ void Command::copy(BufferHandle src, ImageHandle dst, uint src_offset, BitmapVie
   auto& buf = g_buf_pool[src];
   auto& img = g_img_mgr[dst];
 
-  img.transform(this, ImageState::copy_dst);
+  transform(dst, ImageState::copy_dst);
 
   auto footprint = D3D12_PLACED_SUBRESOURCE_FOOTPRINT{};
   footprint.Offset             = src_offset;
@@ -170,7 +181,6 @@ void Command::copy(BufferHandle src, ImageHandle dst, uint src_offset, BitmapVie
   _cmd->CopyTextureRegion(&dst_loc, pos.x, pos.y, 0, &src_loc, nullptr);
 
   g_cmd_pool.resource(_cmd).bufs.emplace(src);
-  g_cmd_pool.resource(_cmd).imgs.emplace(dst);
 }
 
 void Command::upload(FrameBuffer& buf, ui::FrameData const* data) noexcept

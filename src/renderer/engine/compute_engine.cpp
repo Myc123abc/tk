@@ -58,6 +58,9 @@ void ComputeEngine::update() noexcept
 {
   if (_mipmap_images.empty() && _blur_imgs.empty()) return;
 
+  // sample image to dst image for blur
+  image_scale();
+
   auto cmd = Engine::cmd();
 
   _slots.acquire_slot();
@@ -69,6 +72,7 @@ void ComputeEngine::update() noexcept
 
   auto fence_value = _slots.submit_slot();
   if (cmd->needs_graphics_sync()) g_graphics_engine.wait(g_comp_engine, fence_value);
+  cmd->clear_resource_track();
   
   // release mipmap descs after generation complete
   if (!_mipmap_images.empty())
@@ -106,11 +110,12 @@ void ComputeEngine::generate_mipmaps(Command const* cmd) noexcept
     auto  src_w = img.width();
     auto  src_h = img.height();
 
-    auto i = 0;
-    for (; i < img.mipmap_descs().size(); ++i)
+    for (auto i = 0u; i < img.mipmap_descs().size(); ++i)
     {
-      cmd->transform(handle, ImageState::non_pixel, i);
-      cmd->transform(handle, ImageState::compute_rw, i + 1);
+      cmd->transform({
+        { handle, ImageState::non_pixel, i },
+        { handle, ImageState::compute_rw, i + 1 },
+      });
       auto const& [srv, uav] = img.mipmap_descs()[i];
       g_ctx.compute_pipe_set(ComputePipeSetInfo
       {
@@ -135,8 +140,10 @@ void ComputeEngine::generate_mipmaps(Command const* cmd) noexcept
       src_w = dst_w;
       src_h = dst_h;
     }
-    cmd->transform(handle, ImageState::non_pixel, i);
   }
+  cmd->transform(_mipmap_images
+    | std::views::transform([](auto img)
+      { return Command::TransformInfo{ img, ImageState::non_pixel, static_cast<uint>(g_img_mgr[img].mipmap_descs().size()) }; }));
 }
 
 void ComputeEngine::blur(Command const* cmd) noexcept
@@ -148,9 +155,13 @@ void ComputeEngine::blur(Command const* cmd) noexcept
 
   auto constants = BlurConstants{};
 
+  cmd->transform(_blur_imgs
+    | std::views::transform([](auto const& img)
+      { return Command::TransformInfo{ img.tmp, ImageState::compute_rw }; }));
+
+  auto last_sigma = -FLT_MAX;
   for (auto const& [src_h, dst_h, tmp_h, ext, sigma, cnt] : _blur_imgs)
   {
-    auto& src = g_img_mgr[src_h];
     auto& dst = g_img_mgr[dst_h];
     auto& tmp = g_img_mgr[tmp_h];
 
@@ -160,25 +171,28 @@ void ComputeEngine::blur(Command const* cmd) noexcept
     // calculate widgets and blur radius
     if (!_weights.contains(sigma))
       _weights.emplace(sigma, get_gauss_weights(sigma));
-    auto const& widgets = _weights[sigma];
-    constants.blur_radius = widgets.size() / 2;
-    memcpy(&constants.widgets, widgets.data(), widgets.size() * sizeof(float));
+    if (last_sigma != sigma)
+    {
+      last_sigma = sigma;
+      auto const& widgets = _weights[sigma];
+      constants.blur_radius = widgets.size() / 2;
+      memcpy(&constants.widgets, widgets.data(), widgets.size() * sizeof(float));
+    }
 
     g_ctx.set_compute_root_signature(horizontal_pipe->root_signature);
     g_ctx.set_compute_constants(horizontal_pipe->root_param_idx("constants"), constants);
 
     for (auto i = 0; i < cnt; ++i)
     {
-      cmd->transform(dst_h, ImageState::non_pixel);
-      cmd->transform(tmp_h, ImageState::compute_rw);
-
       g_ctx.set_pipe(horizontal_pipe->pipe_state.Get());
       g_ctx.set_compute_descriptor(horizontal_pipe->root_param_idx("src"), dst.srv().gpu_handle());
       g_ctx.set_compute_descriptor(horizontal_pipe->root_param_idx("dst"), tmp.uav().gpu_handle());
       g_ctx.dispatch(ceil(ext.x / 128.f), ext.y, 1);
 
-      cmd->transform(tmp_h, ImageState::non_pixel);
-      cmd->transform(dst_h, ImageState::compute_rw);
+      cmd->transform({
+        { tmp_h, ImageState::non_pixel },
+        { dst_h, ImageState::compute_rw},
+      });
 
       g_ctx.set_pipe(vertical_pipe->pipe_state.Get());
       g_ctx.set_compute_descriptor(vertical_pipe->root_param_idx("src"), tmp.srv().gpu_handle());
@@ -186,6 +200,50 @@ void ComputeEngine::blur(Command const* cmd) noexcept
       g_ctx.dispatch(ext.x, ceil(ext.y / 128.f), 1);
     }
   }
+}
+
+void ComputeEngine::image_scale() const noexcept
+{
+  if (_blur_imgs.empty()) return;
+
+  g_graphics_engine.acquire_slot();
+  auto cmd = g_graphics_engine.cmd();
+
+  cmd->bind_descriptor_heaps();
+  g_ctx.set_cmd(cmd);
+
+  cmd->transform(_blur_imgs
+    | std::views::transform([](auto const& img) 
+      { return Command::TransformInfo{ img.src, ImageState::pixel }; }));
+
+  for (auto const& [src_h, dst_h, tmp_h, ext, sigma, cnt] : _blur_imgs)
+  {
+    auto rect = Rect{ 0, 0, ext };
+    g_ctx.set_render_target(dst_h, {});
+    g_ctx.graphics_pipe_set(GraphicsPipeSetInfo
+    {
+      .type           = PipelineType::image_scale,
+      .viewport       = rect,
+      .scissor        = rect,
+      .constants_name = "Constants",
+      .constants      = ext,
+      .descs          =
+      {
+        { "img", g_img_mgr[src_h].srv().gpu_handle() },
+      },
+    });
+    g_ctx.draw(2);
+  }
+
+  cmd->transform(_blur_imgs
+    | std::views::transform([](auto const& img)
+      { return std::array{
+        Command::TransformInfo{ img.src, ImageState::non_pixel },
+        Command::TransformInfo{ img.dst, ImageState::non_pixel },
+      };})
+    | std::views::join);
+
+  g_comp_engine.wait(g_graphics_engine, g_graphics_engine.submit_slot());
 }
 
 }

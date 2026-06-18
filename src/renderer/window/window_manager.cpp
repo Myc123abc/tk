@@ -144,6 +144,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
       {
         window.resize_end();
         g_wnd_mgr._resizing = false;
+        g_ui_ctx.mouse_down_pos.reset();
       }
     }
   };

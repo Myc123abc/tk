@@ -41,7 +41,8 @@ public:
   {
     for (auto handle : _loaded_images | std::views::values) destroy(handle);
     for (auto handle : _tmp_imgs | std::views::keys) destroy(handle);
-    for (auto img : _blur_imgs | std::views::values) destroy(img);
+    for (auto const& img : _blur_imgs | std::views::values) destroy(img.image);
+    for (auto img : _destroy_blur_imgs) destroy(img);
   }
 
   auto& operator[](ImageHandle handle) noexcept { return _pool[handle]; }
@@ -78,8 +79,18 @@ private:
   std::unordered_map<std::string, ImageInfo>        _image_infos;
   std::unordered_map<std::string, std::string>      _decoded_failed_images;
 
-  std::unordered_map<ImageHandle, bool>        _tmp_imgs;
-  std::unordered_map<ImageHandle, ImageHandle> _blur_imgs;
+  struct BlurImage
+  {
+    ImageHandle image;
+    uint2       extent;
+    float       sigma{};
+    uint        cnt{};
+    bool        used{};
+  };
+
+  std::unordered_map<ImageHandle, bool>      _tmp_imgs;
+  std::unordered_map<ImageHandle, BlurImage> _blur_imgs;
+  std::vector<ImageHandle>                   _destroy_blur_imgs;
 )
 
 }
