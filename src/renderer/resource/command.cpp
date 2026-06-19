@@ -3,6 +3,7 @@
 #include "../core.hpp"
 #include "../../util/align.hpp"
 #include "descriptor_heap_manager.hpp"
+#include "util/base.hpp"
 
 #include <ranges>
 
@@ -146,6 +147,9 @@ void Command::copy(ImageHandle src, Rect rect, ImageHandle dst, uint2 pos) noexc
     static_cast<LONG>(rect.bottom)
   };
   _cmd->CopyTextureRegion(&dst_loc, pos.x, pos.y, 0, &src_loc, &region_box);
+
+  g_cmd_pool.resource(_cmd).imgs.emplace(src);
+  g_cmd_pool.resource(_cmd).imgs.emplace(dst);
 }
 
 void Command::copy(ImageHandle src, ImageHandle dst) noexcept
@@ -153,34 +157,49 @@ void Command::copy(ImageHandle src, ImageHandle dst) noexcept
   copy(src, { 0, 0, g_img_mgr[src].extent() }, dst, {});
 }
 
-void Command::copy(ImageHandle image_h, BufferHandle upload_heap, uint offset, D3D12_SUBRESOURCE_DATA& data) noexcept
+void Command::copy(BufferHandle buf_h, ImageHandle img_h, std::span<BitmapCopyInfo const> bitmap_copy_infos) noexcept
 {
-  transform(image_h, ImageState::copy_dst);
-  UpdateSubresources(_cmd, g_img_mgr[image_h].handle(), g_buf_pool[upload_heap].handle(), offset, 0, 1, &data);
-  g_cmd_pool.resource(_cmd).bufs.emplace(upload_heap);
-}
+  auto& buf = g_buf_pool[buf_h];
+  auto& img = g_img_mgr[img_h];
 
-void Command::copy(BufferHandle src, ImageHandle dst, uint src_offset, BitmapView const& bitmap, uint2 pos) noexcept
-{
-  auto& buf = g_buf_pool[src];
-  auto& img = g_img_mgr[dst];
+  // transform image state
+  transform(img_h, ImageState::copy_dst);
 
-  transform(dst, ImageState::copy_dst);
+  for (auto const& [view, pos] : bitmap_copy_infos)
+  {
+    auto row_pitch = align(view.row_pitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+    auto data      = reinterpret_cast<uint8 const*>(view.data);
+    auto offset    = align(buf.size(), D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
 
-  auto footprint = D3D12_PLACED_SUBRESOURCE_FOOTPRINT{};
-  footprint.Offset             = src_offset;
-  footprint.Footprint.Width    = bitmap.width;
-  footprint.Footprint.Height   = bitmap.height;
-  footprint.Footprint.Depth    = 1;
-  footprint.Footprint.RowPitch = align(bitmap.row_pitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
-  footprint.Footprint.Format   = static_cast<DXGI_FORMAT>(img.format());
+    // promise placement aligment for CopyTextureRegion
+    buf.offset(offset);
 
-  auto src_loc = CD3DX12_TEXTURE_COPY_LOCATION{ buf.handle(), footprint };
-  auto dst_loc = CD3DX12_TEXTURE_COPY_LOCATION{ img.handle() };
+    // copy bitmap data to buffer
+    for (auto i = 0; i < view.height; ++i, data += view.row_pitch)
+    {
+      buf.copy(data, view.row_pitch);
+      buf.offset(buf.size() + row_pitch);
+    }
 
-  _cmd->CopyTextureRegion(&dst_loc, pos.x, pos.y, 0, &src_loc, nullptr);
+    // set buffer footprint
+    auto footprint = D3D12_PLACED_SUBRESOURCE_FOOTPRINT{};
+    footprint.Offset             = offset;
+    footprint.Footprint.Width    = view.width;
+    footprint.Footprint.Height   = view.height;
+    footprint.Footprint.Depth    = 1;
+    footprint.Footprint.RowPitch = row_pitch;
+    footprint.Footprint.Format   = static_cast<DXGI_FORMAT>(img.format());
 
-  g_cmd_pool.resource(_cmd).bufs.emplace(src);
+    auto src_loc = CD3DX12_TEXTURE_COPY_LOCATION{ buf.handle(), footprint };
+    auto dst_loc = CD3DX12_TEXTURE_COPY_LOCATION{ img.handle() };
+
+    // copy buffer data to texture
+    _cmd->CopyTextureRegion(&dst_loc, pos.x, pos.y, 0, &src_loc, nullptr);
+  }
+
+  // mark resources
+  g_cmd_pool.resource(_cmd).imgs.emplace(img_h);
+  g_cmd_pool.resource(_cmd).bufs.emplace(buf_h);
 }
 
 void Command::upload(FrameBuffer& buf, ui::FrameData const* data) noexcept

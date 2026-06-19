@@ -4,6 +4,7 @@
 #include "util/base.hpp"
 #include "config.hpp"
 #include "../renderer/resource/image_manager.hpp"
+#include "../util/double_buffer.hpp"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -41,6 +42,8 @@ struct SDFBitmap
   {
     return { data.data(), extent.x, extent.y, extent.x };
   }
+
+  auto empty() const noexcept { return !extent.x || !extent.y; }
 };
 
 class TextEngine;
@@ -148,6 +151,8 @@ public:
 
   void upload_uncached_glyphs() noexcept;
 
+  auto& access_swaped_pending_copy_glyphs() noexcept { return _pending_copy_glyphs.access(); }
+
 private:
   auto split_text(std::u32string_view text, FontStyle style) noexcept -> std::vector<std::pair<std::u32string_view, Font*>>;
   auto find_font(uint unicode, FontStyle style) noexcept -> Font*;
@@ -181,7 +186,8 @@ private:
   FontStyleMap<UnicodeMap<GlyphInfo>>              _glyph_infos;
   FontStyleMap<UnicodeMap<std::pair<Font*, uint>>> _uncached_glyphs;
   
-  std::unordered_map<uint, std::vector<std::pair<SDFBitmap, float2>>> _pending_copy_glyphs;
+  using PendingCopyGlyphsInfoType = std::unordered_map<uint, std::vector<std::pair<SDFBitmap, float2>>>;
+  DoubleBuffer<PendingCopyGlyphsInfoType> _pending_copy_glyphs;
   
   float _max_ascender{};
   float _max_height{};

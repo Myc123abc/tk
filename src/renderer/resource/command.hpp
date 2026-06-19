@@ -11,6 +11,12 @@
 
 namespace tk::renderer {
 
+struct BitmapCopyInfo
+{
+  BitmapView bitmap_view; 
+  uint2      pos;
+};
+
 class Command
 {
 public:
@@ -52,8 +58,12 @@ public:
 
   void copy(ImageHandle src, Rect rect, ImageHandle dst, uint2 pos) noexcept;
   void copy(ImageHandle src, ImageHandle dst) noexcept;
-  void copy(ImageHandle image, BufferHandle upload_heap, uint offset, D3D12_SUBRESOURCE_DATA& data) noexcept;
-  void copy(BufferHandle src, ImageHandle dst, uint src_offset, BitmapView const& bitmap, uint2 pos) noexcept;
+  void copy(BufferHandle buf, ImageHandle img, std::span<BitmapCopyInfo const> bitmap_copy_infos) noexcept;
+  void copy(BufferHandle buf, ImageHandle img, Bitmap const& bitmap) noexcept
+  {
+    auto infos = std::vector<BitmapCopyInfo>{{ bitmap.to_bitmap_view() }};
+    copy(buf, img, infos);
+  }
 
   void upload(FrameBuffer& buf, ui::FrameData const* data) noexcept;
   void bind_descriptor_heaps() const noexcept;

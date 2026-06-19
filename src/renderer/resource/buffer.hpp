@@ -34,6 +34,12 @@ public:
     return append(std::ranges::data(values), std::ranges::size(values) * sizeof(std::ranges::range_value_t<T>));
   }
 
+  void offset(uint size) noexcept;
+  void copy(void const* data, uint size) const noexcept;
+
+  void resize(uint size) noexcept;
+  void reserve(uint size) noexcept;
+
   auto gpu_address() const noexcept { return _handle->GetGPUVirtualAddress(); }
   auto size()        const noexcept { return _size;                           }
   auto capacity()    const noexcept { return _capacity;                       }

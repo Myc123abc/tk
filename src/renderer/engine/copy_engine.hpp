@@ -9,12 +9,6 @@ namespace tk::renderer {
 
 class Command;
 
-struct MultiBitmapCopyInfo
-{
-  BitmapView bitmap; 
-  uint2      pos;
-};
-
 class UploadBuffer
 {
 public:
@@ -30,7 +24,7 @@ public:
     info.data  = std::move(bitmap);
   }
 
-  void add_image(ImageHandle image, std::vector<MultiBitmapCopyInfo>&& infos) noexcept
+  void add_image(ImageHandle image, std::vector<BitmapCopyInfo>&& infos) noexcept
   {
     auto& info = _infos.emplace_back();
     info.image = image;
@@ -42,7 +36,7 @@ public:
 private:
   struct MultiBitmapCopy
   {
-    std::vector<MultiBitmapCopyInfo> infos;
+    std::vector<BitmapCopyInfo> infos;
   };
 
   struct Info
@@ -78,7 +72,7 @@ public:
     g_img_mgr[image].copy_will_use();
   }
 
-  void copy(std::vector<MultiBitmapCopyInfo>&& infos, ImageHandle img) noexcept
+  void copy(std::vector<BitmapCopyInfo>&& infos, ImageHandle img) noexcept
   {
     auto slot = _slots.slot();
     assert(slot && _slots.is_idle(slot));

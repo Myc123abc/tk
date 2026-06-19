@@ -72,6 +72,20 @@ void Buffer::init(uint size, bool use_descriptor) noexcept
     create_descriptor();
 }
 
+void Buffer::offset(uint size) noexcept
+{
+  assert(size <= _capacity);
+  _size = size;
+}
+
+void Buffer::copy(void const* data, uint size) const noexcept
+{
+  size = align(size, 4);
+  auto total_size = _size + size;
+  assert(total_size <= _capacity);
+  memcpy(_data + _size, data, size);
+}
+
 auto Buffer::append(void const* data, uint size) noexcept -> uint
 {
   // promise aligment
@@ -84,22 +98,37 @@ auto Buffer::append(void const* data, uint size) noexcept -> uint
   }
   else
   {
-    // add old buffer for destroy
-    g_renderer.add_frame_render_complete_func([_ = _handle] {}, EngineType::graphics);
+    reserve(total_size);
 
-    // temporary copy old data
-    auto old_data = std::vector<std::byte>(_size);
-    memcpy(old_data.data(), _data, _size);
-
-    // create new bigger one
-    init(calculate_capacity(_capacity, total_size), _descriptor_handle.is_valid());
-
-    // copy old data to new buffer
-    append(old_data.data(), old_data.size());
-    // now copy current data again
+    // copy current data again
     append(data, size);
   }
   return size;
+}
+
+void Buffer::resize(uint size) noexcept
+{
+  if (size <= _size) return;
+  reserve(size);
+  _size = size;
+}
+
+void Buffer::reserve(uint size) noexcept
+{
+  if (size <= _capacity) return;
+
+  // add old buffer for destroy
+  g_renderer.add_frame_render_complete_func([_ = _handle] {}, EngineType::graphics);
+
+  // temporary copy old data
+  auto old_data = std::vector<std::byte>(_size);
+  memcpy(old_data.data(), _data, _size);
+
+  // create new bigger one
+  init(calculate_capacity(_capacity, size), _descriptor_handle.is_valid());
+
+  // copy old data to new buffer
+  append(old_data.data(), old_data.size());
 }
 
 }

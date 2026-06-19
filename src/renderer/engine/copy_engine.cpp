@@ -4,12 +4,15 @@
 #include "compute_engine.hpp"
 #include "../renderer.hpp"
 #include "../../util/align.hpp"
+#include "../../ui/text_engine.hpp"
 
 #include <algorithm>
 
 #include <stb_image.h>
 
 namespace tk::renderer {
+
+using namespace ui;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Upload Buffer
@@ -52,9 +55,9 @@ void UploadBuffer::upload(Command* cmd) noexcept
       {
         for (auto const& cpy : cpys.infos)
         {
-          auto row_pitch = align(cpy.bitmap.row_pitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+          auto row_pitch = align(cpy.bitmap_view.row_pitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
           intermediate_sizes.emplace_back(
-            align(row_pitch * cpy.bitmap.height, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT));
+            align(row_pitch * cpy.bitmap_view.height, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT));
         }
       }
     );
@@ -67,27 +70,20 @@ void UploadBuffer::upload(Command* cmd) noexcept
     buf.init(size, false);
 
   // copy bitmap data to image by upload buffer
-  auto offset = uint{};
   for (auto i = 0; i < _infos.size(); ++i)
   {
     auto& info = _infos[i];
     info.data.visit(
       [&](Bitmap& bitmap)
       {
-        auto data = D3D12_SUBRESOURCE_DATA{};
-        data.pData      = bitmap.data;
-        data.RowPitch   = bitmap.row_pitch;
-        data.SlicePitch = bitmap.row_pitch * bitmap.height;
-        cmd->copy(info.image, _buf, offset, data);
+        cmd->copy(_buf, info.image, bitmap);
         if (bitmap.can_free) stbi_image_free(bitmap.data);
       },
       [&](MultiBitmapCopy const& cpys)
       {
-        for (auto const& cpy : cpys.infos)
-          cmd->copy(_buf, info.image, offset, cpy.bitmap, cpy.pos);
+        cmd->copy(_buf, info.image, cpys.infos);
       }
     );
-    offset += intermediate_sizes[i];
   }
 
   _infos.clear();
@@ -112,6 +108,11 @@ void CopyEngine::update() noexcept
   for (auto [src, dst] : moved_imgs) cmd->copy(src, dst);
   
   auto fence_value = _slots.submit_slot();
+
+  // remove glyphs after copy finished
+  auto& pending_copy_glyphs = g_text_engine.access_swaped_pending_copy_glyphs();
+  if (!pending_copy_glyphs.empty())
+    g_renderer.add_frame_render_complete_func([&] { pending_copy_glyphs.clear(); }, EngineType::copy);
 
   if (cmd->needs_graphics_sync()) g_graphics_engine.wait(g_copy_engine, fence_value);
   if (cmd->needs_compute_sync()) g_comp_engine.wait(g_copy_engine, fence_value);

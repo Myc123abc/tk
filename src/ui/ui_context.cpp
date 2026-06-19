@@ -572,7 +572,7 @@ auto UIContext::text(std::string_view text, float2 pos, float size, Color inner_
   // values.emplace_back(.05f); // outline width, TODO: can be set by user
   // add_shape_property(ShapeProperty::Type::glyph, {}, {}, values);
 
-  return {};
+  return { std::ranges::fold_left(res.advances, 0, [](auto res, auto v) { return res + v.x; }), res.max_height };
 }
 
 }

@@ -190,6 +190,9 @@ void discard_end() noexcept
 void rectangle(float2 left_top, float2 right_bottom, Color color, float thickness) noexcept
 {
 	g_ui_ctx.check_draw();
+
+  if (left_top.x == right_bottom.x || left_top.y == right_bottom.y) return;
+
   adjust_pos(left_top, right_bottom); adjust_scale(thickness);
   g_ui_ctx.frame_data()->add_rect(left_top, right_bottom, color, thickness);
 }
@@ -197,6 +200,9 @@ void rectangle(float2 left_top, float2 right_bottom, Color color, float thicknes
 void triangle(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept
 {
 	g_ui_ctx.check_draw();
+
+  if (p0.x == p1.x == p2.x || p0.y == p1.y == p2.y) return;
+
   adjust_pos(p0, p1, p2); adjust_scale(thickness);
 	g_ui_ctx.frame_data()->add_triangle(p0, p1, p2, color, thickness);
 }
@@ -204,6 +210,9 @@ void triangle(float2 p0, float2 p1, float2 p2, Color color, float thickness) noe
 void circle(float2 center, float radius, Color color, float thickness) noexcept
 {
 	g_ui_ctx.check_draw();
+
+  if (radius <= 0) return;
+
   adjust_pos(center); adjust_scale(radius, thickness);
   g_ui_ctx.frame_data()->add_circle(center, radius, color, thickness);
 }

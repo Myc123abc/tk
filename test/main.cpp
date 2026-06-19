@@ -361,8 +361,8 @@ int main()
   auto circle_lerplocator = ui::Tween{};
   circle_lerplocator.init(250'000, ui::Tween::Mode::loop);
 
-  auto wnd1_is_closed = false;
-  auto wnd2_is_closed = true;
+  auto wnd1_is_closed = true;
+  auto wnd2_is_closed = false;
 
   auto cfg = ui::WindowConfig{};
   cfg.display_title_bar             = true;
@@ -481,7 +481,7 @@ int main()
 
       auto text_pos = p2 + float2{ 0, 10 };
       auto text_ext = ui::text("Hello, World!", text_pos, 32, 0xffff00ff);
-      ui::rectangle(text_pos, text_ext, 0x00ff00ff, 1);
+      ui::rectangle(text_pos, text_pos + text_ext, 0x00ff00ff, 1);
 
       if (ui::button("blur onoff", 50, 50, 50, 50, 0x0000ffff, 0x00ff00ff))
       {

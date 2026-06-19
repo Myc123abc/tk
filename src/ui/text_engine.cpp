@@ -171,7 +171,8 @@ auto TextEngine::parse(std::string_view text, FontStyle style) noexcept -> Parse
 
 auto TextEngine::split_text(std::u32string_view text, FontStyle style) noexcept -> std::vector<std::pair<std::u32string_view, Font*>>
 {
-  std::vector<std::pair<std::u32string_view, Font*>> result;
+  // get which text use which font
+  auto result = std::vector<std::pair<std::u32string_view, Font*>>{};
   result.reserve(text.size());
 
   _max_ascender = {};
@@ -267,7 +268,6 @@ auto TextEngine::calc_glyph_pos(float2 extent) noexcept -> std::pair<uint, float
     }
 
     ++current_glyph_atlas_idx;
-    // TODO: _new_glyph_atlas = true;
     _glyph_atlas.emplace_back(g_img_mgr.create(Glyph_Atlas_Width, Glyph_Atlas_Height, ImageFormat::r8_unorm, ImageType::srv));
     current_pos                   = {};
     current_line_max_glyph_height = {};
@@ -278,6 +278,7 @@ void TextEngine::upload_uncached_glyphs() noexcept
 {
   if (_uncached_glyphs.empty()) return;
 
+  auto& pending_copy_glyphs = _pending_copy_glyphs.data();
   for (auto const& [style, infos] : _uncached_glyphs)
   {
     for (auto const& [unicode, pair] : infos)
@@ -285,16 +286,26 @@ void TextEngine::upload_uncached_glyphs() noexcept
       auto [font, glyph_idx] = pair;
       auto bitmap = font->generate_sdf_bitmap(glyph_idx, unicode, style);
       auto [glyph_atlas_idx, cpy_pos] = calc_glyph_pos(bitmap.extent);
-      _pending_copy_glyphs[glyph_atlas_idx].emplace_back(std::move(bitmap), cpy_pos);
+      pending_copy_glyphs[glyph_atlas_idx].emplace_back(std::move(bitmap), cpy_pos);
     }
   }
   _uncached_glyphs.clear();
 
-  for (auto const& [glyph_atlas_idx, bitmaps] : _pending_copy_glyphs)
+  // use copy engine to upload glyph sdf bitmaps to glyph atlas texture
+  for (auto const& [glyph_atlas_idx, bitmap_infos] : pending_copy_glyphs)
   {
+    for (auto const& [bitmap, pos] : bitmap_infos)
+      _glyph_infos[bitmap.style].emplace(bitmap.unicode, GlyphInfo{ glyph_atlas_idx, pos, bitmap.extent, bitmap.left_offset, bitmap.up_offset });
+
+    auto bitmap_cpy_infos = bitmap_infos
+      | std::views::filter([](auto const& bitmap_info) { return !bitmap_info.first.empty(); })
+      | std::views::transform([](auto const& bitmap_info)
+        { return BitmapCopyInfo{ bitmap_info.first.to_bitmap_view(), bitmap_info.second }; })
+      | std::ranges::to<std::vector<BitmapCopyInfo>>();
+    g_copy_engine.copy(std::move(bitmap_cpy_infos), _glyph_atlas[glyph_atlas_idx]);
   }
 
-  _pending_copy_glyphs.clear();
+  _pending_copy_glyphs.swap();
 }
 
 }
