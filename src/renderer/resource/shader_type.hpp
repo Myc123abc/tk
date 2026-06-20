@@ -9,6 +9,7 @@ struct alignas(16) Vertex
   float2 pos{};
   float2 uv{};
   float4 color{};
+  uint   image_idx{};
 };
 
 struct alignas(16) Constants
@@ -31,6 +32,9 @@ struct alignas(16) Constants
   float2 composite_offset;
   float2 composite_extent;
 
+  float4 outer_color;
+
+  float  outline_width{};
   uint   draw_wireframe{};
 };
 

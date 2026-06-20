@@ -3,7 +3,7 @@
 #include "image.hpp"
 #include "buffer.hpp"
 #include "../config.hpp"
-#include "../../ui/frame_data.hpp"
+#include "../../ui/frame_data/frame_data.hpp"
 
 #include <dcomp.h>
 

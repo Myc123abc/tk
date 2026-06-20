@@ -1,8 +1,8 @@
 #include "text_engine.hpp"
 #include "util/error_handling.hpp"
-#include "../renderer/resource/image_manager.hpp"
+#include "../../renderer/resource/image_manager.hpp"
 #include "missing-glyph-sdf-bitmap.hpp"
-#include "../renderer/engine/copy_engine.hpp"
+#include "../../renderer/engine/copy_engine.hpp"
 
 #include <hb-ft.h>
 #include <utf8.h>
@@ -79,10 +79,15 @@ void TextEngine::init() noexcept
   _glyph_atlas.emplace_back(g_img_mgr.create(Glyph_Atlas_Width, Glyph_Atlas_Height, ImageFormat::r8_unorm, ImageType::srv));
 }
 
-void TextEngine::destroy() const noexcept
+void TextEngine::destroy() noexcept
 {
   for (auto handle : _glyph_atlas) g_img_mgr.destroy(handle);
   for (auto const& font : _fonts | std::views::values | std::views::join) font.destroy();
+  for (auto& h : _cached_text_parse_results | std::views::values | std::views::join | std::views::values)
+  {
+    assert(h.valid());
+    _parse_result_pool.free(h);
+  }
 
   hb_buffer_destroy(_hb_buf);
   check(FT_Done_FreeType(_ft), "failed to destroy freetype");
@@ -104,11 +109,16 @@ void TextEngine::load_font(std::string_view path) noexcept
   // clear missing glyphs and cached text advances
   _missing_glyphs.clear();
   for (auto const& [style, text] : _cached_texts_with_missing_glyphs)
-    _cached_text_advances[style].erase(text);
+  {
+    auto& h = _cached_text_parse_results[style][text.data()];
+    assert(h.valid());
+    _parse_result_pool.free(h);
+    _cached_text_parse_results[style].erase(text);
+  }
   _cached_texts_with_missing_glyphs.clear();
 }
 
-auto TextEngine::parse(std::string_view text, FontStyle style) noexcept -> ParseResult
+auto TextEngine::parse(std::string_view text, FontStyle style) noexcept -> TextParseResultHandle
 {
   assert(!text.empty());
 
@@ -118,11 +128,12 @@ auto TextEngine::parse(std::string_view text, FontStyle style) noexcept -> Parse
   auto has_missing_glyphs = false;
 
   // try to get cached text advances
-  auto& cached_text_advances = _cached_text_advances[style];
-  if (cached_text_advances.contains(text.data())) return cached_text_advances[text.data()];
+  auto& cached_text_parse_result = _cached_text_parse_results[style];
+  if (cached_text_parse_result.contains(text.data())) return cached_text_parse_result[text.data()];
 
   // calculate advances
   res.advances.reserve(res.text.size());
+  res.style = style;
 
   // split text
   for (auto [text, font] : split_text(res.text, style))
@@ -162,11 +173,15 @@ auto TextEngine::parse(std::string_view text, FontStyle style) noexcept -> Parse
   res.max_height   = _max_height;
 
   // cached calculate result
-  cached_text_advances.emplace(text.data(), res);
+  assert(!cached_text_parse_result[text.data()].valid());
+  auto handle = _parse_result_pool.alloc();
+  cached_text_parse_result[text.data()] = handle;
 
   add_uncached_glyphs(res.text, style);
 
-  return std::move(res);
+  _parse_result_pool[handle] = std::move(res);
+
+  return handle;
 }
 
 auto TextEngine::split_text(std::u32string_view text, FontStyle style) noexcept -> std::vector<std::pair<std::u32string_view, Font*>>
@@ -306,6 +321,26 @@ void TextEngine::upload_uncached_glyphs() noexcept
   }
 
   _pending_copy_glyphs.swap();
+}
+
+void GlyphInfo::set_vertices(renderer::Vertex* vtx, float2 pos, float size, float ascender, Color color) const noexcept
+{
+  auto scale = get_scale(size);
+  
+  auto p0 = pos + pos_offset * scale;
+  p0.y += ascender * scale;
+  auto p1 = float2{ p0.x + extent.x * scale, p0.y };
+  auto p3 = float2{ p0.x, p0.y + extent.y * scale };
+  auto p2 = float2{ p1.x, p3.y };
+  
+  auto desc_handle = g_img_mgr[g_text_engine._glyph_atlas[glyph_atlas_index]].srv();
+  assert(desc_handle.is_valid());
+  auto idx = static_cast<uint>(desc_handle.index());
+
+  vtx[0] = { p0, { min_x, min_y }, color, idx };
+  vtx[1] = { p1, { max_x, min_y }, color, idx };
+  vtx[2] = { p2, { max_x, max_y }, color, idx };
+  vtx[3] = { p3, { min_x, max_y }, color, idx };
 }
 
 }

@@ -480,8 +480,9 @@ int main()
       circle_lerplocator.update();
 
       auto text_pos = p2 + float2{ 0, 10 };
-      auto text_ext = ui::text("Hello, World!", text_pos, 32, 0xffff00ff);
-      ui::rectangle(text_pos, text_pos + text_ext, 0x00ff00ff, 1);
+      auto text_res = ui::text("Hello, World!", text_pos, 32, 0xffff00ff);
+      ui::rectangle(text_pos, text_pos + text_res.extent, 0x00ff00ff, 1);
+      ui::line({ text_pos.x, text_pos.y + text_res.ascender }, { text_pos.x + text_res.extent.x, text_pos.y + text_res.ascender }, 0xffff00ff);
 
       if (ui::button("blur onoff", 50, 50, 50, 50, 0x0000ffff, 0x00ff00ff))
       {

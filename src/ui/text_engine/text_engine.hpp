@@ -2,9 +2,11 @@
 
 #include "ui/ui.hpp"
 #include "util/base.hpp"
-#include "config.hpp"
-#include "../renderer/resource/image_manager.hpp"
-#include "../util/double_buffer.hpp"
+#include "../config.hpp"
+#include "../../renderer/resource/image_manager.hpp"
+#include "../../util/double_buffer.hpp"
+#include "../../util/object_pool.hpp"
+#include "../../renderer/resource/shader_type.hpp"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -97,34 +99,7 @@ struct GlyphInfo
     return size / FT_Pixel_Size;
   }
 
-  // auto get_vertices(float2 pos, float size, uint offset, float ascender, uint glyph_atlases_index) const noexcept -> std::vector<Vertex>
-  // {
-  //   // TODO: add vertical draw
-  //   auto scale = get_scale(size);
-  //   auto p0 = pos + pos_offset * scale;
-  //   p0.y += ascender * scale;
-  //   auto p1 = float2{ p0.x + extent.x * scale, p0.y };
-  //   auto p2 = float2{ p0.x, p0.y + extent.y * scale };
-  //   auto p3 = float2{ p1.x, p2.y };      
-  //   return
-  //   {
-  //     { p0, { min_x, min_y }, offset, glyph_atlases_index },
-  //     { p1, { max_x, min_y }, offset, glyph_atlases_index },
-  //     { p2, { min_x, max_y }, offset, glyph_atlases_index },
-  //     { p3, { max_x, max_y }, offset, glyph_atlases_index },
-  //   };
-  // }
-
-  // static auto get_indices(uint16& index) noexcept -> std::vector<uint16>
-  // {
-  //   auto idx = index;
-  //   index += 4;
-  //   return
-  //   {
-  //     static_cast<uint16>(idx + 0), static_cast<uint16>(idx + 1), static_cast<uint16>(idx + 2),
-  //     static_cast<uint16>(idx + 2), static_cast<uint16>(idx + 1), static_cast<uint16>(idx + 3),
-  //   };
-  // }
+  void set_vertices(renderer::Vertex* vtx, float2 pos, float size, float ascender, Color color) const noexcept;
 
   static auto get_next_position(float2 pos, float size, float2 advance) noexcept
   {
@@ -134,9 +109,10 @@ struct GlyphInfo
 
 Singleton(TextEngine, g_text_engine,
   friend class Font;
+  friend class GlyphInfo;
 public:
   void init() noexcept;
-  void destroy() const noexcept;
+  void destroy() noexcept;
 
   void load_font(std::string_view path) noexcept;
 
@@ -146,12 +122,20 @@ public:
     float               max_ascender{};
     float               max_height{};
     std::u32string      text;
+    FontStyle           style;
+
+    ParseResult() noexcept = default;
   };
-  auto parse(std::string_view text, FontStyle style) noexcept -> ParseResult;
+  using ParseResultPool       = ObjectPool<ParseResult>;
+  using TextParseResultHandle = ParseResultPool::Handle;
+  auto parse(std::string_view text, FontStyle style) noexcept -> TextParseResultHandle;
+  auto& get_parse_result(TextParseResultHandle handle) const noexcept { return _parse_result_pool[handle]; }
 
   void upload_uncached_glyphs() noexcept;
 
   auto& access_swaped_pending_copy_glyphs() noexcept { return _pending_copy_glyphs.access(); }
+
+  auto const& get_glyph_infos(FontStyle style) noexcept { return _glyph_infos[style]; }
 
 private:
   auto split_text(std::u32string_view text, FontStyle style) noexcept -> std::vector<std::pair<std::u32string_view, Font*>>;
@@ -181,7 +165,8 @@ private:
   std::vector<ImageHandle>                         _glyph_atlas;
   FontStyleMap<std::vector<Font>>                  _fonts;
   std::vector<std::pair<FontStyle, std::string>>   _cached_texts_with_missing_glyphs;
-  FontStyleMap<TextMap<ParseResult>>               _cached_text_advances;
+  FontStyleMap<TextMap<TextParseResultHandle>>     _cached_text_parse_results;
+  ParseResultPool                                  _parse_result_pool;
   FontStyleMap<std::unordered_set<uint>>           _missing_glyphs;
   FontStyleMap<UnicodeMap<GlyphInfo>>              _glyph_infos;
   FontStyleMap<UnicodeMap<std::pair<Font*, uint>>> _uncached_glyphs;
@@ -202,5 +187,7 @@ private:
     auto vector() noexcept { return std::pmr::vector<T>{ &_pool }; }
   } _mem_pool;
 )
+
+using TextParseResultHandle = TextEngine::TextParseResultHandle;
 
 }

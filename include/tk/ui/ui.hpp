@@ -207,6 +207,12 @@ enum class FontStyle
   italic_bold,
 };
 
+struct TextResult
+{
+  float2 extent;
+  float  ascender{};
+};
+
 /**
  * draw text
  * @param text
@@ -214,9 +220,9 @@ enum class FontStyle
  * @param size
  * @param color
  * @param style regular(default), italic, bold, italic_bold
- * @return extent of text
+ * @return text parse result
  */
-auto text(std::string_view text, float2 pos, float size, Color color, FontStyle style = {}) noexcept -> float2;
+auto text(std::string_view text, float2 pos, float size, Color color, FontStyle style = {}) noexcept -> TextResult;
 
 /**
  * draw text
@@ -225,9 +231,9 @@ auto text(std::string_view text, float2 pos, float size, Color color, FontStyle 
  * @param size
  * @param inner_color
  * @param outer_color alpha not 0 then draw outline
- * @return extent of text
+ * @return text parse result
  */
-auto text(std::string_view text, float2 pos, float size, Color inner_color, Color outer_color) noexcept -> float2;
+auto text(std::string_view text, float2 pos, float size, Color inner_color, Color outer_color) noexcept -> TextResult;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Window

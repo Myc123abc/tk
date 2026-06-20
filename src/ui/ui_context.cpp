@@ -3,7 +3,7 @@
 #include "../renderer/window/window_manager.hpp"
 #include "../renderer/renderer.hpp"
 #include "../util/hash.hpp"
-#include "text_engine.hpp"
+#include "text_engine/text_engine.hpp"
 
 using namespace tk::renderer;
 
@@ -550,29 +550,25 @@ auto UIContext::image(std::string_view path, float2 left_top, float2 right_botto
   return std::unexpected(res.error());
 }
 
-auto UIContext::text(std::string_view text, float2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> float2
+auto UIContext::text(std::string_view text, float2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> TextResult
 {
   if (text.empty()) return {};
 
   check_draw();
 
-  auto res = g_text_engine.parse(text, style);
+  auto result_handle = g_text_engine.parse(text, style);
+  frame_data()->add_text(result_handle, pos, size, inner_color, outer_color);
 
-  // text use single glyph shape property and multiple glyph boxs which share the shape property
-  // auto values = std::vector<float>{};
-  // values.emplace_back(res.glyph_atlas_index);
-  // values.emplace_back(inner_color.r);
-  // values.emplace_back(inner_color.g);
-  // values.emplace_back(inner_color.b);
-  // values.emplace_back(inner_color.a);
-  // values.emplace_back(outer_color.r);
-  // values.emplace_back(outer_color.g);
-  // values.emplace_back(outer_color.b);
-  // values.emplace_back(outer_color.a);
-  // values.emplace_back(.05f); // outline width, TODO: can be set by user
-  // add_shape_property(ShapeProperty::Type::glyph, {}, {}, values);
+  auto const& result = g_text_engine.get_parse_result(result_handle);
 
-  return { std::ranges::fold_left(res.advances, 0, [](auto res, auto v) { return res + v.x; }), res.max_height };
+  return
+  {
+    {
+      std::ranges::fold_left(result.advances, 0, [](auto res, auto v) { return res + v.x; }),
+      result.max_height,
+    },
+    result.max_ascender
+  };
 }
 
 }

@@ -1,8 +1,9 @@
 #pragma once
 
 #include "ui/ui.hpp"
-#include "../renderer/resource/shader_type.hpp"
-#include "../renderer/resource/image_manager.hpp"
+#include "../../renderer/resource/shader_type.hpp"
+#include "../../renderer/resource/image_manager.hpp"
+#include "../text_engine/text_engine.hpp"
 #include "util/rect.hpp"
 #include "util/flag.hpp"
 
@@ -24,7 +25,7 @@ inline ImageHandle Write_Image_Handle = {};
 enum class RenderCmdType
 {
   ui,
-
+  text,
   clear_discard_image,
   clear_composite_image,
   discard_write,
@@ -45,6 +46,15 @@ struct RenderCmd
       Rect        scissor_rect{};
       ImageHandle image_handle;
     } ui;
+
+    struct
+    {
+      uint   idx_beg{};
+      uint   idx_size{};
+      Rect   scissor_rect{};
+      float4 outer_color;
+      float  outline_width{};
+    } text;
 
     std::optional<Rect> clear_rect{};
   };
@@ -83,6 +93,7 @@ public:
     _discard_beg_idx               = {};
     _discard_vtx_beg               = {};
     _clear_composite_image_cmd_idx = {};
+    _last_cmd_type                 = {};
   }
 
   struct DrawCmd
@@ -97,6 +108,7 @@ public:
       add_quad_bezier,
       add_cubic_bezier,
       add_image,
+      add_text,
       path_begin,
       add_path_line_to,
       add_path_arc_to,
@@ -192,6 +204,15 @@ public:
 
       struct
       {
+        TextParseResultHandle handle;
+        float2                pos;
+        float                 size{};
+        Color                 inner_color{};
+        Color                 outer_color{};
+      } add_text;
+
+      struct
+      {
         float2 p0{};
       } path_begin;
 
@@ -257,6 +278,7 @@ public:
   void add_quad_bezier(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
   void add_cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept;
   void add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8 alpha, std::span<float2> uvs) noexcept;
+  void add_text(TextParseResultHandle handle, float2 pos, float size, Color inner_color, Color outer_color) noexcept;
 
   void path_begin(float2 p0) noexcept;
   void add_path_line_to(float2 p) noexcept;
@@ -282,6 +304,7 @@ private:
   void _add_quad_bezier(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
   void _add_cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept;
   void _add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8 alpha, float2 uv0, float2 uv1, float2 uv2, float2 uv3) noexcept;
+  void _add_text(TextParseResultHandle handle, float2 pos, float size, Color inner_color, Color outer_color) noexcept;
 
   void _path_begin(float2 p0) noexcept;
   void _add_path_line_to(float2 p) noexcept { if (_points.back() != p) _points.emplace_back(p); }
@@ -341,6 +364,7 @@ private:
 
   void push_render_cmd(RenderCmdType type, ImageHandle image_handle = Write_Image_Handle) noexcept;
   void push_render_cmd_clear_rect(RenderCmdType type, std::optional<Rect> rect = {}) noexcept;
+  void push_render_cmd_text(Color outer_color, float outline_width) noexcept;
 
   void add_convex_poly_filled(Color color) noexcept;
   void add_concave_poly_filled(Color color) noexcept;
@@ -355,6 +379,8 @@ private:
 
   void path_bezier_quad_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float tess_tol, int level) noexcept;
   void path_bezier_cubic_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float2 p3, float tess_tol, int level) noexcept;
+
+  void set_last_cmd_type(std::optional<RenderCmdType> type) noexcept;
 
 private:
   std::vector<DrawCmd> _draw_cmds;
@@ -398,6 +424,8 @@ private:
   inline static auto           arc_radius_cutoff      = 0.f;
   inline static std::array<int, arc_table_size + 16> _circle_segment_counts;
   inline static std::array<float2, arc_table_size>   _arc_vertices;
+
+  std::optional<RenderCmdType> _last_cmd_type;
 };
 
 }

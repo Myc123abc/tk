@@ -4,7 +4,7 @@
 #include "compute_engine.hpp"
 #include "../renderer.hpp"
 #include "../../util/align.hpp"
-#include "../../ui/text_engine.hpp"
+#include "../../ui/text_engine/text_engine.hpp"
 
 #include <algorithm>
 

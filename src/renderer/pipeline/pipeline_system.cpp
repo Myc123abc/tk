@@ -46,6 +46,7 @@ void PipelineSystem::init() noexcept
     { constants, "constants",  0, 0, false, sizeof(Constants) },
     { texture,   "image",      0, 0, true                     },
     { texture,   "mask_image", 0, 1, true                     },
+    { texture,   "images",     0, 2, false                    },
   }, true, true);
   auto image_scale_res = generate_root_signature(
   {
@@ -56,6 +57,16 @@ void PipelineSystem::init() noexcept
   {
     .type      = PipelineType::ui,
     .shader    = "assets/shader/ui/ui.hlsl",
+    .vs        = "vs",
+    .ps        = "ps",
+    .includes  = { "assets/shader/ui" },
+    .rt_fmt    = RenderResource::Render_Target_Format,
+    .blend     = BlendState::Default(),
+    .root_sign = ui_res,
+  },
+  {
+    .type      = PipelineType::text,
+    .shader    = "assets/shader/ui/text.hlsl",
     .vs        = "vs",
     .ps        = "ps",
     .includes  = { "assets/shader/ui" },

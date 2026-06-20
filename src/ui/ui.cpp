@@ -1,6 +1,6 @@
 #include "ui/ui.hpp"
 #include "ui_context.hpp"
-#include "text_engine.hpp"
+#include "text_engine/text_engine.hpp"
 #include "../renderer/window/window_manager.hpp"
 
 #include <stb_image.h>
@@ -71,6 +71,7 @@ auto image_extent(std::string_view path) noexcept -> float2
 
 auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha, std::optional<ImageConfig> cfg) noexcept -> std::expected<void, ImageLoadError::Type>
 {
+  if (!alpha || left_top.x == right_bottom.x || left_top.y == right_bottom.y) return {};
   adjust_pos(left_top, right_bottom);
   return g_ui_ctx.image(path, left_top, right_bottom, alpha, cfg);
 }
@@ -85,13 +86,15 @@ void load_font(std::string_view path) noexcept
   g_text_engine.load_font(path);
 }
 
-auto text(std::string_view text, float2 pos, float size, Color color, FontStyle style) noexcept -> float2
+auto text(std::string_view text, float2 pos, float size, Color color, FontStyle style) noexcept -> TextResult
 {
+  adjust_pos(pos);
   return g_ui_ctx.text(text, pos, size, color, style, {});
 }
 
-auto text(std::string_view text, float2 pos, float size, Color inner_color, Color outer_color) noexcept -> float2
+auto text(std::string_view text, float2 pos, float size, Color inner_color, Color outer_color) noexcept -> TextResult
 {
+  adjust_pos(pos);
   return g_ui_ctx.text(text, pos, size, inner_color, {}, outer_color);
 }
 

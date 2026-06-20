@@ -304,6 +304,35 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
       });
     }
     break;
+
+    case Type::text:
+    {
+      // TODO: change a way
+      auto& rt_img = g_img_mgr[rt];
+      constants.render_target_extent = rt_img.extent();
+      constants.outer_color          = render_cmd.text.outer_color;
+      constants.outline_width        = render_cmd.text.outline_width;
+      g_ctx.graphics_draw(GraphicsDrawInfo
+      {
+        .pipe_info = GraphicsPipeSetInfo
+        {
+          .type           = PipelineType::text,
+          .viewport       = rt_img.rect(),
+          .scissor        = render_cmd.text.scissor_rect,
+          .constants_name = "Constants",
+          .constants      = constants,
+          .descs          =
+          {
+            { "images", g_desc_heap_mgr.first_gpu_handle(DescriptorHeapType::cbv_srv_uav) },
+          },
+        },
+        .render_target = rt,
+        .depth_stencil = {},
+        .idx_beg       = render_cmd.text.idx_beg,
+        .idx_cnt       = render_cmd.text.idx_size,
+      });
+    }
+    break;
     }
   }
 
