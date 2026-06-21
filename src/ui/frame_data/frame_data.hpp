@@ -36,27 +36,20 @@ enum class RenderCmdType
 struct RenderCmd
 {
   RenderCmdType type;
+  uint          idx_beg{};
+  uint          idx_size{};
+  Rect          scissor_rect{};
 
   union
   {
     struct
     {
-      uint        idx_beg{};
-      uint        idx_size{};
-      Rect        scissor_rect{};
-      ImageHandle image_handle;
-    } ui;
-
-    struct
-    {
-      uint   idx_beg{};
-      uint   idx_size{};
-      Rect   scissor_rect{};
       float4 outer_color;
       float  outline_width{};
     } text;
 
-    std::optional<Rect> clear_rect{};
+    ImageHandle img;
+    Rect        clear_rect{};
   };
 };
 
@@ -363,7 +356,7 @@ private:
   void add_rect(float2 left_top, float2 right_bottom, Color color = {}) noexcept;
 
   void push_render_cmd(RenderCmdType type, ImageHandle image_handle = Write_Image_Handle) noexcept;
-  void push_render_cmd_clear_rect(RenderCmdType type, std::optional<Rect> rect = {}) noexcept;
+  void push_render_cmd_clear_rect(RenderCmdType type, Rect rect = {}) noexcept;
   void push_render_cmd_text(Color outer_color, float outline_width) noexcept;
 
   void add_convex_poly_filled(Color color) noexcept;

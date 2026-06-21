@@ -61,9 +61,9 @@ void FrameData::push_render_cmd(RenderCmdType type, ImageHandle image_handle) no
 
   auto& cmd = _render_cmds.emplace_back();
   cmd.type = type;
-  cmd.ui.idx_beg      = _draw_index_beg;
-  cmd.ui.idx_size     = idx_size;
-  cmd.ui.image_handle = image_handle;
+  cmd.idx_beg  = _draw_index_beg;
+  cmd.idx_size = idx_size;
+  cmd.img      = image_handle;
 
   _draw_index_beg = static_cast<uint>(_indices.size());
 
@@ -79,15 +79,15 @@ void FrameData::push_render_cmd_text(Color outer_color, float outline_width) noe
 
   auto& cmd = _render_cmds.emplace_back();
   cmd.type               = RenderCmdType::text;
-  cmd.text.idx_beg       = _draw_index_beg;
-  cmd.text.idx_size      = idx_size;
+  cmd.idx_beg            = _draw_index_beg;
+  cmd.idx_size           = idx_size;
   cmd.text.outer_color   = outer_color;
   cmd.text.outline_width = outline_width;
 
   _draw_index_beg = static_cast<uint>(_indices.size());
 }
 
-void FrameData::push_render_cmd_clear_rect(RenderCmdType type, std::optional<Rect> rect) noexcept
+void FrameData::push_render_cmd_clear_rect(RenderCmdType type, Rect rect) noexcept
 {
   auto& cmd = _render_cmds.emplace_back();
   cmd.type       = type;

@@ -59,7 +59,7 @@ void FrameData::_discard_end() noexcept
   push_render_cmd(RenderCmdType::discard_composite);
 
   auto wnd = g_ui_ctx.window();
-  _render_cmds.back().ui.scissor_rect = wnd->is_resizing() ? wnd->rect() : wnd->content_rect(); 
+  _render_cmds.back().scissor_rect = wnd->is_resizing() ? wnd->rect() : wnd->content_rect(); 
 }
 
 }

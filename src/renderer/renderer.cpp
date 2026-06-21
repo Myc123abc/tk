@@ -235,8 +235,8 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
       },
       .render_target = rt,
       .depth_stencil = ds,
-      .idx_beg       = cmd.ui.idx_beg,
-      .idx_cnt       = cmd.ui.idx_size,
+      .idx_beg       = cmd.idx_beg,
+      .idx_cnt       = cmd.idx_size,
     });
   };
 
@@ -251,21 +251,28 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
     switch (render_cmd.type)
     {
     case Type::ui:
-      graphics_draw(render_cmd, PipelineType::ui, rt, {}, render_cmd.ui.scissor_rect,
+      graphics_draw(render_cmd, PipelineType::ui, rt, {}, render_cmd.scissor_rect,
       {
-        { "image", g_img_mgr[render_cmd.ui.image_handle].srv().gpu_handle() },
+        { "image", g_img_mgr[render_cmd.img].srv().gpu_handle() },
+      });
+      break;
+
+    case Type::text:
+      constants.outer_color   = render_cmd.text.outer_color;
+      constants.outline_width = render_cmd.text.outline_width;
+      graphics_draw(render_cmd, PipelineType::text, rt, {}, render_cmd.scissor_rect,
+      {
+        { "images", g_desc_heap_mgr.first_gpu_handle(DescriptorHeapType::cbv_srv_uav) },
       });
       break;
 
     case Type::clear_discard_image:
-      assert(render_cmd.clear_rect);
-      discard_mask_rc = render_cmd.clear_rect.value();
+      discard_mask_rc = render_cmd.clear_rect;
       clear_resize_render_target(_discard_image, discard_mask_rc);
       break;
 
     case Type::clear_composite_image:
-      assert(render_cmd.clear_rect);
-      discard_composite_rc = render_cmd.clear_rect.value();
+      discard_composite_rc = render_cmd.clear_rect;
       clear_resize_render_target(_composite_image, discard_composite_rc);
       break;
 
@@ -278,7 +285,7 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
       constants.composite_offset = -discard_composite_rc.pos();
       graphics_draw(render_cmd, PipelineType::composite_write, _composite_image, {}, { 0, 0, discard_composite_rc.extent() },
       {
-        { "image", g_img_mgr[render_cmd.ui.image_handle].srv().gpu_handle() },
+        { "image", g_img_mgr[render_cmd.img].srv().gpu_handle() },
       });
       break;
 
@@ -293,43 +300,14 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
       constants.composite_extent = composite_img.extent();
 
       cmd->transform({
-        { _discard_image, ImageState::pixel },
+        { _discard_image,   ImageState::pixel },
         { _composite_image, ImageState::pixel },
       });
 
-      graphics_draw(render_cmd, PipelineType::discard_draw, rt, {}, render_cmd.ui.scissor_rect,
+      graphics_draw(render_cmd, PipelineType::discard_draw, rt, {}, render_cmd.scissor_rect,
       {
         { "image",      composite_img.srv().gpu_handle() },
         { "mask_image", discard_img.srv().gpu_handle()   },
-      });
-    }
-    break;
-
-    case Type::text:
-    {
-      // TODO: change a way
-      auto& rt_img = g_img_mgr[rt];
-      constants.render_target_extent = rt_img.extent();
-      constants.outer_color          = render_cmd.text.outer_color;
-      constants.outline_width        = render_cmd.text.outline_width;
-      g_ctx.graphics_draw(GraphicsDrawInfo
-      {
-        .pipe_info = GraphicsPipeSetInfo
-        {
-          .type           = PipelineType::text,
-          .viewport       = rt_img.rect(),
-          .scissor        = render_cmd.text.scissor_rect,
-          .constants_name = "Constants",
-          .constants      = constants,
-          .descs          =
-          {
-            { "images", g_desc_heap_mgr.first_gpu_handle(DescriptorHeapType::cbv_srv_uav) },
-          },
-        },
-        .render_target = rt,
-        .depth_stencil = {},
-        .idx_beg       = render_cmd.text.idx_beg,
-        .idx_cnt       = render_cmd.text.idx_size,
       });
     }
     break;

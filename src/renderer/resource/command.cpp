@@ -96,16 +96,21 @@ void Command::transform(std::initializer_list<TransformInfo> infos) const noexce
   auto barriers = std::vector<D3D12_RESOURCE_BARRIER>{};
   for (auto [image, states, subresource] : infos)
   {
-    barriers.append_range(g_img_mgr[image].transform(this, states, subresource));
-    g_cmd_pool.resource(_cmd).imgs.emplace(image);
+    auto res = g_img_mgr[image].transform(this, states, subresource);
+    if (!res.empty())
+    {
+      g_cmd_pool.resource(_cmd).imgs.emplace(image);
+      barriers.append_range(std::move(res));
+    }
   };
   barrier(barriers);
 }
 
 void Command::transform(ImageHandle image, Flag<ImageState> states, uint subresource) const noexcept
 {
-  barrier(g_img_mgr[image].transform(this, states, subresource));
-  g_cmd_pool.resource(_cmd).imgs.emplace(image);
+  auto res = g_img_mgr[image].transform(this, states, subresource);
+  if (!res.empty()) g_cmd_pool.resource(_cmd).imgs.emplace(image);
+  barrier(res);
 }
 
 void Command::clear(ImageHandle image, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) const noexcept

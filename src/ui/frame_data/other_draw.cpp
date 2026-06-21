@@ -13,15 +13,7 @@ void FrameData::_add_scissor_rect(Rect rect) noexcept
   if (_last_cmd_type) push_render_cmd(_last_cmd_type.value());
 
   for (auto idx : _render_cmd_rect_idxs)
-  {
-    auto& cmd = _render_cmds[idx];
-    if (cmd.type == RenderCmdType::ui)
-      _render_cmds[idx].ui.scissor_rect = rect;
-    else if (cmd.type == RenderCmdType::text)
-      _render_cmds[idx].text.scissor_rect = rect;
-    else
-      std::unreachable();
-  }
+    _render_cmds[idx].scissor_rect = rect;
   _render_cmd_rect_idxs.clear();
 }
 
