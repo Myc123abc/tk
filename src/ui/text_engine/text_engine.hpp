@@ -59,7 +59,7 @@ public:
   auto name()  const noexcept { return _name;  }
   auto style() const noexcept { return _style; }
 
-  auto find_glyph(uint unicode) noexcept
+  auto find_glyph(uint unicode) const noexcept
   {
     return FT_Get_Char_Index(_face, unicode);
   }
@@ -136,6 +136,7 @@ public:
   auto& access_swaped_pending_copy_glyphs() noexcept { return _pending_copy_glyphs.access(); }
 
   auto const& get_glyph_infos(FontStyle style) noexcept { return _glyph_infos[style]; }
+  auto get_missing_glyph_info() noexcept -> GlyphInfo const&;
 
 private:
   auto split_text(std::u32string_view text, FontStyle style) noexcept -> std::vector<std::pair<std::u32string_view, Font*>>;

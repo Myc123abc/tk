@@ -86,7 +86,6 @@ public:
     _discard_beg_idx               = {};
     _discard_vtx_beg               = {};
     _clear_composite_image_cmd_idx = {};
-    _last_cmd_type                 = {};
   }
 
   struct DrawCmd
@@ -202,6 +201,7 @@ public:
         float                 size{};
         Color                 inner_color{};
         Color                 outer_color{};
+        float                 outline_width{};
       } add_text;
 
       struct
@@ -271,7 +271,7 @@ public:
   void add_quad_bezier(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
   void add_cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept;
   void add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8 alpha, std::span<float2> uvs) noexcept;
-  void add_text(TextParseResultHandle handle, float2 pos, float size, Color inner_color, Color outer_color) noexcept;
+  void add_text(TextParseResultHandle handle, float2 pos, float size, Color inner_color, Color outer_color, float outline_width) noexcept;
 
   void path_begin(float2 p0) noexcept;
   void add_path_line_to(float2 p) noexcept;
@@ -288,32 +288,6 @@ public:
   void discard_beg(std::function<void()> func) noexcept;
   void discard_end() noexcept;
 
-private:
-  void _add_rect(float2 left_top, float2 right_bottom, Color color, float thickness) noexcept;
-  void _add_triangle(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
-  void _add_circle(float2 center, float radius, Color color, float thickness) noexcept;
-  void _add_line(float2 p0, float2 p1, Color color, float thickness) noexcept;
-  void _add_arc(float2 center, float2 p0, float2 p1, Color color, float thickness) noexcept;
-  void _add_quad_bezier(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
-  void _add_cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept;
-  void _add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8 alpha, float2 uv0, float2 uv1, float2 uv2, float2 uv3) noexcept;
-  void _add_text(TextParseResultHandle handle, float2 pos, float size, Color inner_color, Color outer_color) noexcept;
-
-  void _path_begin(float2 p0) noexcept;
-  void _add_path_line_to(float2 p) noexcept { if (_points.back() != p) _points.emplace_back(p); }
-  void _add_path_arc_to(float2 center, float2 p1, bool ccw) noexcept;
-  void _add_path_quad_bezier_to(float2 p1, float2 p2) noexcept;
-  void _add_path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept;
-  void _path_end(bool close, Color color, float thickness) noexcept;
-  void _union_beg(uint& idx) noexcept;
-
-  void _add_scissor_rect(Rect rect) noexcept;
-
-  void _discard_beg(uint count, uint& idx) noexcept;
-  void _discard_end() noexcept;
-
-public:
-  void build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept;
   void build_render_cmds() noexcept;
 
   void set_window_pos(float2 pos) noexcept { _window_pos = pos; }
@@ -331,6 +305,31 @@ public:
   auto check()      const noexcept { return _render_cmd_rect_idxs.empty(); }
 
 private:
+  void _add_rect(float2 left_top, float2 right_bottom, Color color, float thickness) noexcept;
+  void _add_triangle(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
+  void _add_circle(float2 center, float radius, Color color, float thickness) noexcept;
+  void _add_line(float2 p0, float2 p1, Color color, float thickness) noexcept;
+  void _add_arc(float2 center, float2 p0, float2 p1, Color color, float thickness) noexcept;
+  void _add_quad_bezier(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
+  void _add_cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept;
+  void _add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8 alpha, float2 uv0, float2 uv1, float2 uv2, float2 uv3) noexcept;
+  void _add_text(TextParseResultHandle handle, float2 pos, float size, Color inner_color, Color outer_color, float outline_width) noexcept;
+
+  void _path_begin(float2 p0) noexcept;
+  void _add_path_line_to(float2 p) noexcept { if (_points.back() != p) _points.emplace_back(p); }
+  void _add_path_arc_to(float2 center, float2 p1, bool ccw) noexcept;
+  void _add_path_quad_bezier_to(float2 p1, float2 p2) noexcept;
+  void _add_path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept;
+  void _path_end(bool close, Color color, float thickness) noexcept;
+  void _union_beg(uint& idx) noexcept;
+
+  void _add_scissor_rect(Rect rect) noexcept;
+
+  void _discard_beg(uint count, uint& idx) noexcept;
+  void _discard_end() noexcept;
+
+  void build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept;
+
   using Vertex = renderer::Vertex;
 
   auto expand_beg(uint vertices_size, uint indices_size) noexcept -> std::pair<Vertex*, uint16*>
@@ -350,7 +349,6 @@ private:
     _index_beg  += _tmp_indices_size;
   }
 
-private:
   auto get_vertices_bound_rect(uint vtx_beg, uint vtx_cnt) const noexcept -> Rect;
   auto get_vertices_bound_rect(uint vtx_beg) const noexcept { return get_vertices_bound_rect(vtx_beg, _vertices.size() - vtx_beg); }
   void add_rect(float2 left_top, float2 right_bottom, Color color = {}) noexcept;
@@ -372,8 +370,6 @@ private:
 
   void path_bezier_quad_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float tess_tol, int level) noexcept;
   void path_bezier_cubic_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float2 p3, float tess_tol, int level) noexcept;
-
-  void set_last_cmd_type(std::optional<RenderCmdType> type) noexcept;
 
 private:
   std::vector<DrawCmd> _draw_cmds;
@@ -418,7 +414,10 @@ private:
   inline static std::array<int, arc_table_size + 16> _circle_segment_counts;
   inline static std::array<float2, arc_table_size>   _arc_vertices;
 
-  std::optional<RenderCmdType> _last_cmd_type;
+  bool  _have_text_cmds{};
+  uint  _text_beg_idx{};
+  Color _text_outer_color{};
+  float _text_outline_width{};
 };
 
 }

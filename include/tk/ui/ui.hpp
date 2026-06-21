@@ -53,6 +53,9 @@ struct Color
       to_u8(a);
   }
 
+  auto operator==(Color col) const noexcept { return r == col.r && g == col.g && b == col.b && a == col.a; }
+  auto operator!=(Color col) const noexcept { return !operator==(col); }
+
   float r{}, g{}, b{}, a{};
 };
 
@@ -223,6 +226,13 @@ enum class FontStyle
   italic_bold,
 };
 
+struct FontConfig
+{
+  FontStyle style{};
+  Color     outer_color;
+  float     outline_width{ 0.15f };
+};
+
 struct TextResult
 {
   float2 extent;
@@ -235,21 +245,10 @@ struct TextResult
  * @param pos left top of text
  * @param size
  * @param color
- * @param style regular(default), italic, bold, italic_bold
+ * @param cfg font config
  * @return text parse result
  */
-auto text(std::string_view text, float2 pos, float size, Color color, FontStyle style = {}) noexcept -> TextResult;
-
-/**
- * draw text
- * @param text
- * @param pos left top of text
- * @param size
- * @param inner_color
- * @param outer_color alpha not 0 then draw outline
- * @return text parse result
- */
-auto text(std::string_view text, float2 pos, float size, Color inner_color, Color outer_color) noexcept -> TextResult;
+auto text(std::string_view text, float2 pos, float size, Color color, FontConfig cfg = {}) noexcept -> TextResult;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Window

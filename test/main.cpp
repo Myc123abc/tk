@@ -479,10 +479,28 @@ int main()
       ui::circle(point_in_circle({ size.x - 30, size.y - 30}, 20, circle_lerplocator.get() * 360), 3, 0xffffffff);
       circle_lerplocator.update();
 
+      auto font_cfg = ui::FontConfig{};
+
       auto text_pos = p2 + float2{ 0, 10 };
-      auto text_res = ui::text("Hello, World!", text_pos, 32, 0xffff00ff);
+      auto text_res = ui::text("Hello, World!", text_pos, 32, 0xffff00ff, font_cfg);
       ui::rectangle(text_pos, text_pos + text_res.extent, 0x00ff00ff, 1);
       ui::line({ text_pos.x, text_pos.y + text_res.ascender }, { text_pos.x + text_res.extent.x, text_pos.y + text_res.ascender }, 0xffff00ff);
+      text_pos.y += text_res.extent.y;
+
+      text_res = ui::text("你好，世界！", text_pos, 32, 0xff00ffff, font_cfg);
+      ui::rectangle(text_pos, text_pos + text_res.extent, 0x00ff00ff, 1);
+      ui::line({ text_pos.x, text_pos.y + text_res.ascender }, { text_pos.x + text_res.extent.x, text_pos.y + text_res.ascender }, 0xffff00ff);
+      text_pos.y += text_res.extent.y;
+
+      text_res = ui::text("こんにちは、世界！", text_pos, 32, 0x00ffffff, font_cfg);
+      ui::rectangle(text_pos, text_pos + text_res.extent, 0x00ff00ff, 1);
+      ui::line({ text_pos.x, text_pos.y + text_res.ascender }, { text_pos.x + text_res.extent.x, text_pos.y + text_res.ascender }, 0xffff00ff);
+      text_pos.y += text_res.extent.y;
+
+      text_res = ui::text("Hello 你好 こんにちは、世界！", text_pos, 32, 0xffffffff, font_cfg);
+      ui::rectangle(text_pos, text_pos + text_res.extent, 0x00ff00ff, 1);
+      ui::line({ text_pos.x, text_pos.y + text_res.ascender }, { text_pos.x + text_res.extent.x, text_pos.y + text_res.ascender }, 0xffff00ff);
+      text_pos.y += text_res.extent.y;
 
       if (ui::button("blur onoff", 50, 50, 50, 50, 0x0000ffff, 0x00ff00ff))
       {

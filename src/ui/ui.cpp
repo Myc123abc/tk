@@ -86,16 +86,11 @@ void load_font(std::string_view path) noexcept
   g_text_engine.load_font(path);
 }
 
-auto text(std::string_view text, float2 pos, float size, Color color, FontStyle style) noexcept -> TextResult
+auto text(std::string_view text, float2 pos, float size, Color color, FontConfig cfg) noexcept -> TextResult
 {
+  if (text.empty()) return {};
   adjust_pos(pos);
-  return g_ui_ctx.text(text, pos, size, color, style, {});
-}
-
-auto text(std::string_view text, float2 pos, float size, Color inner_color, Color outer_color) noexcept -> TextResult
-{
-  adjust_pos(pos);
-  return g_ui_ctx.text(text, pos, size, inner_color, {}, outer_color);
+  return g_ui_ctx.text(text, pos, size, color, cfg);
 }
 
 auto get_cursor_pos() noexcept -> float2

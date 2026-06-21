@@ -10,7 +10,7 @@ void FrameData::add_scissor_rect(Rect rect) noexcept
 
 void FrameData::_add_scissor_rect(Rect rect) noexcept
 {
-  if (_last_cmd_type) push_render_cmd(_last_cmd_type.value());
+  push_render_cmd(RenderCmdType::ui);
 
   for (auto idx : _render_cmd_rect_idxs)
     _render_cmds[idx].scissor_rect = rect;
@@ -28,8 +28,8 @@ void FrameData::_add_image(ImageHandle handle, float2 left_top, float2 right_bot
 {
   assert(!_using_discard_shapes && alpha);
 
-  if (_last_cmd_type)
-    push_render_cmd(_build_mode.contains(BuildMode::discard) ? RenderCmdType::discard_draw_composite : _last_cmd_type.value());
+  auto type = _build_mode.contains(BuildMode::discard) ? RenderCmdType::discard_draw_composite : RenderCmdType::ui;
+  push_render_cmd(type);
 
   auto col = Color{ 1, 1, 1, static_cast<float>(alpha) / 255 }.to_uint();
   auto [vertices, indices] = expand_beg(4, 6);
@@ -45,22 +45,36 @@ void FrameData::_add_image(ImageHandle handle, float2 left_top, float2 right_bot
   indices[5]  = static_cast<uint16>(_vertex_beg + 3);
   expand_end();
 
-  push_render_cmd(_build_mode.contains(BuildMode::discard) ? RenderCmdType::discard_draw_composite : RenderCmdType::ui, handle);
+  push_render_cmd(type, handle);
 }
 
-void FrameData::add_text(TextParseResultHandle handle, float2 pos, float size, Color inner_color, Color outer_color) noexcept
+void FrameData::add_text(TextParseResultHandle handle, float2 pos, float size, Color inner_color, Color outer_color, float outline_width) noexcept
 {
   auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::add_text);
-  cmd.data.add_text = { handle, pos, size, inner_color, outer_color };
+  cmd.data.add_text = { handle, pos, size, inner_color, outer_color, outline_width };
 }
 
-void FrameData::_add_text(TextParseResultHandle handle, float2 pos, float size, Color inner_color, Color outer_color) noexcept
+void FrameData::_add_text(TextParseResultHandle handle, float2 pos, float size, Color inner_color, Color outer_color, float outline_width) noexcept
 {
-  if (_last_cmd_type)
+  // check whether text rendering config is changed
+  if (_have_text_cmds)
   {
-    // TODO: current not use this
-    assert(_last_cmd_type.value() == RenderCmdType::ui);
-    push_render_cmd(_last_cmd_type.value());
+    if (_text_outer_color != outer_color || _text_outline_width != outline_width)
+    {
+      push_render_cmd_text(_text_outer_color, _text_outline_width);
+      _text_beg_idx       = _render_cmds.size();
+      _text_outer_color   = outer_color;
+      _text_outline_width = outline_width;
+    }
+  }
+  else
+  {
+    _have_text_cmds     = true;
+    _text_beg_idx       = _render_cmds.size();
+    _text_outer_color   = outer_color;
+    _text_outline_width = outline_width;
+
+    push_render_cmd(RenderCmdType::ui);
   }
 
   auto const& result = g_text_engine.get_parse_result(handle);
@@ -68,13 +82,17 @@ void FrameData::_add_text(TextParseResultHandle handle, float2 pos, float size, 
   auto cnt = result.advances.size();
   assert(cnt == result.text.size());
 
-  auto const& infos = g_text_engine.get_glyph_infos(result.style);
+  auto const& infos              = g_text_engine.get_glyph_infos(result.style);
+  auto const& missing_glyph_info = g_text_engine.get_missing_glyph_info();
 
   auto [vertices, indices] = expand_beg(4 * cnt, 6 * cnt);
   auto vtx_offset = 0, idx_offset = 0;
   for (auto i = 0; i < cnt; ++i)
   {
-    infos.at(result.text[i]).set_vertices(vertices + vtx_offset, pos, size, result.max_ascender, inner_color);
+    auto const& info = infos.contains(result.text[i])
+      ? infos.at(result.text[i])
+      : missing_glyph_info;
+    info.set_vertices(vertices + vtx_offset, pos, size, result.max_ascender, inner_color);
 
     auto vtx_beg = _vertex_beg + vtx_offset;
     indices[idx_offset + 0] = static_cast<uint16>(vtx_beg + 0);
@@ -89,9 +107,6 @@ void FrameData::_add_text(TextParseResultHandle handle, float2 pos, float size, 
     pos        += result.advances[i];
   }
   expand_end();
-
-  // TODO: maybe run when no new style text
-  push_render_cmd_text(outer_color, .5f);
 }
 
 }

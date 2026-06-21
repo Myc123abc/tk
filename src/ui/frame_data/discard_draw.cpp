@@ -28,8 +28,7 @@ void FrameData::_discard_beg(uint count, uint& idx) noexcept
   _build_mode.add(BuildMode::discard);
 
   // push render cmd before this call
-  // TODO: need be change because text render need outer_color and outline_width as render call constants
-  if (_last_cmd_type) push_render_cmd(_last_cmd_type.value());
+  push_render_cmd(RenderCmdType::ui);
 
   _discard_vtx_beg      = _vertex_beg;
   _using_discard_shapes = true;

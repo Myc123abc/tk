@@ -550,14 +550,14 @@ auto UIContext::image(std::string_view path, float2 left_top, float2 right_botto
   return std::unexpected(res.error());
 }
 
-auto UIContext::text(std::string_view text, float2 pos, float size, Color inner_color, FontStyle style, Color outer_color) noexcept -> TextResult
+auto UIContext::text(std::string_view text, float2 pos, float size, Color inner_color, FontConfig cfg) noexcept -> TextResult
 {
   if (text.empty()) return {};
 
   check_draw();
 
-  auto result_handle = g_text_engine.parse(text, style);
-  frame_data()->add_text(result_handle, pos, size, inner_color, outer_color);
+  auto result_handle = g_text_engine.parse(text, cfg.style);
+  frame_data()->add_text(result_handle, pos, size, inner_color, cfg.outer_color, cfg.outline_width);
 
   auto const& result = g_text_engine.get_parse_result(result_handle);
 

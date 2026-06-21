@@ -212,7 +212,6 @@ void PipelineSystem::Pipeline::init_graphics(PipelineCreateInfo const& info) noe
   stream.PS                    = compile_result.ps;
   stream.RTVFormats            = render_target_formats;
   
-  // TODO: cull mode none only use 2D render now, 3D need to use back cull
   auto rasterizer = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
   rasterizer.DepthClipEnable = false;
   rasterizer.CullMode        = D3D12_CULL_MODE_NONE;

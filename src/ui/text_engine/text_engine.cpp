@@ -289,11 +289,35 @@ auto TextEngine::calc_glyph_pos(float2 extent) noexcept -> std::pair<uint, float
   }
 }
 
+auto TextEngine::get_missing_glyph_info() noexcept -> GlyphInfo const&
+{
+  return _glyph_infos[FontStyle::regular].at(Missing_Glyph_Unicode);
+}
+
 void TextEngine::upload_uncached_glyphs() noexcept
 {
-  if (_uncached_glyphs.empty()) return;
-
   auto& pending_copy_glyphs = _pending_copy_glyphs.data();
+
+  // cache missing glyph
+  if (!_glyph_infos[FontStyle::regular].contains(Missing_Glyph_Unicode))
+  {
+    // copy missing glyph sdf bitmap
+    auto bitmap = SDFBitmap{};
+    bitmap.data.resize(sizeof(Missing_Glyph_SDF_Bitmap));
+    memcpy(bitmap.data.data(), Missing_Glyph_SDF_Bitmap, bitmap.data.size());
+    bitmap.extent      = { Missing_Glyph_Width, Missing_Glyph_Height };
+    bitmap.unicode     = Missing_Glyph_Unicode;
+    bitmap.style       = FontStyle::regular;
+    bitmap.left_offset = Missing_Glyph_Left_Offset;
+    bitmap.up_offset   = Missing_Glyph_Up_Offset;
+
+    // add to pending copy glyphs
+    auto [glyph_atlas_idx, cpy_pos] = calc_glyph_pos({ Missing_Glyph_Width, Missing_Glyph_Height });
+    pending_copy_glyphs[glyph_atlas_idx].emplace_back(std::move(bitmap), cpy_pos);
+  }
+
+  if (pending_copy_glyphs.empty()) return;
+
   for (auto const& [style, infos] : _uncached_glyphs)
   {
     for (auto const& [unicode, pair] : infos)

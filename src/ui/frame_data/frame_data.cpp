@@ -98,41 +98,41 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
 {
   using Type = DrawCmd::Type;
 
+  // push text cmd when text cmd call finish
+  if (_have_text_cmds && cmd.type != Type::add_text)
+  {
+    push_render_cmd_text(_text_outer_color, _text_outline_width);
+    _have_text_cmds = false;
+  }
+
   switch (cmd.type)
   {
   case Type::add_rect:
     _add_rect(cmd.data.add_rect.left_top, cmd.data.add_rect.right_bottom, cmd.data.add_rect.color, cmd.data.add_rect.thickness);
-    set_last_cmd_type(RenderCmdType::ui);
     break;
 
   case Type::add_triangle:
     _add_triangle(cmd.data.add_triangle.p0, cmd.data.add_triangle.p1, cmd.data.add_triangle.p2, cmd.data.add_triangle.color, cmd.data.add_triangle.thickness);
-    set_last_cmd_type(RenderCmdType::ui);
     break;
 
   case Type::add_circle:
     _add_circle(cmd.data.add_circle.center, cmd.data.add_circle.radius, cmd.data.add_circle.color, cmd.data.add_circle.thickness);
-    set_last_cmd_type(RenderCmdType::ui);
     break;
 
   case Type::add_line:
     _add_line(cmd.data.add_line.p0, cmd.data.add_line.p1, cmd.data.add_line.color, cmd.data.add_line.thickness);
-    set_last_cmd_type(RenderCmdType::ui);
     break;
 
   case Type::add_arc:
     _add_arc(cmd.data.add_arc.center, cmd.data.add_arc.p0, cmd.data.add_arc.p1, cmd.data.add_arc.color, cmd.data.add_arc.thickness);
-    set_last_cmd_type(RenderCmdType::ui);
     break;
 
   case Type::add_quad_bezier:
     _add_quad_bezier(cmd.data.add_quad_bezier.p0, cmd.data.add_quad_bezier.p1, cmd.data.add_quad_bezier.p2, cmd.data.add_quad_bezier.color, cmd.data.add_quad_bezier.thickness);
-    set_last_cmd_type(RenderCmdType::ui);
     break;
 
   case Type::add_cubic_bezier:
     _add_cubic_bezier(cmd.data.add_cubic_bezier.p0, cmd.data.add_cubic_bezier.p1, cmd.data.add_cubic_bezier.p2, cmd.data.add_cubic_bezier.p3, cmd.data.add_cubic_bezier.color, cmd.data.add_cubic_bezier.thickness);
-    set_last_cmd_type(RenderCmdType::ui);
     break;
 
   case Type::add_image:
@@ -146,12 +146,10 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
       cmd.data.add_image.uv2,
       cmd.data.add_image.uv3
     );
-    set_last_cmd_type(RenderCmdType::ui);
     break;
 
   case Type::add_text:
-    _add_text(cmd.data.add_text.handle, cmd.data.add_text.pos, cmd.data.add_text.size, cmd.data.add_text.inner_color, cmd.data.add_text.outer_color);
-    set_last_cmd_type(RenderCmdType::text);
+    _add_text(cmd.data.add_text.handle, cmd.data.add_text.pos, cmd.data.add_text.size, cmd.data.add_text.inner_color, cmd.data.add_text.outer_color, cmd.data.add_text.outline_width);
     break;
 
   case Type::path_begin:
@@ -176,7 +174,6 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
 
   case Type::path_end:
     _path_end(cmd.data.path_end.close, cmd.data.path_end.color, cmd.data.path_end.thickness);
-    set_last_cmd_type(RenderCmdType::ui);
     break;
 
   case Type::union_beg:
@@ -184,12 +181,10 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
     break;
 
   case Type::union_end:
-    set_last_cmd_type(RenderCmdType::ui);
     break;
 
   case Type::add_scissor_rect:
     _add_scissor_rect(cmd.data.add_scissor_rect.rect);
-    set_last_cmd_type({});
     break;
 
   case Type::discard_beg:
@@ -198,7 +193,6 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
 
   case Type::discard_end:
     _discard_end();
-    set_last_cmd_type({});
     break;
   }
 }
@@ -207,11 +201,6 @@ void FrameData::build_render_cmds() noexcept
 {
   for (auto idx = 0u; idx < _draw_cmds.size(); ++idx)
     build_render_cmd(_draw_cmds[idx], idx);
-}
-
-void FrameData::set_last_cmd_type(std::optional<RenderCmdType> type) noexcept
-{
-  _last_cmd_type = type;
 }
 
 }
