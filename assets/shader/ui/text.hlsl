@@ -11,7 +11,7 @@ struct PS_Param
 PS_Param vs(VS_Param arg)
 {
   PS_Param res;
-  res.pos       = float4((arg.pos + constants.window_pos) / constants.render_target_extent * float2(2, -2) + float2(-1, 1), 0, 1);
+  res.pos       = float4((arg.pos + constants.window_pos + constants.composite_offset) / constants.render_target_extent * float2(2, -2) + float2(-1, 1), 0, 1);
   res.col       = color(arg.col);
   res.uv        = arg.uv;
   res.image_idx = arg.image_idx;

@@ -29,7 +29,8 @@ enum class RenderCmdType
   clear_discard_image,
   clear_composite_image,
   discard_write,
-  discard_draw_composite,
+  discard_draw_ui_composite,
+  discard_draw_text_composite,
   discard_composite,
 };
 
@@ -355,7 +356,7 @@ private:
 
   void push_render_cmd(RenderCmdType type, ImageHandle image_handle = Write_Image_Handle) noexcept;
   void push_render_cmd_clear_rect(RenderCmdType type, Rect rect = {}) noexcept;
-  void push_render_cmd_text(Color outer_color, float outline_width) noexcept;
+  void push_render_cmd_text(RenderCmdType type, Color outer_color, float outline_width) noexcept;
 
   void add_convex_poly_filled(Color color) noexcept;
   void add_concave_poly_filled(Color color) noexcept;

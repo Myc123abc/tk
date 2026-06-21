@@ -28,7 +28,7 @@ void FrameData::_add_image(ImageHandle handle, float2 left_top, float2 right_bot
 {
   assert(!_using_discard_shapes && alpha);
 
-  auto type = _build_mode.contains(BuildMode::discard) ? RenderCmdType::discard_draw_composite : RenderCmdType::ui;
+  auto type = _build_mode.contains(BuildMode::discard) ? RenderCmdType::discard_draw_ui_composite : RenderCmdType::ui;
   push_render_cmd(type);
 
   auto col = Color{ 1, 1, 1, static_cast<float>(alpha) / 255 }.to_uint();
@@ -61,7 +61,8 @@ void FrameData::_add_text(TextParseResultHandle handle, float2 pos, float size, 
   {
     if (_text_outer_color != outer_color || _text_outline_width != outline_width)
     {
-      push_render_cmd_text(_text_outer_color, _text_outline_width);
+      auto type = _build_mode.contains(BuildMode::discard) ? RenderCmdType::discard_draw_text_composite : RenderCmdType::text;
+      push_render_cmd_text(type, _text_outer_color, _text_outline_width);
       _text_beg_idx       = _render_cmds.size();
       _text_outer_color   = outer_color;
       _text_outline_width = outline_width;
@@ -74,7 +75,7 @@ void FrameData::_add_text(TextParseResultHandle handle, float2 pos, float size, 
     _text_outer_color   = outer_color;
     _text_outline_width = outline_width;
 
-    push_render_cmd(RenderCmdType::ui);
+    push_render_cmd(_build_mode.contains(BuildMode::discard) ? RenderCmdType::discard_draw_ui_composite : RenderCmdType::ui);
   }
 
   auto const& result = g_text_engine.get_parse_result(handle);

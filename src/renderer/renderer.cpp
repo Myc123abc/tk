@@ -201,11 +201,7 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
 
   auto& rt_img = g_img_mgr[res.render_target()];
 
-  auto constants = Constants
-  {
-    .render_target_extent = rt_img.extent(),
-    .window_pos           = frame_data->window_pos(),
-  };
+  auto constants = Constants{};
 
   auto clear_resize_render_target = [this, cmd](ImageHandle& handle, Rect rect)
   {
@@ -251,6 +247,8 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
     switch (render_cmd.type)
     {
     case Type::ui:
+      constants.window_pos       = frame_data->window_pos();
+      constants.composite_offset = {};
       graphics_draw(render_cmd, PipelineType::ui, rt, {}, render_cmd.scissor_rect,
       {
         { "image", g_img_mgr[render_cmd.img].srv().gpu_handle() },
@@ -258,8 +256,10 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
       break;
 
     case Type::text:
-      constants.outer_color   = render_cmd.text.outer_color;
-      constants.outline_width = render_cmd.text.outline_width;
+      constants.window_pos       = frame_data->window_pos();
+      constants.composite_offset = {};
+      constants.outer_color      = render_cmd.text.outer_color;
+      constants.outline_width    = render_cmd.text.outline_width;
       graphics_draw(render_cmd, PipelineType::text, rt, {}, render_cmd.scissor_rect,
       {
         { "images", g_desc_heap_mgr.first_gpu_handle(DescriptorHeapType::cbv_srv_uav) },
@@ -281,11 +281,23 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
       graphics_draw(render_cmd, PipelineType::mask_write_max, _discard_image, {}, { 0, 0, discard_mask_rc.extent() });
       break;
 
-    case Type::discard_draw_composite:
+    case Type::discard_draw_ui_composite:
+      constants.window_pos       = {};
       constants.composite_offset = -discard_composite_rc.pos();
-      graphics_draw(render_cmd, PipelineType::composite_write, _composite_image, {}, { 0, 0, discard_composite_rc.extent() },
+      graphics_draw(render_cmd, PipelineType::ui, _composite_image, {}, { 0, 0, discard_composite_rc.extent() },
       {
         { "image", g_img_mgr[render_cmd.img].srv().gpu_handle() },
+      });
+      break;
+
+    case Type::discard_draw_text_composite:
+      constants.window_pos       = {};
+      constants.composite_offset = -discard_composite_rc.pos();
+      constants.outer_color      = render_cmd.text.outer_color;
+      constants.outline_width    = render_cmd.text.outline_width;
+      graphics_draw(render_cmd, PipelineType::text, _composite_image, {}, { 0, 0, discard_composite_rc.extent() },
+      {
+        { "images", g_desc_heap_mgr.first_gpu_handle(DescriptorHeapType::cbv_srv_uav) },
       });
       break;
 
@@ -294,6 +306,7 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
       auto& discard_img   = g_img_mgr[_discard_image];
       auto& composite_img = g_img_mgr[_composite_image];
 
+      constants.window_pos       = frame_data->window_pos();
       constants.mask_offset      = -discard_mask_rc.pos();
       constants.mask_extent      = discard_img.extent();
       constants.composite_offset = -discard_composite_rc.pos();

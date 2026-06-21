@@ -53,7 +53,7 @@ void FrameData::_discard_end() noexcept
 
   auto rc = get_vertices_bound_rect(_discard_vtx_beg);
   _render_cmds[_clear_composite_image_cmd_idx].clear_rect = rc;
-  push_render_cmd(RenderCmdType::discard_draw_composite);
+  push_render_cmd(RenderCmdType::discard_draw_ui_composite);
   add_rect({ rc.left, rc.top }, { rc.right, rc.bottom });
   push_render_cmd(RenderCmdType::discard_composite);
 

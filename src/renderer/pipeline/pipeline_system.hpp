@@ -21,8 +21,6 @@ enum class PipelineType
   mask_write_max,
   mask_write_add,
 
-  composite_write,
-
   discard_draw,
 
   mipmap,

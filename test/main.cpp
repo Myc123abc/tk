@@ -467,11 +467,12 @@ int main()
 
       static auto blur_img_2 = false;
 
-      ui::discard_beg([]{ ui::circle({50,50}, 50); });
+      ui::discard_beg([]{ ui::circle({ 50, 50 }, 50); });
       if (blur_img_2)
         res = image(img1, {}, wnd_ext, 0x44, ui::ImageConfig::blur(5, 5));
       else
         res = image(img1, {}, wnd_ext, 0x44);
+      ui::rectangle({ 50, 50 }, { 100, 100 }, 0x00ff00ff);
       ui::discard_end();
 
       // circle point
@@ -497,12 +498,14 @@ int main()
       ui::line({ text_pos.x, text_pos.y + text_res.ascender }, { text_pos.x + text_res.extent.x, text_pos.y + text_res.ascender }, 0xffff00ff);
       text_pos.y += text_res.extent.y;
 
+      ui::discard_beg([&] { ui::rectangle(text_pos + float2{ 30, 0 }, text_pos + float2{ 80, 50 }); });
       text_res = ui::text("Hello 你好 こんにちは、世界！", text_pos, 32, 0xffffffff, font_cfg);
       ui::rectangle(text_pos, text_pos + text_res.extent, 0x00ff00ff, 1);
       ui::line({ text_pos.x, text_pos.y + text_res.ascender }, { text_pos.x + text_res.extent.x, text_pos.y + text_res.ascender }, 0xffff00ff);
       text_pos.y += text_res.extent.y;
+      ui::discard_end();
 
-      if (ui::button("blur onoff", 50, 50, 50, 50, 0x0000ffff, 0x00ff00ff))
+      if (ui::button("blur onoff", 100, 100, 50, 50, 0x0000ffff, 0x00ff00ff))
       {
         if (cfg.backdrop.style == ui::BackdropStyle::blur)
           cfg.backdrop.default_acrylic();

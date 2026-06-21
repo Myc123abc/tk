@@ -75,16 +75,6 @@ void PipelineSystem::init() noexcept
     .root_sign = ui_res,
   },
   {
-    .type      = PipelineType::composite_write,
-    .shader    = "assets/shader/ui/composite_write.hlsl",
-    .vs        = "vs",
-    .ps        = "ps",
-    .includes  = { "assets/shader/ui" },
-    .rt_fmt    = RenderResource::Render_Target_Format,
-    .blend     = BlendState::Default(),
-    .root_sign = ui_res,
-  },
-  {
     .type      = PipelineType::window_shadow,
     .shader    = "assets/shader/ui/window_shadow.hlsl",
     .vs        = "vs",
