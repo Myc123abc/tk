@@ -99,10 +99,7 @@ void DescriptorHeapManager::DescriptorHeap::reserve(uint capacity) noexcept
     auto size = _handles.size();
 
     // destroy old heap
-    g_renderer.add_frame_render_complete_func([_ = _heap] {},
-      _type == DescriptorHeapType::cbv_srv_uav
-        ? EngineType::graphics | EngineType::compute
-        : EngineType::graphics);
+    g_renderer.add_frame_render_complete_func([_ = _heap] {});
 
     // create new bigger one
     auto heap_desc = D3D12_DESCRIPTOR_HEAP_DESC{};

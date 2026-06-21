@@ -2,6 +2,7 @@
 #include "util/error_handling.hpp"
 #include "../../renderer/resource/image_manager.hpp"
 #include "missing-glyph-sdf-bitmap.hpp"
+#include "../../util/file_manager.hpp"
 #include "../../renderer/engine/copy_engine.hpp"
 
 #include <hb-ft.h>
@@ -15,17 +16,20 @@ using namespace tk::renderer;
 
 namespace tk::ui {
 
-void Font::init(std::string_view path) noexcept
+auto Font::init(std::string_view path) noexcept -> uint8
 {
   _name = path;
 
-  check(FT_New_Face(g_text_engine._ft, path.data(), 0, &_face), "failed to load font");
-  check(FT_Set_Pixel_Sizes(_face, 0, FT_Pixel_Size), "failed to set pixel size");
+  auto res = FT_New_Face(g_text_engine._ft, path.data(), 0, &_face);
+  if (res) return res;
+  res = FT_Set_Pixel_Sizes(_face, 0, FT_Pixel_Size);
+  if (res) return res;
 
   _hb_font = hb_ft_font_create(_face, nullptr);
 
   _ascender = static_cast<float>(_face->ascender) * FT_Pixel_Size / _face->units_per_EM;
   _height   = static_cast<float>(_face->height)   * FT_Pixel_Size / _face->units_per_EM;
+  _family   = _face->family_name;
 
   using enum FontStyle;
   switch (_face->style_flags)
@@ -43,6 +47,8 @@ void Font::init(std::string_view path) noexcept
     _style = regular;
     break;
   }
+
+  return res;
 }
 
 void Font::destroy() const noexcept
@@ -56,6 +62,7 @@ auto Font::generate_sdf_bitmap(uint glyph_idx, uint unicode, FontStyle style) co
   assert(glyph_idx);
   check(FT_Load_Glyph(_face, glyph_idx, FT_LOAD_RENDER), "failed to load glyph with render");
   auto glyph = _face->glyph;
+  check(FT_Render_Glyph(glyph, FT_RENDER_MODE_NORMAL), "failed to render bitmap");
   check(FT_Render_Glyph(glyph, FT_RENDER_MODE_SDF), "failed to render sdf bitmap");
   auto ft_bitmap = _face->glyph->bitmap;
   auto bitmap = SDFBitmap{};
@@ -91,34 +98,48 @@ void TextEngine::destroy() noexcept
 
   hb_buffer_destroy(_hb_buf);
   check(FT_Done_FreeType(_ft), "failed to destroy freetype");
+
+  assert(_discard_text_parse_result_handles.empty());
 }
 
-void TextEngine::load_font(std::string_view path) noexcept
+auto TextEngine::load_font(std::string_view path) noexcept -> std::expected<FontInfo, FontLoadErrorType>
 {
-  if (std::ranges::any_of(_fonts | std::views::values | std::views::join, [&](auto const& font) { return font.name() == path; }))
-  {
-    warn("[TextEngine] font {} is already loaded", path);
-    return;
-  }
+  // check whether already loaded
+  auto fonts = _fonts | std::views::values | std::views::join;
+  if (auto it = std::ranges::find_if(fonts, [&](auto const& font) { return font.name() == path; });
+      it != fonts.end())
+    return FontInfo{ it->_family, it->_style };
+
+  // check whether exist
+  if (!g_file_mgr.exists(path)) return std::unexpected(FontLoadError::unexist{});
   
   // create font
   auto font = Font{};
-  font.init(path);
+  if (auto res = font.init(path); res) return std::unexpected(FontLoadError::freetype_err{ res });
+  auto info = FontInfo{ font._family, font._style };
   _fonts[font.style()].emplace_back(std::move(font));
 
   // clear missing glyphs and cached text advances
-  _missing_glyphs.clear();
+  _missing_glyphs[font.style()].clear();
   for (auto const& [style, text] : _cached_texts_with_missing_glyphs)
   {
-    auto& h = _cached_text_parse_results[style][text.data()];
+    auto h = _cached_text_parse_results[style][text.data()];
     assert(h.valid());
-    _parse_result_pool.free(h);
+    _discard_text_parse_result_handles.emplace_back(h);
     _cached_text_parse_results[style].erase(text);
   }
   _cached_texts_with_missing_glyphs.clear();
+
+  return info;
 }
 
-auto TextEngine::parse(std::string_view text, FontStyle style) noexcept -> TextParseResultHandle
+void TextEngine::clear_discard_text_parse_results() noexcept
+{
+  for (auto h : _discard_text_parse_result_handles) _parse_result_pool.free(h);
+  _discard_text_parse_result_handles.clear();
+}
+
+auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view family) noexcept -> TextParseResultHandle
 {
   assert(!text.empty());
 
@@ -148,7 +169,12 @@ auto TextEngine::parse(std::string_view text, FontStyle style) noexcept -> TextP
 
       auto glyph_positions = hb_buffer_get_glyph_positions(_hb_buf, nullptr);
       for (auto i = 0; i < text.size(); ++i)
-        res.advances.emplace_back(static_cast<float>(glyph_positions[i].x_advance) / 64, static_cast<float>(glyph_positions[i].y_advance) / 64);
+      {
+        auto x = static_cast<float>(glyph_positions[i].x_advance) / 64;
+        auto y = static_cast<float>(glyph_positions[i].y_advance) / 64;
+        res.advances.emplace_back(x, y);
+        res.extent.x += x;
+      }
     }
     // if not have font, the text is missing glyphs
     else
@@ -157,6 +183,7 @@ auto TextEngine::parse(std::string_view text, FontStyle style) noexcept -> TextP
       static auto missing_glyph_position_info = float2{ Missing_Glyph_Advance_X * Missing_Glyph_Size / FT_Pixel_Size,
                                                         Missing_Glyph_Advance_Y * Missing_Glyph_Size / FT_Pixel_Size };
       res.advances.resize(res.advances.size() + text.size(), missing_glyph_position_info);
+      res.extent.x += res.advances.size() * missing_glyph_position_info.x;
     }
   }
 
@@ -169,8 +196,8 @@ auto TextEngine::parse(std::string_view text, FontStyle style) noexcept -> TextP
     _max_height   = std::max(_max_height, Missing_Glyph_Font_Height);
   }
 
-  res.max_ascender = _max_ascender;
-  res.max_height   = _max_height;
+  res.ascender = _max_ascender;
+  res.extent.y = _max_height;
 
   // cached calculate result
   assert(!cached_text_parse_result[text.data()].valid());
@@ -316,7 +343,7 @@ void TextEngine::upload_uncached_glyphs() noexcept
     pending_copy_glyphs[glyph_atlas_idx].emplace_back(std::move(bitmap), cpy_pos);
   }
 
-  if (pending_copy_glyphs.empty()) return;
+  if (_uncached_glyphs.empty()) return;
 
   for (auto const& [style, infos] : _uncached_glyphs)
   {

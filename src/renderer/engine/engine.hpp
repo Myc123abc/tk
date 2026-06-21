@@ -32,6 +32,8 @@ public:
 
   auto set_event_on_completion() const noexcept -> HANDLE;
 
+  void wait_idle() noexcept;
+
   void destroy() noexcept;
 
   auto reset_cmd(ID3D12CommandAllocator* alloc) const noexcept { return g_cmd_pool.reinit(_cmd, alloc); }

@@ -49,7 +49,7 @@ public:
   auto get(ImageHandle handle) noexcept { return _pool.get(handle); }
 
   auto extent(std::string_view path) noexcept -> float2;
-  auto try_load(std::string_view path, uint w, uint h) noexcept -> std::expected<ImageHandle, ui::ImageLoadError::Type>;
+  auto try_load(std::string_view path, uint w, uint h) noexcept -> std::expected<ImageHandle, ui::ImageLoadErrorType>;
   void update() noexcept;
 
   auto blur(ImageHandle handle, float2 ext, float sigma, uint cnt) noexcept -> ImageHandle;

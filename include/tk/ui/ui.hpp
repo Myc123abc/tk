@@ -3,11 +3,13 @@
 #include "../util/flag.hpp"
 #include "../util/base.hpp"
 #include "../util/variant.hpp"
+#include "color.hpp"
 #include "tween.hpp"
+#include "widget.hpp"
 
 #include <windows.h>
 
-#include <string_view>
+#include <string>
 #include <optional>
 #include <expected>
 
@@ -16,48 +18,6 @@ namespace tk::ui {
 ////////////////////////////////////////////////////////////////////////////////
 ///                                Misc
 ////////////////////////////////////////////////////////////////////////////////
-
-struct Color
-{
-  Color() = default;
-
-  inline static constexpr auto inv_255 = 1.f / 255;
-
-  Color(uint color) noexcept
-  {
-    r = static_cast<float>((color >> 24) & 0xFF) * inv_255;
-    g = static_cast<float>((color >> 16) & 0xFF) * inv_255;
-    b = static_cast<float>((color >> 8 ) & 0xFF) * inv_255;
-    a = static_cast<float>((color      ) & 0xFF) * inv_255;
-  }
-
-  Color(float4 color) noexcept
-    : r(color.x), g(color.y), b(color.z), a(color.w) {}
-
-  Color(float r, float g, float b, float a) noexcept
-    : r(r), g(g), b(b), a(a) {}
-
-  operator float4() const noexcept { return { r, g, b, a }; }
-
-  auto to_uint() const noexcept -> uint
-  {
-    auto to_u8 = [](float x) noexcept -> uint
-    {
-      x = std::clamp(x, 0.f, 1.f);
-      return std::lround(x * 255);
-    };
-   return
-      to_u8(r) << 24 |
-      to_u8(g) << 16 |
-      to_u8(b) <<  8 |
-      to_u8(a);
-  }
-
-  auto operator==(Color col) const noexcept { return r == col.r && g == col.g && b == col.b && a == col.a; }
-  auto operator!=(Color col) const noexcept { return !operator==(col); }
-
-  float r{}, g{}, b{}, a{};
-};
 
 /**
  * get lerp color
@@ -145,23 +105,25 @@ using BackdropStyle = WindowConfig::BlurBackdrop::Style;
  * get a lerp value in ping pong
  * @param name unique global name
  * @param b drive boolean value
- * @param duration duration (us)
+ * @param forward_dur duration (us)
+ * @param reverse_dur duration (us)
  * @param ease ease funcation for tween
  * @return lerp value (0.0 ~ 1.0)
  */
-auto ping_pong(std::string_view name, bool b, double duration, Tween::Ease ease = Tween::linear) noexcept -> double;
-
-/**
- * get cursor position
- * @return cursor position
- */
-auto get_cursor_pos() noexcept -> float2;
+auto ping_pong(std::string_view name, bool b, double forward_dur, double reverse_dur, Tween::Ease ease = Tween::linear) noexcept -> double;
+inline auto ping_pong(std::string_view name, bool b, double duration, Tween::Ease ease = Tween::linear) noexcept { return ping_pong(name, b, duration, duration, ease); }
 
 /**
  * reset tween
  * @param name name of tween
  */
 void reset_tween(std::string_view name) noexcept;
+
+/**
+ * get cursor position
+ * @return cursor position
+ */
+auto get_cursor_pos() noexcept -> float2;
 
 /**
  * get extent of image
@@ -171,6 +133,7 @@ void reset_tween(std::string_view name) noexcept;
 auto image_extent(std::string_view path) noexcept -> float2;
 
 namespace ImageLoadError {
+
 struct unexist{};
 struct loading{};
 struct decode_failed{ std::string_view msg; };
@@ -180,7 +143,10 @@ using Type = Variant<
   loading,
   decode_failed
 >;
+
 }
+
+using ImageLoadErrorType = ImageLoadError::Type;
 
 struct ImageConfig
 {
@@ -203,20 +169,14 @@ struct ImageConfig
  * @param cfg can use for blur image
  * @return false if image is unexist, or loading, or load failed
  */
-auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha = 0xff, std::optional<ImageConfig> cfg = {}) noexcept -> std::expected<void, ImageLoadError::Type>;
+auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha = 0xff, std::optional<ImageConfig> cfg = {}) noexcept -> std::expected<void, ImageLoadErrorType>;
 
 /**
  * load image
  * @param path
  * @return false if image is unexist, or loading, or load failed
  */
-auto load_image(std::string_view path) noexcept -> std::expected<void, ImageLoadError::Type>;
-
-/**
- * load font
- * @param path
- */
-void load_font(std::string_view path) noexcept;
+auto load_image(std::string_view path) noexcept -> std::expected<void, ImageLoadErrorType>;
 
 enum class FontStyle
 {
@@ -226,11 +186,37 @@ enum class FontStyle
   italic_bold,
 };
 
-struct FontConfig
+struct FontInfo
 {
-  FontStyle style{};
-  Color     outer_color;
-  float     outline_width{ 0.15f };
+  std::string family;
+  FontStyle   style;
+};
+
+namespace FontLoadError {
+
+struct unexist {};
+struct freetype_err { uint8 code{}; };
+
+using Type = Variant<unexist, freetype_err>;
+
+}
+
+using FontLoadErrorType = FontLoadError::Type;
+
+/**
+ * load font
+ * @param path
+ * @return font info
+ */
+auto load_font(std::string_view path) noexcept -> std::expected<FontInfo, FontLoadErrorType>;
+
+struct TextConfig
+{
+  std::string_view family;
+  FontStyle        style{};
+  Color            outer_color;
+  float            outline_width{ 0.15f };
+  bool             pos_as_baseline{};
 };
 
 struct TextResult
@@ -245,10 +231,19 @@ struct TextResult
  * @param pos left top of text
  * @param size
  * @param color
- * @param cfg font config
+ * @param cfg text config
  * @return text parse result
  */
-auto text(std::string_view text, float2 pos, float size, Color color, FontConfig cfg = {}) noexcept -> TextResult;
+auto text(std::string_view text, float2 pos, float size, Color color, TextConfig cfg = {}) noexcept -> TextResult;
+
+/**
+ * get parse result of text with sepcific config
+ * @param text
+ * @param size
+ * @param cfg text config
+ * @return text parse result
+ */
+auto text(std::string_view text, float size, TextConfig cfg = {}) noexcept -> TextResult;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Window
@@ -447,87 +442,6 @@ void union_beg() noexcept;
  * @param thickness
  */
 void union_end(Color color = {}, float thickness = {}) noexcept;
-
-////////////////////////////////////////////////////////////////////////////////
-///                               Widget
-////////////////////////////////////////////////////////////////////////////////
-
-struct ButtonState
-{
-  bool clicked{};
-  bool hovered{};
-  bool move_out{};
-
-  constexpr operator bool() const noexcept
-  {
-    return clicked;
-  }  
-};
-
-/**
- * a button feature can custom shape
- * @param name name cannot be duplicate in the window
- * @param x
- * @param y
- * @param width
- * @param height
- * @return button state
- */
-auto button(std::string_view name, float x, float y, uint width, uint height) noexcept-> ButtonState;
-
-/**
- * normal button
- * @param name name cannot be duplicate in the window
- * @param x
- * @param y
- * @param width
- * @param height
- * @param button_color
- * @param button_hover_color
- * @return button state
- */
-auto button(
-  std::string_view name,
-  float            x,
-  float            y,
-  uint             width,
-  uint             height,
-  Color            button_color,
-  Color            button_hover_color) noexcept-> ButtonState;
-
-/**
- * draw a button, can draw an icon in the center of button
- * default have a color lerp animation when cursor hover on button and leave on it
- * @param name name cannot be duplicate in the window
- * @param x
- * @param y
- * @param width
- * @param height
- * @param button_color
- * @param button_hover_color
- * @param mouse_down_color
- * @param icon_update_func the function be called for draw icon by ui draw api,
- *                         Color is used for icon color lerp changed,
- * @param icon_width
- * @param icon_height
- * @param icon_color
- * @param icon_hover_color
- * @return button state
- */
-auto button(
-  std::string_view                               name,
-  float                                          x,
-  float                                          y,
-  uint                                           width,
-  uint                                           height,
-  Color                                          button_color,
-  Color                                          button_hover_color,
-  std::optional<Color>                           mouse_down_color,
-  std::function<void(uint, uint, Color)>         icon_update_func,
-  uint                                           icon_width,
-  uint                                           icon_height,
-  Color                                          icon_color,
-  Color                                          icon_hover_color) noexcept-> ButtonState;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                               Key

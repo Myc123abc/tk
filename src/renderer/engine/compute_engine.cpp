@@ -79,7 +79,7 @@ void ComputeEngine::update() noexcept
     g_renderer.add_frame_render_complete_func([this, handles = std::move(_mipmap_images)]
     {
       for (auto const& handle : handles) g_img_mgr[handle].release_mipmap_descs();
-    }, EngineType::compute);
+    });
 
   // mark tmp images are used finish after blur process is completely
   if (!_blur_imgs.empty())
@@ -90,7 +90,7 @@ void ComputeEngine::update() noexcept
     g_renderer.add_frame_render_complete_func([tmp_imgs = std::move(tmp_imgs)]
     {
       for (auto h : tmp_imgs) g_img_mgr.tmp_img_used_finish(h);
-    }, EngineType::compute);
+    });
     _blur_imgs.clear();
   }
 }

@@ -53,7 +53,7 @@ class Font
 {
   friend class TextEngine;
 public:
-  void init(std::string_view path) noexcept;
+  auto init(std::string_view path) noexcept -> uint8;
   void destroy() const noexcept;
 
   auto name()  const noexcept { return _name;  }
@@ -68,6 +68,7 @@ public:
 
 private:
   std::string _name;
+  std::string _family;
   FontStyle   _style;
   FT_Face     _face{};
   hb_font_t*  _hb_font{};
@@ -114,13 +115,13 @@ public:
   void init() noexcept;
   void destroy() noexcept;
 
-  void load_font(std::string_view path) noexcept;
+  auto load_font(std::string_view path) noexcept -> std::expected<FontInfo, FontLoadErrorType>;
 
   struct ParseResult
   {
     std::vector<float2> advances;
-    float               max_ascender{};
-    float               max_height{};
+    float2              extent;
+    float               ascender{};
     std::u32string      text;
     FontStyle           style;
 
@@ -128,7 +129,7 @@ public:
   };
   using ParseResultPool       = ObjectPool<ParseResult>;
   using TextParseResultHandle = ParseResultPool::Handle;
-  auto parse(std::string_view text, FontStyle style) noexcept -> TextParseResultHandle;
+  auto parse(std::string_view text, FontStyle style, std::string_view family) noexcept -> TextParseResultHandle;
   auto& get_parse_result(TextParseResultHandle handle) const noexcept { return _parse_result_pool[handle]; }
 
   void upload_uncached_glyphs() noexcept;
@@ -137,6 +138,8 @@ public:
 
   auto const& get_glyph_infos(FontStyle style) noexcept { return _glyph_infos[style]; }
   auto get_missing_glyph_info() noexcept -> GlyphInfo const&;
+
+  void clear_discard_text_parse_results() noexcept;
 
 private:
   auto split_text(std::u32string_view text, FontStyle style) noexcept -> std::vector<std::pair<std::u32string_view, Font*>>;
@@ -171,6 +174,7 @@ private:
   FontStyleMap<std::unordered_set<uint>>           _missing_glyphs;
   FontStyleMap<UnicodeMap<GlyphInfo>>              _glyph_infos;
   FontStyleMap<UnicodeMap<std::pair<Font*, uint>>> _uncached_glyphs;
+  std::vector<TextParseResultHandle>               _discard_text_parse_result_handles;
   
   using PendingCopyGlyphsInfoType = std::unordered_map<uint, std::vector<std::pair<SDFBitmap, float2>>>;
   DoubleBuffer<PendingCopyGlyphsInfoType> _pending_copy_glyphs;

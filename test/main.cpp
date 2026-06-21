@@ -1,4 +1,9 @@
 #include "tk/tk.hpp"
+#include "fps.hpp"
+#include "playback_btn.hpp"
+
+#include <string>
+#include <span>
 
 using namespace tk;
 
@@ -7,122 +12,6 @@ auto point_in_circle(float2 center, float radius, float theta) noexcept -> float
   auto a = radians(theta);
   return { center.x + radius * std::cos(a), center.y + radius * std::sin(a) };
 }
-
-class PlaybackButton
-{
-public:
-  void init(std::string_view name) noexcept
-  {
-    _name = name;
-    _lerp_name = std::string(name) + "lerp value";
-  }
-
-  auto operator()(float2 p0, float2 p1, float2 p2, ui::Color color, ui::Color hovered_color, float thickness) noexcept -> bool
-  {
-    auto width  = p1.x - p0.x;
-    auto height = p2.y - p0.y;
-    auto [clicked, hovered, _] = ui::button(_name, p0.x, p0.y, width, height);
-    if (hovered) color = hovered_color;
-
-    if (clicked) _paused = !_paused;
-    auto v = ui::ping_pong(_lerp_name, !_paused, 100'000);
-
-    _lerp_pts = std::vector<LerpPoint>
-    {
-      //         playback button                    pause button
-      { p0,                                p0,                              },
-      { p0 + float2(width / 2,  height / 4), p0 + float2( width / 3, 0)         },
-      { p2 + float2(width / 2, -height / 4), p2 + float2( width / 3, 0)         },
-      { p2,                                p2,                              },
-      { p0 + float2(width / 2,  height / 4), { p1.x - width / 3, p0.y },      },
-      { p1,                                { p1.x, p0.y },                  },
-      { p1,                                { p1.x, p2.y },                  },
-      { p2 + float2(width / 2, -height / 4), { p1.x - width / 3, p2.y },      },
-      { p1,                                p0 + float2(width / 3, height / 2) },
-      { { p0.x, p1.y },                    { p1.x - width / 3, p1.y },      },
-    };
-
-    _pts.clear();
-    for (auto const& pt : _lerp_pts)
-      _pts.emplace_back(ui::lerp(pt.p0, pt.p1, v));
-
-    ui::union_beg();
-
-    ui::path_begin(_pts[0]);
-    ui::path_line_to(_pts[1]);
-    ui::path_quad_bezier_to(_pts[8], _pts[2]);
-    ui::path_line_to(_pts[3]);
-    ui::path_end();
-
-    ui::path_begin(_pts[7]);
-    ui::path_quad_bezier_to(_pts[9], _pts[4]);
-    ui::path_line_to(_pts[5]);
-    if (_pts[6] != _pts[5])
-      ui::path_line_to(_pts[6]);
-    ui::path_end();
-
-    ui::union_end(color, thickness);
-
-    return clicked;
-  }
-
-  void pause() noexcept { _paused = true;  }
-  void play()  noexcept { _paused = false; }
-
-  void reset() noexcept
-  {
-    _paused = true;
-    ui::reset_tween(_lerp_name);
-  }
-
-  auto is_paused() const noexcept { return _paused; }
-
-private:
-  struct LerpPoint
-  {
-    float2 p0{};
-    float2 p1{};
-  };
-
-  std::string            _name;
-  std::string            _lerp_name;
-  std::vector<LerpPoint> _lerp_pts;
-  std::vector<float2>    _pts{};
-  bool                   _paused{ true };
-};
-
-struct FrameRate
-{
-  float deltas[60]{};
-  uint  idx{};
-  float accum{};
-  uint  cnt{};
-  float fps{};
-
-  void update() noexcept
-  {
-    // delta unit change to sec
-    auto delta = ui::delta_time() / 1000'000;
-
-    // calc accum
-    accum += delta - deltas[idx];
-
-    // store delta
-    deltas[idx] = delta;
-
-    // move to next
-    idx = (idx + 1) % _countof(deltas);
-
-    // get delta cnt
-    cnt = std::min(cnt + 1, static_cast<uint>(_countof(deltas)));
-
-    // calc fps
-    fps = accum > 0.f ? 1.f / (accum / cnt) : std::numeric_limits<float>::max();
-  }
-
-  auto get() const noexcept { return fps; }
-
-} fps;
 
 void circle_draw_test() noexcept
 {
@@ -273,7 +162,7 @@ inline auto img2 = "assets/image/test.png";
 
 void test_discard(uint fmt) noexcept
 {
-  auto _ = std::expected<void, ui::ImageLoadError::Type>{};
+  auto _ = std::expected<void, ui::ImageLoadErrorType>{};
   ui::discard_beg([]{ ui::circle({ 50, 50 }, 25); });
   auto r = fmt % 7;
   switch (r)
@@ -326,17 +215,153 @@ auto load_image(std::string_view path) noexcept
     );
 }
 
-auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha = 0xff) noexcept -> std::expected<void, ui::ImageLoadError::Type>
+auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha = 0xff) noexcept -> std::expected<void, ui::ImageLoadErrorType>
 {
-  return ui::image(path, left_top, right_bottom, alpha).or_else([&](ui::ImageLoadError::Type err)
+  return ui::image(path, left_top, right_bottom, alpha).or_else([&](ui::ImageLoadErrorType err)
   {
     err.visit(
       [&](ui::ImageLoadError::loading) { info("loading {}", path); },
       [&](ui::ImageLoadError::unexist) { warn("unexist image {}", path); },
       [&](ui::ImageLoadError::decode_failed const& err) { warn("decode failed of image {} : {}", path, err.msg); }
     );
-    return std::expected<void, ui::ImageLoadError::Type>{ std::unexpected(err) };
+    return std::expected<void, ui::ImageLoadErrorType>{ std::unexpected(err) };
   });
+}
+
+auto fonts = std::vector<ui::FontInfo>{};
+
+void load_font(std::string_view path) noexcept
+{
+  auto res = ui::load_font(path);
+  if (!res.has_value())
+  {
+    res.error().visit(
+      [&](ui::FontLoadError::unexist) { warn("failed to load font {}", path); },
+      [&](ui::FontLoadError::freetype_err err) { warn("failed to load font {}, freetype error {}", path, err.code); }
+    );
+  }
+  else
+    fonts.emplace_back(res.value());
+}
+
+/*
+TODO:
+1. font-select text rendering
+2. vertical text rendering
+3. rotate rendering
+*/
+
+struct ButtonConfig
+{
+  std::string_view text;
+  float            text_size{};
+  ui::Color        text_color{};
+  float4           padding{};
+
+  ui::Color        button_color{};
+  ui::Color        hover_color{};
+  ui::Color        click_color{};
+};
+
+auto button(std::string_view name, float2 pos, float width, float height, ButtonConfig const& cfg) noexcept
+{
+  auto text_res = ui::text(cfg.text, cfg.text_size);
+  auto res = button(name, pos.x, pos.y, width + cfg.padding.x + cfg.padding.z, (height ? height : text_res.extent.y) + cfg.padding.y + cfg.padding.w,
+    cfg.button_color, cfg.hover_color, cfg.click_color);
+  ui::text(cfg.text, pos + float2{ cfg.padding.x, cfg.padding.y }, cfg.text_size, cfg.text_color);
+  return res;
+}
+
+struct SelectList_State
+{
+  float2 extent;
+  int    idx{ -1 };
+};
+
+struct SelectListConfig
+{
+  float     size{};
+  float     width{};
+  ui::Color border_color;
+  float4    padding{};
+
+  ui::Color button_color;
+  ui::Color hover_color;
+  ui::Color click_color;
+  ui::Color text_color;
+};
+
+auto select_list(std::string_view name, float2 pos, std::span<std::string_view> items, SelectListConfig const& cfg) noexcept
+{
+  auto id_name = "tk::ui::select_list::";
+
+  // calc max width
+  auto max_width = 0.f;
+  for (auto i = 0; i < items.size(); ++i)
+  {
+    auto ext = ui::text(items[i], cfg.size).extent;
+    if (!cfg.width)
+      max_width = std::max(max_width, ext.x);
+  }
+  if (cfg.width) max_width = cfg.width;
+
+  // render buttons
+  auto pos_y = pos.y;
+  for (auto i = 0; i < items.size(); ++i)
+  {
+    auto ext = ui::text(items[i], cfg.size).extent;
+    auto btn_cfg = ButtonConfig
+    {
+      .text         = items[i],
+      .text_size    = cfg.size,
+      .text_color   = cfg.text_color,
+      .padding      = cfg.padding,
+      .button_color = cfg.button_color,
+      .hover_color  = cfg.hover_color,
+      .click_color  = cfg.click_color,
+    };
+    button(id_name + std::string(name) + std::to_string(i), { pos.x, pos_y }, max_width, 0, btn_cfg);
+    pos_y += ext.y + cfg.padding.y + cfg.padding.w;
+  }
+
+  // render border
+  if (cfg.border_color.a)
+    ui::rectangle(pos, float2{ pos.x + max_width + cfg.padding.x + cfg.padding.z, pos_y }, cfg.border_color, 1);
+}
+
+void select_font() noexcept
+{
+  auto sl_cfg = SelectListConfig
+  {
+    .size         = 12,
+    .width        = 140,
+    .border_color = 0xe1e4e8ff,
+    .padding      = { 8, 3, 0, 3 },
+
+    .button_color = 0xf6f8faff,
+    .hover_color  = 0xebf0f4ff,
+    .click_color  = 0xe2e5e9ff,
+    .text_color   = 0x000000ff,
+  };
+  auto items = std::vector<std::string_view>{
+    "一覧", // TODO: sdf render not good on px size 12 in this glyph
+    "により",
+    "三回",
+    "asd",
+    "bveqw",
+    "qwv",
+    "cx",
+    "boj",
+    "0j12",
+    "vqg",
+    "12wd0j",
+    "das0k",
+    "120jd0l",
+    "12",
+    "1", "2", "3", "4", "5", "6", "8"
+  };
+  select_list("select_list", { 10, 10 }, items, sl_cfg);
+  // ui::button("test_b", 10, 10, 100, 100, 0x00ff00ff, 0xffff00ff);
 }
 
 int main()
@@ -346,8 +371,9 @@ int main()
   load_image(img1);
   load_image(img2);
 
-  ui::load_font("assets/font/NotoSansJP-Regular.ttf");
-  ui::load_font("assets/font/NotoSansSC-Regular.ttf");
+  load_font("assets/font/NotoSansJP-Regular.ttf");
+  load_font("assets/font/YuGothR.ttc");
+  // load_font("assets/font/NotoSansSC-Regular.ttf");
 
   auto playback_btn = PlaybackButton{};
   playback_btn.init("playback button");
@@ -371,6 +397,10 @@ int main()
   cfg.wireframe_color               = 0x7160e8ff;
   auto cfg2 = cfg;
   cfg.backdrop.default_blur();
+
+  auto fps = Fps{};
+  fps.init(360);
+  fps.start();
 
   while (!wnd1_is_closed || !wnd2_is_closed)
   {
@@ -418,8 +448,10 @@ int main()
       ui::begin("wnd2", 0, 1080, 200, 200, &wnd2_is_closed, cfg2);
 
       auto wnd_ext = ui::window_drawable_extent();
-      ui::rectangle({}, wnd_ext, 0x282c34ff);
+      // ui::rectangle({}, wnd_ext, 0x282c34ff);
+      ui::rectangle({}, wnd_ext, 0xffffffff);
 
+      #if 0
       if (ui::get_key(ui::Key::Q)) wnd2_is_closed = true;
 
       // playback button
@@ -454,54 +486,76 @@ int main()
       ui::rectangle(p, p + float2{ progress, 3 }, 0x0000ffff);
 
       // image
-      auto res = std::expected<void, ui::ImageLoadError::Type>{};
-      if (loop_trigger)
-      {
-        auto img_ext = ui::image_extent(img2);
-        auto ext = wnd_ext - p2;
-        auto scale = std::max(img_ext.x / ext.x, img_ext.y / ext.y);
-        img_ext /= scale;
-        res = image(img2, p2, p2 + img_ext);
-      }
-      if (res) loop_trigger.update();
+      auto res = std::expected<void, ui::ImageLoadErrorType>{};
+      // if (loop_trigger)
+      // {
+      //   auto img_ext = ui::image_extent(img2);
+      //   auto ext = wnd_ext - p2;
+      //   auto scale = std::max(img_ext.x / ext.x, img_ext.y / ext.y);
+      //   img_ext /= scale;
+      //   res = image(img2, p2, p2 + img_ext);
+      // }
+      // if (res) loop_trigger.update();
 
       static auto blur_img_2 = false;
 
-      ui::discard_beg([]{ ui::circle({ 50, 50 }, 50); });
-      if (blur_img_2)
-        res = image(img1, {}, wnd_ext, 0x44, ui::ImageConfig::blur(5, 5));
-      else
-        res = image(img1, {}, wnd_ext, 0x44);
-      ui::rectangle({ 50, 50 }, { 100, 100 }, 0x00ff00ff);
-      ui::discard_end();
+      // ui::discard_beg([]{ ui::circle({ 50, 50 }, 50); });
+      // if (blur_img_2)
+      //   res = image(img1, {}, wnd_ext, 0x44, ui::ImageConfig::blur(5, 5));
+      // else
+      //   res = image(img1, {}, wnd_ext, 0x44);
+      // ui::rectangle({ 50, 50 }, { 100, 100 }, 0x00ff00ff);
+      // ui::discard_end();
 
       // circle point
-      auto size = ui::window_drawable_extent();
-      ui::circle(point_in_circle({ size.x - 30, size.y - 30}, 20, circle_lerplocator.get() * 360), 3, 0xffffffff);
-      circle_lerplocator.update();
+      // auto size = ui::window_drawable_extent();
+      // ui::circle(point_in_circle({ size.x - 30, size.y - 30}, 20, circle_lerplocator.get() * 360), 3, 0xffffffff);
+      // circle_lerplocator.update();
 
-      auto font_cfg = ui::FontConfig{};
+      auto text_cfg = ui::TextConfig{};
+
+      auto unit = float2{ 10, 10 };
+      auto bp_y = 50;
+      ui::line({ 0, bp_y }, { wnd_ext.x, bp_y }, 0x00ff00ff);
+      for (auto x = 0, i = 0; x < wnd_ext.x; x += unit.x, ++i)
+      {
+        auto p = float2{ x, bp_y - unit.y };
+        ui::line({ x, bp_y }, p, 0x00ff00ff);
+
+        if (i % 2 == 0)
+        {
+          text_cfg.pos_as_baseline = true;
+          auto res = ui::text(std::to_string(i), 12, text_cfg);
+          ui::text(std::to_string(i), { p.x - res.extent.x / 2, bp_y + res.extent.y }, 12, 0x00ff00ff, text_cfg);
+        }
+      }
+      text_cfg.pos_as_baseline = {};
 
       auto text_pos = p2 + float2{ 0, 10 };
-      auto text_res = ui::text("Hello, World!", text_pos, 32, 0xffff00ff, font_cfg);
-      ui::rectangle(text_pos, text_pos + text_res.extent, 0x00ff00ff, 1);
-      ui::line({ text_pos.x, text_pos.y + text_res.ascender }, { text_pos.x + text_res.extent.x, text_pos.y + text_res.ascender }, 0xffff00ff);
+      auto text_res = ui::text("Hello, World!", 32, text_cfg);
+      // auto text_res = ui::text("Hello, World!", text_pos, 32, 0xffff00ff, text_cfg);
+      // ui::rectangle(text_pos, text_pos + text_res.extent, 0x00ff00ff, 1);
+      // ui::line({ text_pos.x, text_pos.y + text_res.ascender }, { text_pos.x + text_res.extent.x, text_pos.y + text_res.ascender }, 0xffff00ff);
       text_pos.y += text_res.extent.y;
 
-      text_res = ui::text("你好，世界！", text_pos, 32, 0xff00ffff, font_cfg);
-      ui::rectangle(text_pos, text_pos + text_res.extent, 0x00ff00ff, 1);
-      ui::line({ text_pos.x, text_pos.y + text_res.ascender }, { text_pos.x + text_res.extent.x, text_pos.y + text_res.ascender }, 0xffff00ff);
+      text_res = ui::text("你好，世界！", 32, text_cfg);
+      // ui::rectangle(text_pos, text_pos + text_res.extent, 0x00ff00ff, 1);
+      // ui::line({ text_pos.x, text_pos.y + text_res.ascender }, { text_pos.x + text_res.extent.x, text_pos.y + text_res.ascender }, 0xffff00ff);
       text_pos.y += text_res.extent.y;
 
-      text_res = ui::text("こんにちは、世界！", text_pos, 32, 0x00ffffff, font_cfg);
-      ui::rectangle(text_pos, text_pos + text_res.extent, 0x00ff00ff, 1);
-      ui::line({ text_pos.x, text_pos.y + text_res.ascender }, { text_pos.x + text_res.extent.x, text_pos.y + text_res.ascender }, 0xffff00ff);
+      text_res = ui::text("こんにちは、世界！", 32, text_cfg);
+      // ui::rectangle(text_pos, text_pos + text_res.extent, 0x00ff00ff, 1);
+      // ui::line({ text_pos.x, text_pos.y + text_res.ascender }, { text_pos.x + text_res.extent.x, text_pos.y + text_res.ascender }, 0xffff00ff);
       text_pos.y += text_res.extent.y;
 
+      ui::line({ text_pos.x + 30, 0 }, { text_pos.x + 30, wnd_ext.y }, 0xff0000ff);
+      ui::line({ text_pos.x + 80, 0 }, { text_pos.x + 80, wnd_ext.y }, 0xff0000ff);
       ui::discard_beg([&] { ui::rectangle(text_pos + float2{ 30, 0 }, text_pos + float2{ 80, 50 }); });
-      text_res = ui::text("Hello 你好 こんにちは、世界！", text_pos, 32, 0xffffffff, font_cfg);
+      // TODO: impl selec list
+      text_cfg.family = fonts[1].family;
+      text_res = ui::text("Hello 你好 こんにちは、世界！", text_pos, 32, 0xffffffff, text_cfg);
       ui::rectangle(text_pos, text_pos + text_res.extent, 0x00ff00ff, 1);
-      ui::line({ text_pos.x, text_pos.y + text_res.ascender }, { text_pos.x + text_res.extent.x, text_pos.y + text_res.ascender }, 0xffff00ff);
+      // ui::line({ text_pos.x, text_pos.y + text_res.ascender }, { text_pos.x + text_res.extent.x, text_pos.y + text_res.ascender }, 0xffff00ff);
       text_pos.y += text_res.extent.y;
       ui::discard_end();
 
@@ -513,6 +567,9 @@ int main()
           cfg.backdrop.default_blur();
         blur_img_2 = !blur_img_2;
       }
+      #endif
+
+      select_font();
 
       ui::end();
     }

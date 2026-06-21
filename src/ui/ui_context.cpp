@@ -260,6 +260,8 @@ void UIContext::postprocess_render() noexcept
 
   update_keys();
 
+  g_text_engine.clear_discard_text_parse_results();
+
   // update delta time
   static auto tp = std::chrono::steady_clock::now();
   auto now = std::chrono::steady_clock::now();
@@ -368,13 +370,13 @@ void UIContext::add_title_bar() noexcept
 
   // minimize button
   if (button("tk::ui::title_bar_minimize_button", w - btn_width * 3, 0, btn_width, btn_height, background_color, btn_hovered_color, btn_mouse_down_color,
-    [] (uint width, uint height, Color col) { ui::line({ 0, height / 2 }, { width, height / 2 }, col, 1); },
+    [] (float width, float height, Color col) { ui::line({ 0, height / 2 }, { width, height / 2 }, col, 1); },
     icon_width, icon_height, 0x395063ff, 0x395063ff))
     _wnd->minimize();
 
   // maximize / restore button
   if (button("tk::ui::title_bar_maximize_restore_button", w - btn_width * 2, 0, btn_width, btn_height, background_color, btn_hovered_color, btn_mouse_down_color,
-    [&] (uint width, uint height, Color col)
+    [&] (float width, float height, Color col)
     {
       if (_wnd->is_maximized())
       {
@@ -393,7 +395,7 @@ void UIContext::add_title_bar() noexcept
 
   // close button
   if (button("tk::ui::title_bar_close_button", w - btn_width, 0, btn_width, btn_height, background_color, close_btn_hovered_color, close_btn_mouse_down_color,
-    [] (uint width, uint height, Color col)
+    [] (float width, float height, Color col)
     {
       ui::line({}, { width, height }, col);
       ui::line({ width, 0 }, { 0, height }, col);
@@ -417,10 +419,10 @@ auto UIContext::generic_id(std::string_view name) noexcept -> size_t
   return id;
 }
 
-auto UIContext::get_tween(size_t id, double duration, Tween::Ease ease) noexcept -> Tween*
+auto UIContext::get_tween(size_t id, double forward_dur, double reverse_dur, Tween::Ease ease) noexcept -> Tween*
 {
   if (!_tweens.contains(id))
-    _tweens[id].init(duration, {}, ease);
+    _tweens[id].init(forward_dur, reverse_dur, {}, ease);
   return &_tweens[id];
 }
 
@@ -435,9 +437,9 @@ void UIContext::reset_tween(size_t id) noexcept
   if (_tweens.contains(id)) _tweens[id].reset();
 }
 
-auto UIContext::ping_pong(bool b, size_t id, double duration, Tween::Ease ease) noexcept -> double
+auto UIContext::ping_pong(bool b, size_t id, double forward_dur, double reverse_dur, Tween::Ease ease) noexcept -> double
 {
-  auto tween = g_ui_ctx.get_tween(id, duration, ease);
+  auto tween = g_ui_ctx.get_tween(id, forward_dur, reverse_dur, ease);
 
   if (b)
   {
@@ -523,7 +525,7 @@ auto UIContext::get_key(Key key) noexcept -> Flag<KeyState>
   return ctx.state;
 }
 
-auto UIContext::image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha, std::optional<ImageConfig> cfg) noexcept -> std::expected<void, ImageLoadError::Type>
+auto UIContext::image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha, std::optional<ImageConfig> cfg) noexcept -> std::expected<void, ImageLoadErrorType>
 {
   check_draw();
 
@@ -550,25 +552,26 @@ auto UIContext::image(std::string_view path, float2 left_top, float2 right_botto
   return std::unexpected(res.error());
 }
 
-auto UIContext::text(std::string_view text, float2 pos, float size, Color inner_color, FontConfig cfg) noexcept -> TextResult
+auto UIContext::text(std::string_view text, float2 pos, float size, Color inner_color, TextConfig cfg) noexcept -> TextResult
 {
   if (text.empty()) return {};
 
   check_draw();
 
-  auto result_handle = g_text_engine.parse(text, cfg.style);
-  frame_data()->add_text(result_handle, pos, size, inner_color, cfg.outer_color, cfg.outline_width);
+  auto        result_handle = g_text_engine.parse(text, cfg.style, cfg.family);
+  auto const& result        = g_text_engine.get_parse_result(result_handle);
 
-  auto const& result = g_text_engine.get_parse_result(result_handle);
+  auto scale = size / FT_Pixel_Size / _wnd->scale();
+  auto ascender = result.ascender * scale;
+  auto extent   = result.extent   * scale;
 
-  return
+  if (inner_color.a)
   {
-    {
-      std::ranges::fold_left(result.advances, 0, [](auto res, auto v) { return res + v.x; }),
-      result.max_height,
-    },
-    result.max_ascender
-  };
+    if (cfg.pos_as_baseline) pos.y -= ascender;
+    frame_data()->add_text(result_handle, pos, size, inner_color, cfg.outer_color, cfg.outline_width);
+  }
+
+  return { extent, ascender };
 }
 
 }

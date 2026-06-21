@@ -54,21 +54,29 @@ void Renderer::render() noexcept
   process_render();
 }
 
+void Renderer::wait_idle() noexcept
+{
+  g_graphics_engine.wait_idle();
+  g_copy_engine.wait_idle();
+  g_comp_engine.wait_idle();
+}
+
 void Renderer::destroy() noexcept
 {
-  // pop all message
+  push_tmp_frame_render_complete_funcs();
   while (!_frame_render_complete_funcs.empty())
     message_process();
 
   destroy_images();
 
   // destroy render resources
-  g_graphics_engine.destroy();
-  g_comp_engine.destroy();
-  g_copy_engine.destroy();
   for (auto& res : _res | std::views::values) res.destroy();
 
   g_img_mgr.destroy();
+
+  g_graphics_engine.destroy();
+  g_comp_engine.destroy();
+  g_copy_engine.destroy();
 }
 
 void Renderer::create_window_resource(HWND handle, uint width, uint height) noexcept
@@ -86,7 +94,7 @@ void Renderer::destroy_window_resource(HWND handle, HWND blur_handle) noexcept
   {
     res.destroy();
     g_wnd_mgr.destroy_window(handle, blur_handle);
-  }, EngineType::graphics | EngineType::compute | EngineType::copy);
+  });
   _res.erase(handle);
   _destroied_windows.emplace(handle);
 }
@@ -97,27 +105,9 @@ void Renderer::resize_window_resource(HWND handle, uint width, uint height) noex
   _res[handle].resize(width, height);
 }
 
-void Renderer::add_frame_render_complete_func(std::move_only_function<void()>&& func, Flag<EngineType> flag) noexcept
+void Renderer::add_frame_render_complete_func(std::move_only_function<void()>&& func) noexcept
 {
-  auto last_fence_values = std::vector<std::pair<Engine&, uint64>>{};
-  if (flag.contains(EngineType::graphics))
-    last_fence_values.emplace_back(g_graphics_engine, g_graphics_engine.signal());
-  if (flag.contains(EngineType::copy))
-    last_fence_values.emplace_back(g_copy_engine, g_copy_engine.signal());
-  if (flag.contains(EngineType::compute))
-    last_fence_values.emplace_back(g_comp_engine, g_comp_engine.signal());
-
-  _frame_render_complete_funcs.emplace_back([func = std::move(func), last_fence_values = std::move(last_fence_values)]() mutable
-  {
-    for (auto [engine, last_fence_value] : last_fence_values)
-    {
-      auto fence_value = engine.fence_completed_value();
-      err_if(fence_value == UINT64_MAX, "failed to get fence value because device is removed");
-      if (fence_value < last_fence_value) return false;
-    }
-    func();
-    return true;
-  });
+  _tmp_frame_render_complete_funcs.emplace_back(std::move(func));
 }
 
 void Renderer::message_process() noexcept
@@ -166,12 +156,12 @@ void Renderer::process_render() noexcept
 
   // present windows
   if (_render_windows.size() == 1)
-    _res[_render_windows.back()].present(true);
+    _res[_render_windows.back()].present(false);
   else if (_render_windows.size() > 1)
   {
     for (auto handle : _render_windows | std::views::take(_render_windows.size() - 1))
       _res[handle].present(false);
-    _res[_render_windows.back()].present(true);
+    _res[_render_windows.back()].present(false);
   }
 
   // show blur window
@@ -206,10 +196,14 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
   auto clear_resize_render_target = [this, cmd](ImageHandle& handle, Rect rect)
   {
     auto& img = g_img_mgr[handle];
-    if (rect.width() > img.width() || rect.height() > img.height())
+    auto required_width  = static_cast<uint>(std::ceil(rect.width()));
+    auto required_height = static_cast<uint>(std::ceil(rect.height()));
+    if (required_width > img.width() || required_height > img.height())
     {
-      add_frame_render_complete_func([handle] { g_img_mgr.destroy(handle); }, EngineType::graphics);
-      handle = g_img_mgr.create(rect.width(), rect.height(), img);
+      auto width  = std::max(required_width,  img.width());
+      auto height = std::max(required_height, img.height());
+      add_frame_render_complete_func([handle] { g_img_mgr.destroy(handle); });
+      handle = g_img_mgr.create(width, height, img);
     }
     cmd->clear_render_target(handle);;
   };
@@ -357,6 +351,35 @@ void Renderer::postprocess_render() noexcept
 {
   _destroied_windows.clear();
   _render_windows.clear();
+  push_tmp_frame_render_complete_funcs();
+}
+
+void Renderer::push_tmp_frame_render_complete_funcs() noexcept
+{
+  if (_tmp_frame_render_complete_funcs.empty()) return;
+
+  auto last_fence_values = std::vector<std::pair<Engine&, uint64>>
+  {
+    { g_graphics_engine, g_graphics_engine.signal() },
+    { g_copy_engine,     g_copy_engine.signal()     },
+    { g_comp_engine,     g_comp_engine.signal()     },
+  };
+
+  _frame_render_complete_funcs.emplace_back([funcs = std::move(_tmp_frame_render_complete_funcs), last_fence_values = std::move(last_fence_values)]() mutable
+  {
+    for (auto [engine, last_fence_value] : last_fence_values)
+    {
+      auto fence_value = engine.fence_completed_value();
+      if (fence_value == UINT64_MAX)
+      {
+        auto reason = g_core.device()->GetDeviceRemovedReason();
+        err_if(true, "failed to get fence value because device is removed: 0x{:08x}", static_cast<uint>(reason));
+      }
+      if (fence_value < last_fence_value) return false;
+    }
+    for (auto& func : funcs) func();
+    return true;
+  });
 }
 
 // void copy(

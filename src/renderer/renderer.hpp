@@ -10,22 +10,16 @@
 
 namespace tk::renderer {
 
-enum class EngineType
-{
-  graphics = 1 << 0,
-  copy     = 1 << 1,
-  compute  = 1 << 2,
-};
-
 Singleton(Renderer, g_renderer,
 public:
   void init() noexcept;
   void destroy() noexcept;
 
   void render() noexcept;
+  void wait_idle() noexcept;
 
   void message_process() noexcept;
-  void add_frame_render_complete_func(std::move_only_function<void()>&& func, Flag<EngineType> flag) noexcept;
+  void add_frame_render_complete_func(std::move_only_function<void()>&& func) noexcept;
 
   struct RenderInfo
   {
@@ -53,9 +47,11 @@ private:
   void render(RenderResource& res, ui::FrameData const* frame_data) noexcept;
 
   void postprocess_render() noexcept;
+  void push_tmp_frame_render_complete_funcs() noexcept;
 
 private:
   std::deque<std::move_only_function<bool()>> _frame_render_complete_funcs;
+  std::deque<std::move_only_function<void()>> _tmp_frame_render_complete_funcs;
   std::unordered_map<HWND, RenderResource>    _res;
   std::unordered_set<HWND>                    _destroied_windows;
   std::vector<HWND>                           _render_windows;

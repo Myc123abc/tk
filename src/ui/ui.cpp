@@ -69,28 +69,45 @@ auto image_extent(std::string_view path) noexcept -> float2
   return g_img_mgr.extent(path);
 }
 
-auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha, std::optional<ImageConfig> cfg) noexcept -> std::expected<void, ImageLoadError::Type>
+auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha, std::optional<ImageConfig> cfg) noexcept -> std::expected<void, ImageLoadErrorType>
 {
   if (!alpha || left_top.x == right_bottom.x || left_top.y == right_bottom.y) return {};
   adjust_pos(left_top, right_bottom);
   return g_ui_ctx.image(path, left_top, right_bottom, alpha, cfg);
 }
 
-auto load_image(std::string_view path) noexcept -> std::expected<void, ImageLoadError::Type>
+auto load_image(std::string_view path) noexcept -> std::expected<void, ImageLoadErrorType>
 {
   return g_img_mgr.try_load(path, {}, {}).transform([](auto&&) {});
 }
 
-void load_font(std::string_view path) noexcept
+auto load_font(std::string_view path) noexcept -> std::expected<FontInfo, FontLoadErrorType>
 {
-  g_text_engine.load_font(path);
+  return g_text_engine.load_font(path);
 }
 
-auto text(std::string_view text, float2 pos, float size, Color color, FontConfig cfg) noexcept -> TextResult
+auto text(std::string_view text, float2 pos, float size, Color color, TextConfig cfg) noexcept -> TextResult
 {
   if (text.empty()) return {};
-  adjust_pos(pos);
+  adjust_pos(pos); adjust_scale(size);
   return g_ui_ctx.text(text, pos, size, color, cfg);
+}
+
+auto text(std::string_view text, float size, TextConfig cfg) noexcept -> TextResult
+{
+  if (text.empty()) return {};
+  adjust_scale(size);
+  return g_ui_ctx.text(text, {}, size, {}, cfg);
+}
+
+auto ping_pong(std::string_view name, bool b, double forward_dur, double reverse_dur, Tween::Ease ease) noexcept -> double
+{
+  return g_ui_ctx.ping_pong(b, g_ui_ctx.generic_id(name), forward_dur, reverse_dur, ease);
+}
+
+void reset_tween(std::string_view name) noexcept
+{
+  g_ui_ctx.reset_tween(g_ui_ctx.get_id(name));
 }
 
 auto get_cursor_pos() noexcept -> float2
@@ -311,148 +328,6 @@ void union_end(Color color, float thickness) noexcept
   g_ui_ctx.check_draw();
   adjust_scale(thickness);
   g_ui_ctx.frame_data()->union_end(color, thickness);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-///                               Widget
-////////////////////////////////////////////////////////////////////////////////
-
-auto is_hover_on(float2 left_top, float2 right_bottom) noexcept -> bool
-{
-  g_ui_ctx.check_draw();
-  auto p = g_ui_ctx.window()->cursor_pos();
-  return g_ui_ctx.cursor_on_window == g_ui_ctx.window()->handle() &&
-         !g_ui_ctx.window()->is_move_from_maximize()              &&
-         Rect{ left_top, right_bottom }.contains(p);
-}
-
-auto is_click_on(float2 left_top, float2 right_bottom) noexcept -> bool
-{
-  g_ui_ctx.check_draw();
-  auto window = g_ui_ctx.window();
-  if (!window->is_active()             ||
-		   window->is_moving_or_resizing() ||
-      !g_ui_ctx.mouse_down_pos         ||
-      !g_ui_ctx.mouse_up_pos           ||
-       g_ui_ctx.mouse_down_window != g_ui_ctx.mouse_up_window) return false;
-  auto rc = Rect{ left_top, right_bottom };
-  return !g_ui_ctx.is_move_from_maximize               &&
-          rc.contains(g_ui_ctx.mouse_down_pos.value()) &&
-          rc.contains(g_ui_ctx.mouse_up_pos.value());
-}
-
-auto ping_pong(std::string_view name, bool b, double duration, Tween::Ease ease) noexcept -> double
-{
-  return g_ui_ctx.ping_pong(b, g_ui_ctx.generic_id(name), duration, ease);
-}
-
-void reset_tween(std::string_view name) noexcept
-{
-  g_ui_ctx.reset_tween(g_ui_ctx.get_id(name));
-}
-
-auto button(size_t id, float x, float y, uint width, uint height) noexcept-> ButtonState
-{
-  g_ui_ctx.check_draw();
-
-  // what is a button
-  // button is a rectangle with width and height in specific position
-  auto left_top     = float2{ x, y };
-  auto right_bottom = float2{ x + width, y + height };
-  if (g_ui_ctx.is_use_title_bar_now() && !g_ui_ctx.draw_title_bar)
-  {
-    left_top.y     += Title_Bar_Height;
-    right_bottom.y += Title_Bar_Height;
-  }
-
-  auto scale = g_ui_ctx.window()->scale();
-  left_top     *= scale;
-  right_bottom *= scale;
-
-  // when cursor hover on it, it will change color to hovered color
-  auto is_hovered  = g_ui_ctx.is_hover_on(id, left_top, right_bottom) && g_wnd_mgr.is_normal_cursor();
-  auto is_move_out = g_ui_ctx.is_cursor_move_out(id);
-  if (is_hovered && g_ui_ctx.mouse_down_pos)
-  {
-    g_ui_ctx.add_mouse_left_button_state(id, left_top, right_bottom);
-    is_hovered = !is_move_out                                                              &&
-                  Rect{ left_top, right_bottom }.contains(g_ui_ctx.mouse_down_pos.value()) &&
-                  g_ui_ctx.mouse_down_window == g_ui_ctx.window()->handle();
-  }
-
-  return { is_hovered && ui::is_click_on(left_top, right_bottom), is_hovered, is_move_out };
-}
-
-auto button(std::string_view name, float x, float y, uint width, uint height) noexcept-> ButtonState
-{
-  return button(g_ui_ctx.generic_id(name), x, y, width, height);
-}
-
-auto button(
-  std::string_view name,
-  float            x,
-  float            y,
-  uint             width,
-  uint             height,
-  Color            button_color,
-  Color            button_hover_color) noexcept-> ButtonState
-{
-  auto state = button(name, x, y, width, height);
-  ui::rectangle({ x, y }, { x + width, y + height }, state.hovered ? button_hover_color : button_color);
-  return state;
-}
-
-auto button(
-  std::string_view                               name,
-  float                                          x,
-  float                                          y,
-  uint                                           width,
-  uint                                           height,
-  Color                                          button_color,
-  Color                                          button_hover_color,
-  std::optional<Color>                           mouse_down_color,
-  std::function<void(uint, uint, Color)>         icon_update_func,
-  uint                                           icon_width,
-  uint                                           icon_height,
-  Color                                          icon_color,
-  Color                                          icon_hover_color) noexcept-> ButtonState
-{
-  auto id    = g_ui_ctx.generic_id(name);
-  auto state = button(id, x, y, width, height);
-
-  auto value = g_ui_ctx.ping_pong(state.hovered, id, 200'000);
-  if (mouse_down_color && state.move_out) g_ui_ctx.reset_tween(id);
-  button_color = lerp(button_color, button_hover_color, value);
-
-  // when mouse down, color also change
-  if (mouse_down_color && state.hovered)
-  {
-    auto state = g_ui_ctx.get_key(Key::Mouse_Left_Button);
-    if (state.contains(KeyState::down) || state == KeyState::press)
-      button_color = mouse_down_color.value();
-  }
-
-  // draw button
-  ui::rectangle({ x, y }, { x + width, y + height }, button_color);
-
-  // draw icon
-  if (icon_update_func)
-  {
-    icon_color = lerp(icon_color, icon_hover_color, value);
-    auto x_offset = (width  - icon_width)  / 2;
-    auto y_offset = (height - icon_height) / 2;
-    
-    auto scale  = g_ui_ctx.window()->scale();
-    auto icon_x = std::round((x + x_offset) * scale) / scale;
-    auto icon_y = std::round((y + y_offset) * scale) / scale;
-
-    g_ui_ctx.render_on(icon_x, icon_y, [&]
-    {
-      icon_update_func(icon_width, icon_height, icon_color);
-    });
-  }
-
-  return state;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

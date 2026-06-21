@@ -63,13 +63,15 @@ public:
 
   auto delta_time() const noexcept { return _delta_time; }
 
-  auto get_tween(size_t id, double duration, Tween::Ease ease = {}) noexcept -> Tween*;
+  auto get_tween(size_t id, double forward_dur, double reverse_dur, Tween::Ease ease = {}) noexcept -> Tween*;
+  auto get_tween(size_t id, double dur, Tween::Ease ease = {}) noexcept { return get_tween(id, dur, dur, ease); }
   void remove_tween(size_t id) noexcept;
   void reset_tween(size_t id) noexcept;
-  auto ping_pong(bool b, size_t id, double duration, Tween::Ease ease = {}) noexcept -> double;
+  auto ping_pong(bool b, size_t id, double forward_dur, double reverse_dur, Tween::Ease ease = {}) noexcept -> double;
+  auto ping_pong(bool b, size_t id, double dur, Tween::Ease ease = {}) noexcept { return ping_pong(b, id, dur, dur, ease); }
 
-  auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha, std::optional<ImageConfig> cfg) noexcept -> std::expected<void, ImageLoadError::Type>;
-  auto text(std::string_view text, float2 pos, float size, Color inner_color, FontConfig cfg) noexcept -> TextResult;
+  auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha, std::optional<ImageConfig> cfg) noexcept -> std::expected<void, ImageLoadErrorType>;
+  auto text(std::string_view text, float2 pos, float size, Color inner_color, TextConfig cfg) noexcept -> TextResult;
 
   void fullscreen_window() noexcept;
   void restore_fullscreen_window() noexcept;

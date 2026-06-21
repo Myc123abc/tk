@@ -118,7 +118,7 @@ void Buffer::reserve(uint size) noexcept
   if (size <= _capacity) return;
 
   // add old buffer for destroy
-  g_renderer.add_frame_render_complete_func([_ = _handle] {}, EngineType::graphics);
+  g_renderer.add_frame_render_complete_func([_ = _handle] {});
 
   // temporary copy old data
   auto old_data = std::vector<std::byte>(_size);

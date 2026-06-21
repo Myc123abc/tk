@@ -45,10 +45,14 @@ auto Engine::set_event_on_completion() const noexcept -> HANDLE
   return _fence_event;
 }
 
-void Engine::destroy() noexcept
+void Engine::wait_idle() noexcept
 {
   err_if(_fence->SetEventOnCompletion(signal(), _fence_event), "failed to set event on completion");
   WaitForSingleObjectEx(_fence_event, INFINITE, false);
+}
+
+void Engine::destroy() noexcept
+{
   CloseHandle(_fence_event);
   g_cmd_pool.destroy(_cmd);
   _queue.destroy();

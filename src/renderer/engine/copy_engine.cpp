@@ -87,6 +87,7 @@ void UploadBuffer::upload(Command* cmd) noexcept
   }
 
   _infos.clear();
+  buf.clear();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -112,7 +113,7 @@ void CopyEngine::update() noexcept
   // remove glyphs after copy finished
   auto& pending_copy_glyphs = g_text_engine.access_swaped_pending_copy_glyphs();
   if (!pending_copy_glyphs.empty())
-    g_renderer.add_frame_render_complete_func([&] { pending_copy_glyphs.clear(); }, EngineType::copy);
+    g_renderer.add_frame_render_complete_func([&] { pending_copy_glyphs.clear(); });
 
   if (cmd->needs_graphics_sync()) g_graphics_engine.wait(g_copy_engine, fence_value);
   if (cmd->needs_compute_sync()) g_comp_engine.wait(g_copy_engine, fence_value);
@@ -122,7 +123,7 @@ void CopyEngine::update() noexcept
     g_renderer.add_frame_render_complete_func([imgs = std::move(moved_imgs)] mutable
     {
       for (auto& [img, _] : imgs) g_img_mgr.destroy(img);
-    }, EngineType::copy);
+    });
 
   if (_slots.acquire_slot()) _slots.slot()->data.init();
 }

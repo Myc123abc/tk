@@ -33,7 +33,7 @@ auto ImageManager::extent(std::string_view path) noexcept -> float2
   return _image_infos[path.data()].extent;
 }
 
-auto ImageManager::try_load(std::string_view path, uint width, uint height) noexcept -> std::expected<ImageHandle, ImageLoadError::Type>
+auto ImageManager::try_load(std::string_view path, uint width, uint height) noexcept -> std::expected<ImageHandle, ImageLoadErrorType>
 {
   auto filename = path.data();
 
@@ -119,7 +119,7 @@ void ImageManager::update() noexcept
   }
   if (!_destroy_blur_imgs.empty())
     g_renderer.add_frame_render_complete_func([imgs = std::move(_destroy_blur_imgs)]
-      { for (auto img : imgs) g_img_mgr.destroy(img); }, EngineType::graphics | EngineType::compute);
+      { for (auto img : imgs) g_img_mgr.destroy(img); });
 
   // check images whether loeaded
   for (auto it = _load_tasks.begin(); it != _load_tasks.end();)

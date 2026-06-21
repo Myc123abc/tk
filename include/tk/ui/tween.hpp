@@ -28,14 +28,19 @@ public:
 
   using Ease = std::function<double(double)>;
 
-  auto init(double dur, Mode mode = {}, Ease ease = linear) noexcept -> Tween&
+  auto init(double forward_dur, double reverse_dur, Mode mode = {}, Ease ease = linear) noexcept -> Tween&
   {
-    assert(dur);
-    _dur  = dur;
-    _mode = mode;
-    _ease = ease ? ease : linear;
+    _forward_dur = forward_dur;
+    _reverse_dur = reverse_dur;
+    _mode        = mode;
+    _ease        = ease ? ease : linear;
     if (mode == Mode::loop) start();
     return *this;
+  }
+
+  auto init(double dur, Mode mode = {}, Ease ease = linear) noexcept -> Tween&
+  {
+    return init(dur, dur, mode, ease);
   }
 
   auto start() noexcept -> Tween&
@@ -57,7 +62,8 @@ public:
   {
     if (_state == State::started)
     {
-      auto dx = delta / _dur;
+      auto dur = _reversed ? _reverse_dur : _forward_dur;
+      auto dx  = dur ? (delta / dur) : 1.0;
       _x += _reversed ? -dx : dx;
       _x = std::clamp(_x, 0.0, 1.0);
       _y = _ease(_x);
@@ -87,7 +93,8 @@ public:
   auto get()            const noexcept { return _y;                           }
 
 private:
-  double _dur{};
+  double _forward_dur{};
+  double _reverse_dur{};
   double _x{};
   double _y{};
   Ease   _ease;
