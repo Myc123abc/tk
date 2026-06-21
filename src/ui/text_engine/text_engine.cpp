@@ -337,10 +337,11 @@ void GlyphInfo::set_vertices(renderer::Vertex* vtx, float2 pos, float size, floa
   assert(desc_handle.is_valid());
   auto idx = static_cast<uint>(desc_handle.index());
 
-  vtx[0] = { p0, { min_x, min_y }, color, idx };
-  vtx[1] = { p1, { max_x, min_y }, color, idx };
-  vtx[2] = { p2, { max_x, max_y }, color, idx };
-  vtx[3] = { p3, { min_x, max_y }, color, idx };
+  auto col = color.to_uint();
+  vtx[0] = { p0, { min_x, min_y }, col, idx };
+  vtx[1] = { p1, { max_x, min_y }, col, idx };
+  vtx[2] = { p2, { max_x, max_y }, col, idx };
+  vtx[3] = { p3, { min_x, max_y }, col, idx };
 }
 
 }

@@ -8,7 +8,7 @@ struct alignas(16) Vertex
 {
   float2 pos{};
   float2 uv{};
-  float4 color{};
+  uint   color{};
   uint   image_idx{};
 };
 

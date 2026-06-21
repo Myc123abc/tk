@@ -35,6 +35,19 @@ struct VS_Param
 {
   float2 pos       : POSITION;
   float2 uv        : TEXCOORD;
-  float4 col       : COLOR; // TODO: change to uint
+  uint   col       : COLOR;
   uint   image_idx : IMAGE_IDX;
 };
+
+float4 color(uint c)
+{
+  float inv255 = 1.0 / 255.0;
+
+  return float4
+  (
+    ((c >> 24) & 0xFF) * inv255,
+    ((c >> 16) & 0xFF) * inv255,
+    ((c >>  8) & 0xFF) * inv255,
+    ((c      ) & 0xFF) * inv255
+  );
+}

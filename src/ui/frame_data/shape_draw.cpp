@@ -36,10 +36,11 @@ void FrameData::add_rect(float2 left_top, float2 right_bottom, Color color) noex
 {
   auto [vertices, indices] = expand_beg(4, 6);
 
-  vertices[0] = { left_top, {}, color };
-  vertices[1] = { { right_bottom.x, left_top.y }, {}, color };
-  vertices[2] = { right_bottom, {}, color };
-  vertices[3] = { { left_top.x, right_bottom.y }, {}, color };
+  auto col = color.to_uint();
+  vertices[0] = { left_top, {}, col };
+  vertices[1] = { { right_bottom.x, left_top.y }, {}, col };
+  vertices[2] = { right_bottom, {}, col };
+  vertices[3] = { { left_top.x, right_bottom.y }, {}, col };
   indices[0]  = static_cast<uint16>(_vertex_beg + 0);
   indices[1]  = static_cast<uint16>(_vertex_beg + 1);
   indices[2]  = static_cast<uint16>(_vertex_beg + 2);
@@ -171,7 +172,8 @@ void FrameData::add_convex_poly_filled(Color color) noexcept
   assert(pt_cnt > 2);
 
   auto aa_width = g_ui_ctx.window()->scale();
-  auto aa_col   = Color{ color.r, color.g, color.b, 0.f };
+  auto aa_col   = Color{ color.r, color.g, color.b, 0.f }.to_uint();
+  auto col      = color.to_uint();
 
   auto [vertices, indices] = expand_beg(pt_cnt * 2, (pt_cnt - 2) * 3 + pt_cnt * 6);
 
@@ -195,7 +197,7 @@ void FrameData::add_convex_poly_filled(Color color) noexcept
   for (uint i0 = pt_cnt - 1, i1 = 0; i1 < pt_cnt; i0 = i1++)
   {
     auto dmp = fix_normal((_normals[i0] + _normals[i1]) * .5f) * aa_width * .5f;
-    vertices[0] = { _points[i1] - dmp, {}, color  };
+    vertices[0] = { _points[i1] - dmp, {}, col    };
     vertices[1] = { _points[i1] + dmp, {}, aa_col };
     vertices += 2;
 
@@ -219,7 +221,8 @@ void FrameData::add_concave_poly_filled(Color color) noexcept
 
   uint triangle[3]{};
   auto const aa_size = g_ui_ctx.window()->scale();
-  auto col_trans = Color{ color.r, color.g, color.b, 0 };
+  auto col_trans = Color{ color.r, color.g, color.b, 0 }.to_uint();
+  auto col       = color.to_uint();
 
   auto const idx_cnt = (pt_cnt - 2) * 3 + pt_cnt * 6;
   auto const vtx_cnt = pt_cnt * 2;
@@ -252,7 +255,7 @@ void FrameData::add_concave_poly_filled(Color color) noexcept
   {
     auto dm = fix_normal((tmp_normals[i0] + tmp_normals[i1]) * .5f) * aa_size * .5f;
 
-    vtx[0] = { _points[i1] - dm, {}, color     };
+    vtx[0] = { _points[i1] - dm, {}, col       };
     vtx[1] = { _points[i1] + dm, {}, col_trans };
     vtx += 2;
 
@@ -403,7 +406,8 @@ void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noex
   auto const count      = is_closed ? pt_cnt : pt_cnt - 1;
   auto const aa_size    = g_ui_ctx.window()->scale();
   auto const thick_line = thickness > aa_size;
-  auto col_trans = Color{ color.r, color.g, color.b, 0 };
+  auto col_trans = Color{ color.r, color.g, color.b, 0 }.to_uint();
+  auto col       = color.to_uint();
 
   thickness = std::max(thickness, 1.f);
 
@@ -466,9 +470,9 @@ void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noex
 
     for (auto i = 0u; i < pt_cnt; ++i)
     {
-      vtx[0] = { tmp_points[i * 4], {}, col_trans };
-      vtx[1] = { tmp_points[i * 4 + 1], {}, color };
-      vtx[2] = { tmp_points[i * 4 + 2], {}, color };
+      vtx[0] = { tmp_points[i * 4], {}, col_trans     };
+      vtx[1] = { tmp_points[i * 4 + 1], {}, col       };
+      vtx[2] = { tmp_points[i * 4 + 2], {}, col       };
       vtx[3] = { tmp_points[i * 4 + 3], {}, col_trans };
       vtx += 4;
     }
@@ -503,7 +507,7 @@ void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noex
 
     for (auto i = 0u; i < pt_cnt; ++i)
     {
-      vtx[0] = { _points[i], {}, color };
+      vtx[0] = { _points[i],            {}, col       };
       vtx[1] = { tmp_points[i * 2 + 0], {}, col_trans };
       vtx[2] = { tmp_points[i * 2 + 1], {}, col_trans };
       vtx += 3;

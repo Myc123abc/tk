@@ -39,7 +39,7 @@ void FrameData::_add_image(ImageHandle handle, float2 left_top, float2 right_bot
   if (_last_cmd_type)
     push_render_cmd(_build_mode.contains(BuildMode::discard) ? RenderCmdType::discard_draw_composite : _last_cmd_type.value());
 
-  auto col = Color{ 1, 1, 1, static_cast<float>(alpha) / 255 };
+  auto col = Color{ 1, 1, 1, static_cast<float>(alpha) / 255 }.to_uint();
   auto [vertices, indices] = expand_beg(4, 6);
   vertices[0] = { left_top, uv0, col };
   vertices[1] = { { right_bottom.x, left_top.y }, uv1, col };
