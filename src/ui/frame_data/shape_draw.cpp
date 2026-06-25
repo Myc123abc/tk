@@ -36,10 +36,10 @@ void FrameData::add_rect(float2 left_top, float2 right_bottom, Color color) noex
 {
   auto [vertices, indices] = expand_beg(4, 6);
 
-  auto col = color.to_uint();
-  vertices[0] = { left_top, {}, col };
+  auto col    = color.to_uint();
+  vertices[0] = { left_top,                       {}, col };
   vertices[1] = { { right_bottom.x, left_top.y }, {}, col };
-  vertices[2] = { right_bottom, {}, col };
+  vertices[2] = { right_bottom,                   {}, col };
   vertices[3] = { { left_top.x, right_bottom.y }, {}, col };
   indices[0]  = static_cast<uint16>(_vertex_beg + 0);
   indices[1]  = static_cast<uint16>(_vertex_beg + 1);
@@ -470,7 +470,7 @@ void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noex
 
     for (auto i = 0u; i < pt_cnt; ++i)
     {
-      vtx[0] = { tmp_points[i * 4], {}, col_trans     };
+      vtx[0] = { tmp_points[i * 4],     {}, col_trans };
       vtx[1] = { tmp_points[i * 4 + 1], {}, col       };
       vtx[2] = { tmp_points[i * 4 + 2], {}, col       };
       vtx[3] = { tmp_points[i * 4 + 3], {}, col_trans };

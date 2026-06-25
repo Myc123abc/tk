@@ -4,12 +4,26 @@
 
 namespace tk::renderer {
 
+enum class VtxType
+{
+  shape,
+  image,
+  text,
+};
+  
+inline auto vtx_pack(VtxType type, uint img_idx) noexcept
+{
+  return static_cast<uint>(type) << 16 | img_idx;
+}
+
 struct alignas(16) Vertex
 {
   float2 pos{};
   float2 uv{};
   uint   color{};
-  uint   image_idx{};
+  uint   packed{};
+  uint   outer_col{};
+  float  outer_width{};
 };
 
 struct alignas(16) Constants
@@ -32,9 +46,6 @@ struct alignas(16) Constants
   float2 composite_offset;
   float2 composite_extent;
 
-  float4 outer_color;
-
-  float  outline_width{};
   uint   draw_wireframe{};
 };
 

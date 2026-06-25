@@ -200,7 +200,7 @@ auto generate_root_signature(std::vector<DescriptorInfo> const& desc_infos, bool
 
     case textures:
     {
-      range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, info.bind_point, info.space, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+      range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, info.bind_point, info.space, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
       ranges.emplace(range);
       auto const visibility = is_graphics ? D3D12_SHADER_VISIBILITY_PIXEL : D3D12_SHADER_VISIBILITY_ALL;
       root_param.InitAsDescriptorTable(1, &ranges.back(), visibility);
@@ -235,6 +235,7 @@ auto Compiler::compile(std::string_view shader_path, std::vector<std::string_vie
     L"-Qembed_debug",
     L"-Od",
 #endif
+    L"-enable-16bit-types",
   };
 
   auto include_strs = std::vector<std::wstring>{};
@@ -281,8 +282,8 @@ auto Compiler::compile(
   std::unordered_set<std::string_view> const& volatile_descs) noexcept -> CompileResult
 {
   // compile shaders
-  auto [vs_res, vs_cso] = compile(shader, includes, L"vs_6_0", vertex_shader_entry_point);
-  auto [ps_res, ps_cso] = compile(shader, includes, L"ps_6_0", pixel_shader_entry_point);
+  auto [vs_res, vs_cso] = compile(shader, includes, L"vs_6_5", vertex_shader_entry_point);
+  auto [ps_res, ps_cso] = compile(shader, includes, L"ps_6_5", pixel_shader_entry_point);
 
   // get reflection
   auto compile_result = CompileResult{};
@@ -319,7 +320,7 @@ auto Compiler::compile(
   std::optional<RootSignatureResult>          res,
   std::unordered_set<std::string_view> const& volatile_descs) noexcept -> CompileResult
 {
-  auto [comp_res, cso] = compile(shader, includes, L"cs_6_0", compute_shader_entry_point);
+  auto [comp_res, cso] = compile(shader, includes, L"cs_6_5", compute_shader_entry_point);
 
   auto compile_result = CompileResult{};
   compile_result._cs_cso = cso;

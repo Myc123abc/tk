@@ -20,17 +20,13 @@ struct WindowShadowInfo
   std::optional<float4> wireframe_color;
 };
 
-inline ImageHandle Write_Image_Handle = {};
-
 enum class RenderCmdType
 {
   ui,
-  text,
   clear_discard_image,
   clear_composite_image,
   discard_write,
   discard_draw_ui_composite,
-  discard_draw_text_composite,
   discard_composite,
 };
 
@@ -39,19 +35,7 @@ struct RenderCmd
   RenderCmdType type;
   uint          idx_beg{};
   uint          idx_size{};
-  Rect          scissor_rect{};
-
-  union
-  {
-    struct
-    {
-      float4 outer_color;
-      float  outline_width{};
-    } text;
-
-    ImageHandle img;
-    Rect        clear_rect{};
-  };
+  Rect          rect{};
 };
 
 class FrameData
@@ -354,9 +338,8 @@ private:
   auto get_vertices_bound_rect(uint vtx_beg) const noexcept { return get_vertices_bound_rect(vtx_beg, _vertices.size() - vtx_beg); }
   void add_rect(float2 left_top, float2 right_bottom, Color color = {}) noexcept;
 
-  void push_render_cmd(RenderCmdType type, ImageHandle image_handle = Write_Image_Handle) noexcept;
+  void push_render_cmd(RenderCmdType type) noexcept;
   void push_render_cmd_clear_rect(RenderCmdType type, Rect rect = {}) noexcept;
-  void push_render_cmd_text(RenderCmdType type, Color outer_color, float outline_width) noexcept;
 
   void add_convex_poly_filled(Color color) noexcept;
   void add_concave_poly_filled(Color color) noexcept;
@@ -414,11 +397,6 @@ private:
   inline static auto           arc_radius_cutoff      = 0.f;
   inline static std::array<int, arc_table_size + 16> _circle_segment_counts;
   inline static std::array<float2, arc_table_size>   _arc_vertices;
-
-  bool  _have_text_cmds{};
-  uint  _text_beg_idx{};
-  Color _text_outer_color{};
-  float _text_outline_width{};
 };
 
 }

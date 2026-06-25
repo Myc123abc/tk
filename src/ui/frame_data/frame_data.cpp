@@ -49,10 +49,8 @@ auto FrameData::get_vertices_bound_rect(uint vtx_beg, uint vtx_cnt) const noexce
   return rc;
 }
 
-void FrameData::push_render_cmd(RenderCmdType type, ImageHandle image_handle) noexcept
+void FrameData::push_render_cmd(RenderCmdType type) noexcept
 {
-  assert(type != RenderCmdType::text);
-
   auto idx_size = static_cast<uint>(_indices.size() - _draw_index_beg);
   if (!idx_size) return;
 
@@ -60,29 +58,9 @@ void FrameData::push_render_cmd(RenderCmdType type, ImageHandle image_handle) no
     _render_cmd_rect_idxs.emplace_back(_render_cmds.size());
 
   auto& cmd = _render_cmds.emplace_back();
-  cmd.type = type;
+  cmd.type     = type;
   cmd.idx_beg  = _draw_index_beg;
   cmd.idx_size = idx_size;
-  cmd.img      = image_handle;
-
-  _draw_index_beg = static_cast<uint>(_indices.size());
-
-  renderer::g_img_mgr[image_handle].graphics_will_use();
-}
-
-void FrameData::push_render_cmd_text(RenderCmdType type, Color outer_color, float outline_width) noexcept
-{
-  auto idx_size = static_cast<uint>(_indices.size() - _draw_index_beg);
-  if (!idx_size) return;
-
-  _render_cmd_rect_idxs.emplace_back(_render_cmds.size());
-
-  auto& cmd = _render_cmds.emplace_back();
-  cmd.type               = type;
-  cmd.idx_beg            = _draw_index_beg;
-  cmd.idx_size           = idx_size;
-  cmd.text.outer_color   = outer_color;
-  cmd.text.outline_width = outline_width;
 
   _draw_index_beg = static_cast<uint>(_indices.size());
 }
@@ -90,21 +68,13 @@ void FrameData::push_render_cmd_text(RenderCmdType type, Color outer_color, floa
 void FrameData::push_render_cmd_clear_rect(RenderCmdType type, Rect rect) noexcept
 {
   auto& cmd = _render_cmds.emplace_back();
-  cmd.type       = type;
-  cmd.clear_rect = rect;
+  cmd.type = type;
+  cmd.rect = rect;
 }
 
 void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
 {
   using Type = DrawCmd::Type;
-
-  // push text cmd when text cmd call finish
-  if (_have_text_cmds && cmd.type != Type::add_text)
-  {
-    auto type = _build_mode.contains(BuildMode::discard) ? RenderCmdType::discard_draw_text_composite : RenderCmdType::text;
-    push_render_cmd_text(type, _text_outer_color, _text_outline_width);
-    _have_text_cmds = false;
-  }
 
   switch (cmd.type)
   {

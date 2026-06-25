@@ -19,24 +19,23 @@ struct Constants
   float2 composite_offset;
   float2 composite_extent;
 
-  float4 outer_color;
-
-  float  outline_width;
   uint   draw_wireframe;
 };
 
-ConstantBuffer<Constants> constants  : register(b0);
-SamplerState              g_sampler  : register(s0);
-Texture2D                 image      : register(t0);
-Texture2D                 mask_image : register(t0, space1);
-Texture2D                 images[]   : register(t0, space2);
+ConstantBuffer<Constants> constants       : register(b0);
+SamplerState              g_sampler       : register(s0);
+Texture2D                 images[]        : register(t0);
+Texture2D                 mask_image      : register(t0, space1);
+Texture2D                 composite_image : register(t0, space2);
 
 struct VS_Param
 {
-  float2 pos       : POSITION;
-  float2 uv        : TEXCOORD;
-  uint   col       : COLOR;
-  uint   image_idx : IMAGE_IDX;
+  float2 pos         : POSITION;
+  float2 uv          : TEXCOORD;
+  uint   col         : COLOR;
+  uint   packed      : PACKED;
+  uint   outer_col   : OUTER_COL;
+  float  outer_width : OUTER_WIDTH;
 };
 
 float4 color(uint c)

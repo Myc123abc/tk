@@ -374,7 +374,7 @@ void TextEngine::upload_uncached_glyphs() noexcept
   _pending_copy_glyphs.swap();
 }
 
-void GlyphInfo::set_vertices(renderer::Vertex* vtx, float2 pos, float size, float ascender, Color color) const noexcept
+void GlyphInfo::set_vertices(renderer::Vertex* vtx, float2 pos, float size, float ascender, Color color, Color outer_color, float outer_width) const noexcept
 {
   auto scale = get_scale(size);
   
@@ -386,13 +386,14 @@ void GlyphInfo::set_vertices(renderer::Vertex* vtx, float2 pos, float size, floa
   
   auto desc_handle = g_img_mgr[g_text_engine._glyph_atlas[glyph_atlas_index]].srv();
   assert(desc_handle.is_valid());
-  auto idx = static_cast<uint>(desc_handle.index());
 
-  auto col = color.to_uint();
-  vtx[0] = { p0, { min_x, min_y }, col, idx };
-  vtx[1] = { p1, { max_x, min_y }, col, idx };
-  vtx[2] = { p2, { max_x, max_y }, col, idx };
-  vtx[3] = { p3, { min_x, max_y }, col, idx };
+  auto col       = color.to_uint();
+  auto outer_col = outer_color.to_uint();
+  auto packed    = vtx_pack(VtxType::text, desc_handle.index());
+  vtx[0] = { p0, { min_x, min_y }, col, packed, outer_col, outer_width };
+  vtx[1] = { p1, { max_x, min_y }, col, packed, outer_col, outer_width };
+  vtx[2] = { p2, { max_x, max_y }, col, packed, outer_col, outer_width };
+  vtx[3] = { p3, { min_x, max_y }, col, packed, outer_col, outer_width };
 }
 
 }

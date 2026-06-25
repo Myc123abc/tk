@@ -100,7 +100,7 @@ struct GlyphInfo
     return size / FT_Pixel_Size;
   }
 
-  void set_vertices(renderer::Vertex* vtx, float2 pos, float size, float ascender, Color color) const noexcept;
+  void set_vertices(renderer::Vertex* vtx, float2 pos, float size, float ascender, Color color, Color outer_color, float outer_width) const noexcept;
 
   static auto get_next_position(float2 pos, float size, float2 advance) noexcept
   {

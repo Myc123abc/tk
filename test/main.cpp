@@ -360,7 +360,7 @@ void select_font() noexcept
     "12",
     "1", "2", "3", "4", "5", "6", "8"
   };
-  select_list("select_list", { 10, 10 }, items, sl_cfg);
+  select_list("select_list", { 150, 150 }, items, sl_cfg);
   // ui::button("test_b", 10, 10, 100, 100, 0x00ff00ff, 0xffff00ff);
 }
 
@@ -387,8 +387,8 @@ int main()
   auto circle_lerplocator = ui::Tween{};
   circle_lerplocator.init(250'000, ui::Tween::Mode::loop);
 
-  auto wnd1_is_closed = true;
-  auto wnd2_is_closed = false;
+  auto wnd1_is_closed = false;
+  auto wnd2_is_closed = true;
 
   auto cfg = ui::WindowConfig{};
   cfg.display_title_bar             = true;
@@ -399,7 +399,7 @@ int main()
   cfg.backdrop.default_blur();
 
   auto fps = Fps{};
-  fps.init(360);
+  fps.init(240);
   fps.start();
 
   while (!wnd1_is_closed || !wnd2_is_closed)
@@ -448,10 +448,10 @@ int main()
       ui::begin("wnd2", 0, 1080, 200, 200, &wnd2_is_closed, cfg2);
 
       auto wnd_ext = ui::window_drawable_extent();
-      // ui::rectangle({}, wnd_ext, 0x282c34ff);
-      ui::rectangle({}, wnd_ext, 0xffffffff);
+      ui::rectangle({}, wnd_ext, 0x282c34ff);
+      // ui::rectangle({}, wnd_ext, 0xffffffff);
 
-      #if 0
+      #if 1
       if (ui::get_key(ui::Key::Q)) wnd2_is_closed = true;
 
       // playback button
@@ -487,30 +487,30 @@ int main()
 
       // image
       auto res = std::expected<void, ui::ImageLoadErrorType>{};
-      // if (loop_trigger)
-      // {
-      //   auto img_ext = ui::image_extent(img2);
-      //   auto ext = wnd_ext - p2;
-      //   auto scale = std::max(img_ext.x / ext.x, img_ext.y / ext.y);
-      //   img_ext /= scale;
-      //   res = image(img2, p2, p2 + img_ext);
-      // }
-      // if (res) loop_trigger.update();
+      if (loop_trigger)
+      {
+        auto img_ext = ui::image_extent(img2);
+        auto ext = wnd_ext - p2;
+        auto scale = std::max(img_ext.x / ext.x, img_ext.y / ext.y);
+        img_ext /= scale;
+        res = image(img2, p2, p2 + img_ext);
+      }
+      if (res) loop_trigger.update();
 
       static auto blur_img_2 = false;
 
-      // ui::discard_beg([]{ ui::circle({ 50, 50 }, 50); });
-      // if (blur_img_2)
-      //   res = image(img1, {}, wnd_ext, 0x44, ui::ImageConfig::blur(5, 5));
-      // else
-      //   res = image(img1, {}, wnd_ext, 0x44);
-      // ui::rectangle({ 50, 50 }, { 100, 100 }, 0x00ff00ff);
-      // ui::discard_end();
+      ui::discard_beg([]{ ui::circle({ 50, 50 }, 50); });
+      if (blur_img_2)
+        res = image(img1, {}, wnd_ext, 0x44, ui::ImageConfig::blur(5, 5));
+      else
+        res = image(img1, {}, wnd_ext, 0x44);
+      ui::rectangle({ 50, 50 }, { 100, 100 }, 0x00ff00ff);
+      ui::discard_end();
 
       // circle point
-      // auto size = ui::window_drawable_extent();
-      // ui::circle(point_in_circle({ size.x - 30, size.y - 30}, 20, circle_lerplocator.get() * 360), 3, 0xffffffff);
-      // circle_lerplocator.update();
+      auto size = ui::window_drawable_extent();
+      ui::circle(point_in_circle({ size.x - 30, size.y - 30}, 20, circle_lerplocator.get() * 360), 3, 0xffffffff);
+      circle_lerplocator.update();
 
       auto text_cfg = ui::TextConfig{};
 
@@ -551,8 +551,7 @@ int main()
       ui::line({ text_pos.x + 30, 0 }, { text_pos.x + 30, wnd_ext.y }, 0xff0000ff);
       ui::line({ text_pos.x + 80, 0 }, { text_pos.x + 80, wnd_ext.y }, 0xff0000ff);
       ui::discard_beg([&] { ui::rectangle(text_pos + float2{ 30, 0 }, text_pos + float2{ 80, 50 }); });
-      // TODO: impl selec list
-      text_cfg.family = fonts[1].family;
+      // text_cfg.family = fonts[1].family;
       text_res = ui::text("Hello 你好 こんにちは、世界！", text_pos, 32, 0xffffffff, text_cfg);
       ui::rectangle(text_pos, text_pos + text_res.extent, 0x00ff00ff, 1);
       // ui::line({ text_pos.x, text_pos.y + text_res.ascender }, { text_pos.x + text_res.extent.x, text_pos.y + text_res.ascender }, 0xffff00ff);

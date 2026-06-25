@@ -16,12 +16,12 @@ PS_Param vs(VS_Param arg)
   return res;
 }
 
-float4 ps(PS_Param args) : SV_TARGET
+float4 ps(PS_Param arg) : SV_TARGET
 {
-  float4 col = image.Sample(g_sampler, args.composite_uv);
+  float4 col = composite_image.Sample(g_sampler, arg.composite_uv);
   float mask = 1.0;
-  if (args.mask_uv.x > 0 && args.mask_uv.x < 1 && args.mask_uv.y > 0 && args.mask_uv.y < 1)
-    mask -= mask_image.Sample(g_sampler, args.mask_uv).r;
+  if (arg.mask_uv.x > 0 && arg.mask_uv.x < 1 && arg.mask_uv.y > 0 && arg.mask_uv.y < 1)
+    mask -= mask_image.Sample(g_sampler, arg.mask_uv).r;
 
   if (col.a > 0.0) col.rgb /= col.a;
   col.a *= mask;

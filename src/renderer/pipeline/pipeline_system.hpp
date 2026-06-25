@@ -12,7 +12,6 @@ namespace tk::renderer {
 enum class PipelineType
 {
   ui,
-  text,
   window_shadow,
 
   blur_horizontal_pass,
