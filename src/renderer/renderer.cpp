@@ -10,6 +10,7 @@
 #include "context.hpp"
 #include "resource/shader_type.hpp"
 #include "config.hpp"
+#include "../ui/ui_context.hpp"
 
 #include <dwmapi.h>
 
@@ -149,12 +150,20 @@ void Renderer::process_render() noexcept
 
   // present windows
   if (_render_windows.size() == 1)
-    _res[_render_windows.back()].present(true);
+    _res[_render_windows.back()].present(_need_vsync);
   else if (_render_windows.size() > 1)
   {
     for (auto handle : _render_windows | std::views::take(_render_windows.size() - 1))
       _res[handle].present(false);
-    _res[_render_windows.back()].present(true);
+    _res[_render_windows.back()].present(_need_vsync);
+  }
+  // HACK: on some monitor, non-vsync maybe lead window flicker on resize beg and end.
+  // use duration to promise vsync avoid this case.
+  if (_need_vsync)
+  {
+    _vsync_dur += ui::g_ui_ctx.delta_time();
+    if (_vsync_dur > Cancel_Vsync_Duration)
+      _need_vsync = false;
   }
 
   // show blur window

@@ -187,6 +187,7 @@ void UIContext::render() noexcept
       {
         wnd_ctx.need_clear = false;
         g_renderer.submit({ handle });
+        g_renderer.need_vsync();
       }
       data->set_window_pos(_wnd->real_pos());
       data->add_scissor_rect(_wnd->rect());
@@ -202,6 +203,7 @@ void UIContext::render() noexcept
   {
     _fullscreen_window_need_clear = false;
     g_renderer.submit({ _fullscreen_window });
+    g_renderer.need_vsync();
   }
 
   postprocess_render();

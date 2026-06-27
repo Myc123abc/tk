@@ -37,6 +37,8 @@ public:
 
   void clear_blur_resize_data() noexcept { _blur_host_window = {}; _blur_window_rect = {}; }
 
+  void need_vsync() noexcept { _need_vsync = true; _vsync_dur = {}; }
+
 private:
   void init_images() noexcept;
   void destroy_images() noexcept;
@@ -64,6 +66,9 @@ private:
 
   ImageHandle _discard_image;
   ImageHandle _composite_image;
+
+  bool   _need_vsync{};
+  double _vsync_dur{};
 )
 
 }

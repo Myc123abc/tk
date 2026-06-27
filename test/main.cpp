@@ -449,9 +449,7 @@ int main()
 
       auto wnd_ext = ui::window_drawable_extent();
       ui::rectangle({}, wnd_ext, 0x282c34ff);
-      // ui::rectangle({}, wnd_ext, 0xffffffff);
 
-      #if 1
       if (ui::get_key(ui::Key::Q)) wnd2_is_closed = true;
 
       // playback button
@@ -550,7 +548,7 @@ int main()
 
       ui::line({ text_pos.x + 30, 0 }, { text_pos.x + 30, wnd_ext.y }, 0xff0000ff);
       ui::line({ text_pos.x + 80, 0 }, { text_pos.x + 80, wnd_ext.y }, 0xff0000ff);
-      ui::discard_beg([&] { ui::rectangle(text_pos + float2{ 30, 0 }, text_pos + float2{ 80, 50 }); });
+      ui::discard_beg([&] { ui::rectangle(text_pos + float2{ 30, -2 }, text_pos + float2{ 80, 50 }); });
       // text_cfg.family = fonts[1].family;
       text_res = ui::text("Hello 你好 こんにちは、世界！", text_pos, 32, 0xffffffff, text_cfg);
       ui::rectangle(text_pos, text_pos + text_res.extent, 0x00ff00ff, 1);
@@ -566,7 +564,6 @@ int main()
           cfg.backdrop.default_blur();
         blur_img_2 = !blur_img_2;
       }
-      #endif
 
       select_font();
 

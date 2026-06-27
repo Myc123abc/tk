@@ -172,6 +172,8 @@ void FrameData::build_render_cmds() noexcept
 {
   for (auto idx = 0u; idx < _draw_cmds.size(); ++idx)
     build_render_cmd(_draw_cmds[idx], idx);
+  err_if(_build_mode.contains(BuildMode::uni), "union_end not be called");
+  err_if(_build_mode.contains(BuildMode::discard), "discard_end not be called");
 }
 
 }
