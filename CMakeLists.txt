@@ -16,10 +16,18 @@ set(CLIPPER2_UTILS OFF)
 set(CLIPPER2_EXAMPLES OFF)
 set(CLIPPER2_TESTS OFF)
 
+set(MSDFGEN_CORE_ONLY ON)
+set(MSDFGEN_BUILD_STANDALONE OFF)
+set(MSDFGEN_USE_SKIA OFF)
+set(MSDFGEN_DISABLE_SVG ON)
+set(MSDFGEN_DISABLE_PNG ON)
+set(MSDFGEN_DYNAMIC_RUNTIME ON)
+
 add_subdirectory(vendor/DirectX-Headers)
 add_subdirectory(vendor/freetype)
 add_subdirectory(vendor/harfbuzz)
 add_subdirectory(vendor/Clipper2/CPP)
+add_subdirectory(vendor/msdfgen)
 
 # when generator not vs, rc files will be built fail
 if (NOT "${CMAKE_GENERATOR}" MATCHES "Visual Studio")
@@ -58,6 +66,7 @@ target_link_libraries(tk
     harfbuzz
     libunibreak
     Clipper2
+    msdfgen::msdfgen
 )
 
 add_executable(test test/main.cpp)
