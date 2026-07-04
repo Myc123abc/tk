@@ -148,7 +148,7 @@ private:
 public:
   void add_mouse_left_button_state(size_t id, float2 left_top, float2 right_bottom) noexcept;
   auto is_cursor_move_out(size_t id) noexcept -> bool;
-  auto is_mouse_left_button_down_on(size_t id) noexcept -> bool;
+  auto is_last_mouse_down_id(size_t id) const noexcept { return _btn_state.id == id; }
 
   //
   // key state

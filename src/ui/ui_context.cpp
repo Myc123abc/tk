@@ -224,7 +224,7 @@ void UIContext::postprocess_render() noexcept
 {
   // clear state
   _ids.clear();
-  if (mouse_up_window) clear_state();
+  if (mouse_up_pos) clear_state();
 
   // update cursor hovered widget id
   if (!_hovered_widget_ids.empty())
@@ -320,11 +320,6 @@ void UIContext::add_mouse_left_button_state(size_t id, float2 left_top, float2 r
 auto UIContext::is_cursor_move_out(size_t id) noexcept -> bool
 {
   return _btn_state.id != id ? false : _btn_state.move_out;
-}
-
-auto UIContext::is_mouse_left_button_down_on(size_t id) noexcept -> bool
-{
-  return _btn_state.id == id && get_key(Key::Mouse_Left_Button).contains(KeyState::down);
 }
 
 void UIContext::render_on(float x, float y, std::move_only_function<void()>&& func) noexcept

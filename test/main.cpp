@@ -345,7 +345,7 @@ void select_font() noexcept
     .text_color   = 0x000000ff,
   };
   auto items = std::vector<std::string_view>{
-    "一覧", // TODO: sdf render not good on px size 12 in this glyph
+    "一覧",
     "により",
     "三回",
     "asd",
@@ -368,28 +368,40 @@ void select_font() noexcept
 void silder(std::string_view name, float x, float y, float width, float height, float beg, float end, float& v) noexcept
 {
   if (beg >= end && width > 0 && height > 0) return;
+
+  auto id_name   = "tk::ui::silder";
+  auto bar_name  = std::format("{}::{}::{}", id_name, name, "bar");
+  auto knob_name = std::format("{}::{}::{}", id_name, name, "knob");
   
   v = std::clamp(v, beg, end);
-  auto ratio = v / (end - beg);
 
-  auto r      = height / 2;
-  auto len    = width - 2 * r;
-  auto center = float2{ x + r + len * ratio, y + r };
-
+  auto ratio    = (v - beg) / (end - beg);
+  auto r        = height / 2;
+  auto len      = width - 2 * r;
+  auto center   = float2{ x + r + len * ratio, y + r };
   auto left_top = float2{ x + r, y + r / 2 };
-  ui::rectangle(left_top, { left_top.x + len, left_top.y + r }, 0x808080ff);
 
-  auto circle_col = 0xff00ffff;
-  auto state = ui::button(name, center.x - r, center.y - r, r * 2, r * 2);
-  if (state.hovered)
-    circle_col = 0x0000ffff;
-  if (state.down)
+  auto bar_color        = 0x808080ff;
+  auto bar_hover_color  = 0xa0a0a0ff;
+  auto knob_color       = 0xff00ffff;
+  auto knob_hover_color = 0x0000ffff;
+
+  auto bar_state  = ui::button(bar_name, x, y, width, height);
+  auto knob_state = ui::button(name, center.x - r, center.y - r, r * 2, r * 2);
+
+  if (bar_state.hovered)  bar_color  = bar_hover_color;
+  if (knob_state.hovered) knob_color = knob_hover_color;
+
+  if (knob_state.down || bar_state.clicked)
   {
-    auto pos = ui::get_cursor_pos_on_window();
-    info("x {} y {}", pos.x, pos.y);
+    knob_color = knob_hover_color;
+    auto cursor_x  = ui::get_cursor_pos_on_window().x;
+    auto cur_ratio = std::clamp((cursor_x - x - r) / len, 0.f, 1.f);
+    v = beg + cur_ratio * (end - beg);
   }
-  ui::circle(center, r, circle_col);
 
+  ui::rectangle(left_top, { x + r + len, y + r / 2 + r }, bar_color);
+  ui::circle(center, r, knob_color);
 }
 
 int main()
@@ -460,8 +472,8 @@ int main()
       ui::add_move_invalid_area({}, { 150, 150 });
 
       // silder
-      float outline_width{};
-      silder("silder_test", 0, 90, 100, 10, 0, 100, outline_width);
+      static float outline_width{};
+      silder("silder_test", 0, 90, 100, 10, 0, 0.5, outline_width);
       ui::text(std::format("outline width : {}", outline_width), { 0, 90 }, 24, 0x00ff00ff);
 
       auto cfg = ui::TextConfig{};
@@ -611,7 +623,7 @@ int main()
         load_font("assets/font/NotoSansJP-Regular.ttf");
       }
 
-      // select_font();
+      select_font();
 
       ui::end();
     }

@@ -177,7 +177,8 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     if (LOWORD(w_param) == WA_INACTIVE)
     {
       finish_moving_or_resizing(handle);
-      g_ui_ctx.clear_state();
+      if (GetAsyncKeyState(VK_LBUTTON) >= 0)
+        g_ui_ctx.clear_state();
     }
 
     if (windows.contains(handle))
