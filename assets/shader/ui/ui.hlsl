@@ -28,6 +28,17 @@ PS_Param vs(VS_Param arg)
 #define Vtx_Type_Image 1
 #define Vtx_Type_Text  2
 
+float2 px_range = float2(2, 2);
+
+float screen_px_range(float2 extent, uint2 uv)
+{
+  float2 unit_range = px_range / extent;
+  float2 screen_tex_size = rsqrt(sqrt(ddx(uv.x)) + sqrt(ddy(uv.y)));
+  return max(0.5 * dot(unit_range, screen_tex_size), 1.0);
+}
+
+float median(float r, float g, float b) { return max(min(r, g), min(max(r, g), b)); }
+
 float4 ps(PS_Param arg) : SV_TARGET
 {
   if (arg.type == Vtx_Type_Shape)
@@ -38,29 +49,29 @@ float4 ps(PS_Param arg) : SV_TARGET
   //
   // text render
   //
+  Texture2D img = images[NonUniformResourceIndex(arg.img_idx)];
 
-  // reference: https://computergraphics.stackexchange.com/questions/306/sharp-corners-with-signed-distance-fields-fonts
-  // author: Detheroc
-  float d = images[NonUniformResourceIndex(arg.img_idx)].Sample(g_sampler, arg.uv).r - 0.5;
-  float w = fwidth(d);
-  float inner_alpha = clamp(d / w + 0.5, 0.0, 1.0);
+  uint2 extent;
+  img.GetDimensions(extent.x, extent.y);
 
-  float4 color;
+  float3 msd = img.Sample(g_sampler, arg.uv).rgb;
+  float sd   = median(msd.r, msd.g, msd.b);
+  float screen_range       = screen_px_range(extent, arg.uv);
+  float distance_from_edge = sd - 0.5;
+  float inner_alpha        = clamp(screen_range * distance_from_edge + 0.5, 0.0, 1.0);
+
   float4 inner_color = arg.col;
   float4 outer_color = arg.outer_col;
 
   if (outer_color.a == 0.0)
-    color = float4(inner_color.rgb, inner_color.a * inner_alpha);
-  else
-  {
-    if (inner_color.a == 0)
-      inner_color = float4(0.0, 0.0, 0.0, 0.0);
-    else
-      inner_color *= inner_alpha;
+    return float4(inner_color.rgb, inner_color.a * inner_alpha);
 
-    // reference: https://www.redblobgames.com/x/2404-distance-field-effects/
-    float outer_alpha = clamp((d + arg.outer_width) / w + 0.5, 0.0, 1.0);
-    color = inner_color + (outer_color * (outer_alpha - inner_alpha));
-  }
-  return color;
+  if (inner_color.a == 0)
+    inner_color = float4(0.0, 0.0, 0.0, 0.0);
+  else
+    inner_color *= inner_alpha;
+
+  // reference: https://www.redblobgames.com/x/2404-distance-field-effects/
+  float outer_alpha = clamp(screen_range * (distance_from_edge + arg.outer_width) + 0.5, 0.0, 1.0);
+  return inner_color + (outer_color * (outer_alpha - inner_alpha));
 }

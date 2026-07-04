@@ -16,6 +16,7 @@ struct ButtonState
   bool clicked{};
   bool hovered{};
   bool move_out{};
+  bool down{};
 
   constexpr operator bool() const noexcept
   {

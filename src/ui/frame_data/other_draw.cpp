@@ -61,17 +61,24 @@ void FrameData::_add_text(TextParseResultHandle handle, float2 pos, float size, 
   auto cnt = result.advances.size();
   assert(cnt == result.text.size());
 
-  auto const& infos              = g_text_engine.get_glyph_infos(result.style);
-  auto const& missing_glyph_info = g_text_engine.get_missing_glyph_info();
+  GlyphInfo const* info{};
+  GlyphInfo const* notdef_glyph_info{};
+
+  auto const& infos = g_text_engine.get_glyph_infos(result.style);
 
   auto [vertices, indices] = expand_beg(4 * cnt, 6 * cnt);
   auto vtx_offset = 0, idx_offset = 0;
   for (auto i = 0; i < cnt; ++i)
   {
-    auto const& info = infos.contains(result.text[i])
-      ? infos.at(result.text[i])
-      : missing_glyph_info;
-    info.set_vertices(vertices + vtx_offset, pos, size, result.ascender, inner_color, outer_color, outline_width);
+    if (infos.contains(result.text[i]))
+      info = &infos.at(result.text[i]);
+    else
+    {
+      if (!notdef_glyph_info) notdef_glyph_info = &g_text_engine.get_notdef_glyph_info(result.style);
+      info = notdef_glyph_info;
+    }
+
+    info->set_vertices(vertices + vtx_offset, pos, size, result.ascender, inner_color, outer_color, outline_width);
 
     auto vtx_beg = _vertex_beg + vtx_offset;
     indices[idx_offset + 0] = static_cast<uint16>(vtx_beg + 0);
@@ -83,7 +90,7 @@ void FrameData::_add_text(TextParseResultHandle handle, float2 pos, float size, 
 
     vtx_offset += 4;
     idx_offset += 6;
-    pos        += result.advances[i] * info.get_scale(size);
+    pos        += result.advances[i] * info->get_scale(size);
   }
   expand_end();
 }

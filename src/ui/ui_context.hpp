@@ -86,6 +86,8 @@ public:
   auto window() const noexcept { return _wnd; }
   auto frame_data() noexcept { return &_wnd_ctx->frame_data; }
 
+  void postprocess() const noexcept;
+
 private:
   void update_window_config(WindowConfig const& cfg) noexcept;
 
@@ -129,6 +131,7 @@ public:
   std::optional<int2> mouse_up_pos;
   bool                is_move_from_maximize{};
   bool                draw_title_bar{};
+  bool                is_last_mouse_up{};
 
   //
   // button state
@@ -145,6 +148,7 @@ private:
 public:
   void add_mouse_left_button_state(size_t id, float2 left_top, float2 right_bottom) noexcept;
   auto is_cursor_move_out(size_t id) noexcept -> bool;
+  auto is_mouse_left_button_down_on(size_t id) noexcept -> bool;
 
   //
   // key state

@@ -164,10 +164,22 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   }
 
   case WM_SETFOCUS:
-  case WM_ACTIVATE:
   case WM_SIZE:
   case WM_MOVE:
   {
+    if (windows.contains(handle))
+      windows[handle].keep_blur_window_behind();
+    break;
+  }
+
+  case WM_ACTIVATE:
+  {
+    if (LOWORD(w_param) == WA_INACTIVE)
+    {
+      finish_moving_or_resizing(handle);
+      g_ui_ctx.clear_state();
+    }
+
     if (windows.contains(handle))
       windows[handle].keep_blur_window_behind();
     break;
@@ -280,20 +292,18 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   case WM_LBUTTONUP:
   {
     finish_moving_or_resizing(handle);
+    g_ui_ctx.is_last_mouse_up = true;
     break;
   }
 
   case WM_CANCELMODE:
   {
-    if (LOWORD(w_param) == WA_INACTIVE)
-    {
-      finish_moving_or_resizing(handle);
-      g_ui_ctx.clear_state();
-    }
+    finish_moving_or_resizing(handle);
+    g_ui_ctx.clear_state();
     break;
+  }
 
   case WM_SETCURSOR: return true;
-  }
 
   }
 
@@ -308,6 +318,8 @@ void WindowManager::update() noexcept
 void WindowManager::update_cursor() noexcept
 {
   if (_resizing) return;
+  if (GetAsyncKeyState(VK_LBUTTON) < 0) return;
+
   if (g_ui_ctx.cursor_on_window = get_cursor_on_window(); g_ui_ctx.cursor_on_window)
   {
     auto const& cursor_on_window = _windows[g_ui_ctx.cursor_on_window];

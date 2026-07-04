@@ -1,18 +1,149 @@
 #include "text_engine.hpp"
 #include "util/error_handling.hpp"
 #include "../../renderer/resource/image_manager.hpp"
-#include "missing-glyph-sdf-bitmap.hpp"
 #include "../../util/file_manager.hpp"
 #include "../../renderer/engine/copy_engine.hpp"
 
 #include <hb-ft.h>
 #include <utf8.h>
+#include FT_OUTLINE_H
 
 #include <ranges>
 
 #define check(x, msg) err_if(static_cast<bool>(x), "[TextEngine] {}", msg)
 
+using namespace tk;
+using namespace tk::ui;
 using namespace tk::renderer;
+
+namespace {
+
+constexpr auto Notdef_Glyph_Unicode = std::numeric_limits<uint>::max();
+
+struct FtContext
+{
+  double           scale{};
+  msdfgen::Point2  position{};
+  msdfgen::Shape   *shape{};
+  msdfgen::Contour *contour{};
+};
+
+auto ftPoint2(const FT_Vector &vector, double scale) noexcept
+{
+  return msdfgen::Point2(scale*vector.x, scale*vector.y);
+}
+
+auto ftMoveTo(const FT_Vector *to, void *user) noexcept
+{
+  FtContext *context = reinterpret_cast<FtContext *>(user);
+  if (!(context->contour && context->contour->edges.empty()))
+    context->contour = &context->shape->addContour();
+  context->position = ftPoint2(*to, context->scale);
+  return 0;
+}
+
+auto ftLineTo(const FT_Vector *to, void *user) noexcept
+{
+  FtContext *context = reinterpret_cast<FtContext *>(user);
+  auto endpoint = ftPoint2(*to, context->scale);
+  if (endpoint != context->position)
+  {
+    context->contour->addEdge(msdfgen::EdgeHolder(context->position, endpoint));
+    context->position = endpoint;
+  }
+  return 0;
+}
+
+auto ftConicTo(const FT_Vector *control, const FT_Vector *to, void *user) noexcept
+{
+  FtContext *context = reinterpret_cast<FtContext *>(user);
+  auto endpoint = ftPoint2(*to, context->scale);
+  if (endpoint != context->position)
+  {
+    context->contour->addEdge(msdfgen::EdgeHolder(context->position, ftPoint2(*control, context->scale), endpoint));
+    context->position = endpoint;
+  }
+  return 0;
+}
+
+auto ftCubicTo(const FT_Vector *control1, const FT_Vector *control2, const FT_Vector *to, void *user) noexcept
+{
+  FtContext *context = reinterpret_cast<FtContext *>(user);
+  auto endpoint = ftPoint2(*to, context->scale);
+  if (endpoint != context->position || crossProduct(ftPoint2(*control1, context->scale)-endpoint, ftPoint2(*control2, context->scale)-endpoint))
+  {
+    context->contour->addEdge(msdfgen::EdgeHolder(context->position, ftPoint2(*control1, context->scale), ftPoint2(*control2, context->scale), endpoint));
+    context->position = endpoint;
+  }
+  return 0;
+}
+
+auto get_shape(FT_GlyphSlot glyph, uint glyph_idx, double scale) noexcept
+{
+  // read outline
+  auto shape = msdfgen::Shape{};
+  shape.setYAxisOrientation(msdfgen::Y_DOWNWARD);
+
+  auto ctx = FtContext{};
+  ctx.scale = scale;
+  ctx.shape = &shape;
+
+  auto outline_funcs = FT_Outline_Funcs{};
+  outline_funcs.move_to  = &ftMoveTo;
+  outline_funcs.line_to  = &ftLineTo;
+  outline_funcs.conic_to = &ftConicTo;
+  outline_funcs.cubic_to = &ftCubicTo;
+  outline_funcs.shift    = 0;
+  outline_funcs.delta    = 0;
+  auto err = FT_Outline_Decompose(&glyph->outline, &outline_funcs, &ctx);
+  assert(!err);
+
+  if (!shape.contours.empty() && shape.contours.back().edges.empty())
+    shape.contours.pop_back();
+
+  // validate and normalize shape
+  assert(shape.validate());
+  shape.normalize();
+
+  return std::move(shape);
+}
+
+auto generate_msdf(msdfgen::Shape& shape) noexcept -> std::pair<msdfgen::Bitmap<float, 3>, float2>
+{
+  if (shape.contours.empty()) return {};
+
+  static auto const px_range      = msdfgen::Range{ 2 };
+  static auto const scale         = msdfgen::Vector2{ FT_Pixel_Size };
+  static auto const range         = px_range / std::min(scale.x, scale.y);
+  static auto const sd_zero_value = range.lower != range.upper ? float(range.lower/(range.lower-range.upper)) : .5f;
+
+  static auto const generator_cfg        = msdfgen::MSDFGeneratorConfig{ true };
+  static auto const post_err_correct_cfg = msdfgen::MSDFGeneratorConfig{ true,
+    msdfgen::ErrorCorrectionConfig{ msdfgen::ErrorCorrectionConfig::DISABLED, msdfgen::ErrorCorrectionConfig::DO_NOT_CHECK_DISTANCE }};
+
+  auto bounds    = shape.getBounds();
+  auto min_x     = bounds.l + range.lower;
+  auto min_y     = bounds.b + range.lower;
+  auto max_x     = bounds.r + range.upper;
+  auto max_y     = bounds.t + range.upper;
+  auto width     = std::ceil((max_x - min_x) * scale.x);
+  auto height    = std::ceil((max_y - min_y) * scale.y);
+  auto translate = msdfgen::Vector2{ -min_x, -min_y };
+  auto offset    = float2{ static_cast<float>(min_x * scale.x), static_cast<float>(-max_y * scale.y) };
+
+  // generate msdf
+  auto msdf           = msdfgen::Bitmap<float, 3>(width, height);
+  auto transformation = msdfgen::SDFTransformation{ msdfgen::Projection{ scale, translate }, range};
+  msdfgen::edgeColoringSimple(shape, 3, 0);
+  msdfgen::generateMSDF(msdf, shape, transformation, generator_cfg);
+
+  msdfgen::distanceSignCorrection(msdf, shape, transformation, sd_zero_value, msdfgen::FILL_NONZERO);
+  msdfgen::msdfErrorCorrection(msdf, shape, transformation, post_err_correct_cfg);
+
+  return { std::move(msdf), offset };
+}
+
+}
 
 namespace tk::ui {
 
@@ -32,7 +163,7 @@ auto Font::init(std::string_view path) noexcept -> uint8
   _family   = _face->family_name;
 
   using enum FontStyle;
-  switch (_face->style_flags)
+  switch (_face->style_flags & 0b11)
   {
   case FT_STYLE_FLAG_ITALIC:
     _style = italic;
@@ -57,24 +188,45 @@ void Font::destroy() const noexcept
   check(FT_Done_Face(_face), "failed to destroy font");
 }
 
-auto Font::generate_sdf_bitmap(uint glyph_idx, uint unicode, FontStyle style) const noexcept -> SDFBitmap
+auto Font::generate_msdf_bitmap(uint glyph_idx, uint unicode, FontStyle style) const noexcept -> MSDFBitmap
 {
-  assert(glyph_idx);
-  check(FT_Load_Glyph(_face, glyph_idx, FT_LOAD_RENDER), "failed to load glyph with render");
-  auto glyph = _face->glyph;
-  check(FT_Render_Glyph(glyph, FT_RENDER_MODE_NORMAL), "failed to render bitmap");
-  check(FT_Render_Glyph(glyph, FT_RENDER_MODE_SDF), "failed to render sdf bitmap");
-  auto ft_bitmap = _face->glyph->bitmap;
-  auto bitmap = SDFBitmap{};
-  bitmap.extent      = { ft_bitmap.width, ft_bitmap.rows };
-  bitmap.unicode     = unicode;
-  bitmap.style       = style;
-  bitmap.left_offset = glyph->bitmap_left;
-  bitmap.up_offset   = -glyph->bitmap_top;
-  bitmap.data = g_text_engine._mem_pool.vector<uint8>();
-  bitmap.data.resize(bitmap.extent.x * bitmap.extent.y);
-  memcpy(bitmap.data.data(), ft_bitmap.buffer, bitmap.data.size());
+  // load glyph
+  check(FT_Load_Glyph(_face, glyph_idx, FT_LOAD_NO_SCALE), "failed to load glyph no scale");
+
+  // calc scale
+  auto scale = 1.0 / (_face->units_per_EM ? _face->units_per_EM : 1);
+
+  // generate msdf bitmap
+  auto shape              = get_shape(_face->glyph, glyph_idx, scale);
+  auto [msdf, pos_offset] = generate_msdf(shape);
+
+  auto bitmap = MSDFBitmap{};
+  bitmap.extent     = { msdf.width(), msdf.height() };
+  bitmap.unicode    = unicode;
+  bitmap.style      = style;
+  bitmap.data       = g_text_engine._mem_pool.vector<uint8>();
+  bitmap.pos_offset = pos_offset;
+  bitmap.data.resize(bitmap.extent.x * bitmap.extent.y * 4);
+
+  auto cnt  = bitmap.extent.x * bitmap.extent.y;
+  auto data = static_cast<float*>(msdf);
+  for (auto i = 0; i < cnt; ++i)
+  {
+    auto to = [](float v) -> uint8 { return std::clamp(v, 0.f, 1.f) * 255.f + .5f; };
+    bitmap.data[i * 4 + 0] = to(data[i * 3 + 0]);
+    bitmap.data[i * 4 + 1] = to(data[i * 3 + 1]);
+    bitmap.data[i * 4 + 2] = to(data[i * 3 + 2]);
+    bitmap.data[i * 4 + 3] = 255;
+  }
+
   return bitmap;
+}
+
+auto Font::get_glyph_advance(uint glyph_idx) const noexcept -> float2
+{
+  check(FT_Load_Glyph(_face, glyph_idx, FT_LOAD_DEFAULT), "failed to load glyph for advance");
+  auto glyph = _face->glyph;
+  return { static_cast<float>(glyph->advance.x) / 64, static_cast<float>(glyph->advance.y) / 64 };
 }
 
 void TextEngine::init() noexcept
@@ -83,7 +235,7 @@ void TextEngine::init() noexcept
   _hb_buf = hb_buffer_create();
 
   // create the first glyph atlas
-  _glyph_atlas.emplace_back(g_img_mgr.create(Glyph_Atlas_Width, Glyph_Atlas_Height, ImageFormat::r8_unorm, ImageType::srv));
+  _glyph_atlas.emplace_back(g_img_mgr.create(Glyph_Atlas_Width, Glyph_Atlas_Height, ImageFormat::rgba8_unorm, ImageType::srv));
 }
 
 void TextEngine::destroy() noexcept
@@ -98,8 +250,6 @@ void TextEngine::destroy() noexcept
 
   hb_buffer_destroy(_hb_buf);
   check(FT_Done_FreeType(_ft), "failed to destroy freetype");
-
-  assert(_discard_text_parse_result_handles.empty());
 }
 
 auto TextEngine::load_font(std::string_view path) noexcept -> std::expected<FontInfo, FontLoadErrorType>
@@ -116,27 +266,30 @@ auto TextEngine::load_font(std::string_view path) noexcept -> std::expected<Font
   // create font
   auto font = Font{};
   if (auto res = font.init(path); res) return std::unexpected(FontLoadError::freetype_err{ res });
-  auto info = FontInfo{ font._family, font._style };
-  _fonts[font.style()].emplace_back(std::move(font));
+  auto info  = FontInfo{ font._family, font._style };
+  auto style = font.style();
+  _fonts[style].emplace_back(std::move(font));
 
   // clear missing glyphs and cached text advances
-  _missing_glyphs[font.style()].clear();
-  for (auto const& [style, text] : _cached_texts_with_missing_glyphs)
+  _missing_glyphs[style].clear();
+  for (auto const& text : _cached_texts_with_missing_glyphs[style])
   {
     auto h = _cached_text_parse_results[style][text.data()];
     assert(h.valid());
     _discard_text_parse_result_handles.emplace_back(h);
     _cached_text_parse_results[style].erase(text);
   }
-  _cached_texts_with_missing_glyphs.clear();
+  _cached_texts_with_missing_glyphs[style].clear();
+
+  // clear notdef missing font
+  // TODO: when expand glyph release feature, need to process old notdef glyph release too
+  if (_missing_notdef_font_styles.erase(style))
+  {
+    _uncached_glyphs[style].erase(Notdef_Glyph_Unicode);
+    _uncached_glyphs[style].emplace(Notdef_Glyph_Unicode, std::make_pair(&_fonts[style].front(), 0));
+  }
 
   return info;
-}
-
-void TextEngine::clear_discard_text_parse_results() noexcept
-{
-  for (auto h : _discard_text_parse_result_handles) _parse_result_pool.free(h);
-  _discard_text_parse_result_handles.clear();
 }
 
 auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view family) noexcept -> TextParseResultHandle
@@ -180,21 +333,19 @@ auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view 
     else
     {
       has_missing_glyphs = true;
-      static auto missing_glyph_position_info = float2{ Missing_Glyph_Advance_X * Missing_Glyph_Size / FT_Pixel_Size,
-                                                        Missing_Glyph_Advance_Y * Missing_Glyph_Size / FT_Pixel_Size };
-      res.advances.resize(res.advances.size() + text.size(), missing_glyph_position_info);
-      res.extent.x += res.advances.size() * missing_glyph_position_info.x;
+      auto notdef_glyph_font = find_notdef_glyph_font(style).first;
+      assert(notdef_glyph_font);
+      auto notdef_glyph_advance = notdef_glyph_font->get_glyph_advance(0);
+      res.advances.resize(res.advances.size() + text.size(), notdef_glyph_advance);
+      res.extent.x += text.size() * notdef_glyph_advance.x;
+      _max_ascender = std::max(_max_ascender, notdef_glyph_font->_ascender);
+      _max_height   = std::max(_max_height,   notdef_glyph_font->_height);
+      add_notdef_glyph(style);
     }
   }
 
   if (has_missing_glyphs) 
-  {
-    // cache text with missing glyphs
-    _cached_texts_with_missing_glyphs.emplace_back(style, text.data());
-    // update max info
-    _max_ascender = std::max(_max_ascender, Missing_Glyph_Font_Ascender);
-    _max_height   = std::max(_max_height, Missing_Glyph_Font_Height);
-  }
+    _cached_texts_with_missing_glyphs[style].emplace_back(text.data());
 
   res.ascender = _max_ascender;
   res.extent.y = _max_height;
@@ -256,6 +407,33 @@ auto TextEngine::find_font(uint unicode, FontStyle style) noexcept -> Font*
   return it == fonts->second.end() ? nullptr : &*it;
 }
 
+auto font_style_str(FontStyle style) noexcept
+{
+  switch (style)
+  {
+  case FontStyle::regular:     return "regular";
+  case FontStyle::bold:        return "bold";
+  case FontStyle::italic:      return "italic";
+  case FontStyle::italic_bold: return "italic_bold";
+  default: std::unreachable();
+  }
+}
+
+auto TextEngine::find_notdef_glyph_font(FontStyle style) noexcept -> std::pair<Font*, bool>
+{
+  if (auto fonts = _fonts.find(style); fonts != _fonts.end() && !fonts->second.empty())
+    return { &fonts->second.front(), false };
+
+  if (auto fonts = _fonts.find(FontStyle::regular); fonts != _fonts.end() && !fonts->second.empty())
+    return { &fonts->second.front(), true };
+
+  for (auto& [font_style, fonts] : _fonts)
+    if (!fonts.empty()) return { &fonts.front(), true };
+
+  err_if(true, "there are not have any font be loaded!");
+  std::unreachable();
+}
+
 void TextEngine::add_uncached_glyphs(std::u32string_view text, FontStyle style) noexcept
 {
   for (auto ch : text)
@@ -268,6 +446,17 @@ void TextEngine::add_uncached_glyphs(std::u32string_view text, FontStyle style) 
         _missing_glyphs[style].emplace(ch);
     }
   }
+}
+
+void TextEngine::add_notdef_glyph(FontStyle style) noexcept
+{
+  if (glyph_infos_has(Notdef_Glyph_Unicode, style) || uncached_glyphs_has(Notdef_Glyph_Unicode, style)) return;
+
+  auto [font, is_fallback] = find_notdef_glyph_font(style);
+  if (!font) return;
+  if (is_fallback) _missing_notdef_font_styles.emplace(style);
+
+  _uncached_glyphs[style].emplace(Notdef_Glyph_Unicode, std::make_pair(font, 0));
 }
 
 auto TextEngine::find_glyph(uint unicode, FontStyle style) noexcept -> std::optional<std::pair<Font*, uint>>
@@ -310,38 +499,29 @@ auto TextEngine::calc_glyph_pos(float2 extent) noexcept -> std::pair<uint, float
     }
 
     ++current_glyph_atlas_idx;
-    _glyph_atlas.emplace_back(g_img_mgr.create(Glyph_Atlas_Width, Glyph_Atlas_Height, ImageFormat::r8_unorm, ImageType::srv));
+    _glyph_atlas.emplace_back(g_img_mgr.create(Glyph_Atlas_Width, Glyph_Atlas_Height, ImageFormat::rgba8_unorm, ImageType::srv));
     current_pos                   = {};
     current_line_max_glyph_height = {};
   }
 }
 
-auto TextEngine::get_missing_glyph_info() noexcept -> GlyphInfo const&
+auto TextEngine::get_notdef_glyph_info(FontStyle style) noexcept -> GlyphInfo const&
 {
-  return _glyph_infos[FontStyle::regular].at(Missing_Glyph_Unicode);
+  if (auto infos = _glyph_infos.find(style); infos != _glyph_infos.end())
+    if (infos->second.contains(Notdef_Glyph_Unicode))
+      return infos->second.at(Notdef_Glyph_Unicode);
+
+  for (auto const& [font_style, infos] : _glyph_infos)
+    if (infos.contains(Notdef_Glyph_Unicode))
+      return infos.at(Notdef_Glyph_Unicode);
+
+  assert(false);
+  std::unreachable();
 }
 
 void TextEngine::upload_uncached_glyphs() noexcept
 {
   auto& pending_copy_glyphs = _pending_copy_glyphs.data();
-
-  // cache missing glyph
-  if (!_glyph_infos[FontStyle::regular].contains(Missing_Glyph_Unicode))
-  {
-    // copy missing glyph sdf bitmap
-    auto bitmap = SDFBitmap{};
-    bitmap.data.resize(sizeof(Missing_Glyph_SDF_Bitmap));
-    memcpy(bitmap.data.data(), Missing_Glyph_SDF_Bitmap, bitmap.data.size());
-    bitmap.extent      = { Missing_Glyph_Width, Missing_Glyph_Height };
-    bitmap.unicode     = Missing_Glyph_Unicode;
-    bitmap.style       = FontStyle::regular;
-    bitmap.left_offset = Missing_Glyph_Left_Offset;
-    bitmap.up_offset   = Missing_Glyph_Up_Offset;
-
-    // add to pending copy glyphs
-    auto [glyph_atlas_idx, cpy_pos] = calc_glyph_pos({ Missing_Glyph_Width, Missing_Glyph_Height });
-    pending_copy_glyphs[glyph_atlas_idx].emplace_back(std::move(bitmap), cpy_pos);
-  }
 
   if (_uncached_glyphs.empty()) return;
 
@@ -350,7 +530,7 @@ void TextEngine::upload_uncached_glyphs() noexcept
     for (auto const& [unicode, pair] : infos)
     {
       auto [font, glyph_idx] = pair;
-      auto bitmap = font->generate_sdf_bitmap(glyph_idx, unicode, style);
+      auto bitmap = font->generate_msdf_bitmap(glyph_idx, unicode, style);
       auto [glyph_atlas_idx, cpy_pos] = calc_glyph_pos(bitmap.extent);
       pending_copy_glyphs[glyph_atlas_idx].emplace_back(std::move(bitmap), cpy_pos);
     }
@@ -361,7 +541,7 @@ void TextEngine::upload_uncached_glyphs() noexcept
   for (auto const& [glyph_atlas_idx, bitmap_infos] : pending_copy_glyphs)
   {
     for (auto const& [bitmap, pos] : bitmap_infos)
-      _glyph_infos[bitmap.style].emplace(bitmap.unicode, GlyphInfo{ glyph_atlas_idx, pos, bitmap.extent, bitmap.left_offset, bitmap.up_offset });
+      _glyph_infos[bitmap.style].insert_or_assign(bitmap.unicode, GlyphInfo{ glyph_atlas_idx, pos, bitmap.extent, bitmap.pos_offset });
 
     auto bitmap_cpy_infos = bitmap_infos
       | std::views::filter([](auto const& bitmap_info) { return !bitmap_info.first.empty(); })
@@ -394,6 +574,13 @@ void GlyphInfo::set_vertices(renderer::Vertex* vtx, float2 pos, float size, floa
   vtx[1] = { p1, { max_x, min_y }, col, packed, outer_col, outer_width };
   vtx[2] = { p2, { max_x, max_y }, col, packed, outer_col, outer_width };
   vtx[3] = { p3, { min_x, max_y }, col, packed, outer_col, outer_width };
+}
+
+void TextEngine::postprocess() noexcept
+{
+  for (auto h : _discard_text_parse_result_handles)
+    _parse_result_pool.free(h);
+  _discard_text_parse_result_handles.clear();
 }
 
 }

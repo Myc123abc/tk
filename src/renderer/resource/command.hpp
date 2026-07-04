@@ -49,7 +49,7 @@ public:
   void transform(std::initializer_list<TransformInfo> infos) const noexcept;
 
   template <std::ranges::input_range R>
-  requires std::convertible_to<std::ranges::range_value_t<R>, TransformInfo>
+  requires std::convertible_to<std::ranges::range_value_t<R>, Command::TransformInfo>
   void transform(R&& range) const noexcept;
 
   void clear(ImageHandle image, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) const noexcept;

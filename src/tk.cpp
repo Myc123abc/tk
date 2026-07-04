@@ -5,8 +5,6 @@
 #include "util/thread_pool.hpp"
 #include "util/file_manager.hpp"
 
-#include "msdf.hpp"
-
 using namespace tk::renderer;
 using namespace tk::ui;
 
@@ -14,7 +12,6 @@ namespace tk {
 
 void init() noexcept
 {
-  test_msdfgen();
   g_thread_pool.init();
   g_renderer.init();
   g_wnd_mgr.init();
@@ -38,6 +35,7 @@ void update() noexcept
   g_ui_ctx.render();
   g_wnd_mgr.message_process();
   g_renderer.render();
+  g_ui_ctx.postprocess();
 }
 
 }

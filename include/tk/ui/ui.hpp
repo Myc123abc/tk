@@ -126,6 +126,12 @@ void reset_tween(std::string_view name) noexcept;
 auto get_cursor_pos() noexcept -> float2;
 
 /**
+ * get cursor position on window
+ * @return cursor position
+ */
+auto get_cursor_pos_on_window() noexcept -> float2;
+
+/**
  * get extent of image
  * @param path
  * @return width and height of image, if not exist, return (0, 0)

@@ -8,6 +8,7 @@
 #include "../../util/object_pool.hpp"
 #include "../../renderer/resource/shader_type.hpp"
 
+#include <msdfgen.h>
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include <hb.h>
@@ -31,18 +32,17 @@ requires(T t)
   t.end();
 };
 
-struct SDFBitmap
+struct MSDFBitmap
 {
   std::pmr::vector<uint8> data;
   uint2                   extent{};
   uint                    unicode{ std::numeric_limits<uint>::max() };
   FontStyle               style{};
-  float                   left_offset{};
-  float                   up_offset{};
+  float2                  pos_offset{};
 
   auto to_bitmap_view() const noexcept -> renderer::BitmapView
   {
-    return { data.data(), extent.x, extent.y, extent.x };
+    return { data.data(), extent.x, extent.y, extent.x * 4 };
   }
 
   auto empty() const noexcept { return !extent.x || !extent.y; }
@@ -64,7 +64,8 @@ public:
     return FT_Get_Char_Index(_face, unicode);
   }
 
-  auto generate_sdf_bitmap(uint glyph_idx, uint unicode, FontStyle style) const noexcept -> SDFBitmap;
+  auto get_glyph_advance(uint glyph_idx) const noexcept -> float2;
+  auto generate_msdf_bitmap(uint glyph_idx, uint unicode, FontStyle style) const noexcept -> MSDFBitmap;
 
 private:
   std::string _name;
@@ -86,8 +87,8 @@ struct GlyphInfo
   float2 extent{};
   float2 pos_offset{};
 
-  GlyphInfo(uint glyph_atlas_index, float2 pos, float2 extent, float left_offset, float up_offset) noexcept
-    : glyph_atlas_index(glyph_atlas_index), extent(extent), pos_offset(left_offset, up_offset)
+  GlyphInfo(uint glyph_atlas_index, float2 pos, float2 extent, float2 pos_offset) noexcept
+    : glyph_atlas_index(glyph_atlas_index), extent(extent), pos_offset(pos_offset)
   {
     min_x = (pos.x + 0.5f) / Glyph_Atlas_Width;
     min_y = (pos.y + 0.5f) / Glyph_Atlas_Height;
@@ -137,14 +138,16 @@ public:
   auto& access_swaped_pending_copy_glyphs() noexcept { return _pending_copy_glyphs.access(); }
 
   auto const& get_glyph_infos(FontStyle style) noexcept { return _glyph_infos[style]; }
-  auto get_missing_glyph_info() noexcept -> GlyphInfo const&;
+  auto get_notdef_glyph_info(FontStyle style) noexcept -> GlyphInfo const&;
 
-  void clear_discard_text_parse_results() noexcept;
+  void postprocess() noexcept;
 
 private:
   auto split_text(std::u32string_view text, FontStyle style) noexcept -> std::vector<std::pair<std::u32string_view, Font*>>;
   auto find_font(uint unicode, FontStyle style) noexcept -> Font*;
+  auto find_notdef_glyph_font(FontStyle style) noexcept -> std::pair<Font*, bool>;
   void add_uncached_glyphs(std::u32string_view text, FontStyle style) noexcept;
+  void add_notdef_glyph(FontStyle style) noexcept;
   auto find_glyph(uint unicode, FontStyle style) noexcept -> std::optional<std::pair<Font*, uint>>;
 
   template <MapType Map>
@@ -168,15 +171,16 @@ private:
 
   std::vector<ImageHandle>                         _glyph_atlas;
   FontStyleMap<std::vector<Font>>                  _fonts;
-  std::vector<std::pair<FontStyle, std::string>>   _cached_texts_with_missing_glyphs;
+  FontStyleMap<std::vector<std::string>>           _cached_texts_with_missing_glyphs;
   FontStyleMap<TextMap<TextParseResultHandle>>     _cached_text_parse_results;
   ParseResultPool                                  _parse_result_pool;
   FontStyleMap<std::unordered_set<uint>>           _missing_glyphs;
   FontStyleMap<UnicodeMap<GlyphInfo>>              _glyph_infos;
   FontStyleMap<UnicodeMap<std::pair<Font*, uint>>> _uncached_glyphs;
   std::vector<TextParseResultHandle>               _discard_text_parse_result_handles;
+  std::unordered_set<FontStyle>                    _missing_notdef_font_styles;
   
-  using PendingCopyGlyphsInfoType = std::unordered_map<uint, std::vector<std::pair<SDFBitmap, float2>>>;
+  using PendingCopyGlyphsInfoType = std::unordered_map<uint, std::vector<std::pair<MSDFBitmap, float2>>>;
   DoubleBuffer<PendingCopyGlyphsInfoType> _pending_copy_glyphs;
   
   float _max_ascender{};

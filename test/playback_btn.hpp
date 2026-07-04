@@ -17,7 +17,7 @@ public:
   {
     auto width  = p1.x - p0.x;
     auto height = p2.y - p0.y;
-    auto [clicked, hovered, _] = ui::button(_name, p0.x, p0.y, width, height);
+    auto [clicked, hovered, move_out, down] = ui::button(_name, p0.x, p0.y, width, height);
     if (hovered) color = hovered_color;
 
     if (clicked) _paused = !_paused;

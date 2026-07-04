@@ -115,6 +115,12 @@ auto get_cursor_pos() noexcept -> float2
   return renderer::get_cursor_pos();
 }
 
+auto get_cursor_pos_on_window() noexcept -> float2
+{
+  g_ui_ctx.check_draw();
+  return get_cursor_pos() - g_ui_ctx.window()->pos();
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Window
 ////////////////////////////////////////////////////////////////////////////////

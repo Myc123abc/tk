@@ -4,6 +4,7 @@
 
 #include <string>
 #include <span>
+#include <format>
 
 using namespace tk;
 
@@ -364,6 +365,33 @@ void select_font() noexcept
   // ui::button("test_b", 10, 10, 100, 100, 0x00ff00ff, 0xffff00ff);
 }
 
+void silder(std::string_view name, float x, float y, float width, float height, float beg, float end, float& v) noexcept
+{
+  if (beg >= end && width > 0 && height > 0) return;
+  
+  v = std::clamp(v, beg, end);
+  auto ratio = v / (end - beg);
+
+  auto r      = height / 2;
+  auto len    = width - 2 * r;
+  auto center = float2{ x + r + len * ratio, y + r };
+
+  auto left_top = float2{ x + r, y + r / 2 };
+  ui::rectangle(left_top, { left_top.x + len, left_top.y + r }, 0x808080ff);
+
+  auto circle_col = 0xff00ffff;
+  auto state = ui::button(name, center.x - r, center.y - r, r * 2, r * 2);
+  if (state.hovered)
+    circle_col = 0x0000ffff;
+  if (state.down)
+  {
+    auto pos = ui::get_cursor_pos_on_window();
+    info("x {} y {}", pos.x, pos.y);
+  }
+  ui::circle(center, r, circle_col);
+
+}
+
 int main()
 {
   tk::init();
@@ -372,8 +400,11 @@ int main()
   load_image(img2);
 
   load_font("assets/font/NotoSansJP-Regular.ttf");
-  load_font("assets/font/YuGothR.ttc");
+  // load_font("assets/font/NotoSansJP-Bold.ttf");
+  // load_font("assets/font/YuGothR.ttc");
   // load_font("assets/font/NotoSansSC-Regular.ttf");
+  // load_font("assets/font/SitkaVF-Italic.ttf");
+  load_font("assets/font/SourceCodePro-Regular.ttf");
 
   auto playback_btn = PlaybackButton{};
   playback_btn.init("playback button");
@@ -428,17 +459,29 @@ int main()
         wnd2_is_closed = !wnd2_is_closed;
       ui::add_move_invalid_area({}, { 150, 150 });
 
+      // silder
+      float outline_width{};
+      silder("silder_test", 0, 90, 100, 10, 0, 100, outline_width);
+      ui::text(std::format("outline width : {}", outline_width), { 0, 90 }, 24, 0x00ff00ff);
+
+      auto cfg = ui::TextConfig{};
+      cfg.outer_color = 0xff0000ff;
+      cfg.outline_width = outline_width;
+      auto res = ui::text("a c一覧", { 0, 0 }, 32, 0x000000ff, cfg);
+      ui::text("abc一覧", { 0, res.extent.y }, 32, 0x000000ff);
+      // ui::line({ 0, res.ascender }, { res.extent.x, res.ascender }, 0xff0000ff);
+
       // circle_draw_test();
       // line_draw_test();
       // test_path_draw();
       // test_discard(fmt);
 
-      ui::discard_beg([]{ ui::rectangle({70, 70}, {300, 90});});
-      ui::union_beg();
-      ui::circle({50, 50}, 40);
-      ui::circle({90, 90}, 40);
-      ui::union_end(0xff0000ff, 3);
-      ui::discard_end();
+      // ui::discard_beg([]{ ui::rectangle({70, 70}, {300, 90});});
+      // ui::union_beg();
+      // ui::circle({50, 50}, 40);
+      // ui::circle({90, 90}, 40);
+      // ui::union_end(0xff0000ff, 3);
+      // ui::discard_end();
 
       ui::end();
     }
@@ -548,13 +591,15 @@ int main()
 
       ui::line({ text_pos.x + 30, 0 }, { text_pos.x + 30, wnd_ext.y }, 0xff0000ff);
       ui::line({ text_pos.x + 80, 0 }, { text_pos.x + 80, wnd_ext.y }, 0xff0000ff);
-      ui::discard_beg([&] { ui::rectangle(text_pos + float2{ 30, -2 }, text_pos + float2{ 80, 50 }); });
+      // ui::discard_beg([&] { ui::rectangle(text_pos + float2{ 30, -2 }, text_pos + float2{ 80, 50 }); });
       // text_cfg.family = fonts[1].family;
+      text_cfg.outer_color = 0xff0000ff;
+      // TODO: msdf async load, because cpu generate is slow...
       text_res = ui::text("Hello 你好 こんにちは、世界！", text_pos, 32, 0xffffffff, text_cfg);
       ui::rectangle(text_pos, text_pos + text_res.extent, 0x00ff00ff, 1);
-      // ui::line({ text_pos.x, text_pos.y + text_res.ascender }, { text_pos.x + text_res.extent.x, text_pos.y + text_res.ascender }, 0xffff00ff);
+      ui::line({ text_pos.x, text_pos.y + text_res.ascender }, { text_pos.x + text_res.extent.x, text_pos.y + text_res.ascender }, 0xffff00ff);
       text_pos.y += text_res.extent.y;
-      ui::discard_end();
+      // ui::discard_end();
 
       if (ui::button("blur onoff", 100, 100, 50, 50, 0x0000ffff, 0x00ff00ff))
       {
@@ -563,9 +608,10 @@ int main()
         else if (cfg.backdrop.style == ui::BackdropStyle::acrylic)
           cfg.backdrop.default_blur();
         blur_img_2 = !blur_img_2;
+        load_font("assets/font/NotoSansJP-Regular.ttf");
       }
 
-      select_font();
+      // select_font();
 
       ui::end();
     }

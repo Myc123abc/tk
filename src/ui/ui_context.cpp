@@ -217,6 +217,7 @@ void UIContext::clear_state() noexcept
   mouse_up_pos          = {};
   is_move_from_maximize = {};
   _btn_state            = {};
+  is_last_mouse_up      = {};
 }
 
 void UIContext::postprocess_render() noexcept
@@ -250,7 +251,9 @@ void UIContext::postprocess_render() noexcept
       mouse_up_window = wnd->handle();
       mouse_up_pos    = wnd->cursor_pos();
     }
-  };
+  }
+  else if (mouse_left_button_state == KeyState::up && mouse_down_pos)
+    clear_state();
 
   // update button state
   if (_btn_state.id)
@@ -261,8 +264,6 @@ void UIContext::postprocess_render() noexcept
   }
 
   update_keys();
-
-  g_text_engine.clear_discard_text_parse_results();
 
   // update delta time
   static auto tp = std::chrono::steady_clock::now();
@@ -319,6 +320,11 @@ void UIContext::add_mouse_left_button_state(size_t id, float2 left_top, float2 r
 auto UIContext::is_cursor_move_out(size_t id) noexcept -> bool
 {
   return _btn_state.id != id ? false : _btn_state.move_out;
+}
+
+auto UIContext::is_mouse_left_button_down_on(size_t id) noexcept -> bool
+{
+  return _btn_state.id == id && get_key(Key::Mouse_Left_Button).contains(KeyState::down);
 }
 
 void UIContext::render_on(float x, float y, std::move_only_function<void()>&& func) noexcept
@@ -574,6 +580,11 @@ auto UIContext::text(std::string_view text, float2 pos, float size, Color inner_
   }
 
   return { extent, ascender };
+}
+
+void UIContext::postprocess() const noexcept
+{
+  g_text_engine.postprocess();
 }
 
 }

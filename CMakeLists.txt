@@ -48,6 +48,9 @@ target_compile_definitions(tk
   PRIVATE
     UTF_CPP_CPLUSPLUS=202002L
 )
+if (MSVC)
+  target_compile_options(tk PUBLIC /utf-8)
+endif()
 target_include_directories(tk
   PUBLIC
     include

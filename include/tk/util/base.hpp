@@ -1,11 +1,13 @@
 #pragma once
 
+#include <concepts>
 #include <initializer_list>
 #include <numbers>
 #include <immintrin.h>
 #include <assert.h>
 #include <cmath>
 #include <algorithm>
+#include <type_traits>
 
 namespace tk {
 
@@ -54,20 +56,164 @@ struct vec<2, T>
   constexpr auto operator*(T v) const noexcept -> self { return { x * v, y * v }; }
   constexpr auto operator/(T v) const noexcept -> self { return { x / v, y / v }; }
 
+  template <Numeric U>
+    requires (!std::same_as<T, U>)
+  constexpr auto operator+(U v) const noexcept -> vec<2, std::common_type_t<T, U>>
+  {
+    using R = std::common_type_t<T, U>;
+    return { static_cast<R>(x) + static_cast<R>(v), static_cast<R>(y) + static_cast<R>(v) };
+  }
+
+  template <Numeric U>
+    requires (!std::same_as<T, U>)
+  constexpr auto operator-(U v) const noexcept -> vec<2, std::common_type_t<T, U>>
+  {
+    using R = std::common_type_t<T, U>;
+    return { static_cast<R>(x) - static_cast<R>(v), static_cast<R>(y) - static_cast<R>(v) };
+  }
+
+  template <Numeric U>
+    requires (!std::same_as<T, U>)
+  constexpr auto operator*(U v) const noexcept -> vec<2, std::common_type_t<T, U>>
+  {
+    using R = std::common_type_t<T, U>;
+    return { static_cast<R>(x) * static_cast<R>(v), static_cast<R>(y) * static_cast<R>(v) };
+  }
+
+  template <Numeric U>
+    requires (!std::same_as<T, U>)
+  constexpr auto operator/(U v) const noexcept -> vec<2, std::common_type_t<T, U>>
+  {
+    using R = std::common_type_t<T, U>;
+    return { static_cast<R>(x) / static_cast<R>(v), static_cast<R>(y) / static_cast<R>(v) };
+  }
+
   constexpr auto operator+=(T v) noexcept -> self& { x += v; y += v; return *this; }
   constexpr auto operator-=(T v) noexcept -> self& { x -= v; y -= v; return *this; }
   constexpr auto operator*=(T v) noexcept -> self& { x *= v; y *= v; return *this; }
   constexpr auto operator/=(T v) noexcept -> self& { x /= v; y /= v; return *this; }
+
+  template <Numeric U>
+    requires (!std::same_as<T, U>)
+  constexpr auto operator+=(U v) noexcept -> self&
+  {
+    using R = std::common_type_t<T, U>;
+    x = static_cast<T>(static_cast<R>(x) + static_cast<R>(v));
+    y = static_cast<T>(static_cast<R>(y) + static_cast<R>(v));
+    return *this;
+  }
+
+  template <Numeric U>
+    requires (!std::same_as<T, U>)
+  constexpr auto operator-=(U v) noexcept -> self&
+  {
+    using R = std::common_type_t<T, U>;
+    x = static_cast<T>(static_cast<R>(x) - static_cast<R>(v));
+    y = static_cast<T>(static_cast<R>(y) - static_cast<R>(v));
+    return *this;
+  }
+
+  template <Numeric U>
+    requires (!std::same_as<T, U>)
+  constexpr auto operator*=(U v) noexcept -> self&
+  {
+    using R = std::common_type_t<T, U>;
+    x = static_cast<T>(static_cast<R>(x) * static_cast<R>(v));
+    y = static_cast<T>(static_cast<R>(y) * static_cast<R>(v));
+    return *this;
+  }
+
+  template <Numeric U>
+    requires (!std::same_as<T, U>)
+  constexpr auto operator/=(U v) noexcept -> self&
+  {
+    using R = std::common_type_t<T, U>;
+    x = static_cast<T>(static_cast<R>(x) / static_cast<R>(v));
+    y = static_cast<T>(static_cast<R>(y) / static_cast<R>(v));
+    return *this;
+  }
 
   constexpr auto operator+(self v) const noexcept -> self { return { x + v.x, y + v.y }; }
   constexpr auto operator-(self v) const noexcept -> self { return { x - v.x, y - v.y }; }
   constexpr auto operator*(self v) const noexcept -> self { return { x * v.x, y * v.y }; }
   constexpr auto operator/(self v) const noexcept -> self { return { x / v.x, y / v.y }; }
 
+  template <Numeric U>
+    requires (!std::same_as<T, U>)
+  constexpr auto operator+(vec<2, U> v) const noexcept -> vec<2, std::common_type_t<T, U>>
+  {
+    using R = std::common_type_t<T, U>;
+    return { static_cast<R>(x) + static_cast<R>(v.x), static_cast<R>(y) + static_cast<R>(v.y) };
+  }
+
+  template <Numeric U>
+    requires (!std::same_as<T, U>)
+  constexpr auto operator-(vec<2, U> v) const noexcept -> vec<2, std::common_type_t<T, U>>
+  {
+    using R = std::common_type_t<T, U>;
+    return { static_cast<R>(x) - static_cast<R>(v.x), static_cast<R>(y) - static_cast<R>(v.y) };
+  }
+
+  template <Numeric U>
+    requires (!std::same_as<T, U>)
+  constexpr auto operator*(vec<2, U> v) const noexcept -> vec<2, std::common_type_t<T, U>>
+  {
+    using R = std::common_type_t<T, U>;
+    return { static_cast<R>(x) * static_cast<R>(v.x), static_cast<R>(y) * static_cast<R>(v.y) };
+  }
+
+  template <Numeric U>
+    requires (!std::same_as<T, U>)
+  constexpr auto operator/(vec<2, U> v) const noexcept -> vec<2, std::common_type_t<T, U>>
+  {
+    using R = std::common_type_t<T, U>;
+    return { static_cast<R>(x) / static_cast<R>(v.x), static_cast<R>(y) / static_cast<R>(v.y) };
+  }
+
   constexpr auto operator+=(self v) noexcept -> self& { x += v.x; y += v.y; return *this; }
   constexpr auto operator-=(self v) noexcept -> self& { x -= v.x; y -= v.y; return *this; }
   constexpr auto operator*=(self v) noexcept -> self& { x *= v.x; y *= v.y; return *this; }
   constexpr auto operator/=(self v) noexcept -> self& { x /= v.x; y /= v.y; return *this; }
+
+  template <Numeric U>
+    requires (!std::same_as<T, U>)
+  constexpr auto operator+=(vec<2, U> v) noexcept -> self&
+  {
+    using R = std::common_type_t<T, U>;
+    x = static_cast<T>(static_cast<R>(x) + static_cast<R>(v.x));
+    y = static_cast<T>(static_cast<R>(y) + static_cast<R>(v.y));
+    return *this;
+  }
+
+  template <Numeric U>
+    requires (!std::same_as<T, U>)
+  constexpr auto operator-=(vec<2, U> v) noexcept -> self&
+  {
+    using R = std::common_type_t<T, U>;
+    x = static_cast<T>(static_cast<R>(x) - static_cast<R>(v.x));
+    y = static_cast<T>(static_cast<R>(y) - static_cast<R>(v.y));
+    return *this;
+  }
+
+  template <Numeric U>
+    requires (!std::same_as<T, U>)
+  constexpr auto operator*=(vec<2, U> v) noexcept -> self&
+  {
+    using R = std::common_type_t<T, U>;
+    x = static_cast<T>(static_cast<R>(x) * static_cast<R>(v.x));
+    y = static_cast<T>(static_cast<R>(y) * static_cast<R>(v.y));
+    return *this;
+  }
+
+  template <Numeric U>
+    requires (!std::same_as<T, U>)
+  constexpr auto operator/=(vec<2, U> v) noexcept -> self&
+  {
+    using R = std::common_type_t<T, U>;
+    x = static_cast<T>(static_cast<R>(x) / static_cast<R>(v.x));
+    y = static_cast<T>(static_cast<R>(y) / static_cast<R>(v.y));
+    return *this;
+  }
 
   constexpr auto operator-() const noexcept -> self { return { -x, -y }; }
 
@@ -259,7 +405,7 @@ struct alignas(16) vec<4, float>
 
   union
   {
-    struct { float x{}, y{}, z{}, w{}; };
+    struct { float x, y, z, w; };
     __m128 simd;
   };
 
