@@ -564,7 +564,7 @@ auto UIContext::text(std::string_view text, float2 pos, float size, Color inner_
 
   auto const  result_handle = g_text_engine.parse(text, cfg.style, cfg.family);
   auto const& result        = g_text_engine.get_parse_result(result_handle);
-  if (result.generateing) return {};
+  if (!result.generating_glyph_info_keys.empty()) return {};
 
   auto scale = size / FT_Pixel_Size / _wnd->scale();
   auto ascender = result.ascender * scale;

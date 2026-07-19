@@ -59,28 +59,14 @@ void FrameData::_add_text(TextParseResultHandle handle, float2 pos, float size, 
   auto const& result = g_text_engine.get_parse_result(handle);
 
   auto cnt = result.advances.size();
-  assert(cnt == result.text.size());
-
-  GlyphInfo const* info{};
-  GlyphInfo const* notdef_glyph_info{};
-
-  // TODO: move glyph_infos to parse result
-  // also can remove text in parse result
-  auto const& infos = g_text_engine.get_glyph_infos(result.style);
 
   auto [vertices, indices] = expand_beg(4 * cnt, 6 * cnt);
   auto vtx_offset = 0, idx_offset = 0;
   for (auto i = 0; i < cnt; ++i)
   {
-    if (infos.contains(result.text[i]))
-      info = &infos.at(result.text[i]);
-    else
-    {
-      if (!notdef_glyph_info) notdef_glyph_info = &g_text_engine.get_notdef_glyph_info(result.style);
-      info = notdef_glyph_info;
-    }
+    auto const& info = g_text_engine.get_glyph_info(result.glyph_info_keys[i]);
 
-    info->set_vertices(vertices + vtx_offset, pos, size, result.ascender, inner_color, outer_color, outline_width);
+    info.set_vertices(vertices + vtx_offset, pos, size, result.ascender, inner_color, outer_color, outline_width);
 
     auto vtx_beg = _vertex_beg + vtx_offset;
     indices[idx_offset + 0] = static_cast<uint16>(vtx_beg + 0);
@@ -92,7 +78,7 @@ void FrameData::_add_text(TextParseResultHandle handle, float2 pos, float size, 
 
     vtx_offset += 4;
     idx_offset += 6;
-    pos        += result.advances[i] * info->get_scale(size);
+    pos        += result.advances[i] * info.get_scale(size);
   }
   expand_end();
 }

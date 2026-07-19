@@ -31,13 +31,35 @@ requires(T t)
   t.end();
 };
 
+struct GlyphKey
+{
+  friend struct GlyphKeyHash;
+
+  GlyphKey() noexcept = default;
+  GlyphKey(FontStyle style, uint unicode) noexcept : _k(static_cast<uint64>(style) << 32 | unicode) {}
+
+  auto has(uint unicode) const noexcept -> bool { return _k & 0xffffffff; }
+
+  auto operator==(GlyphKey const&) const noexcept -> bool = default;
+
+// private:
+  uint64 _k{};
+};
+
+struct GlyphKeyHash
+{
+  auto operator()(GlyphKey k) const noexcept
+  {
+    return std::hash<uint64>{}(k._k);
+  }
+};
+
 struct MSDFBitmap
 {
   std::vector<uint8> data;
   uint2              extent{};
-  uint               unicode{ std::numeric_limits<uint>::max() };
-  FontStyle          style{};
   float2             pos_offset{};
+  GlyphKey           glyph_key;
 
   auto to_bitmap_view() const noexcept -> renderer::BitmapView
   {
@@ -64,7 +86,7 @@ public:
   }
 
   auto get_glyph_advance(uint glyph_idx) const noexcept -> float2;
-  auto generate_msdf_bitmap(uint glyph_idx, uint unicode, FontStyle style) const noexcept -> MSDFBitmap;
+  auto generate_msdf_bitmap(uint glyph_idx, GlyphKey key) const noexcept -> MSDFBitmap;
 
 private:
   std::string _name;
@@ -119,12 +141,11 @@ public:
 
   struct ParseResult
   {
-    std::vector<float2> advances;
-    float2              extent;
-    float               ascender{};
-    std::u32string      text;
-    FontStyle           style;
-    bool                generateing{};
+    std::vector<float2>   advances;
+    float2                extent;
+    float                 ascender{};
+    std::vector<GlyphKey> glyph_info_keys;
+    std::unordered_set<GlyphKey, GlyphKeyHash> generating_glyph_info_keys;
 
     ParseResult() noexcept = default;
   };
@@ -137,8 +158,7 @@ public:
   void upload_bitmaps() noexcept;
 
   void clear_pending_copy_glyphs() noexcept { _pending_copy_glyphs.clear(); }
-
-  auto const& get_glyph_infos(FontStyle style) noexcept { return _glyph_infos[style]; }
+  auto const& get_glyph_info(GlyphKey key) const noexcept { return _glyph_infos.at(key); }
   auto get_notdef_glyph_info(FontStyle style) noexcept -> GlyphInfo const&;
 
   void postprocess() noexcept;
@@ -147,23 +167,14 @@ private:
   auto split_text(std::u32string_view text, FontStyle style) noexcept -> std::vector<std::pair<std::u32string_view, Font*>>;
   auto find_font(uint unicode, FontStyle style) noexcept -> Font*;
   auto find_notdef_glyph_font(FontStyle style) noexcept -> std::pair<Font*, bool>;
-  auto add_uncached_glyphs(std::u32string_view text, FontStyle style) noexcept -> bool;
+  void add_uncached_glyphs(std::u32string_view text, FontStyle style, ParseResult& result) noexcept;
   auto add_notdef_glyph(FontStyle style) noexcept -> bool;
   auto find_glyph(uint unicode, FontStyle style) noexcept -> std::optional<std::pair<Font*, uint>>;
-
-  template <MapType Map>
-  static auto has(Map& map, uint unicode, FontStyle style) noexcept { return map.contains(style) ? map[style].contains(unicode) : false; }
-  auto glyph_infos_has(uint unicode, FontStyle style)     noexcept { return has(_glyph_infos, unicode, style);     }
-  auto missing_glyphs_has(uint unicode, FontStyle style)  noexcept { return has(_missing_glyphs, unicode, style);  }
-  auto uncached_glyphs_has(uint unicode, FontStyle style) noexcept { return has(_uncached_glyphs, unicode, style); }
-
   auto calc_glyph_pos(float2 extent) noexcept -> std::pair<uint, float2>;
 
 private:
   template <typename T>
   using FontStyleMap = std::unordered_map<FontStyle, T>;
-  template <typename T>
-  using UnicodeMap   = std::unordered_map<uint, T>;
   template <typename T>
   using TextMap      = std::unordered_map<size_t, T>;
 
@@ -176,10 +187,13 @@ private:
   FontStyleMap<TextMap<TextParseResultHandle>>     _cached_text_parse_results;
   ParseResultPool                                  _parse_result_pool;
   FontStyleMap<std::unordered_set<uint>>           _missing_glyphs;
-  FontStyleMap<UnicodeMap<GlyphInfo>>              _glyph_infos;
-  FontStyleMap<UnicodeMap<std::pair<Font*, uint>>> _uncached_glyphs;
   std::vector<TextParseResultHandle>               _discard_text_parse_result_handles;
   std::unordered_set<FontStyle>                    _missing_notdef_font_styles;
+  std::unordered_set<TextParseResultHandle>        _generating_results;
+
+  std::unordered_map<GlyphKey, GlyphInfo, GlyphKeyHash>              _glyph_infos;
+  std::unordered_set<GlyphKey, GlyphKeyHash>                         _uncached_glyphs;
+  std::unordered_map<GlyphKey, std::pair<Font*, uint>, GlyphKeyHash> _ungenerated_glyphs;
   
   using PendingCopyGlyphsInfoType = std::unordered_map<uint, std::vector<std::pair<MSDFBitmap, float2>>>;
   PendingCopyGlyphsInfoType _pending_copy_glyphs;
