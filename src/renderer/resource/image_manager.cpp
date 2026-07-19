@@ -81,8 +81,7 @@ auto ImageManager::try_load(std::string_view path, uint width, uint height) noex
 
   // load image if not loaded
   if (!_load_tasks.contains(filename))
-  {
-    auto task = g_thread_pool.submit([path = std::string(path), width, height]
+    _load_tasks.emplace(path, g_thread_pool.submit([path = std::string(path), width, height]
     {
       int w, h; 
       std::string msg;
@@ -95,9 +94,8 @@ auto ImageManager::try_load(std::string_view path, uint width, uint height) noex
       auto use_mipmap = false;
       if (ratio_x > 0 && ratio_y > 0) use_mipmap = ratio_x <= 0.5 || ratio_y <= 0.5;
       return LoadResult{ data, w, h, msg, use_mipmap };
-    });
-    _load_tasks.emplace(path, std::move(task));
-  }
+    }));
+
   return std::unexpected(ImageLoadError::loading{});
 }
 

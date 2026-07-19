@@ -90,7 +90,7 @@ public:
       return Handle{ static_cast<uint16>(block_idx), static_cast<uint16>(slot_idx), slot->generation };
     }
 
-    if (_block_idx == _blocks.size())
+    if (_block_idx >= _blocks.size())
       allocate_block();
 
     auto block_idx = _block_idx;
@@ -171,7 +171,7 @@ private:
   {
     err_if(_blocks.size() > std::numeric_limits<uint16>::max(),
       "[ObjectPool] Failed to allocate new block, exceed the max block capacity");
-    _blocks.emplace_back(std::make_unique<Block>());
+    _blocks.emplace_back();
   }
 
   void advance_alloc_cursor() noexcept
@@ -183,14 +183,20 @@ private:
     }
   }
 
+  auto get_slot(size_t block_idx, uint16 slot_idx) noexcept
+  {
+    assert(block_idx < _blocks.size() && slot_idx < BlockCapacity);
+    return &_blocks[block_idx][slot_idx];
+  }
+
   auto get_slot(size_t block_idx, uint16 slot_idx) const noexcept
   {
     assert(block_idx < _blocks.size() && slot_idx < BlockCapacity);
-    return &(*_blocks[block_idx])[slot_idx];
+    return &_blocks[block_idx][slot_idx];
   }
 
 private:
-  struct Slot
+  struct alignas(64) Slot
   {
     alignas(T) std::byte obj[sizeof(T)];
     uint                 generation{};
@@ -210,11 +216,11 @@ private:
 
   using Block = std::array<Slot, BlockCapacity>;
 
-  std::vector<std::unique_ptr<Block>> _blocks;
-  uint                                _free_head{ InvalidFreeSlot };
-  size_t                              _alive_count{};
-  size_t                              _block_idx{};
-  uint16                              _slot_idx{};
+  std::vector<Block> _blocks;
+  uint               _free_head{ InvalidFreeSlot };
+  size_t             _alive_count{};
+  size_t             _block_idx{};
+  uint16             _slot_idx{};
 };
 
 }

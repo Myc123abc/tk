@@ -112,7 +112,7 @@ auto generate_msdf(msdfgen::Shape& shape) noexcept -> std::pair<msdfgen::Bitmap<
 {
   if (shape.contours.empty()) return {};
 
-  static auto const px_range      = msdfgen::Range{ 2 };
+  static auto const px_range      = msdfgen::Range{ Glyph_MSDF_Pixel_Range };
   static auto const scale         = msdfgen::Vector2{ FT_Pixel_Size };
   static auto const range         = px_range / std::min(scale.x, scale.y);
   static auto const sd_zero_value = range.lower != range.upper ? float(range.lower/(range.lower-range.upper)) : .5f;
@@ -204,7 +204,6 @@ auto Font::generate_msdf_bitmap(uint glyph_idx, uint unicode, FontStyle style) c
   bitmap.extent     = { msdf.width(), msdf.height() };
   bitmap.unicode    = unicode;
   bitmap.style      = style;
-  bitmap.data       = g_text_engine._mem_pool.vector<uint8>();
   bitmap.pos_offset = pos_offset;
   bitmap.data.resize(bitmap.extent.x * bitmap.extent.y * 4);
 
@@ -272,12 +271,12 @@ auto TextEngine::load_font(std::string_view path) noexcept -> std::expected<Font
 
   // clear missing glyphs and cached text advances
   _missing_glyphs[style].clear();
-  for (auto const& text : _cached_texts_with_missing_glyphs[style])
+  for (auto hash : _cached_texts_with_missing_glyphs[style])
   {
-    auto h = _cached_text_parse_results[style][text.data()];
+    auto h = _cached_text_parse_results[style][hash];
     assert(h.valid());
     _discard_text_parse_result_handles.emplace_back(h);
-    _cached_text_parse_results[style].erase(text);
+    _cached_text_parse_results[style].erase(hash);
   }
   _cached_texts_with_missing_glyphs[style].clear();
 
@@ -285,8 +284,8 @@ auto TextEngine::load_font(std::string_view path) noexcept -> std::expected<Font
   // TODO: when expand glyph release feature, need to process old notdef glyph release too
   if (_missing_notdef_font_styles.erase(style))
   {
+    _glyph_infos[style].erase(Notdef_Glyph_Unicode);
     _uncached_glyphs[style].erase(Notdef_Glyph_Unicode);
-    _uncached_glyphs[style].emplace(Notdef_Glyph_Unicode, std::make_pair(&_fonts[style].front(), 0));
   }
 
   return info;
@@ -296,14 +295,16 @@ auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view 
 {
   assert(!text.empty());
 
+  auto hash = std::hash<std::string_view>{}(text);
+
+  // try to get cached text advances
+  auto& cached_text_parse_result = _cached_text_parse_results[style];
+  if (cached_text_parse_result.contains(hash)) return cached_text_parse_result[hash];
+
   auto res = ParseResult{};
   res.text = utf8::utf8to32(text);
 
   auto has_missing_glyphs = false;
-
-  // try to get cached text advances
-  auto& cached_text_parse_result = _cached_text_parse_results[style];
-  if (cached_text_parse_result.contains(text.data())) return cached_text_parse_result[text.data()];
 
   // calculate advances
   res.advances.reserve(res.text.size());
@@ -323,6 +324,7 @@ auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view 
       auto glyph_positions = hb_buffer_get_glyph_positions(_hb_buf, nullptr);
       for (auto i = 0; i < text.size(); ++i)
       {
+        // TODO: harfbuzz usage maybe wrong, test a text which have offset
         auto x = static_cast<float>(glyph_positions[i].x_advance) / 64;
         auto y = static_cast<float>(glyph_positions[i].y_advance) / 64;
         res.advances.emplace_back(x, y);
@@ -340,22 +342,22 @@ auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view 
       res.extent.x += text.size() * notdef_glyph_advance.x;
       _max_ascender = std::max(_max_ascender, notdef_glyph_font->_ascender);
       _max_height   = std::max(_max_height,   notdef_glyph_font->_height);
-      add_notdef_glyph(style);
+      res.generateing = add_notdef_glyph(style) || res.generateing;
     }
   }
 
   if (has_missing_glyphs) 
-    _cached_texts_with_missing_glyphs[style].emplace_back(text.data());
+    _cached_texts_with_missing_glyphs[style].emplace_back(hash);
 
   res.ascender = _max_ascender;
   res.extent.y = _max_height;
 
   // cached calculate result
-  assert(!cached_text_parse_result[text.data()].valid());
+  assert(!cached_text_parse_result[hash].valid());
   auto handle = _parse_result_pool.alloc();
-  cached_text_parse_result[text.data()] = handle;
+  cached_text_parse_result[hash] = handle;
 
-  add_uncached_glyphs(res.text, style);
+  res.generateing = add_uncached_glyphs(res.text, style) || res.generateing;
 
   _parse_result_pool[handle] = std::move(res);
 
@@ -434,29 +436,42 @@ auto TextEngine::find_notdef_glyph_font(FontStyle style) noexcept -> std::pair<F
   std::unreachable();
 }
 
-void TextEngine::add_uncached_glyphs(std::u32string_view text, FontStyle style) noexcept
+auto TextEngine::add_uncached_glyphs(std::u32string_view text, FontStyle style) noexcept -> bool
 {
+  auto has = false;
   for (auto ch : text)
   {
-    if (!glyph_infos_has(ch, style) && !missing_glyphs_has(ch, style) && !uncached_glyphs_has(ch, style))
+    if (!glyph_infos_has(ch, style) && !missing_glyphs_has(ch, style))
     {
+      if (uncached_glyphs_has(ch, style))
+      {
+        has = true;
+        continue;
+      }
+
       if (auto res = find_glyph(ch, style))
+      {
+        has = true;
         _uncached_glyphs[style].emplace(ch, res.value());
+      }
       else
         _missing_glyphs[style].emplace(ch);
     }
   }
+  return has;
 }
 
-void TextEngine::add_notdef_glyph(FontStyle style) noexcept
+auto TextEngine::add_notdef_glyph(FontStyle style) noexcept -> bool
 {
-  if (glyph_infos_has(Notdef_Glyph_Unicode, style) || uncached_glyphs_has(Notdef_Glyph_Unicode, style)) return;
+  if (glyph_infos_has(Notdef_Glyph_Unicode, style))     return false;
+  if (uncached_glyphs_has(Notdef_Glyph_Unicode, style)) return true;
 
   auto [font, is_fallback] = find_notdef_glyph_font(style);
-  if (!font) return;
+  if (!font) return false;
   if (is_fallback) _missing_notdef_font_styles.emplace(style);
 
   _uncached_glyphs[style].emplace(Notdef_Glyph_Unicode, std::make_pair(font, 0));
+  return true;
 }
 
 auto TextEngine::find_glyph(uint unicode, FontStyle style) noexcept -> std::optional<std::pair<Font*, uint>>
@@ -515,30 +530,58 @@ auto TextEngine::get_notdef_glyph_info(FontStyle style) noexcept -> GlyphInfo co
     if (infos.contains(Notdef_Glyph_Unicode))
       return infos.at(Notdef_Glyph_Unicode);
 
-  assert(false);
   std::unreachable();
 }
 
-void TextEngine::upload_uncached_glyphs() noexcept
+void TextEngine::submit_bitmap_generation_tasks() noexcept
 {
-  auto& pending_copy_glyphs = _pending_copy_glyphs.data();
-
   if (_uncached_glyphs.empty()) return;
 
-  for (auto const& [style, infos] : _uncached_glyphs)
+  // submit msdf bitmap generate task on thread pool
+  _generate_bitmap_tasks.emplace_back(g_thread_pool.submit([glyphs = std::move(_uncached_glyphs)]
   {
-    for (auto const& [unicode, pair] : infos)
+    auto bitmaps = std::vector<MSDFBitmap>{};
+    bitmaps.reserve(std::ranges::distance(glyphs | std::views::values | std::views::join));
+    debug("generate glyphs count : {}", bitmaps.capacity());
+    auto beg = std::chrono::high_resolution_clock::now();
+    for (auto const& [style, infos] : glyphs)
     {
-      auto [font, glyph_idx] = pair;
-      auto bitmap = font->generate_msdf_bitmap(glyph_idx, unicode, style);
-      auto [glyph_atlas_idx, cpy_pos] = calc_glyph_pos(bitmap.extent);
-      pending_copy_glyphs[glyph_atlas_idx].emplace_back(std::move(bitmap), cpy_pos);
+      for (auto const& [unicode, pair] : infos)
+      {
+        auto [font, glyph_idx] = pair;
+        // font should always be valid because I never remove font currently
+        bitmaps.emplace_back(font->generate_msdf_bitmap(glyph_idx, unicode, style));
+      }
     }
+    auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - beg).count();
+    debug("consume {}ms", dur);
+    return bitmaps;
+  }));
+}
+
+void TextEngine::upload_bitmaps() noexcept
+{
+  if (_generate_bitmap_tasks.empty()) return;
+
+  // check whether have task complete
+  for (auto it = _generate_bitmap_tasks.begin(); it < _generate_bitmap_tasks.end();)
+  {
+    if (it->is_completed())
+    {
+      // TODO: clear generating flags
+      for (auto const& bitmap : it->take_result())
+      {
+        auto [glyph_atlas_idx, cpy_pos] = calc_glyph_pos(bitmap.extent);
+        _pending_copy_glyphs[glyph_atlas_idx].emplace_back(std::move(bitmap), cpy_pos);
+      }
+      it = _generate_bitmap_tasks.erase(it);
+    }
+    else
+      ++it;
   }
-  _uncached_glyphs.clear();
 
   // use copy engine to upload glyph sdf bitmaps to glyph atlas texture
-  for (auto const& [glyph_atlas_idx, bitmap_infos] : pending_copy_glyphs)
+  for (auto const& [glyph_atlas_idx, bitmap_infos] : _pending_copy_glyphs)
   {
     for (auto const& [bitmap, pos] : bitmap_infos)
       _glyph_infos[bitmap.style].insert_or_assign(bitmap.unicode, GlyphInfo{ glyph_atlas_idx, pos, bitmap.extent, bitmap.pos_offset });
@@ -550,8 +593,6 @@ void TextEngine::upload_uncached_glyphs() noexcept
       | std::ranges::to<std::vector<BitmapCopyInfo>>();
     g_copy_engine.copy(std::move(bitmap_cpy_infos), _glyph_atlas[glyph_atlas_idx]);
   }
-
-  _pending_copy_glyphs.swap();
 }
 
 void GlyphInfo::set_vertices(renderer::Vertex* vtx, float2 pos, float size, float ascender, Color color, Color outer_color, float outer_width) const noexcept

@@ -84,7 +84,7 @@ private:
       auto& pool = instance();
       while (!pool._exit.load(std::memory_order_acquire))
       {
-        auto task = std::function<void()>{};
+        auto task = std::move_only_function<void()>{};
 
         {
           std::unique_lock lock{ pool._mutex };
@@ -109,7 +109,7 @@ private:
   };
 
 private:
-  void enqueue(std::function<void()> f) noexcept
+  void enqueue(std::move_only_function<void()> f) noexcept
   {
     assert(!_exit.load(std::memory_order_acquire));
     {
@@ -141,11 +141,11 @@ public:
   }
 
 private:
-  std::atomic_bool                  _exit;
-  std::vector<Thread>               _threads;
-  std::queue<std::function<void()>> _tasks;
-  std::mutex                        _mutex;
-  std::condition_variable           _cv;
+  std::atomic_bool                            _exit;
+  std::vector<Thread>                         _threads;
+  std::queue<std::move_only_function<void()>> _tasks;
+  std::mutex                                  _mutex;
+  std::condition_variable                     _cv;
 };
 
 inline static auto& g_thread_pool = ThreadPool::instance();

@@ -4,9 +4,9 @@
 #include "util/base.hpp"
 #include "../config.hpp"
 #include "../../renderer/resource/image_manager.hpp"
-#include "../../util/double_buffer.hpp"
 #include "../../util/object_pool.hpp"
 #include "../../renderer/resource/shader_type.hpp"
+#include "../../util/thread_pool.hpp"
 
 #include <msdfgen.h>
 #include <ft2build.h>
@@ -16,7 +16,6 @@
 #include <string>
 #include <unordered_set>
 #include <unordered_map>
-#include <memory_resource>
 
 namespace tk::ui {
 
@@ -34,11 +33,11 @@ requires(T t)
 
 struct MSDFBitmap
 {
-  std::pmr::vector<uint8> data;
-  uint2                   extent{};
-  uint                    unicode{ std::numeric_limits<uint>::max() };
-  FontStyle               style{};
-  float2                  pos_offset{};
+  std::vector<uint8> data;
+  uint2              extent{};
+  uint               unicode{ std::numeric_limits<uint>::max() };
+  FontStyle          style{};
+  float2             pos_offset{};
 
   auto to_bitmap_view() const noexcept -> renderer::BitmapView
   {
@@ -125,6 +124,7 @@ public:
     float               ascender{};
     std::u32string      text;
     FontStyle           style;
+    bool                generateing{};
 
     ParseResult() noexcept = default;
   };
@@ -133,9 +133,10 @@ public:
   auto parse(std::string_view text, FontStyle style, std::string_view family) noexcept -> TextParseResultHandle;
   auto& get_parse_result(TextParseResultHandle handle) const noexcept { return _parse_result_pool[handle]; }
 
-  void upload_uncached_glyphs() noexcept;
+  void submit_bitmap_generation_tasks() noexcept;
+  void upload_bitmaps() noexcept;
 
-  auto& access_swaped_pending_copy_glyphs() noexcept { return _pending_copy_glyphs.access(); }
+  void clear_pending_copy_glyphs() noexcept { _pending_copy_glyphs.clear(); }
 
   auto const& get_glyph_infos(FontStyle style) noexcept { return _glyph_infos[style]; }
   auto get_notdef_glyph_info(FontStyle style) noexcept -> GlyphInfo const&;
@@ -146,8 +147,8 @@ private:
   auto split_text(std::u32string_view text, FontStyle style) noexcept -> std::vector<std::pair<std::u32string_view, Font*>>;
   auto find_font(uint unicode, FontStyle style) noexcept -> Font*;
   auto find_notdef_glyph_font(FontStyle style) noexcept -> std::pair<Font*, bool>;
-  void add_uncached_glyphs(std::u32string_view text, FontStyle style) noexcept;
-  void add_notdef_glyph(FontStyle style) noexcept;
+  auto add_uncached_glyphs(std::u32string_view text, FontStyle style) noexcept -> bool;
+  auto add_notdef_glyph(FontStyle style) noexcept -> bool;
   auto find_glyph(uint unicode, FontStyle style) noexcept -> std::optional<std::pair<Font*, uint>>;
 
   template <MapType Map>
@@ -164,14 +165,14 @@ private:
   template <typename T>
   using UnicodeMap   = std::unordered_map<uint, T>;
   template <typename T>
-  using TextMap      = std::unordered_map<std::string, T>;
+  using TextMap      = std::unordered_map<size_t, T>;
 
   FT_Library   _ft{};
   hb_buffer_t* _hb_buf{};
 
   std::vector<ImageHandle>                         _glyph_atlas;
   FontStyleMap<std::vector<Font>>                  _fonts;
-  FontStyleMap<std::vector<std::string>>           _cached_texts_with_missing_glyphs;
+  FontStyleMap<std::vector<size_t>>                _cached_texts_with_missing_glyphs;
   FontStyleMap<TextMap<TextParseResultHandle>>     _cached_text_parse_results;
   ParseResultPool                                  _parse_result_pool;
   FontStyleMap<std::unordered_set<uint>>           _missing_glyphs;
@@ -181,20 +182,12 @@ private:
   std::unordered_set<FontStyle>                    _missing_notdef_font_styles;
   
   using PendingCopyGlyphsInfoType = std::unordered_map<uint, std::vector<std::pair<MSDFBitmap, float2>>>;
-  DoubleBuffer<PendingCopyGlyphsInfoType> _pending_copy_glyphs;
+  PendingCopyGlyphsInfoType _pending_copy_glyphs;
   
   float _max_ascender{};
   float _max_height{};
 
-  struct MemmoryPool
-  {
-  private:
-    std::pmr::monotonic_buffer_resource _pool;
-
-  public:
-    template <typename T>
-    auto vector() noexcept { return std::pmr::vector<T>{ &_pool }; }
-  } _mem_pool;
+  std::vector<Task<std::vector<MSDFBitmap>>> _generate_bitmap_tasks;
 )
 
 using TextParseResultHandle = TextEngine::TextParseResultHandle;

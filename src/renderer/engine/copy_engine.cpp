@@ -111,12 +111,10 @@ void CopyEngine::update() noexcept
   auto fence_value = _slots.submit_slot();
 
   // remove glyphs after copy finished
-  auto& pending_copy_glyphs = g_text_engine.access_swaped_pending_copy_glyphs();
-  if (!pending_copy_glyphs.empty())
-    g_renderer.add_frame_render_complete_func([&] { pending_copy_glyphs.clear(); });
+  g_text_engine.clear_pending_copy_glyphs();
 
   if (cmd->needs_graphics_sync()) g_graphics_engine.wait(g_copy_engine, fence_value);
-  if (cmd->needs_compute_sync()) g_comp_engine.wait(g_copy_engine, fence_value);
+  if (cmd->needs_compute_sync())  g_comp_engine.wait(g_copy_engine, fence_value);
   cmd->clear_resource_track();
 
   if (!moved_imgs.empty())

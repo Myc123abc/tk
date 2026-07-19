@@ -392,7 +392,7 @@ void silder(std::string_view name, float x, float y, float width, float height, 
   if (bar_state.hovered)  bar_color  = bar_hover_color;
   if (knob_state.hovered) knob_color = knob_hover_color;
 
-  if (knob_state.down || bar_state.clicked)
+  if (knob_state.down || bar_state.down)
   {
     knob_color = knob_hover_color;
     auto cursor_x  = ui::get_cursor_pos_on_window().x;
@@ -606,7 +606,6 @@ int main()
       // ui::discard_beg([&] { ui::rectangle(text_pos + float2{ 30, -2 }, text_pos + float2{ 80, 50 }); });
       // text_cfg.family = fonts[1].family;
       text_cfg.outer_color = 0xff0000ff;
-      // TODO: msdf async load, because cpu generate is slow...
       text_res = ui::text("Hello 你好 こんにちは、世界！", text_pos, 32, 0xffffffff, text_cfg);
       ui::rectangle(text_pos, text_pos + text_res.extent, 0x00ff00ff, 1);
       ui::line({ text_pos.x, text_pos.y + text_res.ascender }, { text_pos.x + text_res.extent.x, text_pos.y + text_res.ascender }, 0xffff00ff);

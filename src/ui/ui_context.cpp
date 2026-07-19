@@ -158,7 +158,8 @@ void UIContext::restore_fullscreen_window() noexcept
 void UIContext::preprocess_render() noexcept
 {
   close_window();
-  g_text_engine.upload_uncached_glyphs();
+  g_text_engine.submit_bitmap_generation_tasks();
+  g_text_engine.upload_bitmaps();
 }
 
 void UIContext::render() noexcept
@@ -561,8 +562,9 @@ auto UIContext::text(std::string_view text, float2 pos, float size, Color inner_
 
   check_draw();
 
-  auto        result_handle = g_text_engine.parse(text, cfg.style, cfg.family);
+  auto const  result_handle = g_text_engine.parse(text, cfg.style, cfg.family);
   auto const& result        = g_text_engine.get_parse_result(result_handle);
+  if (result.generateing) return {};
 
   auto scale = size / FT_Pixel_Size / _wnd->scale();
   auto ascender = result.ascender * scale;

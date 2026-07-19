@@ -64,6 +64,8 @@ void FrameData::_add_text(TextParseResultHandle handle, float2 pos, float size, 
   GlyphInfo const* info{};
   GlyphInfo const* notdef_glyph_info{};
 
+  // TODO: move glyph_infos to parse result
+  // also can remove text in parse result
   auto const& infos = g_text_engine.get_glyph_infos(result.style);
 
   auto [vertices, indices] = expand_beg(4 * cnt, 6 * cnt);

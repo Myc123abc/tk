@@ -28,12 +28,15 @@ PS_Param vs(VS_Param arg)
 #define Vtx_Type_Image 1
 #define Vtx_Type_Text  2
 
-float2 px_range = float2(2, 2);
+static const float  msdf_px_range              = 4.0;
+static const float  outline_reference_px_range = 2.0;
+static const float2 px_range                   = float2(msdf_px_range, msdf_px_range);
+static const float  outline_width_scale        = outline_reference_px_range / msdf_px_range;
 
-float screen_px_range(float2 extent, uint2 uv)
+float screen_px_range(float2 extent, float2 uv)
 {
   float2 unit_range = px_range / extent;
-  float2 screen_tex_size = rsqrt(sqrt(ddx(uv.x)) + sqrt(ddy(uv.y)));
+  float2 screen_tex_size = 1.0 / fwidth(uv);
   return max(0.5 * dot(unit_range, screen_tex_size), 1.0);
 }
 
@@ -63,15 +66,19 @@ float4 ps(PS_Param arg) : SV_TARGET
   float4 inner_color = arg.col;
   float4 outer_color = arg.outer_col;
 
-  if (outer_color.a == 0.0)
-    return float4(inner_color.rgb, inner_color.a * inner_alpha);
-
-  if (inner_color.a == 0)
-    inner_color = float4(0.0, 0.0, 0.0, 0.0);
-  else
-    inner_color *= inner_alpha;
-
   // reference: https://www.redblobgames.com/x/2404-distance-field-effects/
-  float outer_alpha = clamp(screen_range * (distance_from_edge + arg.outer_width) + 0.5, 0.0, 1.0);
-  return inner_color + (outer_color * (outer_alpha - inner_alpha));
+  float outer_alpha = clamp(screen_range * (distance_from_edge + arg.outer_width * outline_width_scale) + 0.5, 0.0, 1.0);
+  if (sd == 0.0)
+    outer_alpha = 0.0;
+
+  float outline_alpha    = max(outer_alpha - inner_alpha, 0.0);
+  float inner_coverage   = inner_color.a * inner_alpha;
+  float outline_coverage = outer_color.a * outline_alpha;
+  float alpha            = saturate(inner_coverage + outline_coverage);
+
+  if (alpha == 0.0)
+    return float4(0.0, 0.0, 0.0, 0.0);
+
+  float3 rgb = (inner_color.rgb * inner_coverage + outer_color.rgb * outline_coverage) / alpha;
+  return float4(rgb, alpha);
 }
