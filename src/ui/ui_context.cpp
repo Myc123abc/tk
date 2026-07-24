@@ -158,8 +158,7 @@ void UIContext::restore_fullscreen_window() noexcept
 void UIContext::preprocess_render() noexcept
 {
   close_window();
-  g_text_engine.submit_bitmap_generation_tasks();
-  g_text_engine.upload_bitmaps();
+  g_text_engine.update();
 }
 
 void UIContext::render() noexcept

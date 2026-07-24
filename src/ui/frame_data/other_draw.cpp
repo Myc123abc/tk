@@ -65,8 +65,9 @@ void FrameData::_add_text(TextParseResultHandle handle, float2 pos, float size, 
   for (auto i = 0; i < cnt; ++i)
   {
     auto const& info = g_text_engine.get_glyph_info(result.glyph_info_keys[i]);
+    auto scale = info.get_scale(size);
 
-    info.set_vertices(vertices + vtx_offset, pos, size, result.ascender, inner_color, outer_color, outline_width);
+    info.set_vertices(vertices + vtx_offset, pos + result.offsets[i] * scale, size, result.ascender, inner_color, outer_color, outline_width);
 
     auto vtx_beg = _vertex_beg + vtx_offset;
     indices[idx_offset + 0] = static_cast<uint16>(vtx_beg + 0);
@@ -78,7 +79,7 @@ void FrameData::_add_text(TextParseResultHandle handle, float2 pos, float size, 
 
     vtx_offset += 4;
     idx_offset += 6;
-    pos        += result.advances[i] * info.get_scale(size);
+    pos        += result.advances[i] * scale;
   }
   expand_end();
 }

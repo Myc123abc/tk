@@ -1,102 +1,14 @@
 #pragma once
 
-#include "ui/ui.hpp"
-#include "util/base.hpp"
 #include "../config.hpp"
-#include "../../renderer/resource/image_manager.hpp"
 #include "../../util/object_pool.hpp"
+#include "../../util/hash.hpp"
 #include "../../renderer/resource/shader_type.hpp"
+#include "../../renderer/resource/image_manager.hpp"
 #include "../../util/thread_pool.hpp"
-
-#include <msdfgen.h>
-#include <ft2build.h>
-#include FT_FREETYPE_H
-#include <hb.h>
-
-#include <string>
-#include <unordered_set>
-#include <unordered_map>
+#include "font.hpp"
 
 namespace tk::ui {
-
-template<typename T>
-concept MapType =
-requires(T t)
-{
-  typename T::key_type;
-  typename T::mapped_type;
-
-  t.find(typename T::key_type{});
-  t.begin();
-  t.end();
-};
-
-struct GlyphKey
-{
-  friend struct GlyphKeyHash;
-
-  GlyphKey() noexcept = default;
-  GlyphKey(FontStyle style, uint unicode) noexcept : _k(static_cast<uint64>(style) << 32 | unicode) {}
-
-  auto has(uint unicode) const noexcept -> bool { return _k & 0xffffffff; }
-
-  auto operator==(GlyphKey const&) const noexcept -> bool = default;
-
-// private:
-  uint64 _k{};
-};
-
-struct GlyphKeyHash
-{
-  auto operator()(GlyphKey k) const noexcept
-  {
-    return std::hash<uint64>{}(k._k);
-  }
-};
-
-struct MSDFBitmap
-{
-  std::vector<uint8> data;
-  uint2              extent{};
-  float2             pos_offset{};
-  GlyphKey           glyph_key;
-
-  auto to_bitmap_view() const noexcept -> renderer::BitmapView
-  {
-    return { data.data(), extent.x, extent.y, extent.x * 4 };
-  }
-
-  auto empty() const noexcept { return !extent.x || !extent.y; }
-};
-
-class TextEngine;
-class Font
-{
-  friend class TextEngine;
-public:
-  auto init(std::string_view path) noexcept -> uint8;
-  void destroy() const noexcept;
-
-  auto name()  const noexcept { return _name;  }
-  auto style() const noexcept { return _style; }
-
-  auto find_glyph(uint unicode) const noexcept
-  {
-    return FT_Get_Char_Index(_face, unicode);
-  }
-
-  auto get_glyph_advance(uint glyph_idx) const noexcept -> float2;
-  auto generate_msdf_bitmap(uint glyph_idx, GlyphKey key) const noexcept -> MSDFBitmap;
-
-private:
-  std::string _name;
-  std::string _family;
-  FontStyle   _style;
-  FT_Face     _face{};
-  hb_font_t*  _hb_font{};
-  float       _ascender{};
-  float       _height{};
-};
 
 struct GlyphInfo
 {
@@ -142,10 +54,11 @@ public:
   struct ParseResult
   {
     std::vector<float2>   advances;
+    std::vector<float2>   offsets;
     float2                extent;
     float                 ascender{};
     std::vector<GlyphKey> glyph_info_keys;
-    std::unordered_set<GlyphKey, GlyphKeyHash> generating_glyph_info_keys;
+    GlyphKeySet           generating_glyph_info_keys;
 
     ParseResult() noexcept = default;
   };
@@ -154,23 +67,26 @@ public:
   auto parse(std::string_view text, FontStyle style, std::string_view family) noexcept -> TextParseResultHandle;
   auto& get_parse_result(TextParseResultHandle handle) const noexcept { return _parse_result_pool[handle]; }
 
-  void submit_bitmap_generation_tasks() noexcept;
-  void upload_bitmaps() noexcept;
+  void update() noexcept;
 
   void clear_pending_copy_glyphs() noexcept { _pending_copy_glyphs.clear(); }
   auto const& get_glyph_info(GlyphKey key) const noexcept { return _glyph_infos.at(key); }
-  auto get_notdef_glyph_info(FontStyle style) noexcept -> GlyphInfo const&;
 
   void postprocess() noexcept;
 
 private:
   auto split_text(std::u32string_view text, FontStyle style) noexcept -> std::vector<std::pair<std::u32string_view, Font*>>;
   auto find_font(uint unicode, FontStyle style) noexcept -> Font*;
-  auto find_notdef_glyph_font(FontStyle style) noexcept -> std::pair<Font*, bool>;
-  void add_uncached_glyphs(std::u32string_view text, FontStyle style, ParseResult& result) noexcept;
-  auto add_notdef_glyph(FontStyle style) noexcept -> bool;
-  auto find_glyph(uint unicode, FontStyle style) noexcept -> std::optional<std::pair<Font*, uint>>;
+  auto find_notdef_glyph_font() noexcept -> Font*;
+  void add_uncached_glyph(Font* font, uint glyph_idx, GlyphKey key, ParseResult& result) noexcept;
+  auto add_notdef_glyph() noexcept -> bool;
   auto calc_glyph_pos(float2 extent) noexcept -> std::pair<uint, float2>;
+  void regenerate_missing_glyphs(Font* font) noexcept;
+  void remove_missing_glyphs(FontStyle style) noexcept;
+  void reload_missing_glyphs() noexcept;
+
+  void submit_bitmap_generation_tasks() noexcept;
+  void upload_bitmaps() noexcept;
 
 private:
   template <typename T>
@@ -178,29 +94,47 @@ private:
   template <typename T>
   using TextMap      = std::unordered_map<size_t, T>;
 
-  FT_Library   _ft{};
-  hb_buffer_t* _hb_buf{};
+  struct ParseKey
+  {
+    size_t      text_hash{};
+    size_t      family_hash{};
+    FontStyle   style{};
 
-  std::vector<ImageHandle>                         _glyph_atlas;
-  FontStyleMap<std::vector<Font>>                  _fonts;
-  FontStyleMap<std::vector<size_t>>                _cached_texts_with_missing_glyphs;
-  FontStyleMap<TextMap<TextParseResultHandle>>     _cached_text_parse_results;
-  ParseResultPool                                  _parse_result_pool;
-  FontStyleMap<std::unordered_set<uint>>           _missing_glyphs;
-  std::vector<TextParseResultHandle>               _discard_text_parse_result_handles;
-  std::unordered_set<FontStyle>                    _missing_notdef_font_styles;
-  std::unordered_set<TextParseResultHandle>        _generating_results;
+    auto operator==(ParseKey const&) const noexcept -> bool = default;
+  };
 
-  std::unordered_map<GlyphKey, GlyphInfo, GlyphKeyHash>              _glyph_infos;
-  std::unordered_set<GlyphKey, GlyphKeyHash>                         _uncached_glyphs;
-  std::unordered_map<GlyphKey, std::pair<Font*, uint>, GlyphKeyHash> _ungenerated_glyphs;
-  
+  struct ParseKeyHash
+  {
+    auto operator()(ParseKey const& key) const noexcept
+    {
+      return generic_hash(key.text_hash, key.style, key.family_hash);
+    }
+  };
+
+  using ParseResultMap = std::unordered_map<ParseKey, TextParseResultHandle, ParseKeyHash>;
+
   using PendingCopyGlyphsInfoType = std::unordered_map<uint, std::vector<std::pair<MSDFBitmap, float2>>>;
-  PendingCopyGlyphsInfoType _pending_copy_glyphs;
-  
-  float _max_ascender{};
-  float _max_height{};
 
+  FT_Library                                 _ft{};
+  hb_buffer_t*                               _hb_buf{};
+  std::vector<ImageHandle>                   _glyph_atlas;
+  Font*                                      _notdef_font{};
+  std::vector<std::unique_ptr<Font>>         _fonts;
+  FontStyleMap<uint>                         _style_fonts;
+  FontStyleMap<std::vector<ParseKey>>        _cached_texts_with_missing_glyphs;
+  ParseResultMap                             _cached_text_parse_results;
+  TextMap<TextParseResultHandle>             _last_ready_text_parse_results;
+  ParseResultPool                            _parse_result_pool;
+  FontStyleMap<std::unordered_set<uint>>     _missing_glyphs;
+  std::vector<TextParseResultHandle>         _discard_text_parse_result_handles;
+  std::unordered_set<TextParseResultHandle>  _generating_results;
+  FontStyleMap<GlyphKeySet>                  _pending_reload_missing_glyphs;
+  GlyphKeyMap<GlyphInfo>                     _glyph_infos;
+  GlyphKeySet                                _uncached_glyphs;
+  GlyphKeySet                                _ungenerated_glyphs;
+  PendingCopyGlyphsInfoType                  _pending_copy_glyphs;
+  float                                      _max_ascender{};
+  float                                      _max_height{};
   std::vector<Task<std::vector<MSDFBitmap>>> _generate_bitmap_tasks;
 )
 

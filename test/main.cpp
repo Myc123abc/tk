@@ -1,6 +1,7 @@
 #include "tk/tk.hpp"
 #include "fps.hpp"
 #include "playback_btn.hpp"
+#include "tk/ui/ui.hpp"
 
 #include <string>
 #include <span>
@@ -372,7 +373,7 @@ void silder(std::string_view name, float x, float y, float width, float height, 
   auto id_name   = "tk::ui::silder";
   auto bar_name  = std::format("{}::{}::{}", id_name, name, "bar");
   auto knob_name = std::format("{}::{}::{}", id_name, name, "knob");
-  
+
   v = std::clamp(v, beg, end);
 
   auto ratio    = (v - beg) / (end - beg);
@@ -412,11 +413,11 @@ int main()
   load_image(img2);
 
   load_font("assets/font/NotoSansJP-Regular.ttf");
-  // load_font("assets/font/NotoSansJP-Bold.ttf");
+  load_font("assets/font/NotoSansJP-Bold.ttf");
   // load_font("assets/font/YuGothR.ttc");
   // load_font("assets/font/NotoSansSC-Regular.ttf");
   // load_font("assets/font/SitkaVF-Italic.ttf");
-  load_font("assets/font/SourceCodePro-Regular.ttf");
+  // load_font("assets/font/SourceCodePro-Regular.ttf");
 
   auto playback_btn = PlaybackButton{};
   playback_btn.init("playback button");
@@ -565,7 +566,7 @@ int main()
       ui::circle(point_in_circle({ size.x - 30, size.y - 30}, 20, circle_lerplocator.get() * 360), 3, 0xffffffff);
       circle_lerplocator.update();
 
-      auto text_cfg = ui::TextConfig{};
+      static auto text_cfg = ui::TextConfig{};
 
       auto unit = float2{ 10, 10 };
       auto bp_y = 50;
@@ -620,6 +621,10 @@ int main()
           cfg.backdrop.default_blur();
         blur_img_2 = !blur_img_2;
         load_font("assets/font/NotoSansJP-Regular.ttf");
+        if (text_cfg.style == ui::FontStyle::regular)
+          text_cfg.style = ui::FontStyle::bold;
+        else
+          text_cfg.style = ui::FontStyle::regular;
       }
 
       select_font();
