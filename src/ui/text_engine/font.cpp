@@ -173,6 +173,8 @@ auto Font::init(std::string_view path) noexcept -> uint8
     break;
   }
 
+  _key = FontStyleKey{ _family, _style };
+
   return res;
 }
 

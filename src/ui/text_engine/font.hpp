@@ -2,6 +2,7 @@
 
 #include "ui/ui.hpp"
 #include "../../renderer/resource/image.hpp"
+#include "../../util/hash.hpp"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -38,8 +39,8 @@ struct GlyphKeyHash
 };
 
 template <typename T>
-using GlyphKeyMap  = std::unordered_map<GlyphKey, T, GlyphKeyHash>;
-using GlyphKeySet  = std::unordered_set<GlyphKey, GlyphKeyHash>;
+using GlyphKeyMap = std::unordered_map<GlyphKey, T, GlyphKeyHash>;
+using GlyphKeySet = std::unordered_set<GlyphKey, GlyphKeyHash>;
 
 struct MSDFBitmap
 {
@@ -56,6 +57,29 @@ struct MSDFBitmap
   auto empty() const noexcept { return !extent.x || !extent.y; }
 };
 
+struct FontStyleKey
+{
+  size_t    family_hash{};
+  FontStyle style{};
+
+  FontStyleKey() = default;
+  FontStyleKey(std::string_view family, FontStyle style) noexcept
+    : family_hash(generic_hash(family)), style(style) {}
+
+  auto operator==(FontStyleKey const&) const noexcept -> bool = default;
+};
+
+struct FontStyleKeyHash
+{
+  auto operator()(FontStyleKey const& key) const noexcept
+  {
+    return generic_hash(key.family_hash, key.style);
+  }
+};
+
+template <typename T>
+using FontStyleMap = std::unordered_map<FontStyleKey, T, FontStyleKeyHash>;
+
 class Font
 {
   friend class TextEngine;
@@ -65,6 +89,8 @@ public:
 
   auto name()  const noexcept { return _name;  }
   auto style() const noexcept { return _style; }
+  auto family() const noexcept { return _family; }
+  auto key() const noexcept { return _key; }
 
   auto find_glyph(uint unicode) const noexcept
   {
@@ -78,14 +104,16 @@ public:
   auto id() const noexcept { return _id; }
 
 private:
-  uint        _id{};
-  std::string _name;
-  std::string _family;
-  FontStyle   _style;
-  FT_Face     _face{};
-  hb_font_t*  _hb_font{};
-  float       _ascender{};
-  float       _height{};
+  uint         _id{};
+  std::string  _name;
+  std::string  _family;
+  FontStyle    _style;
+  FT_Face      _face{};
+  hb_font_t*   _hb_font{};
+  float        _ascender{};
+  float        _height{};
+  FontStyleKey _key;
+
   mutable std::mutex _mutex;
 };
 

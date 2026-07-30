@@ -248,9 +248,8 @@ void load_font(std::string_view path) noexcept
 
 /*
 TODO:
-1. font-select text rendering
-2. vertical text rendering
-3. rotate rendering
+1. vertical text rendering
+2. rotate rendering
 */
 
 struct ButtonConfig
@@ -414,10 +413,10 @@ int main()
 
   load_font("assets/font/NotoSansJP-Regular.ttf");
   load_font("assets/font/NotoSansJP-Bold.ttf");
-  // load_font("assets/font/YuGothR.ttc");
+  load_font("assets/font/YuGothR.ttc");
   // load_font("assets/font/NotoSansSC-Regular.ttf");
   // load_font("assets/font/SitkaVF-Italic.ttf");
-  // load_font("assets/font/SourceCodePro-Regular.ttf");
+  load_font("assets/font/SourceCodePro-Regular.ttf");
 
   auto playback_btn = PlaybackButton{};
   playback_btn.init("playback button");
@@ -605,7 +604,6 @@ int main()
       ui::line({ text_pos.x + 30, 0 }, { text_pos.x + 30, wnd_ext.y }, 0xff0000ff);
       ui::line({ text_pos.x + 80, 0 }, { text_pos.x + 80, wnd_ext.y }, 0xff0000ff);
       // ui::discard_beg([&] { ui::rectangle(text_pos + float2{ 30, -2 }, text_pos + float2{ 80, 50 }); });
-      // text_cfg.family = fonts[1].family;
       text_cfg.outer_color = 0xff0000ff;
       text_res = ui::text("Hello 你好 こんにちは、世界！", text_pos, 32, 0xffffffff, text_cfg);
       ui::rectangle(text_pos, text_pos + text_res.extent, 0x00ff00ff, 1);
@@ -625,6 +623,7 @@ int main()
           text_cfg.style = ui::FontStyle::bold;
         else
           text_cfg.style = ui::FontStyle::regular;
+        text_cfg.family = fonts[2].family;
       }
 
       select_font();

@@ -51,30 +51,40 @@ auto TextEngine::load_font(std::string_view path) noexcept -> std::expected<Font
   // create font
   auto font = std::make_unique<Font>();
   if (auto res = font->init(path); res) return std::unexpected(FontLoadError::freetype_err{ res });
+
+  // create font info
   font->_id = static_cast<uint>(_fonts.size());
-  auto info  = FontInfo{ font->_family, font->_style };
-  auto style = font->style();
+  auto info = FontInfo{ font->_family, font->_style };
+
+  // store font
   auto loaded_font = _fonts.emplace_back(std::move(font)).get();
-  _style_fonts[style] = loaded_font->id();
+  auto res = _font_idxs.emplace(loaded_font->key(), loaded_font->id());
+  assert(res.second);
+  _style_font_idxs[static_cast<size_t>(loaded_font->style())].emplace_back(loaded_font->id());
+
+  // set notdef font if not have
   if (!_notdef_font) _notdef_font = loaded_font;
-  regenerate_missing_glyphs(loaded_font);
+  
+  for (auto const& [key, missing_glyphs] : _missing_glyphs)
+    if (key.style == loaded_font->style())
+      regenerate_missing_glyphs(loaded_font, key);
 
   return info;
 }
 
-void TextEngine::regenerate_missing_glyphs(Font* font) noexcept
+void TextEngine::regenerate_missing_glyphs(Font* font, FontStyleKey key) noexcept
 {
-  auto  style          = font->style();
-  auto& missing_glyphs = _missing_glyphs[style];
+  auto& missing_glyphs = _missing_glyphs[key];
   if (missing_glyphs.empty()) return;
 
-  auto& glyphs = _pending_reload_missing_glyphs[style];
+  auto& glyphs = _pending_reload_missing_glyphs[key];
 
   for (auto unicode : missing_glyphs)
   {
     auto glyph_idx = font->find_glyph(unicode);
     if (!glyph_idx) continue;
 
+    _fallback_font_idxs[key][unicode] = font->id();
     auto key = GlyphKey{ font->id(), glyph_idx };
     glyphs.emplace(key);
     assert(!_glyph_infos.contains(key) && !_uncached_glyphs.contains(key));
@@ -114,7 +124,8 @@ auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view 
   res.glyph_info_keys.reserve(u32str.size());
 
   // split text
-  for (auto [text, font] : split_text(u32str, style))
+  auto glyph_style_key = FontStyleKey(family, style);
+  for (auto [text, font] : split_text(u32str, glyph_style_key))
   {
     // use hb calculate advances
     if (font)
@@ -168,7 +179,7 @@ auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view 
   }
 
   if (has_missing_glyphs)
-    _cached_texts_with_missing_glyphs[style].emplace_back(key);
+    _cached_texts_with_missing_glyphs[glyph_style_key].emplace_back(key);
 
   res.ascender = _max_ascender;
   res.extent.y = _max_height;
@@ -194,7 +205,7 @@ auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view 
   return handle;
 }
 
-auto TextEngine::split_text(std::u32string_view text, FontStyle style) noexcept -> std::vector<std::pair<std::u32string_view, Font*>>
+auto TextEngine::split_text(std::u32string_view text, FontStyleKey key) noexcept -> std::vector<std::pair<std::u32string_view, Font*>>
 {
   // get which text use which font
   auto result = std::vector<std::pair<std::u32string_view, Font*>>{};
@@ -211,12 +222,12 @@ auto TextEngine::split_text(std::u32string_view text, FontStyle style) noexcept 
   };
 
   auto beg      = text.begin();
-  auto cur_font = find_font(*beg, style);;
+  auto cur_font = find_font(*beg, key);;
   update(cur_font);
 
   for (auto it = beg + 1; it != text.end(); ++it)
   {
-    auto font = find_font(*it, style);
+    auto font = find_font(*it, key);
     if (font == cur_font) continue;
 
     result.emplace_back(std::u32string_view{ beg, it }, cur_font);
@@ -231,21 +242,31 @@ auto TextEngine::split_text(std::u32string_view text, FontStyle style) noexcept 
   return result;
 }
 
-auto TextEngine::find_font(uint unicode, FontStyle style) noexcept -> Font*
+auto TextEngine::find_font(uint unicode, FontStyleKey key) noexcept -> Font*
 {
-  if (_missing_glyphs[style].contains(unicode)) return {};
+  if (_missing_glyphs[key].contains(unicode)) return {};
 
-  auto it = _style_fonts.find(style);
-  if (it == _style_fonts.end())
+  auto it = _font_idxs.find(key);
+  if (it != _font_idxs.end())
   {
-    _missing_glyphs[style].emplace(unicode);
-    return {};
+    auto font = _fonts[it->second].get();
+    if (font->find_glyph(unicode)) return font;
   }
 
-  auto font = _fonts[it->second].get();
-  if (font->find_glyph(unicode)) return font;
+  auto& fallback_font_idxs = _fallback_font_idxs[key];
+  if (auto fallback_it = fallback_font_idxs.find(unicode); fallback_it != fallback_font_idxs.end())
+    return _fonts[fallback_it->second].get();
 
-  _missing_glyphs[style].emplace(unicode);
+  for (auto font_idx : _style_font_idxs[static_cast<size_t>(key.style)])
+  {
+    auto font = _fonts[font_idx].get();
+    if (!font->find_glyph(unicode)) continue;
+
+    fallback_font_idxs.emplace(unicode, font_idx);
+    return font;
+  }
+
+  _missing_glyphs[key].emplace(unicode);
   return {};
 }
 
@@ -412,20 +433,20 @@ void TextEngine::upload_bitmaps() noexcept
 
 void TextEngine::reload_missing_glyphs() noexcept
 {
-  for (auto& [style, keys] : _pending_reload_missing_glyphs)
+  for (auto& [font_style_key, keys] : _pending_reload_missing_glyphs)
   {
     if (keys.empty() || std::ranges::any_of(keys, [&](auto const& key) { return !_glyph_infos.contains(key); }))
       continue;
-    remove_missing_glyphs(style);
+    remove_missing_glyphs(font_style_key);
     keys.clear();
   }
 }
 
-void TextEngine::remove_missing_glyphs(FontStyle style) noexcept
+void TextEngine::remove_missing_glyphs(FontStyleKey key) noexcept
 {
   // clear missing glyphs and cached text advances
-  _missing_glyphs[style].clear();
-  for (auto const& key : _cached_texts_with_missing_glyphs[style])
+  _missing_glyphs[key].clear();
+  for (auto const& key : _cached_texts_with_missing_glyphs[key])
   {
     auto it = _cached_text_parse_results.find(key);
     assert(it != _cached_text_parse_results.end());
@@ -437,7 +458,7 @@ void TextEngine::remove_missing_glyphs(FontStyle style) noexcept
     _discard_text_parse_result_handles.emplace_back(h);
     _cached_text_parse_results.erase(it);
   }
-  _cached_texts_with_missing_glyphs[style].clear();
+  _cached_texts_with_missing_glyphs[key].clear();
 }
 
 

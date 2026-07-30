@@ -2,7 +2,6 @@
 
 #include "../config.hpp"
 #include "../../util/object_pool.hpp"
-#include "../../util/hash.hpp"
 #include "../../renderer/resource/shader_type.hpp"
 #include "../../renderer/resource/image_manager.hpp"
 #include "../../util/thread_pool.hpp"
@@ -75,25 +74,6 @@ public:
   void postprocess() noexcept;
 
 private:
-  auto split_text(std::u32string_view text, FontStyle style) noexcept -> std::vector<std::pair<std::u32string_view, Font*>>;
-  auto find_font(uint unicode, FontStyle style) noexcept -> Font*;
-  auto find_notdef_glyph_font() noexcept -> Font*;
-  void add_uncached_glyph(Font* font, uint glyph_idx, GlyphKey key, ParseResult& result) noexcept;
-  auto add_notdef_glyph() noexcept -> bool;
-  auto calc_glyph_pos(float2 extent) noexcept -> std::pair<uint, float2>;
-  void regenerate_missing_glyphs(Font* font) noexcept;
-  void remove_missing_glyphs(FontStyle style) noexcept;
-  void reload_missing_glyphs() noexcept;
-
-  void submit_bitmap_generation_tasks() noexcept;
-  void upload_bitmaps() noexcept;
-
-private:
-  template <typename T>
-  using FontStyleMap = std::unordered_map<FontStyle, T>;
-  template <typename T>
-  using TextMap      = std::unordered_map<size_t, T>;
-
   struct ParseKey
   {
     size_t      text_hash{};
@@ -111,21 +91,41 @@ private:
     }
   };
 
-  using ParseResultMap = std::unordered_map<ParseKey, TextParseResultHandle, ParseKeyHash>;
+private:
+  auto split_text(std::u32string_view text, FontStyleKey key) noexcept -> std::vector<std::pair<std::u32string_view, Font*>>;
+  auto find_font(uint unicode, FontStyleKey key) noexcept -> Font*;
+  auto find_notdef_glyph_font() noexcept -> Font*;
+  void add_uncached_glyph(Font* font, uint glyph_idx, GlyphKey key, ParseResult& result) noexcept;
+  auto add_notdef_glyph() noexcept -> bool;
+  auto calc_glyph_pos(float2 extent) noexcept -> std::pair<uint, float2>;
+  void regenerate_missing_glyphs(Font* font, FontStyleKey key) noexcept;
+  void remove_missing_glyphs(FontStyleKey key) noexcept;
+  void reload_missing_glyphs() noexcept;
 
+  void submit_bitmap_generation_tasks() noexcept;
+  void upload_bitmaps() noexcept;
+
+private:
+  template <typename T>
+  using TextMap                   = std::unordered_map<size_t, T>;
+  using ParseResultMap            = std::unordered_map<ParseKey, TextParseResultHandle, ParseKeyHash>;
   using PendingCopyGlyphsInfoType = std::unordered_map<uint, std::vector<std::pair<MSDFBitmap, float2>>>;
+  using StyleFontIdxs             = std::array<std::vector<uint>, static_cast<size_t>(FontStyle::italic_bold) + 1>;
+  using FallbackFontIdxMap        = FontStyleMap<std::unordered_map<uint, uint>>;
 
   FT_Library                                 _ft{};
   hb_buffer_t*                               _hb_buf{};
   std::vector<ImageHandle>                   _glyph_atlas;
   Font*                                      _notdef_font{};
   std::vector<std::unique_ptr<Font>>         _fonts;
-  FontStyleMap<uint>                         _style_fonts;
+  FontStyleMap<uint>                         _font_idxs;
+  StyleFontIdxs                              _style_font_idxs;
   FontStyleMap<std::vector<ParseKey>>        _cached_texts_with_missing_glyphs;
   ParseResultMap                             _cached_text_parse_results;
   TextMap<TextParseResultHandle>             _last_ready_text_parse_results;
   ParseResultPool                            _parse_result_pool;
   FontStyleMap<std::unordered_set<uint>>     _missing_glyphs;
+  FallbackFontIdxMap                         _fallback_font_idxs;
   std::vector<TextParseResultHandle>         _discard_text_parse_result_handles;
   std::unordered_set<TextParseResultHandle>  _generating_results;
   FontStyleMap<GlyphKeySet>                  _pending_reload_missing_glyphs;
