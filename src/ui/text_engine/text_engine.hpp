@@ -108,6 +108,8 @@ private:
   void upload_bitmaps() noexcept;
 
 private:
+  template <typename T>
+  using TextMap                   = std::unordered_map<size_t, T>;
   using ParseResultMap            = std::unordered_map<ParseKey, TextParseResultHandle, ParseKeyHash>;
   using PendingCopyGlyphsInfoType = std::unordered_map<uint, std::vector<std::pair<MSDFBitmap, float2>>>;
   using StyleFontIdxs             = std::array<std::vector<uint>, static_cast<size_t>(FontStyle::italic_bold) + 1>;
@@ -122,7 +124,7 @@ private:
   StyleFontIdxs                              _style_font_idxs;
   FontStyleMap<std::vector<ParseKey>>        _cached_texts_with_missing_glyphs;
   ParseResultMap                             _cached_text_parse_results;
-  ParseResultMap                             _last_ready_text_parse_results;
+  TextMap<TextParseResultHandle>             _last_ready_text_parse_results;
   ParseResultPool                            _parse_result_pool;
   FontStyleMap<std::unordered_set<uint>>     _missing_glyphs;
   FallbackFontIdxMap                         _fallback_font_idxs;

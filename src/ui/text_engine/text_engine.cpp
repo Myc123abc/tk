@@ -96,8 +96,8 @@ auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view 
 {
   assert(!text.empty());
 
-  auto str_hash = std::hash<std::string_view>{};
-  auto key      = TextEngine::ParseKey{ str_hash(text), str_hash(family), style, direction };
+  auto text_hash = generic_hash(text);
+  auto key       = TextEngine::ParseKey{ text_hash, generic_hash(family), style, direction };
 
   // try to get cached text advances
   if (auto it = _cached_text_parse_results.find(key); it != _cached_text_parse_results.end())
@@ -105,10 +105,10 @@ auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view 
     auto const& result = _parse_result_pool[it->second];
     if (result.generating_glyph_info_keys.empty())
     {
-      _last_ready_text_parse_results[key] = it->second;
+      _last_ready_text_parse_results[text_hash] = it->second;
       return it->second;
     }
-    if (auto fallback_it = _last_ready_text_parse_results.find(key); fallback_it != _last_ready_text_parse_results.end())
+    if (auto fallback_it = _last_ready_text_parse_results.find(text_hash); fallback_it != _last_ready_text_parse_results.end())
       return fallback_it->second;
     return it->second;
   }
@@ -249,11 +249,11 @@ auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view 
 
   if (is_generating)
   {
-    if (auto fallback_it = _last_ready_text_parse_results.find(key); fallback_it != _last_ready_text_parse_results.end())
+    if (auto fallback_it = _last_ready_text_parse_results.find(text_hash); fallback_it != _last_ready_text_parse_results.end())
       return fallback_it->second;
   }
   else
-    _last_ready_text_parse_results[key] = handle;
+    _last_ready_text_parse_results[text_hash] = handle;
 
   return handle;
 }
@@ -505,7 +505,7 @@ void TextEngine::remove_missing_glyphs(FontStyleKey key) noexcept
     assert(it != _cached_text_parse_results.end());
     auto h = it->second;
     assert(h.valid());
-    if (auto fallback_it = _last_ready_text_parse_results.find(key);
+    if (auto fallback_it = _last_ready_text_parse_results.find(key.text_hash);
         fallback_it != _last_ready_text_parse_results.end() && fallback_it->second == h)
       _last_ready_text_parse_results.erase(fallback_it);
     _discard_text_parse_result_handles.emplace_back(h);
