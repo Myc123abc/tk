@@ -92,12 +92,12 @@ void TextEngine::regenerate_missing_glyphs(Font* font, FontStyleKey key) noexcep
   }
 }
 
-auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view family) noexcept -> TextParseResultHandle
+auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view family, TextDirection direction) noexcept -> TextParseResultHandle
 {
   assert(!text.empty());
 
   auto str_hash = std::hash<std::string_view>{};
-  auto key      = TextEngine::ParseKey{ str_hash(text), str_hash(family), style };
+  auto key      = TextEngine::ParseKey{ str_hash(text), str_hash(family), style, direction };
 
   // try to get cached text advances
   if (auto it = _cached_text_parse_results.find(key); it != _cached_text_parse_results.end())
@@ -105,10 +105,10 @@ auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view 
     auto const& result = _parse_result_pool[it->second];
     if (result.generating_glyph_info_keys.empty())
     {
-      _last_ready_text_parse_results[key.text_hash] = it->second;
+      _last_ready_text_parse_results[key] = it->second;
       return it->second;
     }
-    if (auto fallback_it = _last_ready_text_parse_results.find(key.text_hash); fallback_it != _last_ready_text_parse_results.end())
+    if (auto fallback_it = _last_ready_text_parse_results.find(key); fallback_it != _last_ready_text_parse_results.end())
       return fallback_it->second;
     return it->second;
   }
@@ -134,6 +134,8 @@ auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view 
         std::lock_guard lock{ font->_mutex };
         hb_buffer_reset(_hb_buf);
         hb_buffer_add_utf32(_hb_buf, reinterpret_cast<uint const*>(text.data()), text.size(), 0, -1);
+        if (direction == TextDirection::vertical)
+          hb_buffer_set_direction(_hb_buf, HB_DIRECTION_TTB);
         hb_buffer_guess_segment_properties(_hb_buf);
         hb_shape(font->_hb_font, _hb_buf, nullptr, 0);
       }
@@ -151,12 +153,20 @@ auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view 
           static_cast<float>(glyph_positions[i].x_offset) / 64,
           static_cast<float>(glyph_positions[i].y_offset) / 64,
         };
+        if (direction == TextDirection::vertical)
+        {
+          advance.y = -advance.y;
+          offset.y  = -offset.y;
+        }
         auto key = GlyphKey{ font->id(), glyph_infos[i].codepoint };
 
         res.advances.emplace_back(advance);
         res.offsets.emplace_back(offset);
         res.glyph_info_keys.emplace_back(key);
-        res.extent.x += advance.x;
+        if (direction == TextDirection::horizontal)
+          res.extent.x += advance.x;
+        else
+          res.extent.y += advance.y;
         add_uncached_glyph(font, glyph_infos[i].codepoint, key, res);
       }
     }
@@ -166,12 +176,44 @@ auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view 
       has_missing_glyphs = true;
       auto notdef_glyph_font = find_notdef_glyph_font();
       assert(notdef_glyph_font);
-      auto notdef_glyph_advance = notdef_glyph_font->get_glyph_advance(0);
+
+      {
+        std::lock_guard lock{ notdef_glyph_font->_mutex };
+        hb_buffer_reset(_hb_buf);
+        hb_buffer_add_utf32(_hb_buf, reinterpret_cast<uint const*>(text.data()), text.size(), 0, -1);
+        if (direction == TextDirection::vertical)
+          hb_buffer_set_direction(_hb_buf, HB_DIRECTION_TTB);
+        hb_buffer_guess_segment_properties(_hb_buf);
+        hb_shape(notdef_glyph_font->_hb_font, _hb_buf, nullptr, 0);
+      }
+
+      auto glyph_count     = hb_buffer_get_length(_hb_buf);
+      auto glyph_positions = hb_buffer_get_glyph_positions(_hb_buf, nullptr);
       auto k = GlyphKey{ notdef_glyph_font->id(), 0 };
-      res.advances.resize(res.advances.size() + text.size(), notdef_glyph_advance);
-      res.offsets.resize(res.offsets.size() + text.size());
-      res.glyph_info_keys.resize(res.glyph_info_keys.size() + text.size(), k);
-      res.extent.x += text.size() * notdef_glyph_advance.x;
+      for (auto i = 0u; i < glyph_count; ++i)
+      {
+        auto advance = float2{
+          static_cast<float>(glyph_positions[i].x_advance) / 64,
+          static_cast<float>(glyph_positions[i].y_advance) / 64,
+        };
+        auto offset = float2{
+          static_cast<float>(glyph_positions[i].x_offset) / 64,
+          static_cast<float>(glyph_positions[i].y_offset) / 64,
+        };
+        if (direction == TextDirection::vertical)
+        {
+          advance.y = -advance.y;
+          offset.y  = -offset.y;
+        }
+
+        res.advances.emplace_back(advance);
+        res.offsets.emplace_back(offset);
+        res.glyph_info_keys.emplace_back(k);
+        if (direction == TextDirection::horizontal)
+          res.extent.x += advance.x;
+        else
+          res.extent.y += advance.y;
+      }
       _max_ascender = std::max(_max_ascender, notdef_glyph_font->_ascender);
       _max_height   = std::max(_max_height,   notdef_glyph_font->_height);
       if (add_notdef_glyph()) res.generating_glyph_info_keys.emplace(k);
@@ -181,12 +223,23 @@ auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view 
   if (has_missing_glyphs)
     _cached_texts_with_missing_glyphs[glyph_style_key].emplace_back(key);
 
-  res.ascender = _max_ascender;
-  res.extent.y = _max_height;
+  if (direction == TextDirection::horizontal)
+  {
+    res.extent.y = _max_height;
+    res.ascender = _max_ascender;
+  }
+  else
+  {
+    res.is_vertical = true;
+    res.extent.x    = _max_height;
+    res.ascender    = res.extent.x * .5f;
+    for (auto& offset : res.offsets)
+      offset.x += res.ascender;
+  }
 
   // cached calculate result
   auto handle = _parse_result_pool.alloc();
-  auto [_, inserted] = _cached_text_parse_results.emplace(std::move(key), handle);
+  auto [_, inserted] = _cached_text_parse_results.emplace(key, handle);
   assert(inserted);
 
   auto const is_generating = !res.generating_glyph_info_keys.empty();
@@ -196,11 +249,11 @@ auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view 
 
   if (is_generating)
   {
-    if (auto fallback_it = _last_ready_text_parse_results.find(key.text_hash); fallback_it != _last_ready_text_parse_results.end())
+    if (auto fallback_it = _last_ready_text_parse_results.find(key); fallback_it != _last_ready_text_parse_results.end())
       return fallback_it->second;
   }
   else
-    _last_ready_text_parse_results[key.text_hash] = handle;
+    _last_ready_text_parse_results[key] = handle;
 
   return handle;
 }
@@ -452,7 +505,7 @@ void TextEngine::remove_missing_glyphs(FontStyleKey key) noexcept
     assert(it != _cached_text_parse_results.end());
     auto h = it->second;
     assert(h.valid());
-    if (auto fallback_it = _last_ready_text_parse_results.find(key.text_hash);
+    if (auto fallback_it = _last_ready_text_parse_results.find(key);
         fallback_it != _last_ready_text_parse_results.end() && fallback_it->second == h)
       _last_ready_text_parse_results.erase(fallback_it);
     _discard_text_parse_result_handles.emplace_back(h);

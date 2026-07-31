@@ -56,6 +56,7 @@ public:
     std::vector<float2>   offsets;
     float2                extent;
     float                 ascender{};
+    bool                  is_vertical{};
     std::vector<GlyphKey> glyph_info_keys;
     GlyphKeySet           generating_glyph_info_keys;
 
@@ -63,7 +64,7 @@ public:
   };
   using ParseResultPool       = ObjectPool<ParseResult>;
   using TextParseResultHandle = ParseResultPool::Handle;
-  auto parse(std::string_view text, FontStyle style, std::string_view family) noexcept -> TextParseResultHandle;
+  auto parse(std::string_view text, FontStyle style, std::string_view family, TextDirection direction) noexcept -> TextParseResultHandle;
   auto& get_parse_result(TextParseResultHandle handle) const noexcept { return _parse_result_pool[handle]; }
 
   void update() noexcept;
@@ -76,9 +77,10 @@ public:
 private:
   struct ParseKey
   {
-    size_t      text_hash{};
-    size_t      family_hash{};
-    FontStyle   style{};
+    size_t        text_hash{};
+    size_t        family_hash{};
+    FontStyle     style{};
+    TextDirection direction{};
 
     auto operator==(ParseKey const&) const noexcept -> bool = default;
   };
@@ -87,7 +89,7 @@ private:
   {
     auto operator()(ParseKey const& key) const noexcept
     {
-      return generic_hash(key.text_hash, key.style, key.family_hash);
+      return generic_hash(key.text_hash, key.style, key.family_hash, key.direction);
     }
   };
 
@@ -106,8 +108,6 @@ private:
   void upload_bitmaps() noexcept;
 
 private:
-  template <typename T>
-  using TextMap                   = std::unordered_map<size_t, T>;
   using ParseResultMap            = std::unordered_map<ParseKey, TextParseResultHandle, ParseKeyHash>;
   using PendingCopyGlyphsInfoType = std::unordered_map<uint, std::vector<std::pair<MSDFBitmap, float2>>>;
   using StyleFontIdxs             = std::array<std::vector<uint>, static_cast<size_t>(FontStyle::italic_bold) + 1>;
@@ -122,7 +122,7 @@ private:
   StyleFontIdxs                              _style_font_idxs;
   FontStyleMap<std::vector<ParseKey>>        _cached_texts_with_missing_glyphs;
   ParseResultMap                             _cached_text_parse_results;
-  TextMap<TextParseResultHandle>             _last_ready_text_parse_results;
+  ParseResultMap                             _last_ready_text_parse_results;
   ParseResultPool                            _parse_result_pool;
   FontStyleMap<std::unordered_set<uint>>     _missing_glyphs;
   FallbackFontIdxMap                         _fallback_font_idxs;

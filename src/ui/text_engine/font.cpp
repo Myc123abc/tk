@@ -188,7 +188,7 @@ auto Font::generate_msdf_bitmap(uint glyph_idx, GlyphKey key) const noexcept -> 
 {
   auto lock = std::unique_lock{ _mutex };
   // load glyph
-  check(FT_Load_Glyph(_face, glyph_idx, FT_LOAD_NO_SCALE), "failed to load glyph no scale");
+  check(FT_Load_Glyph(_face, glyph_idx, FT_LOAD_NO_SCALE | FT_LOAD_VERTICAL_LAYOUT), "failed to load glyph no scale");
 
   // calc scale
   auto scale = 1.0 / (_face->units_per_EM ? _face->units_per_EM : 1);

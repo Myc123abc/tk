@@ -66,7 +66,6 @@ float4 ps(PS_Param arg) : SV_TARGET
   float4 inner_color = arg.col;
   float4 outer_color = arg.outer_col;
 
-  // reference: https://www.redblobgames.com/x/2404-distance-field-effects/
   float outer_alpha = clamp(screen_range * (distance_from_edge + arg.outer_width * outline_width_scale) + 0.5, 0.0, 1.0);
   if (sd == 0.0)
     outer_alpha = 0.0;

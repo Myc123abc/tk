@@ -192,6 +192,12 @@ enum class FontStyle
   italic_bold,
 };
 
+enum class TextDirection
+{
+  horizontal,
+  vertical,
+};
+
 struct FontInfo
 {
   std::string family;
@@ -220,6 +226,7 @@ struct TextConfig
 {
   std::string_view family;
   FontStyle        style{};
+  TextDirection    direction{};
   Color            outer_color;
   float            outline_width{ 0.15f };
   bool             pos_as_baseline{};
