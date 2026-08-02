@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../util/flag.hpp"
-#include "../util/base.hpp"
-#include "../util/variant.hpp"
+#include "tk/flag.hpp"
+#include "tk/base.hpp"
+#include "tk/variant.hpp"
 #include "color.hpp"
 #include "tween.hpp"
 #include "widget.hpp"

@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <optional>
 
-#include "util/base.hpp"
+#include "tk/base.hpp"
 #include "../resource/command.hpp"
 
 namespace tk::renderer {

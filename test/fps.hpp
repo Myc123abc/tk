@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tk/util/base.hpp"
+#include "tk/base.hpp"
 #include "tk/ui/ui.hpp"
 
 namespace tk {

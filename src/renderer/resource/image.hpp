@@ -1,9 +1,9 @@
 #pragma once
 
 #include "descriptor_heap_manager.hpp"
-#include "util/flag.hpp"
-#include "util/base.hpp"
-#include "util/rect.hpp"
+#include "tk/flag.hpp"
+#include "tk/base.hpp"
+#include "tk/rect.hpp"
 #include "resource_tack.hpp"
 
 #include <dxgi1_6.h>

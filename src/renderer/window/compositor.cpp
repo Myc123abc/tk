@@ -1,5 +1,5 @@
 #include "compositor.hpp"
-#include "util/error_handling.hpp"
+#include "tk/error_handling.hpp"
 #include "effect/effect.h"
 #include "../core.hpp"
 

@@ -4,8 +4,8 @@
 #include "compositor.hpp"
 #include "ui/ui.hpp"
 
-#include "util/base.hpp"
-#include "util/rect.hpp"
+#include "tk/base.hpp"
+#include "tk/rect.hpp"
 
 #include <windows.h>
 

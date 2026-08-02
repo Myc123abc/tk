@@ -3,7 +3,7 @@
 #include "window_manager.hpp"
 #include "../../ui/ui_context.hpp"
 #include "../config.hpp"
-#include "util/error_handling.hpp"
+#include "tk/error_handling.hpp"
 #include "monitor.hpp"
 
 using namespace tk::ui;

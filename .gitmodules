@@ -22,3 +22,6 @@
 [submodule "vendor/msdfgen"]
 	path = vendor/msdfgen
 	url = https://github.com/Chlumsky/msdfgen.git
+[submodule "vendor/tk-util"]
+	path = vendor/tk-util
+	url = https://github.com/Myc123abc/tk-util

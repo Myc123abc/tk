@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util/rect.hpp"
+#include "tk/rect.hpp"
 
 #include <Windows.h>
 #include <ShellScalingApi.h>

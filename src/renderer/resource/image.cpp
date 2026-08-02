@@ -1,6 +1,6 @@
 #include "image.hpp"
 #include "../core.hpp"
-#include "util/error_handling.hpp"
+#include "tk/error_handling.hpp"
 #include "command.hpp"
 
 using namespace tk;

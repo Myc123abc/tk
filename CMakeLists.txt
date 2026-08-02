@@ -28,6 +28,7 @@ add_subdirectory(vendor/freetype)
 add_subdirectory(vendor/harfbuzz)
 add_subdirectory(vendor/Clipper2/CPP)
 add_subdirectory(vendor/msdfgen)
+add_subdirectory(vendor/tk-util)
 
 # when generator not vs, rc files will be built fail
 if (NOT "${CMAKE_GENERATOR}" MATCHES "Visual Studio")
@@ -70,6 +71,8 @@ target_link_libraries(tk
     libunibreak
     Clipper2
     msdfgen::msdfgen
+  PUBLIC
+    tk::util
 )
 
 add_executable(test test/main.cpp)

@@ -4,8 +4,8 @@
 #include "../../renderer/resource/shader_type.hpp"
 #include "../../renderer/resource/image_manager.hpp"
 #include "../text_engine/text_engine.hpp"
-#include "util/rect.hpp"
-#include "util/flag.hpp"
+#include "tk/rect.hpp"
+#include "tk/flag.hpp"
 
 namespace tk::ui {
 

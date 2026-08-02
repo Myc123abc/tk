@@ -1,9 +1,9 @@
 #pragma once
 
-#include "util/log.hpp"
+#include "tk/log.hpp"
 #include "ui/ui.hpp"
 #include "ui/tween.hpp"
-#include "util/log.hpp"
+#include "tk/log.hpp"
 
 namespace tk {
 
