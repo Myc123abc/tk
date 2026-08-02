@@ -99,6 +99,7 @@ cmake --build build
 |utfcpp|MIT|https://github.com/nemtrif/utfcpp|
 |Clipper2|BSL-1.0|https://github.com/AngusJohnson/Clipper2|
 |msdfgen|MIT|https://github.com/Chlumsky/msdfgen|
+|tk-util|Public Domain|https://github.com/Myc123abc/tk-util|
 
 ## License
 The following licenses are available:
