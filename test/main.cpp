@@ -2,6 +2,7 @@
 #include "fps.hpp"
 #include "playback_btn.hpp"
 #include "tk/ui/ui.hpp"
+#include "tk/ui/transform.hpp"
 
 #include <string>
 #include <span>
@@ -246,12 +247,6 @@ void load_font(std::string_view path) noexcept
     fonts.emplace_back(res.value());
 }
 
-/*
-TODO:
-1. vertical text rendering
-2. rotate rendering
-*/
-
 struct ButtonConfig
 {
   std::string_view text;
@@ -472,16 +467,24 @@ int main()
       ui::add_move_invalid_area({}, { 150, 150 });
 
       // silder
-      static float outline_width{};
-      silder("silder_test", 0, 90, 100, 10, 0, 0.5, outline_width);
-      ui::text(std::format("outline width : {}", outline_width), { 0, 90 }, 24, 0x00ff00ff);
+      // static float outline_width{};
+      // silder("silder_test", 0, 90, 100, 10, 0, 0.5, outline_width);
+      // ui::text(std::format("outline width : {}", outline_width), { 0, 90 }, 24, 0x00ff00ff);
 
       auto cfg = ui::TextConfig{};
-      cfg.outer_color = 0xff0000ff;
-      cfg.outline_width = outline_width;
-      auto res = ui::text("a c一覧", { 0, 0 }, 32, 0x000000ff, cfg);
-      ui::text("abc一覧", { 0, res.extent.y }, 32, 0x000000ff);
-      // ui::line({ 0, res.ascender }, { res.extent.x, res.ascender }, 0xff0000ff);
+      // cfg.outer_color = 0xff0000ff;
+      // cfg.outline_width = outline_width;
+      cfg.direction = ui::TextDirection::vertical;
+      cfg.pos_as_baseline = true;
+      auto res = ui::text("AigW.,()马钰 日本語のテスト。", 32, cfg);
+      auto p1 = float2{ 30 + res.ascender, 0 };
+      auto p2 = float2{ 30 + res.ascender, res.extent.y };
+
+      ui::transform_beg(ui::Transform{}.rotate((p1 + p2) / 2, -3.14/6));
+      ui::text("AigW.,()马钰 日本語のテスト。", { 30, 0 }, 32, 0x000000ff, cfg);
+      ui::rectangle({ 30, 0 }, { 30 + res.extent.x, res.extent.y }, 0x00ff00ff, 1);
+      ui::line({ 30 + res.ascender, 0 }, { 30 + res.ascender, res.extent.y }, 0xff0000ff);
+      ui::transform_end();
 
       // circle_draw_test();
       // line_draw_test();
@@ -511,8 +514,10 @@ int main()
       auto p0 = float2{ 5, 5 };
       auto p1 = p0 + float2{ 12.5 * 1.414, 12.5 };
       auto p2 = p0 + float2{ 0, 25 };
+      ui::transform_beg(ui::Transform{}.rotate(3.14/6));
       if (playback_btn(p0, p1, p2, 0xffffffff, 0xdcdcdcff, 1))
         if (progress_tween.is_not_started()) progress_tween.start();
+      ui::transform_end();
 
       if (!playback_btn.is_paused()) progress_tween.update();
       if (progress_tween.is_finished())
@@ -546,12 +551,15 @@ int main()
         auto ext = wnd_ext - p2;
         auto scale = std::max(img_ext.x / ext.x, img_ext.y / ext.y);
         img_ext /= scale;
+        ui::transform_beg(ui::Transform{}.rotate(-3.14/6));
         res = image(img2, p2, p2 + img_ext);
+        ui::transform_end();
       }
       if (res) loop_trigger.update();
 
       static auto blur_img_2 = false;
 
+      ui::transform_beg(ui::Transform{}.rotate(-3.14/6));
       ui::discard_beg([]{ ui::circle({ 50, 50 }, 50); });
       if (blur_img_2)
         res = image(img1, {}, wnd_ext, 0x44, ui::ImageConfig::blur(5, 5));
@@ -559,6 +567,7 @@ int main()
         res = image(img1, {}, wnd_ext, 0x44);
       ui::rectangle({ 50, 50 }, { 100, 100 }, 0x00ff00ff);
       ui::discard_end();
+      ui::transform_end();
 
       // circle point
       auto size = ui::window_drawable_extent();
@@ -619,6 +628,7 @@ int main()
           cfg.backdrop.default_blur();
         blur_img_2 = !blur_img_2;
         load_font("assets/font/NotoSansJP-Regular.ttf");
+        load_font("assets/font/NotoSansSC-Regular.ttf");
         if (text_cfg.style == ui::FontStyle::regular)
           text_cfg.style = ui::FontStyle::bold;
         else

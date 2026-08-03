@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ui/ui.hpp"
+#include "ui/transform.hpp"
 #include "../../renderer/resource/shader_type.hpp"
 #include "../../renderer/resource/image_manager.hpp"
 #include "../text_engine/text_engine.hpp"
@@ -57,6 +58,7 @@ public:
     _indices.clear();
     _render_cmds.clear();
     _render_cmd_rect_idxs.clear();
+    _transform_stack.clear();
     _points.clear();
     _normals.clear();
     _vertex_beg                    = {};
@@ -95,6 +97,8 @@ public:
       union_beg,
       union_end,
       add_scissor_rect,
+      transform_beg,
+      transform_end,
       discard_beg,
       discard_end,
     } type{};
@@ -170,8 +174,10 @@ public:
       struct
       {
         ImageHandle handle{};
-        float2      left_top{};
-        float2      right_bottom{};
+        float2      p0{};
+        float2      p1{};
+        float2      p2{};
+        float2      p3{};
         uint8       alpha{};
         float2      uv0{};
         float2      uv1{};
@@ -239,6 +245,11 @@ public:
 
       struct
       {
+        Matrix matrix;
+      } transform_beg;
+
+      struct
+      {
         uint count{};
       } discard_beg;
 
@@ -256,6 +267,7 @@ public:
   void add_quad_bezier(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
   void add_cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept;
   void add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8 alpha, std::span<float2> uvs) noexcept;
+  void add_image(ImageHandle handle, float2 p0, float2 p1, float2 p2, float2 p3, uint8 alpha, std::span<float2> uvs) noexcept;
   void add_text(TextParseResultHandle handle, float2 pos, float size, Color inner_color, Color outer_color, float outline_width) noexcept;
 
   void path_begin(float2 p0) noexcept;
@@ -269,6 +281,9 @@ public:
   void union_end(Color color, float thickness) noexcept;
 
   void add_scissor_rect(Rect rect) noexcept;
+
+  void transform_beg(Matrix const& transform) noexcept;
+  void transform_end() noexcept;
 
   void discard_beg(std::function<void()> func) noexcept;
   void discard_end() noexcept;
@@ -297,7 +312,7 @@ private:
   void _add_arc(float2 center, float2 p0, float2 p1, Color color, float thickness) noexcept;
   void _add_quad_bezier(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
   void _add_cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept;
-  void _add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8 alpha, float2 uv0, float2 uv1, float2 uv2, float2 uv3) noexcept;
+  void _add_image(ImageHandle handle, float2 p0, float2 p1, float2 p2, float2 p3, uint8 alpha, float2 uv0, float2 uv1, float2 uv2, float2 uv3) noexcept;
   void _add_text(TextParseResultHandle handle, float2 pos, float size, Color inner_color, Color outer_color, float outline_width) noexcept;
 
   void _path_begin(float2 p0) noexcept;
@@ -309,6 +324,8 @@ private:
   void _union_beg(uint& idx) noexcept;
 
   void _add_scissor_rect(Rect rect) noexcept;
+  void _transform_beg(Matrix const& transform) noexcept;
+  void _transform_end() noexcept;
 
   void _discard_beg(uint count, uint& idx) noexcept;
   void _discard_end() noexcept;
@@ -337,6 +354,8 @@ private:
   auto get_vertices_bound_rect(uint vtx_beg, uint vtx_cnt) const noexcept -> Rect;
   auto get_vertices_bound_rect(uint vtx_beg) const noexcept { return get_vertices_bound_rect(vtx_beg, _vertices.size() - vtx_beg); }
   void add_rect(float2 left_top, float2 right_bottom, Color color = {}) noexcept;
+  void transform_vertices(uint vtx_beg) noexcept;
+  auto transform_point(float2 p) const noexcept -> float2;
 
   void push_render_cmd(RenderCmdType type) noexcept;
   void push_render_cmd_clear_rect(RenderCmdType type, Rect rect = {}) noexcept;
@@ -368,6 +387,8 @@ private:
   std::vector<RenderCmd> _render_cmds;
   std::vector<uint>      _render_cmd_rect_idxs;
   uint                   _draw_index_beg{};
+
+  std::vector<Matrix> _transform_stack;
 
   float2 _window_pos{};
 

@@ -4,6 +4,7 @@
 #include "tk/base.hpp"
 #include "tk/variant.hpp"
 #include "color.hpp"
+#include "transform.hpp"
 #include "tween.hpp"
 #include "widget.hpp"
 
@@ -312,6 +313,21 @@ void fullscreen_window() noexcept;
 
 // restore window if fullscreen
 void restore_fullscreen_window() noexcept;
+
+/**
+ * begin a transform scope for following draw commands
+ * @param transform affine transform applied in draw order
+ */
+void transform_beg(Matrix const& transform) noexcept;
+
+/**
+ * begin a transform scope for following draw commands
+ * @param transform transform builder
+ */
+void transform_beg(Transform const& transform) noexcept;
+
+/// end current transform scope
+void transform_end() noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                            Shape Operator

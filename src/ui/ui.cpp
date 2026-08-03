@@ -35,6 +35,17 @@ void adjust_scale(Args&... args) noexcept
   ((args *= scale), ...);
 }
 
+void adjust_transform(Matrix& transform) noexcept
+{
+  auto offset = g_ui_ctx.get_render_pos();
+  auto scale  = g_ui_ctx.window()->scale();
+  auto inv    = 1.f / scale;
+
+  auto to_window   = Matrix{ scale, 0, 0, scale, offset.x * scale, offset.y * scale };
+  auto from_window = Matrix{ inv,   0, 0, inv,   -offset.x,         -offset.y         };
+  transform = from_window * transform * to_window;
+}
+
 }
 
 namespace tk::ui {
@@ -187,6 +198,25 @@ void restore_fullscreen_window() noexcept
   g_ui_ctx.check_draw();
   if (g_ui_ctx.window()->cfg().no_resize) return;
   g_ui_ctx.restore_fullscreen_window();
+}
+
+void transform_beg(Matrix const& transform) noexcept
+{
+  g_ui_ctx.check_draw();
+  auto adjusted = transform;
+  adjust_transform(adjusted);
+  g_ui_ctx.frame_data()->transform_beg(adjusted);
+}
+
+void transform_beg(Transform const& transform) noexcept
+{
+  transform_beg(transform.matrix());
+}
+
+void transform_end() noexcept
+{
+  g_ui_ctx.check_draw();
+  g_ui_ctx.frame_data()->transform_end();
 }
 
 

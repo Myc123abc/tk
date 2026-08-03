@@ -39,7 +39,10 @@ void FrameData::_union_beg(uint& idx) noexcept
     auto& path = subjects.emplace_back();
     path.reserve(_points.size());
     for (auto const p : _points)
-      path.emplace_back(static_cast<double>(p.x), static_cast<double>(p.y));
+    {
+      auto const transformed = transform_point(p);
+      path.emplace_back(static_cast<double>(transformed.x), static_cast<double>(transformed.y));
+    }
 
     _points.clear();
   };
@@ -114,6 +117,14 @@ void FrameData::_union_beg(uint& idx) noexcept
       union_color     = cmd.data.union_end.color;
       union_thickness = cmd.data.union_end.thickness;
       found_end       = true;
+      break;
+
+    case DrawCmd::Type::transform_beg:
+      _transform_beg(cmd.data.transform_beg.matrix);
+      break;
+
+    case DrawCmd::Type::transform_end:
+      _transform_end();
       break;
 
     case DrawCmd::Type::discard_beg:

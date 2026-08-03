@@ -76,6 +76,9 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
 {
   using Type = DrawCmd::Type;
 
+  auto const vtx_beg = _vertex_beg;
+  auto should_transform_vertices = true;
+
   switch (cmd.type)
   {
   case Type::add_rect:
@@ -109,8 +112,10 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
   case Type::add_image:
     _add_image(
       cmd.data.add_image.handle,
-      cmd.data.add_image.left_top,
-      cmd.data.add_image.right_bottom,
+      cmd.data.add_image.p0,
+      cmd.data.add_image.p1,
+      cmd.data.add_image.p2,
+      cmd.data.add_image.p3,
       cmd.data.add_image.alpha,
       cmd.data.add_image.uv0,
       cmd.data.add_image.uv1,
@@ -148,6 +153,7 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
     break;
 
   case Type::union_beg:
+    should_transform_vertices = false;
     _union_beg(idx);
     break;
 
@@ -155,17 +161,33 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
     break;
 
   case Type::add_scissor_rect:
+    should_transform_vertices = false;
     _add_scissor_rect(cmd.data.add_scissor_rect.rect);
     break;
 
+  case Type::transform_beg:
+    should_transform_vertices = false;
+    _transform_beg(cmd.data.transform_beg.matrix);
+    break;
+
+  case Type::transform_end:
+    should_transform_vertices = false;
+    _transform_end();
+    break;
+
   case Type::discard_beg:
+    should_transform_vertices = false;
     _discard_beg(cmd.data.discard_beg.count, idx);
     break;
 
   case Type::discard_end:
+    should_transform_vertices = false;
     _discard_end();
     break;
   }
+
+  if (should_transform_vertices)
+    transform_vertices(vtx_beg);
 }
 
 void FrameData::build_render_cmds() noexcept
@@ -174,6 +196,7 @@ void FrameData::build_render_cmds() noexcept
     build_render_cmd(_draw_cmds[idx], idx);
   err_if(_build_mode.contains(BuildMode::uni), "union_end not be called");
   err_if(_build_mode.contains(BuildMode::discard), "discard_end not be called");
+  err_if(!_transform_stack.empty(), "transform_end not be called");
 }
 
 }

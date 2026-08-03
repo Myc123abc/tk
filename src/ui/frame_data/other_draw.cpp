@@ -17,14 +17,61 @@ void FrameData::_add_scissor_rect(Rect rect) noexcept
   _render_cmd_rect_idxs.clear();
 }
 
-void FrameData::add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8 alpha, std::span<float2> uvs) noexcept
+void FrameData::transform_beg(Matrix const& transform) noexcept
+{
+  auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::transform_beg);
+  cmd.data.transform_beg = { transform };
+}
+
+void FrameData::_transform_beg(Matrix const& transform) noexcept
+{
+  if (_transform_stack.empty())
+    _transform_stack.emplace_back(transform);
+  else
+    _transform_stack.emplace_back(_transform_stack.back() * transform);
+}
+
+void FrameData::transform_end() noexcept
+{
+  _draw_cmds.emplace_back(DrawCmd::Type::transform_end);
+}
+
+void FrameData::_transform_end() noexcept
+{
+  assert(!_transform_stack.empty());
+  _transform_stack.pop_back();
+}
+
+void FrameData::transform_vertices(uint vtx_beg) noexcept
+{
+  if (_transform_stack.empty())
+    return;
+
+  auto const& transform = _transform_stack.back();
+  for (auto i = vtx_beg; i < _vertex_beg; ++i)
+    _vertices[i].pos = transform * _vertices[i].pos;
+}
+
+auto FrameData::transform_point(float2 p) const noexcept -> float2
+{
+  if (_transform_stack.empty())
+    return p;
+  return _transform_stack.back() * p;
+}
+
+void FrameData::add_image(ImageHandle handle, float2 p0, float2 p1, float2 p2, float2 p3, uint8 alpha, std::span<float2> uvs) noexcept
 {
   assert(uvs.size() == 4);
   auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::add_image);
-  cmd.data.add_image = { handle, left_top, right_bottom, alpha, uvs[0], uvs[1], uvs[2], uvs[3] };
+  cmd.data.add_image = { handle, p0, p1, p2, p3, alpha, uvs[0], uvs[1], uvs[2], uvs[3] };
 }
 
-void FrameData::_add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8 alpha, float2 uv0, float2 uv1, float2 uv2, float2 uv3) noexcept
+void FrameData::add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8 alpha, std::span<float2> uvs) noexcept
+{
+  add_image(handle, left_top, { right_bottom.x, left_top.y }, right_bottom, { left_top.x, right_bottom.y }, alpha, uvs);
+}
+
+void FrameData::_add_image(ImageHandle handle, float2 p0, float2 p1, float2 p2, float2 p3, uint8 alpha, float2 uv0, float2 uv1, float2 uv2, float2 uv3) noexcept
 {
   assert(!_using_discard_shapes && alpha);
 
@@ -33,10 +80,10 @@ void FrameData::_add_image(ImageHandle handle, float2 left_top, float2 right_bot
   auto col    = Color{ 1, 1, 1, static_cast<float>(alpha) / 255 }.to_uint();
   auto packed = renderer::vtx_pack(renderer::VtxType::image, img.srv().index());
   auto [vertices, indices] = expand_beg(4, 6);
-  vertices[0] = { left_top,                       uv0, col, packed };
-  vertices[1] = { { right_bottom.x, left_top.y }, uv1, col, packed };
-  vertices[2] = { right_bottom,                   uv2, col, packed };
-  vertices[3] = { { left_top.x, right_bottom.y }, uv3, col, packed };
+  vertices[0] = { p0, uv0, col, packed };
+  vertices[1] = { p1, uv1, col, packed };
+  vertices[2] = { p2, uv2, col, packed };
+  vertices[3] = { p3, uv3, col, packed };
   indices[0]  = static_cast<uint16>(_vertex_beg + 0);
   indices[1]  = static_cast<uint16>(_vertex_beg + 1);
   indices[2]  = static_cast<uint16>(_vertex_beg + 2);
