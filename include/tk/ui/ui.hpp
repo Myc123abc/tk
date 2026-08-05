@@ -155,6 +155,21 @@ using Type = Variant<
 
 using ImageLoadErrorType = ImageLoadError::Type;
 
+enum class CornerFlag
+{
+  top_left     = 1 << 0,
+  top_right    = 1 << 1,
+  bottom_left  = 1 << 2,
+  bottom_right = 1 << 3,
+
+  none   = 1 << 4,
+  top    = top_left    | top_right,
+  bottom = bottom_left | bottom_right,
+  left   = top_left    | bottom_left,
+  right  = top_right   | bottom_right,
+  all    = top         | bottom,
+};
+
 struct ImageConfig
 {
   struct Blur
@@ -162,9 +177,16 @@ struct ImageConfig
     float sigma{};
     uint  cnt{};
   };
-  Variant<Blur> cfg;
+  struct Rounding
+  {
+    float            radius{};
+    Flag<CornerFlag> flags{};
+  };
+  Variant<Blur>           blur_cfg;
+  std::optional<Rounding> rounding_cfg;
 
-  static auto blur(float sigma, uint cnt) noexcept { return ImageConfig{ Blur{ sigma, cnt } }; }
+  ImageConfig(Blur blur, float radius = {}, Flag<CornerFlag> flags = {}) noexcept
+    : blur_cfg(blur), rounding_cfg({ radius, flags }) {}
 };
 
 /**
@@ -352,8 +374,10 @@ void discard_end() noexcept;
  * @param right_bottom right down corner
  * @param color
  * @param thickness
+ * @param rounding corner radius
+ * @param flags rounded corner selection
  */
-void rectangle(float2 left_top, float2 right_bottom, Color color = {}, float thickness = {}) noexcept;
+void rectangle(float2 left_top, float2 right_bottom, Color color = {}, float thickness = {}, float rounding = {}, Flag<CornerFlag> flags = {}) noexcept;
 
 /**
  * draw a triangle (clockwise)

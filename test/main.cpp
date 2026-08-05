@@ -514,10 +514,8 @@ int main()
       auto p0 = float2{ 5, 5 };
       auto p1 = p0 + float2{ 12.5 * 1.414, 12.5 };
       auto p2 = p0 + float2{ 0, 25 };
-      ui::transform_beg(ui::Transform{}.rotate(30));
       if (playback_btn(p0, p1, p2, 0xffffffff, 0xdcdcdcff, 1))
         if (progress_tween.is_not_started()) progress_tween.start();
-      ui::transform_end();
 
       if (!playback_btn.is_paused()) progress_tween.update();
       if (progress_tween.is_finished())
@@ -551,23 +549,21 @@ int main()
         auto ext = wnd_ext - p2;
         auto scale = std::max(img_ext.x / ext.x, img_ext.y / ext.y);
         img_ext /= scale;
-        ui::transform_beg(ui::Transform{}.rotate(-30));
         res = image(img2, p2, p2 + img_ext);
-        ui::transform_end();
       }
       if (res) loop_trigger.update();
 
       static auto blur_img_2 = false;
 
-      ui::transform_beg(ui::Transform{}.rotate(-30));
       ui::discard_beg([]{ ui::circle({ 50, 50 }, 50); });
       if (blur_img_2)
-        res = image(img1, {}, wnd_ext, 0x44, ui::ImageConfig::blur(5, 5));
+        res = image(img1, {}, wnd_ext, 0x44, ui::ImageConfig{{ 5, 5 }, 100, ui::CornerFlag::all});
+        // res = image(img1, {}, wnd_ext, 0x44, ui::ImageConfig{{ 5, 5 }});
       else
         res = image(img1, {}, wnd_ext, 0x44);
-      ui::rectangle({ 50, 50 }, { 100, 100 }, 0x00ff00ff);
+      ui::rectangle({ 50, 50 }, { 100, 100 }, 0x00ff00ff, 0, 12);
+      ui::rectangle({ 110, 50 }, { 160, 100 }, 0xff8800ff, 2, 12, ui::CornerFlag::top | ui::CornerFlag::bottom_right);
       ui::discard_end();
-      ui::transform_end();
 
       // circle point
       auto size = ui::window_drawable_extent();

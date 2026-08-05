@@ -41,7 +41,6 @@ void FrameData::_discard_beg(uint count, uint& idx) noexcept
   _clear_composite_image_cmd_idx = _render_cmds.size();
   push_render_cmd_clear_rect(RenderCmdType::clear_composite_image);
 
-  _build_mode.add(BuildMode::discard);
   _discard_vtx_beg = _vertex_beg;
 }
 

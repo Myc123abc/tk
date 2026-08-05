@@ -84,6 +84,7 @@ auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 al
 {
   if (!alpha || left_top.x == right_bottom.x || left_top.y == right_bottom.y) return {};
   adjust_pos(left_top, right_bottom);
+  if (cfg && cfg->rounding_cfg) adjust_scale(cfg->rounding_cfg->radius);
   return g_ui_ctx.image(path, left_top, right_bottom, alpha, cfg);
 }
 
@@ -238,14 +239,14 @@ void discard_end() noexcept
 ///                            Geometry
 ////////////////////////////////////////////////////////////////////////////////
 
-void rectangle(float2 left_top, float2 right_bottom, Color color, float thickness) noexcept
+void rectangle(float2 left_top, float2 right_bottom, Color color, float thickness, float rounding, Flag<CornerFlag> flags) noexcept
 {
 	g_ui_ctx.check_draw();
 
   if (left_top.x == right_bottom.x || left_top.y == right_bottom.y) return;
 
-  adjust_pos(left_top, right_bottom); adjust_scale(thickness);
-  g_ui_ctx.frame_data()->add_rect(left_top, right_bottom, color, thickness);
+  adjust_pos(left_top, right_bottom); adjust_scale(thickness, rounding);
+  g_ui_ctx.frame_data()->add_rect(left_top, right_bottom, color, thickness, rounding, flags);
 }
 
 void triangle(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept

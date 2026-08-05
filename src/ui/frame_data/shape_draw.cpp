@@ -5,27 +5,78 @@
 
 namespace tk::ui {
 
-void FrameData::add_rect(float2 left_top, float2 right_bottom, Color color, float thickness) noexcept
+namespace {
+
+auto fix_rect_flags(Flag<CornerFlag> flags) noexcept -> Flag<CornerFlag>
 {
-  auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::add_rect);
-  cmd.data.add_rect = { left_top, right_bottom, color, thickness };
+  auto const mask = CornerFlag::all | CornerFlag::none;
+  if ((flags & mask).empty())
+    flags |= CornerFlag::all;
+  return flags;
 }
 
-void FrameData::_add_rect(float2 left_top, float2 right_bottom, Color color, float thickness) noexcept
+}
+
+void FrameData::path_rect(float2 left_top, float2 right_bottom, float rounding, Flag<CornerFlag> flags) noexcept
+{
+  if (rounding >= .5f)
+  {
+    flags = fix_rect_flags(flags);
+    auto const round_top_bottom = flags.all(CornerFlag::top_left, CornerFlag::top_right)   || flags.all(CornerFlag::bottom_left, CornerFlag::bottom_right);
+    auto const round_left_right = flags.all(CornerFlag::top_left, CornerFlag::bottom_left) || flags.all(CornerFlag::top_right,   CornerFlag::bottom_right);
+    rounding = std::min(rounding, std::abs(right_bottom.x - left_top.x) * (round_top_bottom ? .5f : 1.f) - 1.f);
+    rounding = std::min(rounding, std::abs(right_bottom.y - left_top.y) * (round_left_right ? .5f : 1.f) - 1.f);
+  }
+
+  if (rounding < .5f || flags.contains(CornerFlag::none))
+  {
+    _points.emplace_back(left_top);
+    _points.emplace_back(right_bottom.x, left_top.y);
+    _points.emplace_back(right_bottom);
+    _points.emplace_back(left_top.x, right_bottom.y);
+    return;
+  }
+
+  auto const pi = std::numbers::pi_v<float>;
+  auto const rounding_top_left     = flags.contains(CornerFlag::top_left)     ? rounding : 0.f;
+  auto const rounding_top_right    = flags.contains(CornerFlag::top_right)    ? rounding : 0.f;
+  auto const rounding_bottom_right = flags.contains(CornerFlag::bottom_right) ? rounding : 0.f;
+  auto const rounding_bottom_left  = flags.contains(CornerFlag::bottom_left)  ? rounding : 0.f;
+
+  path_arc_to({ left_top.x     + rounding_top_left,     left_top.y     + rounding_top_left     }, rounding_top_left,     pi,        pi * 1.5f);
+  path_arc_to({ right_bottom.x - rounding_top_right,    left_top.y     + rounding_top_right    }, rounding_top_right,    pi * 1.5f, pi * 2.f);
+  path_arc_to({ right_bottom.x - rounding_bottom_right, right_bottom.y - rounding_bottom_right }, rounding_bottom_right, 0,         pi * .5f);
+  path_arc_to({ left_top.x     + rounding_bottom_left,  right_bottom.y - rounding_bottom_left  }, rounding_bottom_left,  pi * .5f,  pi);
+}
+
+void FrameData::add_rect(float2 left_top, float2 right_bottom, Color color, float thickness, float rounding, Flag<CornerFlag> flags) noexcept
+{
+  auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::add_rect);
+  cmd.data.add_rect = { left_top, right_bottom, color, thickness, rounding, flags };
+}
+
+void FrameData::_add_rect(float2 left_top, float2 right_bottom, Color color, float thickness, float rounding, Flag<CornerFlag> flags) noexcept
 {
   if (_using_discard_shapes) color.a = 1.f;
   else if (color.a == 0) return;
+
+  auto const has_rounding = rounding >= .5f && !flags.contains(CornerFlag::none);
 
   if (thickness > 0)
   {
     left_top     += .5f;
     right_bottom -= .5f;
     assert(_points.empty());
-    _points.emplace_back(left_top);
-    _points.emplace_back(right_bottom.x, left_top.y);
-    _points.emplace_back(right_bottom);
-    _points.emplace_back(left_top.x, right_bottom.y);
+    path_rect(left_top, right_bottom, rounding, flags);
     add_poly_line(color, thickness, true);
+    return;
+  }
+
+  if (has_rounding)
+  {
+    assert(_points.empty());
+    path_rect(left_top, right_bottom, rounding, flags);
+    add_convex_poly_filled(color);
     return;
   }
 

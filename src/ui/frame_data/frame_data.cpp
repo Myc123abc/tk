@@ -82,7 +82,7 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
   switch (cmd.type)
   {
   case Type::add_rect:
-    _add_rect(cmd.data.add_rect.left_top, cmd.data.add_rect.right_bottom, cmd.data.add_rect.color, cmd.data.add_rect.thickness);
+    _add_rect(cmd.data.add_rect.left_top, cmd.data.add_rect.right_bottom, cmd.data.add_rect.color, cmd.data.add_rect.thickness, cmd.data.add_rect.rounding, cmd.data.add_rect.flags);
     break;
 
   case Type::add_triangle:
@@ -121,6 +121,21 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
       cmd.data.add_image.uv1,
       cmd.data.add_image.uv2,
       cmd.data.add_image.uv3
+    );
+    break;
+
+  case Type::add_image_rounded:
+    _add_image_rounded(
+      cmd.data.add_image_rounded.handle,
+      cmd.data.add_image_rounded.left_top,
+      cmd.data.add_image_rounded.right_bottom,
+      cmd.data.add_image_rounded.alpha,
+      cmd.data.add_image_rounded.uv0,
+      cmd.data.add_image_rounded.uv1,
+      cmd.data.add_image_rounded.uv2,
+      cmd.data.add_image_rounded.uv3,
+      cmd.data.add_image_rounded.rounding,
+      cmd.data.add_image_rounded.flags
     );
     break;
 

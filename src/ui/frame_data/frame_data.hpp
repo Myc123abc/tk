@@ -87,6 +87,7 @@ public:
       add_quad_bezier,
       add_cubic_bezier,
       add_image,
+      add_image_rounded,
       add_text,
       path_begin,
       add_path_line_to,
@@ -116,6 +117,8 @@ public:
         float2 right_bottom;
         Color  color;
         float  thickness;
+        float  rounding;
+        Flag<CornerFlag> flags;
       } add_rect;
 
       struct
@@ -184,6 +187,20 @@ public:
         float2      uv2{};
         float2      uv3{};
       } add_image;
+
+      struct
+      {
+        ImageHandle        handle{};
+        float2             left_top{};
+        float2             right_bottom{};
+        uint8              alpha{};
+        float2             uv0{};
+        float2             uv1{};
+        float2             uv2{};
+        float2             uv3{};
+        float              rounding{};
+        Flag<CornerFlag>   flags{};
+      } add_image_rounded;
 
       struct
       {
@@ -259,7 +276,7 @@ public:
     } data;
   };
 
-  void add_rect(float2 left_top, float2 right_bottom, Color color, float thickness) noexcept;
+  void add_rect(float2 left_top, float2 right_bottom, Color color, float thickness, float rounding, Flag<CornerFlag> flags) noexcept;
   void add_triangle(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
   void add_circle(float2 center, float radius, Color color, float thickness) noexcept;
   void add_line(float2 p0, float2 p1, Color color, float thickness) noexcept;
@@ -268,6 +285,7 @@ public:
   void add_cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept;
   void add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8 alpha, std::span<float2> uvs) noexcept;
   void add_image(ImageHandle handle, float2 p0, float2 p1, float2 p2, float2 p3, uint8 alpha, std::span<float2> uvs) noexcept;
+  void add_image_rounded(ImageHandle handle, float2 left_top, float2 right_bottom, uint8 alpha, std::span<float2> uvs, float rounding, Flag<CornerFlag> flags) noexcept;
   void add_text(TextParseResultHandle handle, float2 pos, float size, Color inner_color, Color outer_color, float outline_width) noexcept;
 
   void path_begin(float2 p0) noexcept;
@@ -305,7 +323,7 @@ public:
   auto check()      const noexcept { return _render_cmd_rect_idxs.empty(); }
 
 private:
-  void _add_rect(float2 left_top, float2 right_bottom, Color color, float thickness) noexcept;
+  void _add_rect(float2 left_top, float2 right_bottom, Color color, float thickness, float rounding, Flag<CornerFlag> flags) noexcept;
   void _add_triangle(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
   void _add_circle(float2 center, float radius, Color color, float thickness) noexcept;
   void _add_line(float2 p0, float2 p1, Color color, float thickness) noexcept;
@@ -313,6 +331,7 @@ private:
   void _add_quad_bezier(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
   void _add_cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept;
   void _add_image(ImageHandle handle, float2 p0, float2 p1, float2 p2, float2 p3, uint8 alpha, float2 uv0, float2 uv1, float2 uv2, float2 uv3) noexcept;
+  void _add_image_rounded(ImageHandle handle, float2 left_top, float2 right_bottom, uint8 alpha, float2 uv0, float2 uv1, float2 uv2, float2 uv3, float rounding, Flag<CornerFlag> flags) noexcept;
   void _add_text(TextParseResultHandle handle, float2 pos, float size, Color inner_color, Color outer_color, float outline_width) noexcept;
 
   void _path_begin(float2 p0) noexcept;
@@ -367,6 +386,7 @@ private:
   static auto get_circle_segment_count(float radius) noexcept -> uint;
 
   void add_poly_line(Color color, float thickness, bool is_closed) noexcept;
+  void path_rect(float2 left_top, float2 right_bottom, float rounding, Flag<CornerFlag> flags) noexcept;
   void path_arc_to(float2 center, float radius, float min, float max) noexcept;
   void _path_arc_to(float2 center, float radius, int min, int max) noexcept;
   void _path_arc_to(float2 center, float radius, int min, int max, int segment_cnt) noexcept;
