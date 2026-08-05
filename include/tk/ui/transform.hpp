@@ -50,18 +50,19 @@ public:
     return *this;
   }
 
-  auto rotate(float angle) noexcept -> Transform&
+  auto rotate(float degrees) noexcept -> Transform&
   {
-    auto c = std::cos(angle);
-    auto s = std::sin(angle);
+    auto angle = static_cast<float>(radians(degrees));
+    auto c    = std::cos(angle);
+    auto s    = std::sin(angle);
     _m *= { c, s, -s, c, 0, 0 };
     return *this;
   }
 
-  auto rotate(float2 p, float angle) noexcept -> Transform&
+  auto rotate(float2 p, float degrees) noexcept -> Transform&
   {
     return translate(-p.x, -p.y)
-          .rotate(angle)
+          .rotate(degrees)
           .translate(p.x, p.y);
   }
 

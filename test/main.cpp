@@ -480,7 +480,7 @@ int main()
       auto p1 = float2{ 30 + res.ascender, 0 };
       auto p2 = float2{ 30 + res.ascender, res.extent.y };
 
-      ui::transform_beg(ui::Transform{}.rotate((p1 + p2) / 2, -3.14/6));
+      ui::transform_beg(ui::Transform{}.rotate((p1 + p2) / 2, -30));
       ui::text("AigW.,()马钰 日本語のテスト。", { 30, 0 }, 32, 0x000000ff, cfg);
       ui::rectangle({ 30, 0 }, { 30 + res.extent.x, res.extent.y }, 0x00ff00ff, 1);
       ui::line({ 30 + res.ascender, 0 }, { 30 + res.ascender, res.extent.y }, 0xff0000ff);
@@ -514,7 +514,7 @@ int main()
       auto p0 = float2{ 5, 5 };
       auto p1 = p0 + float2{ 12.5 * 1.414, 12.5 };
       auto p2 = p0 + float2{ 0, 25 };
-      ui::transform_beg(ui::Transform{}.rotate(3.14/6));
+      ui::transform_beg(ui::Transform{}.rotate(30));
       if (playback_btn(p0, p1, p2, 0xffffffff, 0xdcdcdcff, 1))
         if (progress_tween.is_not_started()) progress_tween.start();
       ui::transform_end();
@@ -551,7 +551,7 @@ int main()
         auto ext = wnd_ext - p2;
         auto scale = std::max(img_ext.x / ext.x, img_ext.y / ext.y);
         img_ext /= scale;
-        ui::transform_beg(ui::Transform{}.rotate(-3.14/6));
+        ui::transform_beg(ui::Transform{}.rotate(-30));
         res = image(img2, p2, p2 + img_ext);
         ui::transform_end();
       }
@@ -559,7 +559,7 @@ int main()
 
       static auto blur_img_2 = false;
 
-      ui::transform_beg(ui::Transform{}.rotate(-3.14/6));
+      ui::transform_beg(ui::Transform{}.rotate(-30));
       ui::discard_beg([]{ ui::circle({ 50, 50 }, 50); });
       if (blur_img_2)
         res = image(img1, {}, wnd_ext, 0x44, ui::ImageConfig::blur(5, 5));
