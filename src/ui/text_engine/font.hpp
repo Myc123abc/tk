@@ -3,6 +3,7 @@
 #include "ui/ui.hpp"
 #include "../../renderer/resource/image.hpp"
 #include "../../util/hash.hpp"
+#include "glyph.hpp"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -10,37 +11,8 @@
 
 #include <string>
 #include <mutex>
-#include <unordered_set>
 
 namespace tk::ui {
-
-struct GlyphKey
-{
-  friend struct GlyphKeyHash;
-
-  GlyphKey() noexcept = default;
-  GlyphKey(uint font_id, uint unicode) noexcept : _k(static_cast<uint64>(font_id) << 32 | unicode) {}
-
-  auto operator==(GlyphKey const&) const noexcept -> bool = default;
-
-  auto font_id() const noexcept -> uint { return _k >> 32; }
-  auto codepoint() const noexcept -> uint { return _k & 0xffffffff; }
-
-private:
-  uint64 _k{};
-};
-
-struct GlyphKeyHash
-{
-  auto operator()(GlyphKey k) const noexcept
-  {
-    return std::hash<uint64>{}(k._k);
-  }
-};
-
-template <typename T>
-using GlyphKeyMap = std::unordered_map<GlyphKey, T, GlyphKeyHash>;
-using GlyphKeySet = std::unordered_set<GlyphKey, GlyphKeyHash>;
 
 struct MSDFBitmap
 {

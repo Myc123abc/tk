@@ -3,6 +3,7 @@
 #include "../../renderer/resource/image_manager.hpp"
 #include "../../util/file_manager.hpp"
 #include "../../renderer/engine/copy_engine.hpp"
+#include "glyph_cacher.hpp"
 
 #include <utf8.h>
 
@@ -399,13 +400,9 @@ void TextEngine::submit_bitmap_generation_tasks() noexcept
   {
     auto bitmaps = std::vector<MSDFBitmap>{};
     bitmaps.reserve(glyphs.size());
-    debug("generate glyphs count : {}", bitmaps.capacity());
-    auto beg = std::chrono::high_resolution_clock::now();
     for (auto k : glyphs)
       // font should always be valid because I never remove font currently
       bitmaps.emplace_back(g_text_engine._fonts[k.font_id()]->generate_msdf_bitmap(k.codepoint(), k));
-    auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - beg).count();
-    debug("consume {}ms", dur);
     return bitmaps;
   }));
 }
@@ -534,6 +531,13 @@ void TextEngine::update() noexcept
 {
   submit_bitmap_generation_tasks();
   upload_bitmaps();
+}
+
+void TextEngine::clear_pending_copy_glyphs() noexcept
+{
+  // Cache glyphs before clearing
+  g_glyph_cacher.add(_pending_copy_glyphs);
+  _pending_copy_glyphs.clear();
 }
 
 }

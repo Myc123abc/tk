@@ -5,12 +5,17 @@
 
 namespace tk {
 
-void FileManager::File::init(std::string_view path) noexcept
+void FileManager::File::init(std::string_view path, Flag<Access> access_flag, Flag<Share> share_flag, Disposition disposition) noexcept
 {
+  assert(_file == INVALID_HANDLE_VALUE);
+
   // create file
-  _file = CreateFileA(path.data(), GENERIC_READ, FILE_SHARE_READ,
-    nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-  err_if(_file == INVALID_HANDLE_VALUE, "failed to create file {}", path);
+  _file = CreateFileA(path.data(), access_flag.to<DWORD>(), share_flag.to<DWORD>(),
+    nullptr, static_cast<DWORD>(disposition), FILE_ATTRIBUTE_NORMAL, nullptr);
+  err_if(_file == INVALID_HANDLE_VALUE, "failed to initialize file {}", path);
+
+  if (disposition != Disposition::open_always && disposition != Disposition::open_existing)
+    return;
 
   // get size
   auto li = LARGE_INTEGER{};
@@ -37,13 +42,14 @@ void FileManager::File::init(std::string_view path) noexcept
   }
 
   CloseHandle(_file);
+  _file = INVALID_HANDLE_VALUE;
 }
 
 void FileManager::File::destroy() noexcept
 {
   if (_data && _mapping) UnmapViewOfFile(_data);
   if (_mapping) CloseHandle(_mapping);
-
+  if (_file != INVALID_HANDLE_VALUE) CloseHandle(_file);
   _file    = INVALID_HANDLE_VALUE;
   _mapping = {};
   _data    = {};
@@ -88,14 +94,14 @@ auto FileManager::load(std::string_view path) noexcept -> FileHandle
     // the file content is changed, reload new one
     auto& file = _pool[info.handle];
     file.destroy();
-    file.init(path.data());
+    file.open<File::OpenMode::share_read_existing>(path.data());
     info.last_write_time = last_write_time;
     return info.handle;
   }
 
   // cache file
   info.handle = _pool.alloc();
-  _pool[info.handle].init(path.data());
+  _pool[info.handle].open<File::OpenMode::share_read_existing>(path.data());
   info.status.add(FileStatus::loaded);
   info.last_write_time = std::filesystem::last_write_time(path);
   return info.handle;

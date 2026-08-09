@@ -20,8 +20,43 @@ private:
     File(const File&)            = delete;
     File& operator=(const File&) = delete;
 
-    void init(std::string_view path) noexcept;
+    enum class Access : DWORD
+    {
+      read  = GENERIC_READ,
+      write = GENERIC_WRITE,
+    };
+    enum class Share : DWORD
+    {
+      none  = 0,
+      read  = FILE_SHARE_READ,
+      write = FILE_SHARE_WRITE,
+      del   = FILE_SHARE_DELETE,
+    };
+
+    enum class Disposition : DWORD
+    {
+      create_always     = CREATE_ALWAYS,
+      create_new        = CREATE_NEW,
+      open_always       = OPEN_ALWAYS,
+      open_existing     = OPEN_EXISTING,
+      truncate_existing = TRUNCATE_EXISTING,
+    };
+
+    void init(std::string_view path, Flag<Access> access_flag, Flag<Share> share_flag, Disposition disposition) noexcept;
     void destroy() noexcept;
+
+    enum class OpenMode
+    {
+      share_read_existing,
+    };
+    template <OpenMode Mode>
+    void open(std::string_view path)
+    {
+      if constexpr (Mode == OpenMode::share_read_existing)
+        init(path, Access::read, Share::read, Disposition::open_existing);
+      else
+        static_assert(false, "Unsupported OpenMode");
+    }
 
     operator bool() const noexcept { return _data; }
 
