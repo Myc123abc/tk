@@ -17,6 +17,8 @@ namespace tk::ui {
 
 void TextEngine::init() noexcept
 {
+  _packer.reset({ Glyph_Atlas_Width, Glyph_Atlas_Height });
+
   check(FT_Init_FreeType(&_ft), "failed to initialize freetype");
   _hb_buf = hb_buffer_create();
 
@@ -373,35 +375,19 @@ auto TextEngine::calc_glyph_pos(float2 extent) noexcept -> std::pair<uint, float
   check(extent.x > Glyph_Atlas_Width || extent.y > Glyph_Atlas_Height,
         "too big glyph sdf bitmap, cannot be stored in glyph atlas");
 
-  static float2 current_pos{};
-  static float  current_line_max_glyph_height{};
-  static uint   current_glyph_atlas_idx{};
+  static auto current_glyph_atlas_idx{ 0u };
+  
+  if (auto res = _packer.add(extent.x, extent.y); res)
+    return { current_glyph_atlas_idx, res.value() };
 
-  while (true)
-  {
-    auto max_pos = current_pos + extent;
+  ++current_glyph_atlas_idx;
+  _glyph_atlas.emplace_back(g_img_mgr.create(Glyph_Atlas_Width, Glyph_Atlas_Height, ImageFormat::rgba8_unorm, ImageType::srv));
 
-    if (max_pos.x <= Glyph_Atlas_Width && max_pos.y <= Glyph_Atlas_Height)
-    {
-      auto pos = current_pos;
-      current_pos.x = max_pos.x;
-      current_line_max_glyph_height = std::max(current_line_max_glyph_height, extent.y);
-      return { current_glyph_atlas_idx, pos };
-    }
+  _packer.reset({ Glyph_Atlas_Width, Glyph_Atlas_Height });
+  auto res = _packer.add(extent.x, extent.y);
+  assert(res);
 
-    if (max_pos.x > Glyph_Atlas_Width)
-    {
-      current_pos.x = {};
-      current_pos.y += current_line_max_glyph_height;
-      current_line_max_glyph_height = {};
-      continue;
-    }
-
-    ++current_glyph_atlas_idx;
-    _glyph_atlas.emplace_back(g_img_mgr.create(Glyph_Atlas_Width, Glyph_Atlas_Height, ImageFormat::rgba8_unorm, ImageType::srv));
-    current_pos                   = {};
-    current_line_max_glyph_height = {};
-  }
+  return { current_glyph_atlas_idx, res.value() };
 }
 
 void TextEngine::submit_bitmap_generation_tasks() noexcept

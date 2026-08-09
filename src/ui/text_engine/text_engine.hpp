@@ -6,6 +6,7 @@
 #include "../../renderer/resource/image_manager.hpp"
 #include "../../util/thread_pool.hpp"
 #include "font.hpp"
+#include "packer.hpp"
 
 namespace tk::ui {
 
@@ -138,6 +139,7 @@ private:
   float                                      _max_ascender{};
   float                                      _max_height{};
   std::vector<Task<std::vector<MSDFBitmap>>> _generate_bitmap_tasks;
+  SkylinePacker                              _packer;
 )
 
 using TextParseResultHandle = TextEngine::TextParseResultHandle;
