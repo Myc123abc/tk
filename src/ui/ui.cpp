@@ -35,6 +35,17 @@ void adjust_scale(Args&... args) noexcept
   ((args *= scale), ...);
 }
 
+void adjust_transform(Matrix& transform) noexcept
+{
+  auto offset = g_ui_ctx.get_render_pos();
+  auto scale  = g_ui_ctx.window()->scale();
+  auto inv    = 1.f / scale;
+
+  auto to_window   = Matrix{ scale, 0, 0, scale, offset.x * scale, offset.y * scale };
+  auto from_window = Matrix{ inv,   0, 0, inv,   -offset.x,         -offset.y         };
+  transform = from_window * transform * to_window;
+}
+
 }
 
 namespace tk::ui {
@@ -73,6 +84,7 @@ auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 al
 {
   if (!alpha || left_top.x == right_bottom.x || left_top.y == right_bottom.y) return {};
   adjust_pos(left_top, right_bottom);
+  if (cfg && cfg->rounding_cfg) adjust_scale(cfg->rounding_cfg->radius);
   return g_ui_ctx.image(path, left_top, right_bottom, alpha, cfg);
 }
 
@@ -189,6 +201,25 @@ void restore_fullscreen_window() noexcept
   g_ui_ctx.restore_fullscreen_window();
 }
 
+void transform_beg(Matrix const& transform) noexcept
+{
+  g_ui_ctx.check_draw();
+  auto adjusted = transform;
+  adjust_transform(adjusted);
+  g_ui_ctx.frame_data()->transform_beg(adjusted);
+}
+
+void transform_beg(Transform const& transform) noexcept
+{
+  transform_beg(transform.matrix());
+}
+
+void transform_end() noexcept
+{
+  g_ui_ctx.check_draw();
+  g_ui_ctx.frame_data()->transform_end();
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                            Shape Operator
@@ -208,14 +239,14 @@ void discard_end() noexcept
 ///                            Geometry
 ////////////////////////////////////////////////////////////////////////////////
 
-void rectangle(float2 left_top, float2 right_bottom, Color color, float thickness) noexcept
+void rectangle(float2 left_top, float2 right_bottom, Color color, float thickness, float rounding, Flag<CornerFlag> flags) noexcept
 {
 	g_ui_ctx.check_draw();
 
   if (left_top.x == right_bottom.x || left_top.y == right_bottom.y) return;
 
-  adjust_pos(left_top, right_bottom); adjust_scale(thickness);
-  g_ui_ctx.frame_data()->add_rect(left_top, right_bottom, color, thickness);
+  adjust_pos(left_top, right_bottom); adjust_scale(thickness, rounding);
+  g_ui_ctx.frame_data()->add_rect(left_top, right_bottom, color, thickness, rounding, flags);
 }
 
 void triangle(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept

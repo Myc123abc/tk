@@ -9,7 +9,7 @@ Is still in the early stages of development.
 
 ## TODO
 - [ ] Add more controls to the UI framework.
-- [ ] Implement font selection and vertical text layout.
+- [x] Implement font selection and vertical text layout.
 - [ ] Add MSDF glyph cache files generation and preloading.
 - [ ] Add IME support.
 - [ ] Add audio processing.
