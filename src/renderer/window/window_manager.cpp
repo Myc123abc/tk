@@ -139,14 +139,18 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     {
       auto& window = windows[handle];
       if (window.is_moving())
+      {
         window.move_end();
+        return true;
+      }
       else if (window.is_resizing())
       {
         window.resize_end();
         g_wnd_mgr._resizing = false;
-        g_ui_ctx.mouse_down_pos.reset();
+        return true;
       }
     }
+    return false;
   };
 
   switch (msg)
@@ -292,8 +296,10 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
 
   case WM_LBUTTONUP:
   {
-    finish_moving_or_resizing(handle);
-    g_ui_ctx.is_last_mouse_up = true;
+    if (finish_moving_or_resizing(handle))
+      g_ui_ctx.clear_state();
+    else
+      g_ui_ctx.is_last_mouse_up = true;
     break;
   }
 
