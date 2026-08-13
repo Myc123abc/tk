@@ -56,14 +56,14 @@ auto TextEngine::load_font(std::string_view path) noexcept -> std::expected<Font
   if (auto res = font->init(path); res) return std::unexpected(FontLoadError::freetype_err{ res });
 
   // create font info
-  font->_id = static_cast<uint>(_fonts.size());
   auto info = FontInfo{ font->_family, font->_style };
 
   // store font
+  auto font_idx    = static_cast<uint>(_fonts.size());
   auto loaded_font = _fonts.emplace_back(std::move(font)).get();
-  auto res = _font_idxs.emplace(loaded_font->key(), loaded_font->id());
+  auto res = _font_idxs.emplace(loaded_font->key(), font_idx);
   assert(res.second);
-  _style_font_idxs[static_cast<size_t>(loaded_font->style())].emplace_back(loaded_font->id());
+  _style_font_idxs[static_cast<size_t>(loaded_font->style())].emplace_back(font_idx);
 
   // set notdef font if not have
   if (!_notdef_font) _notdef_font = loaded_font;
@@ -87,11 +87,11 @@ void TextEngine::regenerate_missing_glyphs(Font* font, FontStyleKey key) noexcep
     auto glyph_idx = font->find_glyph(unicode);
     if (!glyph_idx) continue;
 
-    _fallback_font_idxs[key][unicode] = font->id();
-    auto key = GlyphKey{ font->id(), glyph_idx };
-    glyphs.emplace(key);
-    assert(!_glyph_infos.contains(key) && !_uncached_glyphs.contains(key));
-    _ungenerated_glyphs.emplace(key);
+    _fallback_font_idxs[key][unicode] = _font_idxs.at(font->key());
+    auto glyph_key = GlyphKey{ font->key(), glyph_idx };
+    glyphs.emplace(glyph_key);
+    assert(!_glyph_infos.contains(glyph_key) && !_uncached_glyphs.contains(glyph_key));
+    _ungenerated_glyphs.emplace(glyph_key);
   }
 }
 
@@ -161,7 +161,7 @@ auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view 
           advance.y = -advance.y;
           offset.y  = -offset.y;
         }
-        auto key = GlyphKey{ font->id(), glyph_infos[i].codepoint };
+        auto key = GlyphKey{ font->key(), glyph_infos[i].codepoint };
 
         res.advances.emplace_back(advance);
         res.offsets.emplace_back(offset);
@@ -192,7 +192,7 @@ auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view 
 
       auto glyph_count     = hb_buffer_get_length(_hb_buf);
       auto glyph_positions = hb_buffer_get_glyph_positions(_hb_buf, nullptr);
-      auto k = GlyphKey{ notdef_glyph_font->id(), 0 };
+      auto k = GlyphKey{ notdef_glyph_font->key(), 0 };
       for (auto i = 0u; i < glyph_count; ++i)
       {
         auto advance = float2{
@@ -346,7 +346,7 @@ auto TextEngine::find_notdef_glyph_font() noexcept -> Font*
   std::unreachable();
 }
 
-void TextEngine::add_uncached_glyph(Font* font, uint glyph_idx, GlyphKey key, ParseResult& result) noexcept
+void TextEngine::add_uncached_glyph(Font* font, uint glyph_idx, GlyphKey const& key, ParseResult& result) noexcept
 {
   assert(font);
   if (!_glyph_infos.contains(key))
@@ -362,7 +362,7 @@ auto TextEngine::add_notdef_glyph() noexcept -> bool
 {
   auto font = find_notdef_glyph_font();
 
-  auto k = GlyphKey{ font->id(), 0 };
+  auto k = GlyphKey{ font->key(), 0 };
   if (_glyph_infos.contains(k)) return false;
   if (_uncached_glyphs.contains(k)) return true;
 
@@ -391,25 +391,60 @@ auto TextEngine::calc_glyph_pos(float2 extent) noexcept -> std::pair<uint, float
   return { current_glyph_atlas_idx, res.value() };
 }
 
+namespace {
+
+template <std::ranges::sized_range R>
+auto split_range(R&& range, size_t num) noexcept
+{
+  using T = std::ranges::range_value_t<R>;
+
+  auto size     = std::ranges::size(range);
+  auto cnt      = std::min(size, num);
+  auto batches  = std::vector<std::vector<T>>(cnt);
+  auto capacity = size / cnt + (size % cnt != 0);
+  auto idx      = 0;
+  for (auto& batch : batches) batch.reserve(capacity);
+  for (auto const& value : range)
+  {
+    batches[idx].emplace_back(value);
+    idx = (idx + 1) % cnt;
+  }
+  return batches;
+}
+
+}
+
 void TextEngine::submit_bitmap_generation_tasks() noexcept
 {
   if (_ungenerated_glyphs.empty()) return;
 
-  // submit msdf bitmap generate task on thread pool
-  _generate_bitmap_tasks.emplace_back(g_thread_pool.submit([glyphs = std::move(_ungenerated_glyphs)]
+  auto generate_bitmap_task = [this]<std::ranges::sized_range R>(R&& glyphs)
   {
-    auto bitmaps = std::vector<MSDFBitmap>{};
-    bitmaps.reserve(glyphs.size());
-    for (auto k : glyphs)
-      // font should always be valid because I never remove font currently
-      bitmaps.emplace_back(g_text_engine._fonts[k.font_id()]->generate_msdf_bitmap(k.codepoint(), k));
-    return bitmaps;
-  }));
+    _generate_bitmap_tasks.emplace_back(g_thread_pool.submit([glyphs = std::move(glyphs)]
+    {
+      auto bitmaps = std::vector<MSDFBitmap>{};
+      bitmaps.reserve(std::ranges::size(glyphs));
+      for (auto const& key : glyphs)
+        // font should always be valid because I never remove font currently
+        bitmaps.emplace_back(g_text_engine._fonts[g_text_engine._font_idxs.at(key.font_key)]->generate_msdf_bitmap(key.glyph_index, key));
+      return bitmaps;
+    }));
+  };
+
+  if (g_thread_pool.size() > 1)
+  {
+    auto batches = split_range(_ungenerated_glyphs, g_thread_pool.size());
+    for (auto& glyphs : batches)
+      generate_bitmap_task(glyphs);
+  }
+  else
+    generate_bitmap_task(_ungenerated_glyphs);
+  _ungenerated_glyphs.clear();
 }
 
-void TextEngine::upload_bitmaps() noexcept
+auto TextEngine::upload_bitmaps() noexcept -> bool
 {
-  if (_generate_bitmap_tasks.empty()) return;
+  if (_generate_bitmap_tasks.empty()) return false;
 
   // check whether have task complete
   for (auto it = _generate_bitmap_tasks.begin(); it < _generate_bitmap_tasks.end();)
@@ -427,44 +462,12 @@ void TextEngine::upload_bitmaps() noexcept
       ++it;
   }
 
-  if (_pending_copy_glyphs.empty()) return;
+  if (_pending_copy_glyphs.empty()) return false;
 
   // use copy engine to upload glyph sdf bitmaps to glyph atlas texture
-  for (auto const& [glyph_atlas_idx, bitmap_infos] : _pending_copy_glyphs)
-  {
-    for (auto const& [bitmap, pos] : bitmap_infos)
-    {
-      auto res = _glyph_infos.emplace(bitmap.glyph_key, GlyphInfo{ glyph_atlas_idx, pos, bitmap.extent, bitmap.pos_offset });
-      assert(res.second);
-    }
+  upload_bitmaps(_pending_copy_glyphs);
 
-    auto bitmap_cpy_infos = bitmap_infos
-      | std::views::filter([](auto const& bitmap_info) { return !bitmap_info.first.empty(); })
-      | std::views::transform([](auto const& bitmap_info)
-        { return BitmapCopyInfo{ bitmap_info.first.to_bitmap_view(), bitmap_info.second }; })
-      | std::ranges::to<std::vector<BitmapCopyInfo>>();
-    g_copy_engine.copy(std::move(bitmap_cpy_infos), _glyph_atlas[glyph_atlas_idx]);
-  }
-
-  // check which text parse result genrating is complete
-  for (auto it = _generating_results.begin(); it != _generating_results.end();)
-  {
-    auto& result = _parse_result_pool[*it];
-    assert(!result.generating_glyph_info_keys.empty());
-    if (std::ranges::any_of(result.generating_glyph_info_keys, [&](auto const& k) { return !_glyph_infos.contains(k); }))
-    {
-      ++it;
-      continue;
-    }
-    result.generating_glyph_info_keys.clear();
-    it = _generating_results.erase(it);
-  }
-
-  // remove generated glyphs in uncached glyphs
-  for (auto it = _uncached_glyphs.begin(); it != _uncached_glyphs.end();)
-    _glyph_infos.contains(*it) ? it = _uncached_glyphs.erase(it) : ++it;
-
-  reload_missing_glyphs();
+  return true;
 }
 
 void TextEngine::reload_missing_glyphs() noexcept
@@ -508,7 +511,9 @@ void GlyphInfo::set_vertices(renderer::Vertex* vtx, float2 pos, float size, floa
   auto p3 = float2{ p0.x, p0.y + extent.y * scale };
   auto p2 = float2{ p1.x, p3.y };
 
-  auto desc_handle = g_img_mgr[g_text_engine._glyph_atlas[glyph_atlas_index]].srv();
+  auto& img = g_img_mgr[g_text_engine._glyph_atlas[glyph_atlas_index]];
+  img.graphics_will_use();
+  auto desc_handle = img.srv();
   assert(desc_handle.is_valid());
 
   auto col       = color.to_uint();
@@ -529,8 +534,33 @@ void TextEngine::postprocess() noexcept
 
 void TextEngine::update() noexcept
 {
+  auto have_bitmaps_upload = false;
+  have_bitmaps_upload |= upload_bitmaps_from_preload_glyphs();
   submit_bitmap_generation_tasks();
-  upload_bitmaps();
+  have_bitmaps_upload |= upload_bitmaps();
+
+  if (have_bitmaps_upload)
+  {
+    // check which text parse result generating is complete
+    for (auto it = _generating_results.begin(); it != _generating_results.end();)
+    {
+      auto& result = _parse_result_pool[*it];
+      assert(!result.generating_glyph_info_keys.empty());
+      if (std::ranges::any_of(result.generating_glyph_info_keys, [&](auto const& k) { return !_glyph_infos.contains(k); }))
+      {
+        ++it;
+        continue;
+      }
+      result.generating_glyph_info_keys.clear();
+      it = _generating_results.erase(it);
+    }
+
+    // remove generated glyphs in uncached glyphs
+    for (auto it = _uncached_glyphs.begin(); it != _uncached_glyphs.end();)
+      _glyph_infos.contains(*it) ? it = _uncached_glyphs.erase(it) : ++it;
+
+    reload_missing_glyphs();
+  }
 }
 
 void TextEngine::clear_pending_copy_glyphs() noexcept
@@ -538,6 +568,62 @@ void TextEngine::clear_pending_copy_glyphs() noexcept
   // Cache glyphs before clearing
   g_glyph_cacher.add(_pending_copy_glyphs);
   _pending_copy_glyphs.clear();
+  _pending_copy_preload_glyphs.clear();
+}
+
+auto TextEngine::upload_bitmaps_from_preload_glyphs() noexcept -> bool
+{
+  // Check ungenerated glyphs which already exist in preload glyphs
+  auto& preload_glyphs = g_glyph_cacher.preload_glyphs();
+  for (auto it = _ungenerated_glyphs.begin(); it != _ungenerated_glyphs.end();)
+  {
+    auto key = *it;
+    if (preload_glyphs.contains(key))
+    {
+      // Get cache content of glyph.
+      auto& glyph = preload_glyphs[key];
+
+      // Add bitmap need to upload.
+      auto bitmap = MSDFBitmap{};
+      bitmap.data       = std::move(glyph.bitmap);
+      bitmap.extent     = glyph.extent;
+      bitmap.pos_offset = glyph.pos_offset;
+      bitmap.glyph_key  = key;
+      auto [glyph_atlas_idx, cpy_pos] = calc_glyph_pos(bitmap.extent);
+      _pending_copy_preload_glyphs[glyph_atlas_idx].emplace_back(std::move(bitmap), cpy_pos);
+
+      // Remove preload glyph result and ungenerated glyph.
+      preload_glyphs.erase(key);
+      it = _ungenerated_glyphs.erase(it);
+    }
+    else
+      ++it;
+  }
+
+  // Upload bitmaps
+  upload_bitmaps(_pending_copy_preload_glyphs);
+
+  return !_pending_copy_preload_glyphs.empty();
+}
+
+void TextEngine::upload_bitmaps(PendingCopyGlyphsInfoType const& info) noexcept
+{
+  if (info.empty()) return;
+  for (auto const& [glyph_atlas_idx, bitmap_infos] : info)
+  {
+    for (auto const& [bitmap, pos] : bitmap_infos)
+    {
+      auto res = _glyph_infos.emplace(bitmap.glyph_key, GlyphInfo{ glyph_atlas_idx, pos, bitmap.extent, bitmap.pos_offset });
+      assert(res.second);
+    }
+
+    auto bitmap_cpy_infos = bitmap_infos
+      | std::views::filter([](auto const& bitmap_info) { return !bitmap_info.first.empty(); })
+      | std::views::transform([](auto const& bitmap_info)
+        { return BitmapCopyInfo{ bitmap_info.first.to_bitmap_view(), bitmap_info.second }; })
+      | std::ranges::to<std::vector<BitmapCopyInfo>>();
+    g_copy_engine.copy(std::move(bitmap_cpy_infos), _glyph_atlas[glyph_atlas_idx]);
+  }
 }
 
 }

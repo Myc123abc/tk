@@ -2,6 +2,8 @@
 
 #include "tk/base.hpp"
 #include "../config.hpp"
+#include "font.hpp"
+#include "../../renderer/resource/image.hpp"
 #include "../../renderer/resource/shader_type.hpp"
 #include "ui/color.hpp"
 
@@ -12,31 +14,42 @@ namespace tk::ui {
 
 struct GlyphKey
 {
-  friend struct GlyphKeyHash;
-
   GlyphKey() noexcept = default;
-  GlyphKey(uint font_id, uint unicode) noexcept : _k(static_cast<uint64>(font_id) << 32 | unicode) {}
+  GlyphKey(FontStyleKey const& font_key, uint glyph_index) noexcept
+    : font_key(font_key), glyph_index(glyph_index) {}
 
   auto operator==(GlyphKey const&) const noexcept -> bool = default;
 
-  auto font_id() const noexcept -> uint { return _k >> 32; }
-  auto codepoint() const noexcept -> uint { return _k & 0xffffffff; }
-
-private:
-  uint64 _k{};
+  FontStyleKey font_key;
+  uint         glyph_index{};
 };
 
 struct GlyphKeyHash
 {
-  auto operator()(GlyphKey k) const noexcept
+  auto operator()(GlyphKey const& key) const noexcept
   {
-    return std::hash<uint64>{}(k._k);
+    return generic_hash(FontStyleKeyHash{}(key.font_key), key.glyph_index);
   }
 };
 
 template <typename T>
 using GlyphKeyMap = std::unordered_map<GlyphKey, T, GlyphKeyHash>;
 using GlyphKeySet = std::unordered_set<GlyphKey, GlyphKeyHash>;
+
+struct MSDFBitmap
+{
+  std::vector<uint8> data;
+  uint2              extent{};
+  float2             pos_offset{};
+  GlyphKey           glyph_key;
+
+  auto to_bitmap_view() const noexcept -> renderer::BitmapView
+  {
+    return { data.data(), extent.x, extent.y, extent.x * 4 };
+  }
+
+  auto empty() const noexcept { return !extent.x || !extent.y; }
+};
 
 struct GlyphInfo
 {
@@ -47,6 +60,8 @@ struct GlyphInfo
   float  max_y{};
   float2 extent{};
   float2 pos_offset{};
+
+  GlyphInfo() = default;
 
   GlyphInfo(uint glyph_atlas_index, float2 pos, float2 extent, float2 pos_offset) noexcept
     : glyph_atlas_index(glyph_atlas_index), extent(extent), pos_offset(pos_offset)

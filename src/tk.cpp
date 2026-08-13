@@ -4,6 +4,7 @@
 #include "ui/ui_context.hpp"
 #include "util/thread_pool.hpp"
 #include "util/file_manager.hpp"
+#include "ui/text_engine/glyph_cacher.hpp"
 
 using namespace tk::renderer;
 using namespace tk::ui;
@@ -13,6 +14,7 @@ namespace tk {
 void init() noexcept
 {
   g_thread_pool.init();
+  g_glyph_cacher.preload();
   g_renderer.init();
   g_wnd_mgr.init();
   g_ui_ctx.init();
@@ -21,6 +23,7 @@ void init() noexcept
 void destroy() noexcept
 {
   update();
+  g_glyph_cacher.block_save();
   g_renderer.wait_idle();
   g_thread_pool.destroy();
   g_ui_ctx.destroy();

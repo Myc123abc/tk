@@ -11,8 +11,10 @@ can use zstd to partition compressing cache files
 
 struct GlyphCacheHeader
 {
-  GlyphKey  key;
-  GlyphInfo info;
+  GlyphKey key;
+  uint2    extent;
+  float2   pos_offset;
+  uint     bitmap_size{};
 };
 
 struct GlyphCacheData
@@ -21,14 +23,34 @@ struct GlyphCacheData
   std::vector<uint8> bitmap;
 };
 
-Singleton(GlyphCacher, g_glyph_cacher,
+struct PreloadGlyphData
+{
+  uint2              extent;
+  float2             pos_offset;
+  std::vector<uint8> bitmap;
+};
 
+Singleton(GlyphCacher, g_glyph_cacher,
 public:
   void add(PendingCopyGlyphsInfoType& info) noexcept;
+  void try_save() noexcept;
   void save() noexcept;
+  void block_save() noexcept;
+
+  void preload() noexcept;
+
+  auto& preload_glyphs() noexcept { return _preload_glyphs; }
 
 private:
-  std::vector<GlyphCacheData> _glyphs;
+  auto serialize() const noexcept -> std::vector<uint8>;
+  void deserialize(std::span<uint8 const> data) noexcept;
+
+private:
+  std::vector<GlyphCacheData>   _glyphs;
+  uint                          _cache_size{};
+  HANDLE                        _file{ INVALID_HANDLE_VALUE };
+  uint64                        _write_offset{};
+  GlyphKeyMap<PreloadGlyphData> _preload_glyphs;
 )
 
 }

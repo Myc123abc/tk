@@ -2,6 +2,7 @@
 
 namespace tk::renderer {
 
+// TODO: redesign need
 /// track which engines will use this resource
 class ResourceTrack
 {

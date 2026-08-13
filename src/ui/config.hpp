@@ -12,9 +12,10 @@ constexpr auto Window_Active_Response_Time = 200'000;
 
 constexpr auto Image_Pool_Init_Capacity = 32;
 
-constexpr auto Glyph_Atlas_Width      = 1024;
-constexpr auto Glyph_Atlas_Height     = 1024;
-constexpr auto FT_Pixel_Size          = 32;
-constexpr auto Glyph_MSDF_Pixel_Range = 4.f;
+constexpr auto Glyph_Atlas_Width          = 1024;
+constexpr auto Glyph_Atlas_Height         = 1024;
+constexpr auto FT_Pixel_Size              = 32;
+constexpr auto Glyph_MSDF_Pixel_Range     = 4.f;
+constexpr auto Glyph_Local_Cache_Capacity = Glyph_Atlas_Width * Glyph_Atlas_Height * 4;
 
 }

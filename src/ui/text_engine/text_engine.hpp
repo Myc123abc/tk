@@ -4,6 +4,7 @@
 #include "../../renderer/resource/image_manager.hpp"
 #include "../../util/thread_pool.hpp"
 #include "font.hpp"
+#include "glyph.hpp"
 #include "packer.hpp"
 
 namespace tk::ui {
@@ -39,7 +40,7 @@ public:
   void update() noexcept;
 
   void clear_pending_copy_glyphs() noexcept;
-  auto const& get_glyph_info(GlyphKey key) const noexcept { return _glyph_infos.at(key); }
+  auto const& get_glyph_info(GlyphKey const& key) const noexcept { return _glyph_infos.at(key); }
 
   void postprocess() noexcept;
 
@@ -66,7 +67,7 @@ private:
   auto split_text(std::u32string_view text, FontStyleKey key) noexcept -> std::vector<std::pair<std::u32string_view, Font*>>;
   auto find_font(uint unicode, FontStyleKey key) noexcept -> Font*;
   auto find_notdef_glyph_font() noexcept -> Font*;
-  void add_uncached_glyph(Font* font, uint glyph_idx, GlyphKey key, ParseResult& result) noexcept;
+  void add_uncached_glyph(Font* font, uint glyph_idx, GlyphKey const& key, ParseResult& result) noexcept;
   auto add_notdef_glyph() noexcept -> bool;
   auto calc_glyph_pos(float2 extent) noexcept -> std::pair<uint, float2>;
   void regenerate_missing_glyphs(Font* font, FontStyleKey key) noexcept;
@@ -74,7 +75,9 @@ private:
   void reload_missing_glyphs() noexcept;
 
   void submit_bitmap_generation_tasks() noexcept;
-  void upload_bitmaps() noexcept;
+  auto upload_bitmaps() noexcept -> bool;
+  auto upload_bitmaps_from_preload_glyphs() noexcept -> bool;
+  void upload_bitmaps(PendingCopyGlyphsInfoType const& info) noexcept;
 
 private:
   template <typename T>
@@ -103,6 +106,7 @@ private:
   GlyphKeySet                                _uncached_glyphs;
   GlyphKeySet                                _ungenerated_glyphs;
   PendingCopyGlyphsInfoType                  _pending_copy_glyphs;
+  PendingCopyGlyphsInfoType                  _pending_copy_preload_glyphs;
   float                                      _max_ascender{};
   float                                      _max_height{};
   std::vector<Task<std::vector<MSDFBitmap>>> _generate_bitmap_tasks;

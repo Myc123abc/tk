@@ -45,6 +45,8 @@ public:
     return instance;
   }
 
+  auto size() const noexcept { return _threads.size(); }
+
   void init(int size = 0) noexcept
   {
     if (size < Thread_Pool_Min_Size)
@@ -93,8 +95,7 @@ private:
                   !pool._tasks.empty();
           });
 
-          if (pool._exit && pool._tasks.empty())
-            return;
+          if (pool._exit.load(std::memory_order_acquire)) return;
 
           task = std::move(pool._tasks.front());
           pool._tasks.pop();

@@ -1,4 +1,5 @@
 #include "font.hpp"
+#include "glyph.hpp"
 #include "../config.hpp"
 #include "text_engine.hpp"
 
@@ -184,7 +185,7 @@ void Font::destroy() const noexcept
   check(FT_Done_Face(_face), "failed to destroy font");
 }
 
-auto Font::generate_msdf_bitmap(uint glyph_idx, GlyphKey key) const noexcept -> MSDFBitmap
+auto Font::generate_msdf_bitmap(uint glyph_idx, GlyphKey const& key) const noexcept -> MSDFBitmap
 {
   auto lock = std::unique_lock{ _mutex };
   // load glyph

@@ -1,9 +1,7 @@
 #pragma once
 
 #include "ui/ui.hpp"
-#include "../../renderer/resource/image.hpp"
 #include "../../util/hash.hpp"
-#include "glyph.hpp"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -11,23 +9,9 @@
 
 #include <string>
 #include <mutex>
+#include <unordered_map>
 
 namespace tk::ui {
-
-struct MSDFBitmap
-{
-  std::vector<uint8> data;
-  uint2              extent{};
-  float2             pos_offset{};
-  GlyphKey           glyph_key;
-
-  auto to_bitmap_view() const noexcept -> renderer::BitmapView
-  {
-    return { data.data(), extent.x, extent.y, extent.x * 4 };
-  }
-
-  auto empty() const noexcept { return !extent.x || !extent.y; }
-};
 
 struct FontStyleKey
 {
@@ -52,6 +36,9 @@ struct FontStyleKeyHash
 template <typename T>
 using FontStyleMap = std::unordered_map<FontStyleKey, T, FontStyleKeyHash>;
 
+struct GlyphKey;
+struct MSDFBitmap;
+
 class Font
 {
   friend class TextEngine;
@@ -71,12 +58,9 @@ public:
   }
 
   auto get_glyph_advance(uint glyph_idx) const noexcept -> float2;
-  auto generate_msdf_bitmap(uint glyph_idx, GlyphKey key) const noexcept -> MSDFBitmap;
-
-  auto id() const noexcept { return _id; }
+  auto generate_msdf_bitmap(uint glyph_idx, GlyphKey const& key) const noexcept -> MSDFBitmap;
 
 private:
-  uint         _id{};
   std::string  _name;
   std::string  _family;
   FontStyle    _style;
