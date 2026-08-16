@@ -101,7 +101,7 @@ void FrameData::_add_image(ImageHandle handle, float2 p0, float2 p1, float2 p2, 
   indices[5]  = static_cast<uint16>(_vertex_beg + 3);
   expand_end();
 
-  img.graphics_will_use();
+  _sampled_images.emplace(handle);
 }
 
 void FrameData::_add_image_rounded(ImageHandle handle, float2 left_top, float2 right_bottom, uint8 alpha, float2 uv0, float2 uv1, float2 uv2, float2 uv3, float rounding, Flag<CornerFlag> flags) noexcept
@@ -174,7 +174,7 @@ void FrameData::_add_image_rounded(ImageHandle handle, float2 left_top, float2 r
   expand_end();
   _points.clear();
 
-  img.graphics_will_use();
+  _sampled_images.emplace(handle);
 }
 
 void FrameData::add_text(TextParseResultHandle handle, float2 pos, float size, Color inner_color, Color outer_color, float outline_width) noexcept
@@ -196,6 +196,8 @@ void FrameData::_add_text(TextParseResultHandle handle, float2 pos, float size, 
   {
     auto const& info = g_text_engine.get_glyph_info(result.glyph_info_keys[i]);
     auto scale = info.get_scale(size);
+
+    _sampled_images.emplace(g_text_engine.glyph_atlas(info.glyph_atlas_index));
 
     info.set_vertices(vertices + vtx_offset, pos + result.offsets[i] * scale, size, ascender, inner_color, outer_color, outline_width);
 

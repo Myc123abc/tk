@@ -2,15 +2,16 @@
 
 #include "descriptor_heap_manager.hpp"
 #include "../../util/object_pool.hpp"
-#include "resource_tack.hpp"
+#include "gpu_resource.hpp"
 
 #include <d3d12.h>
 #include <wrl/client.h>
 
 namespace tk::renderer {
 
-class Buffer : public ResourceTrack
+class Buffer : private GPUResource
 {
+  friend class Command;
 public:
   Buffer()                         = default;
   ~Buffer()                        = default;

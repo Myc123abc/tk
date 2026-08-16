@@ -512,7 +512,6 @@ void GlyphInfo::set_vertices(renderer::Vertex* vtx, float2 pos, float size, floa
   auto p2 = float2{ p1.x, p3.y };
 
   auto& img = g_img_mgr[g_text_engine._glyph_atlas[glyph_atlas_index]];
-  img.graphics_will_use();
   auto desc_handle = img.srv();
   assert(desc_handle.is_valid());
 

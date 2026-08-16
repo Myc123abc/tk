@@ -6,8 +6,6 @@
 #include "render_resource.hpp"
 
 #include <initializer_list>
-#include <unordered_set>
-#include <unordered_map>
 
 namespace tk::renderer {
 
@@ -67,15 +65,35 @@ public:
 
   void upload(FrameBuffer& buf, ui::FrameData const* data) noexcept;
   void bind_descriptor_heaps() const noexcept;
-  
-  auto needs_graphics_sync() const noexcept -> bool;
-  auto needs_compute_sync()  const noexcept -> bool;
-  auto needs_copy_sync()     const noexcept -> bool;
 
-  void clear_resource_track() const noexcept;
+  auto const& usages() const noexcept { return _usages; }
+
+  void clear_usages() noexcept { _usages.clear(); }
+
+  void use(GPUResource* resource, GPUResourceAccess access) const noexcept
+  {
+    auto has = false;
+    for (auto& usage : _usages)
+    {
+      if (usage.resource == resource)
+      {
+        has = true;
+        usage.access = combine(usage.access, access);
+        return;
+      }
+    }
+    if (!has) _usages.emplace_back(resource, access);
+  }
+
+  void use(ImageHandle image, GPUResourceAccess access) const noexcept
+  {
+    use(g_img_mgr.get(image), access);
+  }
 
 private:
   ID3D12GraphicsCommandList1* _cmd{};
+  D3D12_COMMAND_LIST_TYPE     _type{};
+  mutable std::vector<GPUResourceUsage> _usages;
 };
 
 Singleton(CommandPool, g_cmd_pool,
@@ -89,14 +107,12 @@ public:
     auto h = _pool.alloc();
     auto& cmd = _pool[h];
     cmd.init(type, alloc);
-    _resources.emplace(cmd.get(), Resource{});
     return h;
   }
 
   void destroy(Handle& h) noexcept
   {
     auto& cmd = _pool[h];
-    _resources.erase(cmd.get());
     cmd.destroy();
     _pool.free(h);
   }
@@ -113,29 +129,7 @@ public:
   }
 
 private:
-  void clear_resource_track(Command const* cmd) noexcept
-  {
-    _resources[cmd->get()].clear();
-  }
-
-  struct Resource
-  {
-    std::unordered_set<ImageHandle>  imgs;
-    std::unordered_set<BufferHandle> bufs;
-
-    void clear() noexcept
-    {
-      for (auto img : imgs) g_img_mgr[img].reset_resource_track();
-      for (auto buf : bufs) g_buf_pool[buf].reset_resource_track();
-      imgs.clear();
-      bufs.clear();
-    }
-  };
-  auto resource(ID3D12GraphicsCommandList1* cmd) noexcept -> Resource&;
-
-private:
   Pool _pool;
-  std::unordered_map<ID3D12GraphicsCommandList1*, Resource> _resources;
 )
 
 using CmdHandle = CommandPool::Handle;
@@ -156,7 +150,7 @@ public:
 
   void wait(ID3D12Fence* fence, uint64 value) const noexcept;
   void signal(ID3D12Fence* fence, uint64 value) const noexcept;
-  void submit(ID3D12Fence* fence, uint64 value, std::initializer_list<CmdHandle> cmds) const noexcept;
+  void submit(ID3D12Fence* fence, uint64 value, std::span<Command*> cmds) const noexcept;
 
   auto get() const noexcept { return _queue; }
 
@@ -180,10 +174,11 @@ requires std::convertible_to<std::ranges::range_value_t<R>, Command::TransformIn
 void Command::transform(R&& range) const noexcept
 {
   auto barriers = std::vector<D3D12_RESOURCE_BARRIER>{};
-  for (auto [image, states, subresource] : range)
+  for (auto const& [image, states, subresource] : range)
   {
-    barriers.append_range(g_img_mgr[image].transform(this, states, subresource));
-    g_cmd_pool.resource(_cmd).imgs.emplace(image);
+    auto img = g_img_mgr.get(image);
+    barriers.append_range(img->transform(this, states, subresource));
+    use(img, resource_access(states));
   };
   barrier(barriers);
 }

@@ -108,14 +108,10 @@ void CopyEngine::update() noexcept
 
   for (auto [src, dst] : moved_imgs) cmd->copy(src, dst);
   
-  auto fence_value = _slots.submit_slot();
+  _slots.submit_slot();
 
   // remove glyphs after copy finished
   g_text_engine.clear_pending_copy_glyphs();
-
-  if (cmd->needs_graphics_sync()) g_graphics_engine.wait(g_copy_engine, fence_value);
-  if (cmd->needs_compute_sync())  g_comp_engine.wait(g_copy_engine, fence_value);
-  cmd->clear_resource_track();
 
   if (!moved_imgs.empty())
     g_renderer.add_frame_render_complete_func([imgs = std::move(moved_imgs)] mutable

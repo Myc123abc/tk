@@ -154,8 +154,7 @@ void RenderResource::render_end() noexcept
   cmd->transform(swapchain_image, ImageState::present);
 
 	// submit graphics commands to graphics engine
-	frame.fence_value = g_graphics_engine.submit();
-  cmd->clear_resource_track();
+	frame.fence_value = g_sub_tracker.submit(g_graphics_engine);
 
   // move to next frame
   _frame_index = (_frame_index + 1) % Frame_Count;

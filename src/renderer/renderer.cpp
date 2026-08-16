@@ -112,6 +112,7 @@ void Renderer::message_process() noexcept
 
 void Renderer::preprocess_render() noexcept
 {
+  g_sub_tracker.reset();
   g_copy_engine.update();
   g_comp_engine.update();
 
@@ -186,6 +187,9 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
   assert(frame_data->check());
 
   auto cmd = g_graphics_engine.cmd();
+
+  for (auto image : frame_data->sampled_images())
+    cmd->use(image, GPUResourceAccess::read);
 
   g_ctx.set_cmd(cmd);
 

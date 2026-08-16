@@ -28,9 +28,9 @@ auto Engine::signal() noexcept -> uint64
   return _fence_value;
 }
 
-auto Engine::submit() noexcept -> uint64
+auto Engine::submit(std::span<Command*> cmds) noexcept -> uint64
 {
-  _queue.submit(_fence.Get(), ++_fence_value, { _cmd });
+  _queue.submit(_fence.Get(), ++_fence_value, cmds);
   return _fence_value;
 }
 

@@ -8,6 +8,8 @@
 #include "tk/rect.hpp"
 #include "tk/flag.hpp"
 
+#include <unordered_set>
+
 namespace tk::ui {
 
 struct WindowShadowInfo
@@ -58,6 +60,7 @@ public:
     _indices.clear();
     _render_cmds.clear();
     _render_cmd_rect_idxs.clear();
+    _sampled_images.clear();
     _transform_stack.clear();
     _points.clear();
     _normals.clear();
@@ -318,6 +321,7 @@ public:
   auto& vertices()           const noexcept { return _vertices;           }
   auto& indices()            const noexcept { return _indices;            }
   auto& render_cmds()        const noexcept { return _render_cmds;        }
+  auto& sampled_images()     const noexcept { return _sampled_images;     }
 
   auto window_pos() const noexcept { return _window_pos;                   }
   auto check()      const noexcept { return _render_cmd_rect_idxs.empty(); }
@@ -404,9 +408,10 @@ private:
   uint _tmp_vertices_size{};
   uint _tmp_indices_size{};
 
-  std::vector<RenderCmd> _render_cmds;
-  std::vector<uint>      _render_cmd_rect_idxs;
-  uint                   _draw_index_beg{};
+  std::vector<RenderCmd>          _render_cmds;
+  std::vector<uint>               _render_cmd_rect_idxs;
+  std::unordered_set<ImageHandle> _sampled_images;
+  uint                            _draw_index_beg{};
 
   std::vector<Matrix> _transform_stack;
 

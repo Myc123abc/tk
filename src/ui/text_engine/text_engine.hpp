@@ -41,6 +41,7 @@ public:
 
   void clear_pending_copy_glyphs() noexcept;
   auto const& get_glyph_info(GlyphKey const& key) const noexcept { return _glyph_infos.at(key); }
+  auto glyph_atlas(uint index) const noexcept { return _glyph_atlas[index]; }
 
   void postprocess() noexcept;
 

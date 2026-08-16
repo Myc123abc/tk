@@ -4,7 +4,7 @@
 #include "tk/flag.hpp"
 #include "tk/base.hpp"
 #include "tk/rect.hpp"
-#include "resource_tack.hpp"
+#include "gpu_resource.hpp"
 
 #include <dxgi1_6.h>
 #include <directx/d3dx12.h>
@@ -48,6 +48,16 @@ enum class ImageState
   read          = D3D12_RESOURCE_STATE_GENERIC_READ,
   depth_write   = D3D12_RESOURCE_STATE_DEPTH_WRITE,
 };
+
+constexpr auto resource_access(Flag<ImageState> states) noexcept
+{
+  return states.any(ImageState::copy_dst,
+                    ImageState::compute_rw,
+                    ImageState::render_target,
+                    ImageState::depth_write)
+    ? GPUResourceAccess::write
+    : GPUResourceAccess::read;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Bitmap
@@ -107,8 +117,9 @@ struct Bitmap
 ///                               Image
 ////////////////////////////////////////////////////////////////////////////////
 
-class Image : public ResourceTrack
+class Image : private GPUResource
 {
+  friend class Command;
 public:
   Image()                        = default;
   ~Image()                       = default;

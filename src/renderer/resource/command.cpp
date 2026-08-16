@@ -33,17 +33,12 @@ void Command::close() const noexcept
   err_if(_cmd->Close(), "failed to close command list");
 }
 
-void Command::clear_resource_track() const noexcept
-{
-  g_cmd_pool.clear_resource_track(this);
-}
-
 void CmdQueue::init(D3D12_COMMAND_LIST_TYPE type) noexcept
 {
   auto queue_desc = D3D12_COMMAND_QUEUE_DESC{};
   queue_desc.Type = type;
   err_if(g_core.device()->CreateCommandQueue(&queue_desc, IID_PPV_ARGS(&_queue)),
-        "failed to create command queue");
+    "failed to create command queue");
 }
 
 void CmdQueue::destroy() noexcept
@@ -57,13 +52,8 @@ void CmdQueue::signal(ID3D12Fence* fence, uint64 value) const noexcept
   err_if(_queue->Signal(fence, value), "failed to signal fence");
 }
 
-void CmdQueue::submit(ID3D12Fence* fence, uint64 value, std::initializer_list<CmdHandle> cmd_hs) const noexcept
+void CmdQueue::submit(ID3D12Fence* fence, uint64 value, std::span<Command*> cmds) const noexcept
 {
-  // get commands
-  auto cmds = cmd_hs
-    | std::views::transform([](auto h) { return g_cmd_pool.get(h); })
-    | std::ranges::to<std::vector<Command*>>();
-
   // close commands
   for (auto cmd : cmds) cmd->close();
 
@@ -81,12 +71,6 @@ void CmdQueue::wait(ID3D12Fence* fence, uint64 value) const noexcept
   _queue->Wait(fence, value);
 }
 
-auto CommandPool::resource(ID3D12GraphicsCommandList1* cmd) noexcept -> Resource&
-{
-  assert(_resources.contains(cmd));
-  return _resources[cmd];
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 ///                          command operations
 ////////////////////////////////////////////////////////////////////////////////
@@ -94,41 +78,43 @@ auto CommandPool::resource(ID3D12GraphicsCommandList1* cmd) noexcept -> Resource
 void Command::transform(std::initializer_list<TransformInfo> infos) const noexcept
 {
   auto barriers = std::vector<D3D12_RESOURCE_BARRIER>{};
-  for (auto [image, states, subresource] : infos)
+  for (auto const& [image, states, subresource] : infos)
   {
-    auto res = g_img_mgr[image].transform(this, states, subresource);
-    if (!res.empty())
-    {
-      g_cmd_pool.resource(_cmd).imgs.emplace(image);
-      barriers.append_range(std::move(res));
-    }
+    auto img = g_img_mgr.get(image);
+    auto res = img->transform(this, states, subresource);
+    use(img, resource_access(states));
+    barriers.append_range(std::move(res));
   };
   barrier(barriers);
 }
 
 void Command::transform(ImageHandle image, Flag<ImageState> states, uint subresource) const noexcept
 {
-  auto res = g_img_mgr[image].transform(this, states, subresource);
-  if (!res.empty()) g_cmd_pool.resource(_cmd).imgs.emplace(image);
+  auto img = g_img_mgr.get(image);
+  auto res = img->transform(this, states, subresource);
+  use(img, resource_access(states));
   barrier(res);
 }
 
 void Command::clear(ImageHandle image, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) const noexcept
 {
-  g_img_mgr[image].clear(this, cpu_handle, gpu_handle);
-  g_cmd_pool.resource(_cmd).imgs.emplace(image);
+  auto img = g_img_mgr.get(image);
+  img->clear(this, cpu_handle, gpu_handle);
+  use(img, GPUResourceAccess::write);
 }
 
 void Command::clear_render_target(ImageHandle image, std::optional<Rect> rect) noexcept
 {
-  g_img_mgr[image].clear_render_target(this, rect);
-  g_cmd_pool.resource(_cmd).imgs.emplace(image);
+  auto img = g_img_mgr.get(image);
+  img->clear_render_target(this, rect);
+  use(img, GPUResourceAccess::write);
 }
 
 void Command::clear_depth_stencil(ImageHandle image, std::optional<Rect> rect) noexcept
 {
-  g_img_mgr[image].clear_depth_stencil(this, rect);
-  g_cmd_pool.resource(_cmd).imgs.emplace(image);
+  auto img = g_img_mgr.get(image);
+  img->clear_depth_stencil(this, rect);
+  use(img, GPUResourceAccess::write);
 }
 
 void Command::copy(ImageHandle src, Rect rect, ImageHandle dst, uint2 pos) noexcept
@@ -153,8 +139,8 @@ void Command::copy(ImageHandle src, Rect rect, ImageHandle dst, uint2 pos) noexc
   };
   _cmd->CopyTextureRegion(&dst_loc, pos.x, pos.y, 0, &src_loc, &region_box);
 
-  g_cmd_pool.resource(_cmd).imgs.emplace(src);
-  g_cmd_pool.resource(_cmd).imgs.emplace(dst);
+  use(&src_img, GPUResourceAccess::read);
+  use(&dst_img, GPUResourceAccess::write);
 }
 
 void Command::copy(ImageHandle src, ImageHandle dst) noexcept
@@ -202,44 +188,19 @@ void Command::copy(BufferHandle buf_h, ImageHandle img_h, std::span<BitmapCopyIn
     _cmd->CopyTextureRegion(&dst_loc, pos.x, pos.y, 0, &src_loc, nullptr);
   }
 
-  // mark resources
-  g_cmd_pool.resource(_cmd).imgs.emplace(img_h);
-  g_cmd_pool.resource(_cmd).bufs.emplace(buf_h);
+  use(&img, GPUResourceAccess::write);
+  use(&buf, GPUResourceAccess::read);
 }
 
 void Command::upload(FrameBuffer& buf, ui::FrameData const* data) noexcept
 {
   buf.upload(this, data);
-  g_cmd_pool.resource(_cmd).bufs.emplace(buf.vertice_indices_buf_handle());
+  use(&g_buf_pool[buf.vertice_indices_buf_handle()], GPUResourceAccess::read);
 }
 
 void Command::bind_descriptor_heaps() const noexcept
 {
   g_desc_heap_mgr.bind_heaps(this);
-}
-
-auto Command::needs_graphics_sync() const noexcept -> bool
-{
-  auto const& resources = g_cmd_pool.resource(_cmd);
-  return
-    std::ranges::any_of(resources.imgs, [](auto h) { return g_img_mgr[h].needs_graphics(); }) ||
-    std::ranges::any_of(resources.bufs, [](auto h) { return g_buf_pool[h].needs_graphics(); });
-}
-
-auto Command::needs_compute_sync() const noexcept -> bool
-{
-  auto const& resources = g_cmd_pool.resource(_cmd);
-  return
-    std::ranges::any_of(resources.imgs, [](auto h) { return g_img_mgr[h].needs_compute(); }) ||
-    std::ranges::any_of(resources.bufs, [](auto h) { return g_buf_pool[h].needs_compute(); });
-}
-
-auto Command::needs_copy_sync() const noexcept -> bool
-{
-  auto const& resources = g_cmd_pool.resource(_cmd);
-  return
-    std::ranges::any_of(resources.imgs, [](auto h) { return g_img_mgr[h].needs_copy(); }) ||
-    std::ranges::any_of(resources.bufs, [](auto h) { return g_buf_pool[h].needs_copy(); });
 }
 
 // void copy(Bitmap const& src, Bitmap const& dst) noexcept

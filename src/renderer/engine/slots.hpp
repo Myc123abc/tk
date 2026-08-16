@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../core.hpp"
-#include "engine.hpp"
+#include "submission_tracker.hpp"
 
 #include <vector>
 #include <assert.h>
@@ -35,7 +35,7 @@ public:
   auto submit_slot() noexcept -> uint64
   {
     assert(_slot && is_idle(_slot));
-    _slot->fence_value = _engine->submit(); 
+    _slot->fence_value = g_sub_tracker.submit(*_engine); 
     return _slot->fence_value;
   }
 

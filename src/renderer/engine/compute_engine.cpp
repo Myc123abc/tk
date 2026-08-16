@@ -70,9 +70,7 @@ void ComputeEngine::update() noexcept
   generate_mipmaps(cmd);
   blur(cmd);
 
-  auto fence_value = _slots.submit_slot();
-  if (cmd->needs_graphics_sync()) g_graphics_engine.wait(g_comp_engine, fence_value);
-  cmd->clear_resource_track();
+  _slots.submit_slot();
   
   // release mipmap descs after generation complete
   if (!_mipmap_images.empty())
@@ -242,8 +240,8 @@ void ComputeEngine::image_scale() const noexcept
         Command::TransformInfo{ img.dst, ImageState::non_pixel },
       };})
     | std::views::join);
-
-  g_comp_engine.wait(g_graphics_engine, g_graphics_engine.submit_slot());
+  
+  g_graphics_engine.submit_slot();
 }
 
 }

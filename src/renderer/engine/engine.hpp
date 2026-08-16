@@ -13,6 +13,7 @@ namespace tk::renderer {
 
 class Engine
 {
+  friend class SubmissionTracker;
 public:
   Engine()                         = default;
   ~Engine()                        = default;
@@ -22,7 +23,6 @@ public:
   Engine& operator=(Engine&&)      = delete;
 
   auto signal() noexcept -> uint64;
-  auto submit() noexcept -> uint64;
 
   auto fence_completed_value() const noexcept { return _fence->GetCompletedValue(); }
 
@@ -42,6 +42,9 @@ public:
 
 protected:
   void init(D3D12_COMMAND_LIST_TYPE type) noexcept;
+
+private:
+  auto submit(std::span<Command*> cmds) noexcept -> uint64;
 
 private:
   CmdQueue                                       _queue;
