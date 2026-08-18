@@ -196,6 +196,11 @@ void ComputeEngine::blur(Command const* cmd) noexcept
       g_ctx.set_compute_descriptor(vertical_pipe->root_param_idx("src"), tmp.srv().gpu_handle());
       g_ctx.set_compute_descriptor(vertical_pipe->root_param_idx("dst"), dst.uav().gpu_handle());
       g_ctx.dispatch(ext.x, ceil(ext.y / 128.f), 1);
+
+      cmd->transform({
+        { dst_h, ImageState::non_pixel },
+        { tmp_h, ImageState::compute_rw },
+      });
     }
   }
 }
