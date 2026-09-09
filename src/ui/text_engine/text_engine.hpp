@@ -65,7 +65,7 @@ private:
   };
 
 private:
-  auto split_text(std::u32string_view text, FontStyleKey key) noexcept -> std::vector<std::pair<std::u32string_view, Font*>>;
+  auto split_text(std::string_view text, FontStyleKey key) noexcept -> std::vector<std::pair<std::string_view, Font*>>;
   auto find_font(uint unicode, FontStyleKey key) noexcept -> Font*;
   auto find_notdef_glyph_font() noexcept -> Font*;
   void add_uncached_glyph(Font* font, uint glyph_idx, GlyphKey const& key, ParseResult& result) noexcept;

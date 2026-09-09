@@ -5,7 +5,7 @@
 #include "../../renderer/engine/copy_engine.hpp"
 #include "glyph_cacher.hpp"
 
-#include <utf8.h>
+#include "../../util/unicode.hpp"
 
 #include <ranges>
 
@@ -116,19 +116,19 @@ auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view 
     return it->second;
   }
 
-  auto res    = ParseResult{};
-  auto u32str = utf8::utf8to32(text);
+  auto res  = ParseResult{};
+  auto size = codepoint_cnt(text);
 
   auto has_missing_glyphs = false;
 
   // calculate advances
-  res.advances.reserve(u32str.size());
-  res.offsets.reserve(u32str.size());
-  res.glyph_info_keys.reserve(u32str.size());
+  res.advances.reserve(size);
+  res.offsets.reserve(size);
+  res.glyph_info_keys.reserve(size);
 
   // split text
   auto glyph_style_key = FontStyleKey(family, style);
-  for (auto [text, font] : split_text(u32str, glyph_style_key))
+  for (auto [text, font] : split_text(text, glyph_style_key))
   {
     // use hb calculate advances
     if (font)
@@ -136,7 +136,7 @@ auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view 
       {
         std::lock_guard lock{ font->_mutex };
         hb_buffer_reset(_hb_buf);
-        hb_buffer_add_utf32(_hb_buf, reinterpret_cast<uint const*>(text.data()), text.size(), 0, -1);
+        hb_buffer_add_utf8(_hb_buf, text.data(), text.size(), 0, -1);
         if (direction == TextDirection::vertical)
           hb_buffer_set_direction(_hb_buf, HB_DIRECTION_TTB);
         hb_buffer_guess_segment_properties(_hb_buf);
@@ -183,7 +183,7 @@ auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view 
       {
         std::lock_guard lock{ notdef_glyph_font->_mutex };
         hb_buffer_reset(_hb_buf);
-        hb_buffer_add_utf32(_hb_buf, reinterpret_cast<uint const*>(text.data()), text.size(), 0, -1);
+        hb_buffer_add_utf8(_hb_buf, text.data(), text.size(), 0, -1);
         if (direction == TextDirection::vertical)
           hb_buffer_set_direction(_hb_buf, HB_DIRECTION_TTB);
         hb_buffer_guess_segment_properties(_hb_buf);
@@ -261,10 +261,10 @@ auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view 
   return handle;
 }
 
-auto TextEngine::split_text(std::u32string_view text, FontStyleKey key) noexcept -> std::vector<std::pair<std::u32string_view, Font*>>
+auto TextEngine::split_text(std::string_view text, FontStyleKey key) noexcept -> std::vector<std::pair<std::string_view, Font*>>
 {
   // get which text use which font
-  auto result = std::vector<std::pair<std::u32string_view, Font*>>{};
+  auto result = std::vector<std::pair<std::string_view, Font*>>{};
   result.reserve(text.size());
 
   _max_ascender = {};
@@ -277,23 +277,25 @@ auto TextEngine::split_text(std::u32string_view text, FontStyleKey key) noexcept
     _max_height   = std::max(_max_height, font->_height);
   };
 
-  auto beg      = text.begin();
+  auto view     = UTF8View(text);
+  auto beg      = view.begin();
+  auto end      = view.end();
   auto cur_font = find_font(*beg, key);;
   update(cur_font);
 
-  for (auto it = beg + 1; it != text.end(); ++it)
+  for (auto it = beg + 1; it != end; ++it)
   {
     auto font = find_font(*it, key);
     if (font == cur_font) continue;
 
-    result.emplace_back(std::u32string_view{ beg, it }, cur_font);
+    result.emplace_back(view.substr(beg, it), cur_font);
     beg      = it;
     cur_font = font;
     update(cur_font);
   }
 
-  assert(beg != text.end());
-  result.emplace_back(std::u32string_view{ beg, text.end() }, cur_font);
+  assert(beg != end);
+  result.emplace_back(view.substr(beg, end), cur_font);
 
   return result;
 }

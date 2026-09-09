@@ -1,19 +1,12 @@
 #pragma once
 
 #include "tk/error_handling.hpp"
-
-#include <utf8.h>
+#include "util/unicode.hpp"
 
 #include <optional>
 #include <vector>
 
 namespace tk {
-
-inline auto to_string(std::wstring_view wstr) -> std::string
-{
-  auto u16str = std::u16string(reinterpret_cast<char16_t const*>(wstr.data()), wstr.size());
-  return utf8::utf16to8(u16str);
-}
 
 inline auto get_win32_err_msg() noexcept -> std::string
 {

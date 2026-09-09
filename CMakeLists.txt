@@ -35,19 +35,12 @@ if (NOT "${CMAKE_GENERATOR}" MATCHES "Visual Studio")
   file(WRITE vendor/freetype/src/base/ftver.rc "")
 endif()
 
-# build libunibreak
-file(GLOB_RECURSE LIBUNIBREAK_SRC vendor/libunibreak/src/*.c)
-add_library(libunibreak STATIC ${LIBUNIBREAK_SRC})
-target_include_directories(libunibreak PUBLIC vendor/libunibreak/src)
-
 file(GLOB_RECURSE TK_SRC src/*.cpp)
 add_library(tk ${TK_SRC})
 target_compile_definitions(tk
   PUBLIC
     WIN32_LEAN_AND_MEAN
     NOMINMAX
-  PRIVATE
-    UTF_CPP_CPLUSPLUS=202002L
 )
 if (MSVC)
   target_compile_options(tk PUBLIC /utf-8)
@@ -58,7 +51,6 @@ target_include_directories(tk
   PRIVATE
     include/tk
     vendor/stb
-    vendor/utfcpp/source
     vendor/freetype/include
     vendor/Clipper2/CPP/Clipper2Lib/include
 )
@@ -68,7 +60,6 @@ target_link_libraries(tk
     windowsapp dwmapi d3d11 d2d1
     DirectX-Headers
     harfbuzz
-    libunibreak
     Clipper2
     msdfgen::msdfgen
   PUBLIC

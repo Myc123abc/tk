@@ -1,9 +1,6 @@
 [submodule "vendor/DirectX-Headers"]
 	path = vendor/DirectX-Headers
 	url = https://github.com/microsoft/DirectX-Headers.git
-[submodule "vendor/utfcpp"]
-	path = vendor/utfcpp
-	url = https://github.com/nemtrif/utfcpp.git
 [submodule "vendor/stb"]
 	path = vendor/stb
 	url = https://github.com/nothings/stb.git
@@ -13,9 +10,6 @@
 [submodule "vendor/harfbuzz"]
 	path = vendor/harfbuzz
 	url = https://github.com/harfbuzz/harfbuzz.git
-[submodule "vendor/libunibreak"]
-	path = vendor/libunibreak
-	url = https://github.com/adah1972/libunibreak.git
 [submodule "vendor/Clipper2"]
 	path = vendor/Clipper2
 	url = https://github.com/AngusJohnson/Clipper2.git

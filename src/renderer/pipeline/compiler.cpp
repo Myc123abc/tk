@@ -1,8 +1,7 @@
 #include "compiler.hpp"
 #include "tk/error_handling.hpp"
 #include "../core.hpp"
-
-#include <utf8.h>
+#include "../../util/unicode.hpp"
 
 #include <vector>
 #include <ranges>
@@ -31,14 +30,6 @@ auto read_file(std::string_view path) noexcept -> std::string
 
   return data;
 }
-
-#ifdef _WIN32
-auto to_wstring(std::string_view str) noexcept -> std::wstring
-{
-  auto u16str = utf8::utf8to16(str);
-  return { reinterpret_cast<wchar_t*>(u16str.data()), u16str.size() };
-}
-#endif
 
 // Map a reflected vertex input parameter description to an appropriate DXGI_FORMAT.
 // Only 16-bit and 32-bit scalar component types are mappable for input layouts.
