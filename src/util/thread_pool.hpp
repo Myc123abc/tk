@@ -1,7 +1,5 @@
 #pragma once
 
-#include "../config.hpp"
-
 #include <thread>
 #include <vector>
 #include <queue>
@@ -47,19 +45,13 @@ public:
 
   auto size() const noexcept { return _threads.size(); }
 
-  void init(int size = 0) noexcept
+  void init(int size) noexcept
   {
-    if (size < Thread_Pool_Min_Size)
-      size = std::max(static_cast<int>(std::thread::hardware_concurrency() - 1 - Used_Thread_Num), Thread_Pool_Min_Size);
     _threads.resize(size);
   }
 
   void destroy() noexcept
   {
-    {
-      std::lock_guard lock(_mutex);
-      while (!_tasks.empty()) _tasks.pop();
-    }
     _exit.store(true, std::memory_order_release);
     _cv.notify_all();
     _threads.clear();

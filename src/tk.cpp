@@ -5,6 +5,7 @@
 #include "util/thread_pool.hpp"
 #include "util/file_manager.hpp"
 #include "ui/text_engine/glyph_cacher.hpp"
+#include "iocp.hpp"
 
 using namespace tk::renderer;
 using namespace tk::ui;
@@ -13,7 +14,8 @@ namespace tk {
 
 void init() noexcept
 {
-  g_thread_pool.init();
+  test_iocp();
+  g_thread_pool.init(std::thread::hardware_concurrency() - 2);
   g_glyph_cacher.preload();
   g_renderer.init();
   g_wnd_mgr.init();
