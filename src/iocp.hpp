@@ -82,7 +82,7 @@ private:
 inline void test_iocp() noexcept
 {
   // Open the file for overlapped I/O
-  auto file = CreateFileA("../test/main.cpp", GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr);
+  auto file = CreateFileA("../../test/main.cpp", GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr);
   err_if(file == INVALID_HANDLE_VALUE, "Failed to open the file");
 
   auto iocp = IOCP{};
@@ -111,7 +111,6 @@ inline void test_iocp() noexcept
     }
   }
 
-tag_close:
   // TODO: wait all IO operations complete.
   CloseHandle(file);
   iocp.destroy();

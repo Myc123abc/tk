@@ -66,11 +66,4 @@ target_link_libraries(tk
     tk::util
 )
 
-add_executable(test test/main.cpp)
-target_link_libraries(test PRIVATE tk)
-
-add_custom_target(copy_assets ALL
-  COMMAND ${CMAKE_COMMAND} -E copy_directory
-          ${CMAKE_SOURCE_DIR}/assets
-          $<TARGET_FILE_DIR:tk>/assets
-)
+add_subdirectory(test)

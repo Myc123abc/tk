@@ -148,7 +148,7 @@ void GlyphCacher::preload() noexcept
 
 void GlyphCacher::deserialize(std::span<uint8 const> data) noexcept
 {
-  assert(data.size() > sizeof(Magic));
+  assert(data.size() >= sizeof(Magic));
   err_if(memcmp(data.data(), &Magic, sizeof(Magic)) != 0,
     "Failed to deserialize glyph cache file, magic wrong");
   data = data.subspan(sizeof(Magic));
