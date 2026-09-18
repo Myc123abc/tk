@@ -209,7 +209,7 @@ public:
       {
         TextParseResultHandle handle;
         float2                pos;
-        float                 size{};
+        float                 scale{};
         Color                 inner_color{};
         Color                 outer_color{};
         float                 outline_width{};
@@ -289,7 +289,7 @@ public:
   void add_image(ImageHandle handle, float2 left_top, float2 right_bottom, uint8 alpha, std::span<float2> uvs) noexcept;
   void add_image(ImageHandle handle, float2 p0, float2 p1, float2 p2, float2 p3, uint8 alpha, std::span<float2> uvs) noexcept;
   void add_image_rounded(ImageHandle handle, float2 left_top, float2 right_bottom, uint8 alpha, std::span<float2> uvs, float rounding, Flag<CornerFlag> flags) noexcept;
-  void add_text(TextParseResultHandle handle, float2 pos, float size, Color inner_color, Color outer_color, float outline_width) noexcept;
+  void add_text(TextParseResultHandle handle, float2 pos, float scale, Color inner_color, Color outer_color, float outline_width) noexcept;
 
   void path_begin(float2 p0) noexcept;
   void add_path_line_to(float2 p) noexcept;
@@ -336,7 +336,7 @@ private:
   void _add_cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept;
   void _add_image(ImageHandle handle, float2 p0, float2 p1, float2 p2, float2 p3, uint8 alpha, float2 uv0, float2 uv1, float2 uv2, float2 uv3) noexcept;
   void _add_image_rounded(ImageHandle handle, float2 left_top, float2 right_bottom, uint8 alpha, float2 uv0, float2 uv1, float2 uv2, float2 uv3, float rounding, Flag<CornerFlag> flags) noexcept;
-  void _add_text(TextParseResultHandle handle, float2 pos, float size, Color inner_color, Color outer_color, float outline_width) noexcept;
+  void _add_text(TextParseResultHandle handle, float2 pos, float scale, Color inner_color, Color outer_color, float outline_width) noexcept;
 
   void _path_begin(float2 p0) noexcept;
   void _add_path_line_to(float2 p) noexcept { if (_points.back() != p) _points.emplace_back(p); }

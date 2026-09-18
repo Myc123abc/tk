@@ -95,7 +95,7 @@ void TextEngine::regenerate_missing_glyphs(Font* font, FontStyleKey key) noexcep
   }
 }
 
-auto TextEngine::parse(std::string_view text, FontStyle style, std::string_view family, TextDirection direction) noexcept -> TextParseResultHandle
+auto TextEngine::parse(std::string_view text, std::string_view family, FontStyle style, TextDirection direction) noexcept -> TextParseResultHandle
 {
   assert(!text.empty());
 
@@ -502,11 +502,8 @@ void TextEngine::remove_missing_glyphs(FontStyleKey key) noexcept
   _cached_texts_with_missing_glyphs[key].clear();
 }
 
-
-void GlyphInfo::set_vertices(renderer::Vertex* vtx, float2 pos, float size, float ascender, Color color, Color outer_color, float outer_width) const noexcept
+void GlyphInfo::set_vertices(renderer::Vertex* vtx, float2 pos, float scale, float ascender, Color color, Color outer_color, float outer_width) const noexcept
 {
-  auto scale = get_scale(size);
-
   auto p0 = pos + pos_offset * scale;
   p0.y += ascender * scale;
   auto p1 = float2{ p0.x + extent.x * scale, p0.y };

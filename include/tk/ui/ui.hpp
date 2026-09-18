@@ -270,7 +270,7 @@ struct TextResult
  * @param cfg text config
  * @return text parse result
  */
-auto text(std::string_view text, float2 pos, float size, Color color, TextConfig cfg = {}) noexcept -> TextResult;
+auto text(std::string_view text, float2 pos, float size, Color color, TextConfig const& cfg = {}) noexcept -> TextResult;
 
 /**
  * get parse result of text with sepcific config
@@ -279,7 +279,7 @@ auto text(std::string_view text, float2 pos, float size, Color color, TextConfig
  * @param cfg text config
  * @return text parse result
  */
-auto text(std::string_view text, float size, TextConfig cfg = {}) noexcept -> TextResult;
+auto text(std::string_view text, float size, TextConfig const& cfg = {}) noexcept -> TextResult;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Window

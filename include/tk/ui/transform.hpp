@@ -1,6 +1,7 @@
 #pragma once
 
 #include "tk/base.hpp"
+#include "tk/rect.hpp"
 
 namespace tk::ui {
 
@@ -32,18 +33,26 @@ struct Matrix
     (*this) = (*this) * m;
     return *this;
   }
+
+  auto transform_rect(float2 pos, float2 extent) const noexcept -> Rect
+  {
+    auto rect = Rect{};
+    rect.expand((*this) * pos);
+    rect.expand((*this) * float2{ pos.x + extent.x, pos.y });
+    rect.expand((*this) * (pos + extent));
+    rect.expand((*this) * float2{ pos.x, pos.y + extent.y });
+    return rect;
+  }
+
+  auto transform_extent(float2 extent) const noexcept -> float2
+  {
+    return transform_rect({}, extent).extent();
+  }
 };
 
 class Transform
 {
 public:
-  Transform()                            = default;
-  ~Transform()                           = default;
-  Transform(Transform const&)            = delete;
-  Transform(Transform&&)                 = delete;
-  Transform& operator=(Transform const&) = delete;
-  Transform& operator=(Transform&&)      = delete;
-
   auto translate(float x, float y) noexcept -> Transform&
   {
     _m *= { 1, 0, 0, 1, x, y };
@@ -75,6 +84,21 @@ public:
   auto operator()(float2 p) const noexcept -> float2
   {
     return _m * p;
+  }
+
+  auto operator*(float2 p) const noexcept -> float2
+  {
+    return _m * p;
+  }
+
+  auto transform_rect(float2 pos, float2 extent) const noexcept -> Rect
+  {
+    return _m.transform_rect(pos, extent);
+  }
+
+  auto transform_extent(float2 extent) const noexcept -> float2
+  {
+    return _m.transform_extent(extent);
   }
 
   auto matrix() const noexcept -> Matrix const& { return _m; }

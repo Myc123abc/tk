@@ -14,7 +14,7 @@ namespace tk {
 
 void init() noexcept
 {
-  test_iocp();
+  // test_iocp();
   g_thread_pool.init(std::thread::hardware_concurrency() - 2);
   g_glyph_cacher.preload();
   g_renderer.init();
@@ -36,6 +36,7 @@ void destroy() noexcept
 
 void update() noexcept
 {
+  test_text_layout();
   g_img_mgr.update();
   g_ui_ctx.render();
   g_wnd_mgr.message_process();

@@ -34,7 +34,7 @@ public:
   };
   using ParseResultPool       = ObjectPool<ParseResult>;
   using TextParseResultHandle = ParseResultPool::Handle;
-  auto parse(std::string_view text, FontStyle style, std::string_view family, TextDirection direction) noexcept -> TextParseResultHandle;
+  auto parse(std::string_view text, std::string_view family, FontStyle style, TextDirection direction) noexcept -> TextParseResultHandle;
   auto& get_parse_result(TextParseResultHandle handle) const noexcept { return _parse_result_pool[handle]; }
 
   void update() noexcept;

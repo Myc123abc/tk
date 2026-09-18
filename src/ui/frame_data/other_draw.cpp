@@ -177,13 +177,13 @@ void FrameData::_add_image_rounded(ImageHandle handle, float2 left_top, float2 r
   _sampled_images.emplace(handle);
 }
 
-void FrameData::add_text(TextParseResultHandle handle, float2 pos, float size, Color inner_color, Color outer_color, float outline_width) noexcept
+void FrameData::add_text(TextParseResultHandle handle, float2 pos, float scale, Color inner_color, Color outer_color, float outline_width) noexcept
 {
   auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::add_text);
-  cmd.data.add_text = { handle, pos, size, inner_color, outer_color, outline_width };
+  cmd.data.add_text = { handle, pos, scale, inner_color, outer_color, outline_width };
 }
 
-void FrameData::_add_text(TextParseResultHandle handle, float2 pos, float size, Color inner_color, Color outer_color, float outline_width) noexcept
+void FrameData::_add_text(TextParseResultHandle handle, float2 pos, float scale, Color inner_color, Color outer_color, float outline_width) noexcept
 {
   auto const& result = g_text_engine.get_parse_result(handle);
 
@@ -195,11 +195,10 @@ void FrameData::_add_text(TextParseResultHandle handle, float2 pos, float size, 
   for (auto i = 0; i < cnt; ++i)
   {
     auto const& info = g_text_engine.get_glyph_info(result.glyph_info_keys[i]);
-    auto scale = info.get_scale(size);
 
     _sampled_images.emplace(g_text_engine.glyph_atlas(info.glyph_atlas_index));
 
-    info.set_vertices(vertices + vtx_offset, pos + result.offsets[i] * scale, size, ascender, inner_color, outer_color, outline_width);
+    info.set_vertices(vertices + vtx_offset, pos + result.offsets[i] * scale, scale, ascender, inner_color, outer_color, outline_width);
 
     auto vtx_beg = _vertex_beg + vtx_offset;
     indices[idx_offset + 0] = static_cast<uint16>(vtx_beg + 0);

@@ -5,6 +5,7 @@
 #include "ui/tween.hpp"
 #include "../util/singleton.hpp"
 #include "../renderer/window/window.hpp"
+#include "text_engine/text_layout.hpp"
 
 #include <windows.h>
 
@@ -71,7 +72,8 @@ public:
   auto ping_pong(bool b, size_t id, double dur, Tween::Ease ease = {}) noexcept { return ping_pong(b, id, dur, dur, ease); }
 
   auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha, std::optional<ImageConfig> cfg) noexcept -> std::expected<void, ImageLoadErrorType>;
-  auto text(std::string_view text, float2 pos, float size, Color inner_color, TextConfig cfg) noexcept -> TextResult;
+  auto text(std::string_view text, float2 pos, float size, Color inner_color, TextConfig const& cfg) noexcept -> TextResult;
+  void render_text_layout(TextLayout const& layout) noexcept;
 
   void fullscreen_window() noexcept;
   void restore_fullscreen_window() noexcept;

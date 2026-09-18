@@ -98,14 +98,14 @@ auto load_font(std::string_view path) noexcept -> std::expected<FontInfo, FontLo
   return g_text_engine.load_font(path);
 }
 
-auto text(std::string_view text, float2 pos, float size, Color color, TextConfig cfg) noexcept -> TextResult
+auto text(std::string_view text, float2 pos, float size, Color color, TextConfig const& cfg) noexcept -> TextResult
 {
   if (text.empty()) return {};
   adjust_pos(pos); adjust_scale(size);
   return g_ui_ctx.text(text, pos, size, color, cfg);
 }
 
-auto text(std::string_view text, float size, TextConfig cfg) noexcept -> TextResult
+auto text(std::string_view text, float size, TextConfig const& cfg) noexcept -> TextResult
 {
   if (text.empty()) return {};
   adjust_scale(size);

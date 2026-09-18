@@ -558,22 +558,21 @@ auto UIContext::image(std::string_view path, float2 left_top, float2 right_botto
   return std::unexpected(res.error());
 }
 
-auto UIContext::text(std::string_view text, float2 pos, float size, Color inner_color, TextConfig cfg) noexcept -> TextResult
+auto UIContext::text(std::string_view text, float2 pos, float size, Color inner_color, TextConfig const& cfg) noexcept -> TextResult
 {
   if (text.empty()) return {};
 
   check_draw();
 
-  auto const  result_handle = g_text_engine.parse(text, cfg.style, cfg.family, cfg.direction);
+  auto const  result_handle = g_text_engine.parse(text, cfg.family, cfg.style, cfg.direction);
   auto const& result        = g_text_engine.get_parse_result(result_handle);
-  if (!result.generating_glyph_info_keys.empty()) return {};
 
   auto draw_scale = size / FT_Pixel_Size;
   auto scale      = draw_scale / _wnd->scale();
   auto ascender   = result.ascender * scale;
   auto extent     = result.extent   * scale;
 
-  if (inner_color.a)
+  if (result.generating_glyph_info_keys.empty() && inner_color.a)
   {
     if (cfg.pos_as_baseline)
     {
@@ -582,10 +581,21 @@ auto UIContext::text(std::string_view text, float2 pos, float size, Color inner_
       else
         pos.x -= result.ascender * draw_scale;
     }
-    frame_data()->add_text(result_handle, pos, size, inner_color, cfg.outer_color, cfg.outline_width);
+    frame_data()->add_text(result_handle, pos, draw_scale, inner_color, cfg.outer_color, cfg.outline_width);
   }
 
   return { extent, ascender };
+}
+
+void UIContext::render_text_layout(TextLayout const& layout) noexcept
+{
+  check_draw();
+  for (auto const& [text, pos, _, handle] : layout.texts)
+  {
+    auto const& result = g_text_engine.get_parse_result(handle);
+    if (!result.generating_glyph_info_keys.empty() || !layout.inner_color.a) continue;
+    frame_data()->add_text(handle, layout.pos + pos, layout.scale, layout.inner_color, layout.outer_color, layout.outline_width);
+  }
 }
 
 void UIContext::postprocess() const noexcept

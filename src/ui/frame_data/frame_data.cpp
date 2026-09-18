@@ -140,7 +140,7 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
     break;
 
   case Type::add_text:
-    _add_text(cmd.data.add_text.handle, cmd.data.add_text.pos, cmd.data.add_text.size, cmd.data.add_text.inner_color, cmd.data.add_text.outer_color, cmd.data.add_text.outline_width);
+    _add_text(cmd.data.add_text.handle, cmd.data.add_text.pos, cmd.data.add_text.scale, cmd.data.add_text.inner_color, cmd.data.add_text.outer_color, cmd.data.add_text.outline_width);
     break;
 
   case Type::path_begin:

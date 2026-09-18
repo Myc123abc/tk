@@ -160,12 +160,12 @@ public:
   UTF8View(std::string_view view) noexcept
     : _view(view) {}
 
-  constexpr auto begin() const noexcept -> iterator
+  auto begin() const noexcept -> iterator
   {
     return { _view, 0 };
   }
 
-  constexpr auto end() const noexcept -> iterator
+  auto end() const noexcept -> iterator
   {
     return { _view, static_cast<uint>(_view.size()) };
   }
