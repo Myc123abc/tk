@@ -590,11 +590,14 @@ auto UIContext::text(std::string_view text, float2 pos, float size, Color inner_
 void UIContext::render_text_layout(TextLayout const& layout) noexcept
 {
   check_draw();
-  for (auto const& [text, pos, _, handle] : layout.texts)
+  auto const dpi_scale  = _wnd->scale();
+  auto const scale      = dpi_scale * layout.scale;
+  auto const layout_pos = layout.pos + _wnd_ctx->render_pos;
+  for (auto const& [text, text_pos, _, handle] : layout.texts)
   {
     auto const& result = g_text_engine.get_parse_result(handle);
     if (!result.generating_glyph_info_keys.empty() || !layout.inner_color.a) continue;
-    frame_data()->add_text(handle, layout.pos + pos, layout.scale, layout.inner_color, layout.outer_color, layout.outline_width);
+    frame_data()->add_text(handle, (layout_pos + text_pos) * dpi_scale, scale, layout.inner_color, layout.outer_color, layout.outline_width);
   }
 }
 

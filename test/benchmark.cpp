@@ -203,7 +203,7 @@ auto main() -> int
 {
   tk::init();
 
-  err_if(!ui::load_font("assets/font/SourceCodePro-Regular.ttf"), "failed to load font");
+  err_if(!ui::load_font("assets/font/NotoSansJP-Regular.ttf"), "failed to load font");
 
   auto wndCfg = ui::WindowConfig{};
   wndCfg.display_title_bar             = true;
