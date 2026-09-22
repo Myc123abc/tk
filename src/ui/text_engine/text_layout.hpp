@@ -4,8 +4,46 @@
 
 namespace tk::ui {
 
-struct TextLayout
+class TextLayout
 {
+public:
+  enum class Direction
+  {
+    horizontal,
+    vertical,
+  };
+
+  enum class TextOrder
+  {
+    forward,
+    reverse,
+  };
+
+  TextLayout() = default;
+
+  TextLayout(std::span<std::string const> texts, std::string_view family = {}, FontStyle style = {}, TextDirection direction = {}) noexcept;
+
+  auto adjust_size(float size) noexcept -> TextLayout&;
+
+  auto center_alignment(Direction direction = {}, TextOrder order = {}) noexcept -> TextLayout&;
+
+  void set_pos(float2 pos)          noexcept { _pos           = pos;     }
+  void set_padding(float2 padding)  noexcept { _padding       = padding; }
+  void set_padding_x(float padding) noexcept { _padding.x     = padding; }
+  void set_padding_y(float padding) noexcept { _padding.y     = padding; }
+  void set_color(Color color)       noexcept { _inner_color   = color;   }
+  void set_outer_color(Color color) noexcept { _outer_color   = color;   }
+  void set_outline_width(float w)   noexcept { _outline_width = w;       }
+
+  auto& texts()         const noexcept { return _texts;         }
+  auto  pos()           const noexcept { return _pos;           }
+  auto  extent()        const noexcept { return _extent;        }
+  auto  scale()         const noexcept { return _scale;         }
+  auto  color()         const noexcept { return _inner_color;   }
+  auto  outer_color()   const noexcept { return _outer_color;   }
+  auto  outline_width() const noexcept { return _outline_width; }
+
+private:
   struct Text
   {
     std::string_view      text;
@@ -13,48 +51,18 @@ struct TextLayout
     float2                extent;
     TextParseResultHandle handle;
   };
-  std::vector<Text> texts;
-  float2            pos;
-  float2            extent;
-  float             scale{};
-  Color             inner_color;
-  Color             outer_color;
-  float             outline_width{};
+  std::vector<Text> _texts;
+  float2            _pos;
+  float2            _extent;
+  float             _scale{};
 
-  float             max_width{};
-  float             max_height{};
-  float2            padding;
+  Color             _inner_color;
+  Color             _outer_color;
+  float             _outline_width{};
 
-  auto center_aligment() noexcept -> TextLayout&
-  {
-    auto offset = 0;
-    auto width  = max_width + padding.x;
-    for (auto& text : texts)
-    {
-      text.pos.x = offset + (width - text.extent.x) / 2;
-      offset += width;
-    }
-    return *this;
-  }
+  float             _max_width{};
+  float             _max_height{};
+  float2            _padding;
 };
-
-inline auto get_text_layout(std::vector<std::string_view> const& texts, std::string_view family, FontStyle style, TextDirection direction) noexcept -> TextLayout
-{
-  auto layout = TextLayout{};
-  layout.texts.reserve(texts.size());
-  for (auto text : texts)
-  {
-    auto handle = g_text_engine.parse(text, family, style, direction);
-    auto extent = g_text_engine.get_parse_result(handle).extent;
-
-    layout.texts.emplace_back(text, float2{}, extent, handle);
-
-    layout.max_width  = std::max(layout.max_width,  extent.x);
-    layout.max_height = std::max(layout.max_height, extent.y);
-  }
-  return layout;
-}
-
-void test_text_layout() noexcept;
 
 }

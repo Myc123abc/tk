@@ -28,10 +28,8 @@ PS_Param vs(VS_Param arg)
 #define Vtx_Type_Image 1
 #define Vtx_Type_Text  2
 
-static const float  msdf_px_range              = 4.0;
-static const float  outline_reference_px_range = 2.0;
-static const float2 px_range                   = float2(msdf_px_range, msdf_px_range);
-static const float  outline_width_scale        = outline_reference_px_range / msdf_px_range;
+static const float  msdf_px_range = 4.0;
+static const float2 px_range      = float2(msdf_px_range, msdf_px_range);
 
 float screen_px_range(float2 extent, float2 uv)
 {
@@ -66,7 +64,7 @@ float4 ps(PS_Param arg) : SV_TARGET
   float4 inner_color = arg.col;
   float4 outer_color = arg.outer_col;
 
-  float outer_alpha = clamp(screen_range * (distance_from_edge + arg.outer_width * outline_width_scale) + 0.5, 0.0, 1.0);
+  float outer_alpha = clamp(screen_range * distance_from_edge + arg.outer_width + 0.5, 0.0, 1.0);
   if (sd == 0.0)
     outer_alpha = 0.0;
 

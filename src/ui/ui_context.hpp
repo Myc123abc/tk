@@ -73,7 +73,7 @@ public:
 
   auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha, std::optional<ImageConfig> cfg) noexcept -> std::expected<void, ImageLoadErrorType>;
   auto text(std::string_view text, float2 pos, float size, Color inner_color, TextConfig const& cfg) noexcept -> TextResult;
-  void render_text_layout(TextLayout const& layout) noexcept;
+  void render(TextLayout const& layout) noexcept;
 
   void fullscreen_window() noexcept;
   void restore_fullscreen_window() noexcept;

@@ -6,6 +6,7 @@
 #include FT_OUTLINE_H
 #include <hb-ft.h>
 #include <msdfgen.h>
+#include <core/ShapeDistanceFinder.h>
 
 using namespace tk;
 using namespace tk::ui;
@@ -77,7 +78,7 @@ auto get_shape(FT_GlyphSlot glyph, uint glyph_idx, double scale) noexcept
 {
   // read outline
   auto shape = msdfgen::Shape{};
-  shape.setYAxisOrientation(msdfgen::Y_DOWNWARD);
+  shape.setYAxisOrientation(msdfgen::Y_UPWARD);
 
   auto ctx = FtContext{};
   ctx.scale = scale;
@@ -99,6 +100,11 @@ auto get_shape(FT_GlyphSlot glyph, uint glyph_idx, double scale) noexcept
   // validate and normalize shape
   assert(shape.validate());
   shape.normalize();
+  auto const bounds = shape.getBounds();
+  auto const outer_point = msdfgen::Point2{ bounds.l - (bounds.r - bounds.l) - 1, bounds.b - (bounds.t - bounds.b) - 1 };
+  if (msdfgen::SimpleTrueShapeDistanceFinder::oneShotDistance(shape, outer_point) > 0)
+    for (auto& contour : shape.contours)
+      contour.reverse();
 
   return std::move(shape);
 }
@@ -112,24 +118,33 @@ auto generate_msdf(msdfgen::Shape& shape) noexcept -> std::pair<msdfgen::Bitmap<
   static auto const range         = px_range / std::min(scale.x, scale.y);
   static auto const sd_zero_value = range.lower != range.upper ? float(range.lower/(range.lower-range.upper)) : .5f;
 
-  static auto const generator_cfg        = msdfgen::MSDFGeneratorConfig{ true };
-  static auto const post_err_correct_cfg = msdfgen::MSDFGeneratorConfig{ true,
+  static auto const generator_cfg = msdfgen::MSDFGeneratorConfig{ true,
     msdfgen::ErrorCorrectionConfig{ msdfgen::ErrorCorrectionConfig::DISABLED, msdfgen::ErrorCorrectionConfig::DO_NOT_CHECK_DISTANCE }};
+  static auto const post_err_correct_cfg = msdfgen::MSDFGeneratorConfig{ true,
+    msdfgen::ErrorCorrectionConfig{ msdfgen::ErrorCorrectionConfig::EDGE_PRIORITY, msdfgen::ErrorCorrectionConfig::DO_NOT_CHECK_DISTANCE }};
 
-  auto bounds    = shape.getBounds();
-  auto min_x     = bounds.l + range.lower;
-  auto min_y     = bounds.b + range.lower;
-  auto max_x     = bounds.r + range.upper;
-  auto max_y     = bounds.t + range.upper;
-  auto width     = std::ceil((max_x - min_x) * scale.x);
-  auto height    = std::ceil((max_y - min_y) * scale.y);
-  auto translate = msdfgen::Vector2{ -min_x, -min_y };
-  auto offset    = float2{ static_cast<float>(min_x * scale.x), static_cast<float>(-max_y * scale.y) };
+  auto const bounds = shape.getBounds();
+  auto const min_x  = bounds.l + range.lower;
+  auto const min_y  = bounds.b + range.lower;
+  auto const max_x  = bounds.r - range.lower;
+  auto const max_y  = bounds.t - range.lower;
+  auto const w      = scale.x * (max_x - min_x);
+  auto const h      = scale.y * (max_y - min_y);
+  auto const width  = static_cast<int>(std::ceil(w)) + 1;
+  auto const height = static_cast<int>(std::ceil(h)) + 1;
+  auto const translate = msdfgen::Vector2{
+    -min_x + .5 * (width  - w) / scale.x,
+    -min_y + .5 * (height - h) / scale.y,
+  };
+  auto const offset = float2{
+    static_cast<float>(-translate.x * scale.x),
+    static_cast<float>((translate.y - height / scale.y) * scale.y),
+  };
 
   // generate msdf
   auto msdf           = msdfgen::Bitmap<float, 3>(width, height);
   auto transformation = msdfgen::SDFTransformation{ msdfgen::Projection{ scale, translate }, range};
-  msdfgen::edgeColoringSimple(shape, 3, 0);
+  msdfgen::edgeColoringInkTrap(shape, 3, 0);
   msdfgen::generateMSDF(msdf, shape, transformation, generator_cfg);
 
   msdfgen::distanceSignCorrection(msdf, shape, transformation, sd_zero_value, msdfgen::FILL_NONZERO);
@@ -205,15 +220,20 @@ auto Font::generate_msdf_bitmap(uint glyph_idx, GlyphKey const& key) const noexc
   bitmap.pos_offset = pos_offset;
   bitmap.data.resize(bitmap.extent.x * bitmap.extent.y * 4);
 
-  auto cnt  = bitmap.extent.x * bitmap.extent.y;
-  auto data = static_cast<float*>(msdf);
-  for (auto i = 0; i < cnt; ++i)
+  auto data = static_cast<msdfgen::BitmapConstSection<float, 3>>(msdf);
+  data.reorient(msdfgen::Y_DOWNWARD);
+  for (auto y = 0u; y < bitmap.extent.y; ++y)
   {
-    auto to = [](float v) -> uint8 { return std::clamp(v, 0.f, 1.f) * 255.f + .5f; };
-    bitmap.data[i * 4 + 0] = to(data[i * 3 + 0]);
-    bitmap.data[i * 4 + 1] = to(data[i * 3 + 1]);
-    bitmap.data[i * 4 + 2] = to(data[i * 3 + 2]);
-    bitmap.data[i * 4 + 3] = 255;
+    for (auto x = 0u; x < bitmap.extent.x; ++x)
+    {
+      auto const src = data(x, y);
+      auto const dst = (y * bitmap.extent.x + x) * 4;
+      auto to = [](float v) -> uint8 { return std::clamp(v, 0.f, 1.f) * 255.f + .5f; };
+      bitmap.data[dst + 0] = to(src[0]);
+      bitmap.data[dst + 1] = to(src[1]);
+      bitmap.data[dst + 2] = to(src[2]);
+      bitmap.data[dst + 3] = 255;
+    }
   }
 
   return bitmap;

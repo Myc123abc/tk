@@ -36,7 +36,6 @@ void destroy() noexcept
 
 void update() noexcept
 {
-  test_text_layout();
   g_img_mgr.update();
   g_ui_ctx.render();
   g_wnd_mgr.message_process();
