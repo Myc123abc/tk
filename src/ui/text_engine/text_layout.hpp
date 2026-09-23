@@ -28,6 +28,7 @@ public:
   auto center_alignment(Direction direction = {}, TextOrder order = {}) noexcept -> TextLayout&;
 
   void ignore_text(uint idx) noexcept { _texts.at(idx).ignore = true; }
+  auto adjust_ratios(std::span<float> ratios) noexcept -> TextLayout&;
 
   auto set_pos(float2 pos)          noexcept -> TextLayout& { _pos           = pos;      return *this; }
   auto set_pos(float x, float y)    noexcept -> TextLayout& { _pos           = { x, y }; return *this; }
@@ -72,6 +73,8 @@ private:
   float             _max_width{};
   float             _max_height{};
   float2            _padding;
+  Direction         _direction{};
+  TextOrder         _text_order{};
 };
 
 }

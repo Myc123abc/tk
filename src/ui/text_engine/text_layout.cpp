@@ -6,6 +6,8 @@ namespace tk::ui {
 
 TextLayout::TextLayout(std::span<std::string const> texts, std::string_view family, FontStyle style, TextDirection direction) noexcept
 {
+  assert(texts.size() > 1);
+
   _texts.reserve(texts.size());
   for (std::string_view text : texts)
   {
@@ -31,6 +33,9 @@ auto TextLayout::adjust_size(float size) noexcept -> TextLayout&
 
 auto TextLayout::center_alignment(Direction direction, TextOrder order) noexcept -> TextLayout&
 {
+  _direction  = direction;
+  _text_order = order;
+
   auto offset = 0.f;
   auto width  = unit_width();
   auto height = unit_height();
@@ -60,6 +65,47 @@ auto TextLayout::center_alignment(Direction direction, TextOrder order) noexcept
     _extent = { offset, height };
   else
     _extent = { width, offset };
+
+  return *this;
+}
+
+auto TextLayout::adjust_ratios(std::span<float> ratios) noexcept -> TextLayout&
+{
+  assert(ratios.size() == _texts.size() - 1);
+
+  auto width  = unit_width();
+  auto height = unit_height();
+
+  auto adjust_forward = [&](auto texts, auto ratio_view, auto size)
+  {
+    auto offset = 0.f;
+    auto first_pos = std::ranges::begin(texts)->pos;
+    for (auto&& [text, ratio] : std::views::zip(texts | std::views::drop(1), ratio_view))
+    {
+      offset += size * ratio;
+      if (_direction == Direction::horizontal)
+        text.pos.x = first_pos.x + offset;
+      else
+        text.pos.y = first_pos.y + offset;
+    }
+
+    return size + offset;
+  };
+
+  if (_text_order == TextOrder::reverse)
+  {
+    if (_direction == Direction::horizontal)
+      _extent.x = adjust_forward(_texts | std::views::reverse, ratios | std::views::reverse, width);
+    else
+      _extent.y = adjust_forward(_texts | std::views::reverse, ratios | std::views::reverse, height);
+  }
+  else
+  {
+    if (_direction == Direction::horizontal)
+      _extent.x = adjust_forward(_texts | std::views::all, ratios, width);
+    else
+      _extent.y = adjust_forward(_texts | std::views::all, ratios, height);
+  }
 
   return *this;
 }
