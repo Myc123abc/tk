@@ -30,7 +30,7 @@ void FrameData::_transform_beg(Matrix const& transform) noexcept
   if (_transform_stack.empty())
     _transform_stack.emplace_back(transform);
   else
-    _transform_stack.emplace_back(_transform_stack.back() * transform);
+    _transform_stack.emplace_back(transform * _transform_stack.back());
 }
 
 void FrameData::transform_end() noexcept

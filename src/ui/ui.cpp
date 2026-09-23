@@ -41,7 +41,7 @@ void adjust_transform(Matrix& transform) noexcept
   auto scale  = g_ui_ctx.window()->scale();
   auto inv    = 1.f / scale;
 
-  auto to_window   = Matrix{ scale, 0, 0, scale, offset.x * scale, offset.y * scale };
+  auto to_window   = Matrix{ scale, 0, 0, scale,  offset.x * scale,  offset.y * scale };
   auto from_window = Matrix{ inv,   0, 0, inv,   -offset.x,         -offset.y         };
   transform = from_window * transform * to_window;
 }

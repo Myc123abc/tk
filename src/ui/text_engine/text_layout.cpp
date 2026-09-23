@@ -23,19 +23,17 @@ auto TextLayout::adjust_size(float size) noexcept -> TextLayout&
 {
   _scale = size / FT_Pixel_Size;
   for (auto& text : _texts) text.extent *= _scale;
-  _max_width     *= _scale;
-  _max_height    *= _scale;
-  _padding       *= _scale;
-  _extent        *= _scale;
-  _outline_width *= _scale;
+  _max_width  *= _scale;
+  _max_height *= _scale;
+  _extent     *= _scale;
   return *this;
 }
 
 auto TextLayout::center_alignment(Direction direction, TextOrder order) noexcept -> TextLayout&
 {
   auto offset = 0.f;
-  auto width  = _max_width  + _padding.x;
-  auto height = _max_height + _padding.y;
+  auto width  = unit_width();
+  auto height = unit_height();
 
   auto align_text = [&](Text& text) noexcept
   {
