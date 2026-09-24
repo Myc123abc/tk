@@ -72,6 +72,7 @@ struct LineChartLayout
   float2     extent;
   float      x_unit_interval_len{};
   float      y_unit_interval_len{};
+  float      x_label_y_offset{};
 };
 
 void render_line_chart(LineChartInfo const& info, LineChartLayout const& layout) noexcept
@@ -94,12 +95,15 @@ void render_line_chart(LineChartInfo const& info, LineChartLayout const& layout)
   line(layout.origin_point, layout.x_axis_end_point, info.axis_color);
 
   // draw origin point
-  if (!layout.origin_text_width)
+  if (layout.origin_text_width)
     text(info.origin_point_text, { layout.origin_point.x - layout.origin_text_width, layout.origin_point.y }, info.tick_label_size, info.axis_color);
 
   // draw x tick labels
   text(info.x_axis_label,
-    { layout.x_layout.pos().x + (layout.x_layout.width() - layout.x_label_width) / 2, layout.x_layout.pos().y + layout.x_layout.extent().y  + info.x_label_padding},
+    {
+      layout.x_layout.pos().x + (layout.x_layout.width() - layout.x_label_width) / 2,
+      layout.x_layout.pos().y + layout.x_layout.extent().y  + info.x_label_padding + layout.x_label_y_offset
+    },
     info.label_size, info.axis_color);
   
   // draw grid
@@ -216,6 +220,9 @@ auto line_chart_layout(float2 pos, LineChartInfo const& info) noexcept -> LineCh
   // get x label info
   auto x_label_extent = text(info.x_axis_label, info.label_size).extent;
   layout.x_label_width = x_label_extent.x;
+  auto bounding = g_text_engine.get_bounding_rect(g_text_engine.parse(info.x_axis_label, {}, {}, {}));
+  if (bounding)
+    layout.x_label_y_offset = -bounding->top * info.label_size / FT_Pixel_Size;
 
   layout.extent = { x_axis_end_point.x - pos.x, x_axis_end_point.y + x_layout.height() + x_label_extent.y - pos.y };
 

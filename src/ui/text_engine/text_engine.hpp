@@ -29,6 +29,7 @@ public:
     bool                  is_vertical{};
     std::vector<GlyphKey> glyph_info_keys;
     GlyphKeySet           generating_glyph_info_keys;
+    std::optional<Rect>   bounding_rect;
 
     ParseResult() noexcept = default;
   };
@@ -36,6 +37,8 @@ public:
   using TextParseResultHandle = ParseResultPool::Handle;
   auto parse(std::string_view text, std::string_view family, FontStyle style, TextDirection direction) noexcept -> TextParseResultHandle;
   auto& get_parse_result(TextParseResultHandle handle) const noexcept { return _parse_result_pool[handle]; }
+
+  auto get_bounding_rect(TextParseResultHandle handle) noexcept -> std::optional<Rect>;
 
   void update() noexcept;
 

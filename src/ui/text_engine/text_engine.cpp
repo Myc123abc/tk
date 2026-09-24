@@ -67,7 +67,7 @@ auto TextEngine::load_font(std::string_view path) noexcept -> std::expected<Font
 
   // set notdef font if not have
   if (!_notdef_font) _notdef_font = loaded_font;
-  
+
   for (auto const& [key, missing_glyphs] : _missing_glyphs)
     if (key.style == loaded_font->style())
       regenerate_missing_glyphs(loaded_font, key);
@@ -379,7 +379,7 @@ auto TextEngine::calc_glyph_pos(float2 extent) noexcept -> std::pair<uint, float
         "too big glyph sdf bitmap, cannot be stored in glyph atlas");
 
   static auto current_glyph_atlas_idx{ 0u };
-  
+
   if (auto res = _packer.add(extent.x, extent.y); res)
     return { current_glyph_atlas_idx, res.value() };
 
@@ -622,6 +622,31 @@ void TextEngine::upload_bitmaps(PendingCopyGlyphsInfoType const& info) noexcept
       | std::ranges::to<std::vector<BitmapCopyInfo>>();
     g_copy_engine.copy(std::move(bitmap_cpy_infos), _glyph_atlas[glyph_atlas_idx]);
   }
+}
+
+auto TextEngine::get_bounding_rect(TextParseResultHandle handle) noexcept -> std::optional<Rect>
+{
+  auto& res = _parse_result_pool[handle];
+  if (!res.generating_glyph_info_keys.empty()) return {};
+  if (res.bounding_rect) return res.bounding_rect;
+
+  auto rect = Rect{};
+  auto pos  = float2{};
+  auto ascender = res.is_vertical ? 0.f : res.ascender;
+  for (auto i = 0uz; i < res.glyph_info_keys.size(); ++i)
+  {
+    auto const& info = get_glyph_info(res.glyph_info_keys[i]);
+    auto p0 = pos + res.offsets[i] + info.pos_offset;
+    p0.y += ascender;
+    rect.expand(p0);
+    rect.expand(p0 + info.extent);
+
+    pos += res.advances[i];
+  }
+
+  res.bounding_rect = rect;
+
+  return rect;
 }
 
 }
