@@ -30,9 +30,11 @@ struct LineChartInfo
   std::span<Data> datas;
 };
 
-auto get_intervals_ratios(std::span<float> nums) noexcept -> std::pair<std::vector<float>, std::vector<float>>
+auto get_ratios(std::span<float> nums) noexcept
 {
   assert(nums.size() > 1);
+
+  auto unit_interval_len = 0.f;
 
   // get intervals
   auto intervals = std::vector<float>{};
@@ -48,9 +50,13 @@ auto get_intervals_ratios(std::span<float> nums) noexcept -> std::pair<std::vect
   auto ratios = std::vector<float>{};
   ratios.reserve(intervals.size());
   for (auto v : intervals)
+  {
     ratios.emplace_back(v / min);
+    if (!unit_interval_len && ratios.back() == 1)
+      unit_interval_len = v;
+  }
 
-  return { intervals, ratios };
+  return std::pair{ ratios, unit_interval_len };
 }
 
 struct LineChartLayout
@@ -64,6 +70,8 @@ struct LineChartLayout
   float      origin_text_width{};
   float      x_label_width{};
   float2     extent;
+  float      x_unit_interval_len{};
+  float      y_unit_interval_len{};
 };
 
 void render_line_chart(LineChartInfo const& info, LineChartLayout const& layout) noexcept
@@ -87,7 +95,7 @@ void render_line_chart(LineChartInfo const& info, LineChartLayout const& layout)
 
   // draw origin point
   if (!layout.origin_text_width)
-    ui::text(info.origin_point_text, { layout.origin_point.x - layout.origin_text_width, layout.origin_point.y }, info.tick_label_size, info.axis_color);
+    text(info.origin_point_text, { layout.origin_point.x - layout.origin_text_width, layout.origin_point.y }, info.tick_label_size, info.axis_color);
 
   // draw x tick labels
   text(info.x_axis_label,
@@ -100,13 +108,50 @@ void render_line_chart(LineChartInfo const& info, LineChartLayout const& layout)
     for (auto const& text : layout.y_layout.texts() | std::views::drop(1))
     {
       auto const y = layout.y_layout.pos().y + text.pos.y + text.extent.y / 2;
-      ui::line({ layout.y_axis_beg_point.x, y }, { layout.x_axis_end_point.x , y }, color);
+      line({ layout.y_axis_beg_point.x, y }, { layout.x_axis_end_point.x , y }, color);
     }
 
     for (auto const& text : layout.x_layout.texts() | std::views::drop(1))
     {
       auto const x = layout.x_layout.pos().x + text.pos.x + text.extent.x / 2;
-      ui::line({ x, layout.y_axis_beg_point.y }, { x , layout.origin_point.y }, color);
+      line({ x, layout.y_axis_beg_point.y }, { x , layout.origin_point.y }, color);
+    }
+  }
+
+  // draw datas
+  auto get_offset_ratio = [](float v, std::span<float> vs, float unit_interval_len)
+  {
+    assert(vs.size() > 1);
+    auto it = std::ranges::lower_bound(vs, v);
+    if (it != vs.end())
+    {
+      if (it == vs.begin())
+        return -(vs[0] - v) / unit_interval_len;
+      return (v - vs[0]) / unit_interval_len;
+    }
+    else
+      return (v - vs[0]) / unit_interval_len;
+  };
+
+  auto get_x = [&](float v)
+  {
+    auto ratio = get_offset_ratio(v, info.x_axis_tick_values, layout.x_unit_interval_len);
+    return layout.origin_point.x + layout.x_layout.unit_width() * ratio; 
+  };
+
+  auto get_y = [&](float v)
+  {
+    auto ratio = get_offset_ratio(v, info.y_axis_tick_values, layout.y_unit_interval_len);
+    return layout.origin_point.y - layout.y_layout.unit_height() * ratio; 
+  };
+
+  for (auto const& [points, color] : info.datas)
+  {
+    for (auto [a, b] : points | std::views::pairwise)
+    {
+      auto p0 = float2{ get_x(a.x), get_y(a.y) };
+      auto p1 = float2{ get_x(b.x), get_y(b.y) };
+      line(p0, p1, color);
     }
   }
 }
@@ -115,8 +160,11 @@ auto line_chart_layout(float2 pos, LineChartInfo const& info) noexcept -> LineCh
 {
   auto layout = LineChartLayout{};
 
-  auto [x_intervals, x_ratios] = get_intervals_ratios(info.x_axis_tick_values);
-  auto [y_intervals, y_ratios] = get_intervals_ratios(info.y_axis_tick_values);
+  auto [x_ratios, x_unit_interval_len] = get_ratios(info.x_axis_tick_values);
+  auto [y_ratios, y_unit_interval_len] = get_ratios(info.y_axis_tick_values);
+
+  layout.x_unit_interval_len = x_unit_interval_len;
+  layout.y_unit_interval_len = y_unit_interval_len;
 
   // get y layout
   auto& y_layout = layout.y_layout;
@@ -163,7 +211,7 @@ auto line_chart_layout(float2 pos, LineChartInfo const& info) noexcept -> LineCh
 
   // get origin point info
   if (!info.origin_point_text.empty())
-    layout.origin_text_width = ui::text(info.origin_point_text, info.tick_label_size).extent.x;
+    layout.origin_text_width = text(info.origin_point_text, info.tick_label_size).extent.x;
 
   // get x label info
   auto x_label_extent = text(info.x_axis_label, info.label_size).extent;
@@ -176,7 +224,6 @@ auto line_chart_layout(float2 pos, LineChartInfo const& info) noexcept -> LineCh
 
 void test_line_chart() noexcept
 {
-  // TODO: data lower or bigger than y ticks
   // auto x_tick_values = std::vector<float>{ 0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0 };
   auto x_tick_values = std::vector<float>{ 0, 1.0, 3.0, 4.0, 5.0, 6.0 };
   auto y_tick_values = std::vector<float>{ 0, 10, 20, 30, 40, 50 };
@@ -185,15 +232,30 @@ void test_line_chart() noexcept
   auto y_tick_labels = std::vector<std::string>{ "0", "10", "20", "30", "40", "50" };
   auto data1 = std::vector<float2>
   {
+    { -1, -1 },
     { 0, 0 },
     { 1, 3 },
     { 2, 7 },
     { 3, 12 },
-    { 4, 18 },
+    { 4.5, 18 },
     { 5, 30 },
-    { 6, 45.6 },
+    { 7, 45.6 },
   };
-  auto data = std::vector{ LineChartInfo::Data{ data1, 0x0000ffff } };
+  auto data2 = std::vector<float2>
+  {
+    { 0, 0 },
+    { 1, 5 },
+    { 2, 9 },
+    { 3, 11 },
+    { 4, 25 },
+    { 5, 30 },
+    { 6, 14 },
+  };
+  auto data = std::vector<LineChartInfo::Data>
+  {
+    { data1, 0x0000ffff },
+    { data2, 0xff0000ff },
+  };
 
   auto info = LineChartInfo{};
   info.x_axis_label = "Time (s)";
@@ -214,8 +276,8 @@ void test_line_chart() noexcept
 
   auto pos    = float2(10);
   auto layout = line_chart_layout(pos, info);
+  rectangle(pos, pos + layout.extent, 0x00ff00ff, 1);
   render_line_chart(info, layout);
-  ui::rectangle(pos, pos + layout.extent, 0x00ff00ff, 1);
 }
 
 }

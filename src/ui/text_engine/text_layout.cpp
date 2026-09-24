@@ -79,14 +79,17 @@ auto TextLayout::adjust_ratios(std::span<float> ratios) noexcept -> TextLayout&
   auto adjust_forward = [&](auto texts, auto ratio_view, auto size)
   {
     auto offset = 0.f;
-    auto first_pos = std::ranges::begin(texts)->pos;
+    auto const& first_text = *std::ranges::begin(texts);
+    auto first_center = _direction == Direction::horizontal
+      ? first_text.pos.x + first_text.extent.x / 2
+      : first_text.pos.y + first_text.extent.y / 2;
     for (auto&& [text, ratio] : std::views::zip(texts | std::views::drop(1), ratio_view))
     {
       offset += size * ratio;
       if (_direction == Direction::horizontal)
-        text.pos.x = first_pos.x + offset;
+        text.pos.x = first_center + offset - text.extent.x / 2;
       else
-        text.pos.y = first_pos.y + offset;
+        text.pos.y = first_center + offset - text.extent.y / 2;
     }
 
     return size + offset;
