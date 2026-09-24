@@ -21,6 +21,8 @@ struct LineChartInfo
   float                        x_label_padding;
   float                        y_label_padding;
   std::string_view             origin_point_text;
+  std::string_view             font_family;
+  FontStyle                    font_style{};
 
   struct Data
   {
@@ -77,9 +79,13 @@ struct LineChartLayout
 
 void render_line_chart(LineChartInfo const& info, LineChartLayout const& layout) noexcept
 {
+  auto text_cfg = TextConfig{};
+  text_cfg.family = info.font_family;
+  text_cfg.style  = info.font_style;
+
   // draw y label
   transform_beg(Transform::Rotate(layout.y_label_beg_point, -90));
-  text(info.y_axis_label, layout.y_label_beg_point, info.label_size, info.axis_color);
+  text(info.y_axis_label, layout.y_label_beg_point, info.label_size, info.axis_color, text_cfg);
   transform_end();
 
   // draw y tick labels
@@ -96,7 +102,7 @@ void render_line_chart(LineChartInfo const& info, LineChartLayout const& layout)
 
   // draw origin point
   if (layout.origin_text_width)
-    text(info.origin_point_text, { layout.origin_point.x - layout.origin_text_width, layout.origin_point.y }, info.tick_label_size, info.axis_color);
+    text(info.origin_point_text, { layout.origin_point.x - layout.origin_text_width, layout.origin_point.y }, info.tick_label_size, info.axis_color, text_cfg);
 
   // draw x tick labels
   text(info.x_axis_label,
@@ -104,7 +110,7 @@ void render_line_chart(LineChartInfo const& info, LineChartLayout const& layout)
       layout.x_layout.pos().x + (layout.x_layout.width() - layout.x_label_width) / 2,
       layout.x_layout.pos().y + layout.x_layout.extent().y  + info.x_label_padding + layout.x_label_y_offset
     },
-    info.label_size, info.axis_color);
+    info.label_size, info.axis_color, text_cfg);
   
   // draw grid
   if (auto color = info.grid_color.value_or(0); color.a)
@@ -164,6 +170,10 @@ auto line_chart_layout(float2 pos, LineChartInfo const& info) noexcept -> LineCh
 {
   auto layout = LineChartLayout{};
 
+  auto text_cfg = TextConfig{};
+  text_cfg.family = info.font_family;
+  text_cfg.style  = info.font_style;
+
   auto [x_ratios, x_unit_interval_len] = get_ratios(info.x_axis_tick_values);
   auto [y_ratios, y_unit_interval_len] = get_ratios(info.y_axis_tick_values);
 
@@ -172,7 +182,7 @@ auto line_chart_layout(float2 pos, LineChartInfo const& info) noexcept -> LineCh
 
   // get y layout
   auto& y_layout = layout.y_layout;
-  y_layout = TextLayout(info.y_axis_tick_labels)
+  y_layout = TextLayout(info.y_axis_tick_labels, info.font_family, info.font_style)
     .set_color(info.axis_color)
     .adjust_size(info.tick_label_size)
     .set_padding(info.y_tick_label_padding)
@@ -181,7 +191,7 @@ auto line_chart_layout(float2 pos, LineChartInfo const& info) noexcept -> LineCh
   if (!info.origin_point_text.empty()) y_layout.ignore_text(0);
 
   // get y label info
-  auto y_label_extent = text(info.y_axis_label, info.label_size).extent;
+  auto y_label_extent = text(info.y_axis_label, info.label_size, text_cfg).extent;
   layout.y_label_beg_point = { pos.x, pos.y + (y_layout.height() + y_label_extent.x) / 2 };
 
   // set position of y tick labels
@@ -197,7 +207,7 @@ auto line_chart_layout(float2 pos, LineChartInfo const& info) noexcept -> LineCh
 
   // get x layout
   auto& x_layout = layout.x_layout;
-  x_layout = TextLayout(info.x_axis_tick_labels)
+  x_layout = TextLayout(info.x_axis_tick_labels, info.font_family, info.font_style)
     .set_color(info.axis_color)
     .adjust_size(info.tick_label_size)
     .set_padding(info.x_tick_label_padding);
@@ -215,10 +225,10 @@ auto line_chart_layout(float2 pos, LineChartInfo const& info) noexcept -> LineCh
 
   // get origin point info
   if (!info.origin_point_text.empty())
-    layout.origin_text_width = text(info.origin_point_text, info.tick_label_size).extent.x;
+    layout.origin_text_width = text(info.origin_point_text, info.tick_label_size, text_cfg).extent.x;
 
   // get x label info
-  auto x_label_extent = text(info.x_axis_label, info.label_size).extent;
+  auto x_label_extent = text(info.x_axis_label, info.label_size, text_cfg).extent;
   layout.x_label_width = x_label_extent.x;
   auto bounding = g_text_engine.get_bounding_rect(g_text_engine.parse(info.x_axis_label, {}, {}, {}));
   if (bounding)
