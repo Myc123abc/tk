@@ -239,14 +239,61 @@ auto line_chart_layout(float2 pos, LineChartInfo const& info) noexcept -> LineCh
   return layout;
 }
 
+auto get_tick_values(std::span<float> vs, uint cnt) noexcept
+{
+  auto [min, max] = std::ranges::minmax(vs);
+  auto range      = max - min;
+  assert(cnt > 1 && range > 0);
+  auto step       = range / (cnt - 1);
+
+  auto magnitude = std::pow(10.f, std::floor(std::log10(step)));
+  auto normalized = step / magnitude;
+  if (normalized <= 1.f)  normalized = 1.f;
+  else if (normalized <= 2.f) normalized = 2.f;
+  else if (normalized <= 5.f) normalized = 5.f;
+  else normalized = 10.f;
+  step = normalized * magnitude;
+
+  min = std::floor(min / step) * step;
+  max = std::ceil(max / step) * step;
+  cnt = std::round((max - min) / step) + 1;
+  auto ticks = std::vector<float>(cnt);
+  for (auto [i, tick] : std::views::enumerate(ticks))
+    tick = min + static_cast<float>(i) * step;
+
+  return std::pair{ ticks, step };
+}
+
+auto get_tick_labels(std::span<float> vs, float step) noexcept
+{
+  auto precision = step < 1.f ? static_cast<uint>(-std::floor(std::log10(step))) : 0;
+  auto fmt       = std::format("{{:.{}f}}", precision);
+  auto labels    = std::vector<std::string>(vs.size());
+  for (auto [v, label] : std::views::zip(vs, labels))
+    label = std::vformat(fmt, std::make_format_args(v));
+  return labels;
+}
+
+auto split_x_y_values(std::span<float2> ps) noexcept
+{
+  auto x_vs = std::vector<float>(ps.size());
+  auto y_vs = std::vector<float>(ps.size());
+  for (auto p : ps)
+  {
+    x_vs.emplace_back(p.x);
+    y_vs.emplace_back(p.y);
+  }
+  return std::pair{ x_vs, y_vs };
+}
+
 void test_line_chart() noexcept
 {
   // auto x_tick_values = std::vector<float>{ 0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0 };
-  auto x_tick_values = std::vector<float>{ 0, 1.0, 3.0, 4.0, 5.0, 6.0 };
-  auto y_tick_values = std::vector<float>{ 0, 10, 20, 30, 40, 50 };
+  // auto x_tick_values = std::vector<float>{ 0, 1.0, 3.0, 4.0, 5.0, 6.0 };
+  // auto y_tick_values = std::vector<float>{ 0, 10, 20, 30, 40, 50 };
   // auto x_tick_labels = std::vector<std::string>{ "0", "1.0", "2.0", "3.0", "4.0", "5.0", "6.0" };
-  auto x_tick_labels = std::vector<std::string>{ "0", "1.0", "3.0", "4.0", "5.0", "6.0" };
-  auto y_tick_labels = std::vector<std::string>{ "0", "10", "20", "30", "40", "50" };
+  // auto x_tick_labels = std::vector<std::string>{ "0", "1.0", "3.0", "4.0", "5.0", "6.0" };
+  // auto y_tick_labels = std::vector<std::string>{ "0", "10", "20", "30", "40", "50" };
   auto data1 = std::vector<float2>
   {
     { -1, -1 },
@@ -274,13 +321,23 @@ void test_line_chart() noexcept
     { data2, 0xff0000ff },
   };
 
+  auto [x_vs, y_vs] = split_x_y_values(data1);
+  auto [x_t_vs, x_step] = get_tick_values(x_vs, x_vs.size());
+  auto [y_t_vs, y_step] = get_tick_values(y_vs, y_vs.size());
+  auto x_t_ls = get_tick_labels(x_t_vs, x_step);
+  auto y_t_ls = get_tick_labels(y_t_vs, y_step);
+
   auto info = LineChartInfo{};
   info.x_axis_label = "Time (s)";
   info.y_axis_label = "Speed (m\\s)";
-  info.x_axis_tick_values = x_tick_values;
-  info.y_axis_tick_values = y_tick_values;
-  info.x_axis_tick_labels = x_tick_labels;
-  info.y_axis_tick_labels = y_tick_labels;
+  // info.x_axis_tick_values = x_tick_values;
+  // info.y_axis_tick_values = y_tick_values;
+  // info.x_axis_tick_labels = x_tick_labels;
+  // info.y_axis_tick_labels = y_tick_labels;
+  info.x_axis_tick_values = x_t_vs;
+  info.y_axis_tick_values = y_t_vs;
+  info.x_axis_tick_labels = x_t_ls;
+  info.y_axis_tick_labels = y_t_ls;
   info.x_tick_label_padding = { 32, 8 };
   info.y_tick_label_padding = { 8, 32 };
   info.datas = data;
@@ -289,7 +346,7 @@ void test_line_chart() noexcept
   info.grid_color = 0x404040ff;
   info.label_size = 14;
   info.y_label_padding = 4;
-  info.origin_point_text = "0";
+  // info.origin_point_text = "0";
 
   auto pos    = float2(10);
   auto layout = line_chart_layout(pos, info);
