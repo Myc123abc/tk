@@ -1,7 +1,6 @@
 #pragma once
 
 #include "tk/base.hpp"
-#include "tk/rect.hpp"
 
 namespace tk::ui {
 

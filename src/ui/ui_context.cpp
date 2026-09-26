@@ -596,9 +596,10 @@ void UIContext::render(TextLayout const& layout) noexcept
   for (auto const& [text, text_pos, _, handle, ignore] : layout.texts())
   {
     if (ignore) continue;
-    auto const& result = g_text_engine.get_parse_result(handle);
+    auto const  h      = std::bit_cast<TextEngine::TextParseResultHandle>(handle);
+    auto const& result = g_text_engine.get_parse_result(h);
     if (!result.generating_glyph_info_keys.empty() || !layout.color().a) continue;
-    frame_data()->add_text(handle, (layout_pos + text_pos) * dpi_scale, scale, layout.color(), layout.outer_color(), layout.outline_width() * dpi_scale);
+    frame_data()->add_text(h, (layout_pos + text_pos) * dpi_scale, scale, layout.color(), layout.outer_color(), layout.outline_width() * dpi_scale);
   }
 }
 

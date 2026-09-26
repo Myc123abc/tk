@@ -1,6 +1,8 @@
 #pragma once
 
-#include "text_engine.hpp"
+#include "ui.hpp"
+
+#include <span>
 
 namespace tk::ui {
 
@@ -55,11 +57,11 @@ public:
 private:
   struct Text
   {
-    std::string_view      text;
-    float2                pos;
-    float2                extent;
-    TextParseResultHandle handle;
-    bool                  ignore{};
+    std::string_view text;
+    float2           pos;
+    float2           extent;
+    uint64           handle;
+    bool             ignore{};
   };
   std::vector<Text> _texts;
   float2            _pos;

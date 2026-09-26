@@ -1,4 +1,6 @@
-#include "text_layout.hpp"
+#include "ui/text_layout.hpp"
+#include "text_engine.hpp"
+#include "../ui_context.hpp"
 
 #include <ranges>
 
@@ -14,7 +16,7 @@ TextLayout::TextLayout(std::span<std::string const> texts, std::string_view fami
     auto handle = g_text_engine.parse(text, family, style, direction);
     auto extent = g_text_engine.get_parse_result(handle).extent;
 
-    _texts.emplace_back(text, float2{}, extent, handle);
+    _texts.emplace_back(text, float2{}, extent, std::bit_cast<uint64>(handle));
 
     _max_width  = std::max(_max_width,  extent.x);
     _max_height = std::max(_max_height, extent.y);
