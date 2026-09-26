@@ -35,6 +35,8 @@ if (NOT "${CMAKE_GENERATOR}" MATCHES "Visual Studio")
   file(WRITE vendor/freetype/src/base/ftver.rc "")
 endif()
 
+option(BUILD_TK_TEST "Build tk test programs" OFF)
+
 file(GLOB_RECURSE TK_SRC src/*.cpp)
 add_library(tk ${TK_SRC})
 target_compile_definitions(tk
@@ -66,4 +68,16 @@ target_link_libraries(tk
     tk::util
 )
 
-add_subdirectory(test)
+function(tk_target target)
+  add_custom_command(TARGET ${target} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+      "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/assets"
+      "$<TARGET_FILE_DIR:${target}>/assets"
+    VERBATIM
+  )
+endfunction()
+
+if (BUILD_TK_TEST)
+  enable_testing()
+  add_subdirectory(test)
+endif()
