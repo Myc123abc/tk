@@ -1,5 +1,4 @@
 build
 out
 .*
-assets/image
-assets/font
+assets

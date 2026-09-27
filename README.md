@@ -21,73 +21,10 @@ Is still in the early stages of development.
 - [ ] Design the visual novel runtime system.
 - [ ] Implement a scripting language for creating visual novels.
 
-## Architecture
-```mermaid
-graph TD
-
-Main[main]
-
-subgraph UILayer["UI Layer"]
-  UI[UI]
-  subgraph UICtx["UI Context"]
-    UIContext[UI Context]
-    TextEngine[TextEngine]
-  end
-end
-
-subgraph RenderLayer["Render Layer"]
-  Renderer[Renderer]
-  subgraph GPUEngines["GPU Engines"]
-    GraphicsEngine[GraphicsEngine]
-    ComputeEngine[ComputeEngine]
-    CopyEngine[CopyEngine]
-  end
-  subgraph Pipeline["Pipeline Manager"]
-    PipelineSystem[PipelineSystem]
-    Compiler[DXC]
-  end
-  subgraph ResourceManagement["Resource Management"]
-    DescriptorHeapManager[DescriptorHeapManager]
-    ImageManager[ImageManager]
-  end
-  subgraph WindowManagement["Window Management"]
-    WindowManager[WindowManager]
-    Compositor[Compositor]
-  end
-end
-
-subgraph AsyncTasks["Async Tasks"]
-  ThreadPool[ThreadPool]
-  FileManager[FileManager]
-end
-
-Main --> UI
-
-UI --> UIContext
-UIContext --> TextEngine
-UICtx --> RenderLayer
-
-Renderer --> GPUEngines
-Renderer --> PipelineSystem
-PipelineSystem --> Compiler
-Renderer --> ResourceManagement
-Renderer --> WindowManagement
-
-GPUEngines --> ImageManager
-
-ImageManager --> AsyncTasks
-TextEngine --> AsyncTasks
-
-```
-
-## Build
-Open cmd.
-```cmd
-git clone https://github.com/myc123abc/tk
-cd tk
-cmake -Bbuild -GNinja .
-cmake --build build
-```
+## Libraries
+- [tk-ui](lib/ui/README.md)
+- [tk-util](lib/util/README.md)
+- [tk-benchmark](lib/benchmark/README.md)
 
 ## External Libraries
 
@@ -99,7 +36,6 @@ cmake --build build
 |stb|MIT|https://github.com/nothings/stb|
 |Clipper2|BSL-1.0|https://github.com/AngusJohnson/Clipper2|
 |msdfgen|MIT|https://github.com/Chlumsky/msdfgen|
-|tk-util|Public Domain|https://github.com/Myc123abc/tk-util|
 
 ## License
 The following licenses are available:
