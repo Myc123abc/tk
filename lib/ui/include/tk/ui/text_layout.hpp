@@ -21,13 +21,20 @@ public:
     reverse,
   };
 
+  enum class Alignment
+  {
+    center,
+    left,
+    right,
+  };
+
   TextLayout() = default;
 
   TextLayout(std::span<std::string const> texts, std::string_view family = {}, FontStyle style = {}, TextDirection direction = {}) noexcept;
 
   auto adjust_size(float size) noexcept -> TextLayout&;
 
-  auto center_alignment(Direction direction = {}, TextOrder order = {}) noexcept -> TextLayout&;
+  auto alignment(Alignment align = {}, Direction direction = {}, TextOrder order = {}) noexcept -> TextLayout&;
 
   void ignore_text(uint idx) noexcept { _texts.at(idx).ignore = true; }
   auto adjust_ratios(std::span<float> ratios) noexcept -> TextLayout&;

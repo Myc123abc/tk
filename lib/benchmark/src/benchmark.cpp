@@ -4,89 +4,142 @@
 #include "tk/error_handling.hpp"
 #include "tk/ui/line_chart.hpp"
 
+#include <ranges>
+
 using namespace tk;
 
 namespace tk::benchmark {
 
-void test() noexcept
+auto g_wndCfg     = ui::WindowConfig{};
+auto g_line_chart = ui::LineChart{};
+auto g_is_closed  = false;
+
+struct LineChartData
+{
+  struct Points
+  {
+    std::span<float> xs;
+    std::span<float> ys;
+    uint32_t         color;
+  };
+
+  std::string_view    x_label;
+  std::string_view    y_label;
+  std::vector<Points> points;
+  bool                rendered{};
+
+  void clear() noexcept
+  {
+    rendered = {};
+    points.clear();
+  }
+};
+
+auto g_line_chart_datas = std::vector<LineChartData>{};
+
+void init() noexcept
 {
   tk::init();
 
-  err_if(!ui::load_font("assets/font/NotoSansJP-Regular.ttf"), "failed to load font");
+  err_if(!ui::load_font("C:/Windows/Fonts/segoeui.ttf"), "failed to load font");
 
-  auto wndCfg = ui::WindowConfig{};
-  wndCfg.display_title_bar             = true;
-  wndCfg.display_window_shadow         = true;
-  wndCfg.display_wireframe_only_active = true;
-  wndCfg.wireframe_color               = 0x0000ffff;
+  g_wndCfg.display_title_bar             = true;
+  g_wndCfg.display_window_shadow         = true;
+  g_wndCfg.display_wireframe_only_active = true;
+  g_wndCfg.wireframe_color               = 0x0000ffff;
 
-  auto data1 = std::vector<float2>
+  g_line_chart.x_tick_label_padding = { 32, 8 };
+  g_line_chart.y_tick_label_padding = { 16, 32 };
+  g_line_chart.axis_color           = 0xffffffff;
+  g_line_chart.tick_label_size      = 12;
+  g_line_chart.grid_color           = 0x404040ff;
+  g_line_chart.label_size           = 14;
+  g_line_chart.y_label_padding      = 4;
+}
+
+void destroy() noexcept
+{
+  tk::destroy();
+}
+
+auto running() noexcept -> bool
+{
+  ui::begin("Benchmark", 0, 0, 200, 200, &g_is_closed, g_wndCfg);
+  ui::rectangle({}, ui::window_drawable_extent(), 0x000000ff);
+  return !g_is_closed;
+}
+
+auto get_line_chart() noexcept
+{
+  LineChartData* data{};
+  auto it = std::ranges::find_if(g_line_chart_datas, [](auto const& data) { return !data.rendered; });
+  if (it == g_line_chart_datas.end())
+    data = &g_line_chart_datas.emplace_back(LineChartData());
+  else
+    data = &*it;
+  return data;
+}
+
+void set_labels(std::string_view x_label, std::string_view y_label) noexcept
+{
+  auto data = get_line_chart();
+  data->x_label = x_label;
+  data->y_label = y_label;
+}
+
+void present(std::span<float> xs, std::span<float> ys, uint32_t color) noexcept
+{
+  assert(xs.size() == ys.size());
+  get_line_chart()->points.emplace_back(xs, ys, color);
+}
+
+void update() noexcept
+{
+  auto to_all_vs = [](auto&& range, auto&& mem)
   {
-    { -1, -1 },
-    { 0, 0 },
-    { 1, 3 },
-    { 2, 7 },
-    { 3, 12 },
-    { 4.5, 18 },
-    { 5, 30 },
-    { 7, 45.6 },
+    return range | std::views::transform(mem) | std::views::join | std::ranges::to<std::vector<float>>();
   };
-  auto data2 = std::vector<float2>
+
+  for (auto const& data : g_line_chart_datas)
   {
-    { 0, 0 },
-    { 1, 5 },
-    { 2, 9 },
-    { 3, 11 },
-    { 4, 25 },
-    { 5, 30 },
-    { 6, 14 },
-  };
-  auto data = std::vector<ui::LineChart::Data>
-  {
-    { data1, 0x0000ffff },
-    { data2, 0xff0000ff },
-  };
+    if (data.rendered) continue;
 
-  auto [x_vs, y_vs]     = ui::split_x_y_values(data1);
-  auto [x_t_vs, x_step] = ui::get_tick_values(x_vs, x_vs.size());
-  auto [y_t_vs, y_step] = ui::get_tick_values(y_vs, y_vs.size());
-  auto x_t_ls           = ui::get_tick_labels(x_t_vs, x_step);
-  auto y_t_ls           = ui::get_tick_labels(y_t_vs, y_step);
+    auto xs = to_all_vs(data.points, &LineChartData::Points::xs);
+    auto ys = to_all_vs(data.points, &LineChartData::Points::ys);
 
-  auto line_chart = ui::LineChart{};
-  line_chart.x_axis_label = "Time (s)";
-  line_chart.y_axis_label = "Speed (m\\s)";
-  line_chart.x_axis_tick_values = x_t_vs;
-  line_chart.y_axis_tick_values = y_t_vs;
-  line_chart.x_axis_tick_labels = x_t_ls;
-  line_chart.y_axis_tick_labels = y_t_ls;
-  line_chart.x_tick_label_padding = { 32, 8 };
-  line_chart.y_tick_label_padding = { 8, 32 };
-  line_chart.datas = data;
-  line_chart.axis_color = 0xffffffff;
-  line_chart.tick_label_size = 12;
-  line_chart.grid_color = 0x404040ff;
-  line_chart.label_size = 14;
-  line_chart.y_label_padding = 4;
+    auto [x_vs, x_step] = ui::get_tick_values(xs);
+    auto [y_vs, y_step] = ui::get_tick_values(ys);
+    auto x_ts = ui::get_tick_labels(x_vs, x_step);
+    auto y_ts = ui::get_tick_labels(y_vs, y_step);
 
-  auto is_closed = false;
-  while (!is_closed)
-  {
-    ui::begin("Benchmark", 0, 0, 200, 200, &is_closed, wndCfg);
+    g_line_chart.x_axis_label       = data.x_label;
+    g_line_chart.y_axis_label       = data.y_label;
+    g_line_chart.x_axis_tick_values = x_vs;
+    g_line_chart.y_axis_tick_values = y_vs;
+    g_line_chart.x_axis_tick_labels = x_ts;
+    g_line_chart.y_axis_tick_labels = y_ts;
 
-    ui::rectangle({}, ui::window_drawable_extent(), 0x000000ff);
+    auto datas = std::vector<ui::LineChart::Data>{};
+    datas.reserve(data.points.size());
+    auto pss = std::vector<std::vector<float2>>{};
+    pss.reserve(data.points.size());
+    for (auto [xs, ys, color] : data.points)
+    {
+      pss.emplace_back(std::views::zip_transform([](auto x, auto y) { return float2{ x, y }; }, xs, ys)
+        | std::ranges::to<std::vector<float2>>());
+      datas.emplace_back(pss.back(), color);
+    }
+    g_line_chart.datas = datas;
 
     auto pos = float2(10);
-    line_chart.calc_layout();
-    line_chart.render(pos);
-    ui::rectangle(pos, pos + line_chart.extent(), 0x00ff00ff, 1);
-
-    ui::end();
-
-    tk::update();
+    g_line_chart.calc_layout();
+    g_line_chart.render(pos);
   }
 
-  tk::destroy();
+  ui::end();
+  tk::update();
+
+  for (auto& data : g_line_chart_datas) data.clear();
 }
 
 }

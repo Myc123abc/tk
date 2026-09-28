@@ -1,10 +1,10 @@
 #include "tk/benchmark.hpp"
 
 #include <vector>
-#include <memory>
 #include <print>
 #include <chrono>
 #include <functional>
+#include <ranges>
 
 using ns = std::chrono::nanoseconds;
 using us = std::chrono::microseconds;
@@ -19,31 +19,61 @@ auto measure(std::function<void()> f) noexcept
   return std::chrono::duration_cast<TimeUnit>(end - beg).count();
 }
 
-auto heap_bulk_alloc(int size, int cnt) noexcept
+struct Result
+{
+  long long alloc_time{};
+  long long free_time{};
+};
+
+auto heap_bulk_alloc(int size, int cnt) noexcept -> Result
 {
   auto ps = std::vector<void*>(cnt);
 
-  auto malloc_dur = measure([&]
+  auto alloc_time = measure([&]
   {
     for (auto& p : ps) p = malloc(size);
   });
 
-  auto free_dur = measure([&]
+  auto free_time = measure([&]
   {
     for (auto p : ps) free(p);
   });
 
-  std::println(
-    "heap alloc consume: (size : {}, count: {})\n"
-    "alloc: {}ns\n"
-    "free:  {}ns"
-    , size, cnt, malloc_dur, free_dur
-  );
+  return { alloc_time, free_time };
 }
 
 auto main() -> int
 {
-  heap_bulk_alloc(64, 1024);
+  // get alloc test sizes
+  auto constexpr max_size = 65536;
+  auto constexpr test_cnt = 65536;
+  auto alloc_sizes = std::vector<float>(std::log2(max_size));
+  for (auto [i, size] : alloc_sizes | std::views::enumerate)
+    size = std::pow(2, i + 1);
 
-  tk::benchmark::test();
+  // get test results of heap bulk alloc
+  auto results = std::vector<Result>{};
+  results.reserve(alloc_sizes.size());
+  for (auto size : alloc_sizes)
+    results.emplace_back(heap_bulk_alloc(size, test_cnt));
+
+  auto to_vec = [](auto&& range, auto member)
+  {
+    return range | std::views::transform(member) | std::ranges::to<std::vector<float>>();
+  };
+
+  auto alloc_results = to_vec(results, &Result::alloc_time);
+  auto free_results  = to_vec(results, &Result::free_time);
+
+  tk::benchmark::init();
+  tk::benchmark::set_labels("size (B)", "Time (us)");
+
+  while (tk::benchmark::running())
+  {
+    tk::benchmark::present(alloc_sizes, alloc_results, 0x0000ffff);
+    tk::benchmark::present(alloc_sizes, free_results, 0x00ff00ff);
+    tk::benchmark::update();
+  }
+
+  tk::benchmark::destroy();
 }

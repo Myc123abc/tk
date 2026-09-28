@@ -69,7 +69,14 @@ auto split_x_y_values(std::span<float2> ps) noexcept -> std::pair<std::vector<fl
  * @param cnt count
  * @return tick values and step value
  */
-auto get_tick_values(std::span<float> vs, uint cnt) noexcept -> std::pair<std::vector<float>, uint>;
+auto get_tick_values(std::span<float> vs, uint cnt) noexcept -> std::pair<std::vector<float>, float>;
+
+/**
+ * Convert values to tick values.
+ * @param vs values
+ * @return tick values and step value
+ */
+inline auto get_tick_values(std::span<float> vs) noexcept { return get_tick_values(vs, vs.size()); }
 
 /**
  * Convert tick values to format string.

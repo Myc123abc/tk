@@ -50,7 +50,7 @@ auto split_x_y_values(std::span<float2> ps) noexcept -> std::pair<std::vector<fl
   return { x_vs, y_vs };
 }
 
-auto get_tick_values(std::span<float> vs, uint cnt) noexcept -> std::pair<std::vector<float>, uint>
+auto get_tick_values(std::span<float> vs, uint cnt) noexcept -> std::pair<std::vector<float>, float>
 {
   auto [min, max] = std::ranges::minmax(vs);
   auto range      = max - min;
@@ -103,7 +103,7 @@ void LineChart::calc_layout() noexcept
     .set_color(axis_color)
     .adjust_size(tick_label_size)
     .set_padding(y_tick_label_padding)
-    .center_alignment(TextLayout::Direction::vertical, TextLayout::TextOrder::reverse)
+    .alignment(TextLayout::Alignment::right, TextLayout::Direction::vertical, TextLayout::TextOrder::reverse)
     .adjust_ratios(y_ratios);
   if (!origin_point_text.empty()) y_layout.ignore_text(0);
 
@@ -113,16 +113,18 @@ void LineChart::calc_layout() noexcept
     .set_color(axis_color)
     .adjust_size(tick_label_size)
     .set_padding(x_tick_label_padding)
-    .center_alignment()
+    .alignment()
     .adjust_ratios(x_ratios);
   if (!origin_point_text.empty()) x_layout.ignore_text(0);
 
   // get x label info
   auto x_label_extent = text(x_axis_label, label_size, text_cfg).extent;
   _layout.x_label_width = x_label_extent.x;
-  auto bounding = g_text_engine.get_bounding_rect(g_text_engine.parse(x_axis_label, {}, {}, {}));
-  if (bounding)
-    _layout.x_label_y_offset = -bounding->top * label_size / FT_Pixel_Size;
+  if (!x_axis_label.empty())
+  {
+    auto bounding = g_text_engine.get_bounding_rect(g_text_engine.parse(x_axis_label, {}, {}, {}));
+    if (bounding) _layout.x_label_y_offset = -bounding->top * label_size / FT_Pixel_Size;
+  }
 
   // get extent
   auto y_label_extent = text(y_axis_label, label_size, text_cfg).extent;

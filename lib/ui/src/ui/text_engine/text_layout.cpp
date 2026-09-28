@@ -33,7 +33,7 @@ auto TextLayout::adjust_size(float size) noexcept -> TextLayout&
   return *this;
 }
 
-auto TextLayout::center_alignment(Direction direction, TextOrder order) noexcept -> TextLayout&
+auto TextLayout::alignment(Alignment align, Direction direction, TextOrder order) noexcept -> TextLayout&
 {
   _direction  = direction;
   _text_order = order;
@@ -42,18 +42,30 @@ auto TextLayout::center_alignment(Direction direction, TextOrder order) noexcept
   auto width  = unit_width();
   auto height = unit_height();
 
+  auto aligned_offset = [](float space, float padding, float extent, Alignment align) noexcept
+  {
+    auto padding_offset = padding / 2;
+    switch (align)
+    {
+    case Alignment::left:   return padding_offset;
+    case Alignment::center: return (space - extent) / 2;
+    case Alignment::right:  return space - padding_offset - extent;
+    }
+    return 0.f;
+  };
+
   auto align_text = [&](Text& text) noexcept
   {
     if (direction == Direction::horizontal)
     {
-      text.pos.x = offset + (width - text.extent.x) / 2;
-      text.pos.y = (height - text.extent.y) / 2;
+      text.pos.x = offset + aligned_offset(width, _padding.x, text.extent.x, align);
+      text.pos.y = aligned_offset(height, _padding.y, text.extent.y, Alignment::center);
       offset += width;
     }
     else
     {
-      text.pos.x = (width - text.extent.x) / 2;
-      text.pos.y = offset + (height - text.extent.y) / 2;
+      text.pos.x = aligned_offset(width, _padding.x, text.extent.x, align);
+      text.pos.y = offset + aligned_offset(height, _padding.y, text.extent.y, Alignment::center);
       offset += height;
     }
   };
