@@ -13,6 +13,9 @@ namespace tk::benchmark {
 auto g_wndCfg     = ui::WindowConfig{};
 auto g_line_chart = ui::LineChart{};
 auto g_is_closed  = false;
+auto g_x_label    = std::string_view{};
+auto g_y_label    = std::string_view{};
+auto g_pos        = float2(10);
 
 struct LineChartData
 {
@@ -22,9 +25,6 @@ struct LineChartData
     std::span<float> ys;
     uint32_t         color;
   };
-
-  std::string_view    x_label;
-  std::string_view    y_label;
   std::vector<Points> points;
   bool                rendered{};
 
@@ -82,9 +82,8 @@ auto get_line_chart() noexcept
 
 void set_labels(std::string_view x_label, std::string_view y_label) noexcept
 {
-  auto data = get_line_chart();
-  data->x_label = x_label;
-  data->y_label = y_label;
+  g_x_label = x_label;
+  g_y_label = y_label;
 }
 
 void present(std::span<float> xs, std::span<float> ys, uint32_t color) noexcept
@@ -93,53 +92,74 @@ void present(std::span<float> xs, std::span<float> ys, uint32_t color) noexcept
   get_line_chart()->points.emplace_back(xs, ys, color);
 }
 
+auto to_all_vs = [](auto&& range, auto&& mem)
+{
+  return range | std::views::transform(mem) | std::views::join | std::ranges::to<std::vector<float>>();
+};
+
+void render_line_chart(LineChartData& data) noexcept
+{
+  assert(!data.rendered);
+  data.rendered = true;
+
+  auto xs = to_all_vs(data.points, &LineChartData::Points::xs);
+  auto ys = to_all_vs(data.points, &LineChartData::Points::ys);
+ 
+  auto [x_vs, x_step] = ui::get_tick_values(xs);
+  auto [y_vs, y_step] = ui::get_tick_values(ys);
+  auto x_ts = ui::get_tick_labels(x_vs, x_step);
+  auto y_ts = ui::get_tick_labels(y_vs, y_step);
+ 
+  g_line_chart.x_axis_label       = g_x_label;
+  g_line_chart.y_axis_label       = g_y_label;
+  g_line_chart.x_axis_tick_values = x_vs;
+  g_line_chart.y_axis_tick_values = y_vs;
+  g_line_chart.x_axis_tick_labels = x_ts;
+  g_line_chart.y_axis_tick_labels = y_ts;
+ 
+  auto datas = std::vector<ui::LineChart::Data>{};
+  datas.reserve(data.points.size());
+  auto pss = std::vector<std::vector<float2>>{};
+  pss.reserve(data.points.size());
+  for (auto [xs, ys, color] : data.points)
+  {
+    pss.emplace_back(std::views::zip_transform([](auto x, auto y) { return float2{ x, y }; }, xs, ys)
+      | std::ranges::to<std::vector<float2>>());
+    datas.emplace_back(pss.back(), color);
+  }
+  g_line_chart.datas = datas;
+ 
+  g_line_chart.calc_layout();
+  g_line_chart.render(g_pos);
+ 
+  // draw data label
+  auto line_chart_ext = g_line_chart.extent();
+  auto pos = float2{ g_pos.x + line_chart_ext.x + 10, g_pos.y };
+  auto text_ext = ui::text("123", 12).extent;
+  ui::rectangle(pos, pos + float2(text_ext.y), 0xff0000ff);
+  ui::text("123", pos + float2{ text_ext.y + 10, 0 }, 12, 0xffffffff);
+
+  g_pos.y += g_line_chart.extent().y + 10;
+}
+
 void update() noexcept
 {
-  auto to_all_vs = [](auto&& range, auto&& mem)
-  {
-    return range | std::views::transform(mem) | std::views::join | std::ranges::to<std::vector<float>>();
-  };
-
-  for (auto const& data : g_line_chart_datas)
+  for (auto& data : g_line_chart_datas)
   {
     if (data.rendered) continue;
-
-    auto xs = to_all_vs(data.points, &LineChartData::Points::xs);
-    auto ys = to_all_vs(data.points, &LineChartData::Points::ys);
-
-    auto [x_vs, x_step] = ui::get_tick_values(xs);
-    auto [y_vs, y_step] = ui::get_tick_values(ys);
-    auto x_ts = ui::get_tick_labels(x_vs, x_step);
-    auto y_ts = ui::get_tick_labels(y_vs, y_step);
-
-    g_line_chart.x_axis_label       = data.x_label;
-    g_line_chart.y_axis_label       = data.y_label;
-    g_line_chart.x_axis_tick_values = x_vs;
-    g_line_chart.y_axis_tick_values = y_vs;
-    g_line_chart.x_axis_tick_labels = x_ts;
-    g_line_chart.y_axis_tick_labels = y_ts;
-
-    auto datas = std::vector<ui::LineChart::Data>{};
-    datas.reserve(data.points.size());
-    auto pss = std::vector<std::vector<float2>>{};
-    pss.reserve(data.points.size());
-    for (auto [xs, ys, color] : data.points)
-    {
-      pss.emplace_back(std::views::zip_transform([](auto x, auto y) { return float2{ x, y }; }, xs, ys)
-        | std::ranges::to<std::vector<float2>>());
-      datas.emplace_back(pss.back(), color);
-    }
-    g_line_chart.datas = datas;
-
-    auto pos = float2(10);
-    g_line_chart.calc_layout();
-    g_line_chart.render(pos);
+    render_line_chart(data);
   }
 
   ui::end();
   tk::update();
 
   for (auto& data : g_line_chart_datas) data.clear();
+  g_pos = float2(10);
+}
+
+void new_line_chart() noexcept
+{
+  render_line_chart(*get_line_chart());
 }
 
 }

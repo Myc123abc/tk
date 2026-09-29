@@ -42,6 +42,22 @@ auto heap_bulk_alloc(int size, int cnt) noexcept -> Result
   return { alloc_time, free_time };
 }
 
+auto heap_reuse_alloc(int size, int cnt) noexcept
+{
+  auto ps = std::vector<void*>(cnt);
+
+  auto time = measure([&]
+  {
+    for (auto& p : ps)
+    {
+      p = malloc(size);
+      free(p);
+    }
+  });
+
+  return time;
+}
+
 auto main() -> int
 {
   // get alloc test sizes
@@ -65,6 +81,12 @@ auto main() -> int
   auto alloc_results = to_vec(results, &Result::alloc_time);
   auto free_results  = to_vec(results, &Result::free_time);
 
+  // get test results of heap reuse alloc
+  auto reuse_results = std::vector<float>{};
+  reuse_results.reserve(alloc_sizes.size());
+  for (auto size : alloc_sizes)
+    reuse_results.emplace_back(heap_reuse_alloc(size, test_cnt));
+
   tk::benchmark::init();
   tk::benchmark::set_labels("size (B)", "Time (us)");
 
@@ -72,6 +94,10 @@ auto main() -> int
   {
     tk::benchmark::present(alloc_sizes, alloc_results, 0x0000ffff);
     tk::benchmark::present(alloc_sizes, free_results, 0x00ff00ff);
+
+    tk::benchmark::new_line_chart();
+    tk::benchmark::present(alloc_sizes, reuse_results, 0x00ff00ff);
+
     tk::benchmark::update();
   }
 
