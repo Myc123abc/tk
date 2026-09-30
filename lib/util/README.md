@@ -14,3 +14,5 @@ A header-only C++ utility library.
 |tuple|Wrapper around `std::tuple` with simplified `apply` support.|
 |free_list|Free list used to track free pointers.|
 |memory_pool|Memory pool that specifies the sizes of inner fixed-pools.|
+|hash|Hash algorithm support.|
+|string_id|Convert string to id in compile time.|

@@ -99,8 +99,8 @@ auto TextEngine::parse(std::string_view text, std::string_view family, FontStyle
 {
   assert(!text.empty());
 
-  auto text_hash = generic_hash(text);
-  auto key       = TextEngine::ParseKey{ text_hash, generic_hash(family), style, direction };
+  auto text_hash = hash(text);
+  auto key       = TextEngine::ParseKey{ text_hash, hash(family), style, direction };
 
   // try to get cached text advances
   if (auto it = _cached_text_parse_results.find(key); it != _cached_text_parse_results.end())
@@ -647,6 +647,14 @@ auto TextEngine::get_bounding_rect(TextParseResultHandle handle) noexcept -> std
   res.bounding_rect = rect;
 
   return rect;
+}
+
+auto TextEngine::get_text_bounding_rect(uint64 text_id, float size) noexcept -> std::optional<Rect>
+{
+  assert(text_id);
+  // TODO: whether need generate bitmaps in here if text never be parsed
+  
+  return {};
 }
 
 }

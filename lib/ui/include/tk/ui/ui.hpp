@@ -7,6 +7,8 @@
 #include "transform.hpp"
 #include "tween.hpp"
 #include "widget.hpp"
+#include "tk/string_id.hpp"
+#include "tk/rect.hpp"
 
 #include <windows.h>
 
@@ -280,6 +282,15 @@ auto text(std::string_view text, float2 pos, float size, Color color, TextConfig
  * @return text parse result
  */
 auto text(std::string_view text, float size, TextConfig const& cfg = {}) noexcept -> TextResult;
+
+/**
+ * Get bounding rectangle of the text in specific size.
+ * @param text
+ * @param size
+ * @param cfg text config
+ * @return bounding rectangle if text generation complete.
+ */
+auto get_text_bounding_rect(StringID text, float size, TextConfig const& cfg = {}) noexcept -> std::optional<Rect>;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Window

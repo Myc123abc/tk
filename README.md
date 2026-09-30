@@ -36,6 +36,8 @@ Is still in the early stages of development.
 |stb|MIT|https://github.com/nothings/stb|
 |Clipper2|BSL-1.0|https://github.com/AngusJohnson/Clipper2|
 |msdfgen|MIT|https://github.com/Chlumsky/msdfgen|
+|xxHash|BSD 2-Clause|https://github.com/Cyan4973/xxHash|
+|constexpr-xxh3|BSD 2-Clause|https://github.com/chys87/constexpr-xxh3|
 
 ## License
 The following licenses are available:

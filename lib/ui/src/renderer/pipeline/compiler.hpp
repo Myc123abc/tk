@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../util/hash.hpp"
+#include "tk/hash.hpp"
 #include "../../util/singleton.hpp"
 #include "tk/base.hpp"
 
@@ -95,7 +95,7 @@ public:
     {
       auto operator()(ResourceKey const& key) const noexcept
       {
-        return generic_hash(key.type, key.bind_point, key.space);
+        return hash(key.type, key.bind_point, key.space);
       }
     };
     std::unordered_set<ResourceKey, ResourceKeyHash> _resource_keys;

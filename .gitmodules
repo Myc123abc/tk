@@ -16,3 +16,9 @@
 [submodule "vendor/msdfgen"]
 	path = vendor/msdfgen
 	url = https://github.com/Chlumsky/msdfgen.git
+[submodule "vendor/xxHash"]
+	path = vendor/xxHash
+	url = https://github.com/Cyan4973/xxHash
+[submodule "vendor/constexpr-xxh3"]
+	path = vendor/constexpr-xxh3
+	url = https://github.com/chys87/constexpr-xxh3

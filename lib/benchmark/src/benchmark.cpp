@@ -135,9 +135,13 @@ void render_line_chart(LineChartData& data) noexcept
   // draw data label
   auto line_chart_ext = g_line_chart.extent();
   auto pos = float2{ g_pos.x + line_chart_ext.x + 10, g_pos.y };
-  auto text_ext = ui::text("123", 12).extent;
-  ui::rectangle(pos, pos + float2(text_ext.y), 0xff0000ff);
-  ui::text("123", pos + float2{ text_ext.y + 10, 0 }, 12, 0xffffffff);
+  auto rect = ui::get_text_bounding_rect("123", 12);
+  if (rect)
+  {
+    ui::rectangle(pos, pos + float2(rect->height()), 0xff0000ff);
+    // TODO: simple API for bounding position rendering
+    ui::text("123", pos + float2{ rect->width() + 10, -rect->top }, 12, 0xffffffff);
+  }
 
   g_pos.y += g_line_chart.extent().y + 10;
 }

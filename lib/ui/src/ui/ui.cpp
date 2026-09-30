@@ -112,6 +112,14 @@ auto text(std::string_view text, float size, TextConfig const& cfg) noexcept -> 
   return g_ui_ctx.text(text, {}, size, {}, cfg);
 }
 
+auto get_text_bounding_rect(StringID text, float size, TextConfig const& cfg) noexcept -> std::optional<Rect>
+{
+  if (!text) return {};
+  adjust_scale(size);
+  auto id = get_text_id(text, cfg.family, cfg.style, cfg.direction);
+  return g_text_engine.get_text_bounding_rect(id, size);
+}
+
 auto ping_pong(std::string_view name, bool b, double forward_dur, double reverse_dur, Tween::Ease ease) noexcept -> double
 {
   return g_ui_ctx.ping_pong(b, g_ui_ctx.generic_id(name), forward_dur, reverse_dur, ease);

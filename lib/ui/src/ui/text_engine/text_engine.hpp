@@ -11,6 +11,11 @@ namespace tk::ui {
 
 using PendingCopyGlyphsInfoType = std::unordered_map<uint, std::vector<std::pair<MSDFBitmap, float2>>>;
 
+constexpr auto get_text_id(StringID text, std::string_view family, FontStyle style, TextDirection direction) noexcept
+{
+  return hash(text, family, style, direction);
+}
+
 Singleton(TextEngine, g_text_engine,
   friend class Font;
   friend class GlyphInfo;
@@ -39,6 +44,7 @@ public:
   auto& get_parse_result(TextParseResultHandle handle) const noexcept { return _parse_result_pool[handle]; }
 
   auto get_bounding_rect(TextParseResultHandle handle) noexcept -> std::optional<Rect>;
+  auto get_text_bounding_rect(uint64 text_id, float size) noexcept -> std::optional<Rect>;
 
   void update() noexcept;
 
@@ -63,7 +69,7 @@ private:
   {
     auto operator()(ParseKey const& key) const noexcept
     {
-      return generic_hash(key.text_hash, key.style, key.family_hash, key.direction);
+      return hash(key.text_hash, key.style, key.family_hash, key.direction);
     }
   };
 

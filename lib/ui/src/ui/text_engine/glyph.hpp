@@ -28,7 +28,7 @@ struct GlyphKeyHash
 {
   auto operator()(GlyphKey const& key) const noexcept
   {
-    return generic_hash(FontStyleKeyHash{}(key.font_key), key.glyph_index);
+    return hash(FontStyleKeyHash{}(key.font_key), key.glyph_index);
   }
 };
 

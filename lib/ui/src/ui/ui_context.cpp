@@ -2,7 +2,7 @@
 #include "tk/error_handling.hpp"
 #include "../renderer/window/window_manager.hpp"
 #include "../renderer/renderer.hpp"
-#include "../util/hash.hpp"
+#include "tk/hash.hpp"
 #include "text_engine/text_engine.hpp"
 
 using namespace tk::renderer;
@@ -411,7 +411,7 @@ void UIContext::add_title_bar() noexcept
 
 auto UIContext::get_id(std::string_view name) const noexcept -> size_t
 {
-  return generic_hash(_wnd_ctx->handle, name);
+  return hash(_wnd_ctx->handle, name);
 }
 
 auto UIContext::generic_id(std::string_view name) noexcept -> size_t

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ui/ui.hpp"
-#include "../../util/hash.hpp"
+#include "tk/hash.hpp"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -20,7 +20,7 @@ struct FontStyleKey
 
   FontStyleKey() = default;
   FontStyleKey(std::string_view family, FontStyle style) noexcept
-    : family_hash(generic_hash(family)), style(style) {}
+    : family_hash(hash(family)), style(style) {}
 
   auto operator==(FontStyleKey const&) const noexcept -> bool = default;
 };
@@ -29,7 +29,7 @@ struct FontStyleKeyHash
 {
   auto operator()(FontStyleKey const& key) const noexcept
   {
-    return generic_hash(key.family_hash, key.style);
+    return hash(key.family_hash, key.style);
   }
 };
 
