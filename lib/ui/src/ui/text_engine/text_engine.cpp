@@ -95,29 +95,28 @@ void TextEngine::regenerate_missing_glyphs(Font* font, FontStyleKey key) noexcep
   }
 }
 
-auto TextEngine::parse(std::string_view text, std::string_view family, FontStyle style, TextDirection direction) noexcept -> TextParseResultHandle
+auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction) noexcept -> TextParseResultHandle
 {
   assert(!text.empty());
 
-  auto text_hash = hash(text);
-  auto key       = TextEngine::ParseKey{ text_hash, hash(family), style, direction };
+  auto id = get_text_id(text, family, style, direction);
 
   // try to get cached text advances
-  if (auto it = _cached_text_parse_results.find(key); it != _cached_text_parse_results.end())
+  if (auto it = _cached_text_parse_results.find(id); it != _cached_text_parse_results.end())
   {
     auto const& result = _parse_result_pool[it->second];
     if (result.generating_glyph_info_keys.empty())
     {
-      _last_ready_text_parse_results[text_hash] = it->second;
+      _last_ready_text_parse_results[text.id()] = it->second;
       return it->second;
     }
-    if (auto fallback_it = _last_ready_text_parse_results.find(text_hash); fallback_it != _last_ready_text_parse_results.end())
+    if (auto fallback_it = _last_ready_text_parse_results.find(text.id()); fallback_it != _last_ready_text_parse_results.end())
       return fallback_it->second;
     return it->second;
   }
 
   auto res  = ParseResult{};
-  auto size = codepoint_cnt(text);
+  auto size = codepoint_cnt(text.view());
 
   auto has_missing_glyphs = false;
 
@@ -128,7 +127,7 @@ auto TextEngine::parse(std::string_view text, std::string_view family, FontStyle
 
   // split text
   auto glyph_style_key = FontStyleKey(family, style);
-  for (auto [text, font] : split_text(text, glyph_style_key))
+  for (auto [text, font] : split_text(text.view(), glyph_style_key))
   {
     // use hb calculate advances
     if (font)
@@ -224,7 +223,7 @@ auto TextEngine::parse(std::string_view text, std::string_view family, FontStyle
   }
 
   if (has_missing_glyphs)
-    _cached_texts_with_missing_glyphs[glyph_style_key].emplace_back(key);
+    _cached_texts_with_missing_glyphs[glyph_style_key].emplace_back(id, text.id());
 
   if (direction == TextDirection::horizontal)
   {
@@ -242,7 +241,7 @@ auto TextEngine::parse(std::string_view text, std::string_view family, FontStyle
 
   // cached calculate result
   auto handle = _parse_result_pool.alloc();
-  auto [_, inserted] = _cached_text_parse_results.emplace(key, handle);
+  auto [_, inserted] = _cached_text_parse_results.emplace(id, handle);
   assert(inserted);
 
   auto const is_generating = !res.generating_glyph_info_keys.empty();
@@ -252,11 +251,11 @@ auto TextEngine::parse(std::string_view text, std::string_view family, FontStyle
 
   if (is_generating)
   {
-    if (auto fallback_it = _last_ready_text_parse_results.find(text_hash); fallback_it != _last_ready_text_parse_results.end())
+    if (auto fallback_it = _last_ready_text_parse_results.find(text.id()); fallback_it != _last_ready_text_parse_results.end())
       return fallback_it->second;
   }
   else
-    _last_ready_text_parse_results[text_hash] = handle;
+    _last_ready_text_parse_results[text.id()] = handle;
 
   return handle;
 }
@@ -487,13 +486,13 @@ void TextEngine::remove_missing_glyphs(FontStyleKey key) noexcept
 {
   // clear missing glyphs and cached text advances
   _missing_glyphs[key].clear();
-  for (auto const& key : _cached_texts_with_missing_glyphs[key])
+  for (auto [id, text_hash] : _cached_texts_with_missing_glyphs[key])
   {
-    auto it = _cached_text_parse_results.find(key);
+    auto it = _cached_text_parse_results.find(id);
     assert(it != _cached_text_parse_results.end());
     auto h = it->second;
     assert(h.valid());
-    if (auto fallback_it = _last_ready_text_parse_results.find(key.text_hash);
+    if (auto fallback_it = _last_ready_text_parse_results.find(text_hash);
         fallback_it != _last_ready_text_parse_results.end() && fallback_it->second == h)
       _last_ready_text_parse_results.erase(fallback_it);
     _discard_text_parse_result_handles.emplace_back(h);

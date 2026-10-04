@@ -53,7 +53,7 @@ public:
 	//
 
 	// IGraphicsEffectD2D1Interop
-	HRESULT STDMETHODCALLTYPE GetEffectId(GUID* id) override
+	HRESULT STDMETHODCALLTYPE GetEffectId(GUID* id) noexcept override
 	{
 		if (id)
 		{
@@ -64,11 +64,11 @@ public:
 		return E_POINTER;
 	}
 	// set property by using name, this is not neccessary for C++ programmers
-	HRESULT STDMETHODCALLTYPE GetNamedPropertyMapping(LPCWSTR name, UINT* index, GRAPHICS_EFFECT_PROPERTY_MAPPING* mapping) override
+	HRESULT STDMETHODCALLTYPE GetNamedPropertyMapping(LPCWSTR name, UINT* index, GRAPHICS_EFFECT_PROPERTY_MAPPING* mapping) noexcept override
 	{
 		return E_NOTIMPL;
 	}
-	HRESULT STDMETHODCALLTYPE GetPropertyCount(UINT* count) override
+	HRESULT STDMETHODCALLTYPE GetPropertyCount(UINT* count) noexcept override
 	{
 		if (count)
 		{
@@ -78,7 +78,7 @@ public:
 
 		return E_POINTER;
 	}
-	HRESULT STDMETHODCALLTYPE GetProperty(UINT index, IPropertyValue** value) override
+	HRESULT STDMETHODCALLTYPE GetProperty(UINT index, IPropertyValue** value) noexcept override
 	{
 		if (!value)
 		{
@@ -92,7 +92,7 @@ public:
 
 		return m_properties[index].CopyTo(value);
 	}
-	HRESULT STDMETHODCALLTYPE GetSource(UINT index, IGraphicsEffectSource** source) override
+	HRESULT STDMETHODCALLTYPE GetSource(UINT index, IGraphicsEffectSource** source) noexcept override
 	{
 		if (!source)
 		{
@@ -106,7 +106,7 @@ public:
 
 		return m_effectSources[index].CopyTo(source);
 	}
-	HRESULT STDMETHODCALLTYPE GetSourceCount(UINT* count) override
+	HRESULT STDMETHODCALLTYPE GetSourceCount(UINT* count) noexcept override
 	{
 		if (count)
 		{

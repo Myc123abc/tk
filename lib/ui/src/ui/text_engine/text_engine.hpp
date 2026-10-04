@@ -11,9 +11,9 @@ namespace tk::ui {
 
 using PendingCopyGlyphsInfoType = std::unordered_map<uint, std::vector<std::pair<MSDFBitmap, float2>>>;
 
-constexpr auto get_text_id(StringID text, std::string_view family, FontStyle style, TextDirection direction) noexcept
+constexpr auto get_text_id(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction) noexcept
 {
-  return hash(text, family, style, direction);
+  return hash(text.id(), family, style, direction);
 }
 
 Singleton(TextEngine, g_text_engine,
@@ -40,7 +40,7 @@ public:
   };
   using ParseResultPool       = ObjectPool<ParseResult>;
   using TextParseResultHandle = ParseResultPool::Handle;
-  auto parse(std::string_view text, std::string_view family, FontStyle style, TextDirection direction) noexcept -> TextParseResultHandle;
+  auto parse(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction) noexcept -> TextParseResultHandle;
   auto& get_parse_result(TextParseResultHandle handle) const noexcept { return _parse_result_pool[handle]; }
 
   auto get_bounding_rect(TextParseResultHandle handle) noexcept -> std::optional<Rect>;
@@ -53,25 +53,6 @@ public:
   auto glyph_atlas(uint index) const noexcept { return _glyph_atlas[index]; }
 
   void postprocess() noexcept;
-
-private:
-  struct ParseKey
-  {
-    size_t        text_hash{};
-    size_t        family_hash{};
-    FontStyle     style{};
-    TextDirection direction{};
-
-    auto operator==(ParseKey const&) const noexcept -> bool = default;
-  };
-
-  struct ParseKeyHash
-  {
-    auto operator()(ParseKey const& key) const noexcept
-    {
-      return hash(key.text_hash, key.style, key.family_hash, key.direction);
-    }
-  };
 
 private:
   auto split_text(std::string_view text, FontStyleKey key) noexcept -> std::vector<std::pair<std::string_view, Font*>>;
@@ -91,10 +72,11 @@ private:
 
 private:
   template <typename T>
-  using TextMap            = std::unordered_map<size_t, T>;
-  using ParseResultMap     = std::unordered_map<ParseKey, TextParseResultHandle, ParseKeyHash>;
-  using StyleFontIdxs      = std::array<std::vector<uint>, static_cast<size_t>(FontStyle::italic_bold) + 1>;
-  using FallbackFontIdxMap = FontStyleMap<std::unordered_map<uint, uint>>;
+  using TextMap             = std::unordered_map<size_t, T>;
+  using ParseResultMap      = std::unordered_map<uint64, TextParseResultHandle>;
+  using StyleFontIdxs       = std::array<std::vector<uint>, static_cast<size_t>(FontStyle::italic_bold) + 1>;
+  using FallbackFontIdxMap  = FontStyleMap<std::unordered_map<uint, uint>>;
+  using TextIDTextHashPairs = std::vector<std::pair<uint64, uint64>>;
 
   FT_Library                                 _ft{};
   hb_buffer_t*                               _hb_buf{};
@@ -103,7 +85,7 @@ private:
   std::vector<std::unique_ptr<Font>>         _fonts;
   FontStyleMap<uint>                         _font_idxs;
   StyleFontIdxs                              _style_font_idxs;
-  FontStyleMap<std::vector<ParseKey>>        _cached_texts_with_missing_glyphs;
+  FontStyleMap<TextIDTextHashPairs>          _cached_texts_with_missing_glyphs;
   ParseResultMap                             _cached_text_parse_results;
   TextMap<TextParseResultHandle>             _last_ready_text_parse_results;
   ParseResultPool                            _parse_result_pool;

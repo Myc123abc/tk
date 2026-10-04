@@ -13,8 +13,8 @@ namespace tk::benchmark {
 auto g_wndCfg     = ui::WindowConfig{};
 auto g_line_chart = ui::LineChart{};
 auto g_is_closed  = false;
-auto g_x_label    = std::string_view{};
-auto g_y_label    = std::string_view{};
+auto g_x_label    = StringLiteral{};
+auto g_y_label    = StringLiteral{};
 auto g_pos        = float2(10);
 
 struct LineChartData
@@ -80,7 +80,7 @@ auto get_line_chart() noexcept
   return data;
 }
 
-void set_labels(std::string_view x_label, std::string_view y_label) noexcept
+void set_labels(StringLiteral x_label, StringLiteral y_label) noexcept
 {
   g_x_label = x_label;
   g_y_label = y_label;

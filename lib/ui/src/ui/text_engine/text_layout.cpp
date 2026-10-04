@@ -1,22 +1,21 @@
 #include "ui/text_layout.hpp"
 #include "text_engine.hpp"
-#include "../ui_context.hpp"
 
 #include <ranges>
 
 namespace tk::ui {
 
-TextLayout::TextLayout(std::span<std::string const> texts, std::string_view family, FontStyle style, TextDirection direction) noexcept
+TextLayout::TextLayout(std::vector<StringLiteral> const& texts, std::string_view family, FontStyle style, TextDirection direction) noexcept
 {
   assert(texts.size() > 1);
 
   _texts.reserve(texts.size());
-  for (std::string_view text : texts)
+  for (auto text : texts)
   {
     auto handle = g_text_engine.parse(text, family, style, direction);
     auto extent = g_text_engine.get_parse_result(handle).extent;
 
-    _texts.emplace_back(text, float2{}, extent, std::bit_cast<uint64>(handle));
+    _texts.emplace_back(text.view(), float2{}, extent, std::bit_cast<uint64>(handle));
 
     _max_width  = std::max(_max_width,  extent.x);
     _max_height = std::max(_max_height, extent.y);

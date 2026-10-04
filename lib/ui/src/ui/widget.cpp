@@ -72,20 +72,20 @@ auto button(size_t id, float x, float y, float width, float height) noexcept -> 
   return { is_hovered && is_last_mouse_down_id && is_click_on(left_top, right_bottom), is_hovered, is_move_out, is_down };
 }
 
-auto button(std::string_view name, float x, float y, float width, float height) noexcept -> ButtonState
+auto button(StringID name, float x, float y, float width, float height) noexcept -> ButtonState
 {
   return button(g_ui_ctx.generic_id(name), x, y, width, height);
 }
 
 auto button(
-  std::string_view name,
-  float            x,
-  float            y,
-  float            width,
-  float            height,
-  Color            color,
-  Color            hover_color,
-  Color            click_color) noexcept -> ButtonState
+  StringID name,
+  float    x,
+  float    y,
+  float    width,
+  float    height,
+  Color    color,
+  Color    hover_color,
+  Color    click_color) noexcept -> ButtonState
 {
   auto id    = g_ui_ctx.generic_id(name);
   auto state = button(id, x, y, width, height);
@@ -105,7 +105,7 @@ auto button(
 }
 
 auto button(
-  std::string_view                         name,
+  StringID                                 name,
   float                                    x,
   float                                    y,
   float                                    width,

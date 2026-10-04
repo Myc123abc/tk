@@ -409,15 +409,15 @@ void UIContext::add_title_bar() noexcept
   draw_title_bar = false;
 }
 
-auto UIContext::get_id(std::string_view name) const noexcept -> size_t
+auto UIContext::get_id(StringID name) const noexcept -> size_t
 {
   return hash(_wnd_ctx->handle, name);
 }
 
-auto UIContext::generic_id(std::string_view name) noexcept -> size_t
+auto UIContext::generic_id(StringID name) noexcept -> size_t
 {
   auto id = get_id(name);
-  err_if(_ids.contains(id), "cannot duplicate id {}", name);
+  err_if(_ids.contains(id), "cannot duplicate id");
   _ids.emplace(id);
   return id;
 }
@@ -558,7 +558,7 @@ auto UIContext::image(std::string_view path, float2 left_top, float2 right_botto
   return std::unexpected(res.error());
 }
 
-auto UIContext::text(std::string_view text, float2 pos, float size, Color inner_color, TextConfig const& cfg) noexcept -> TextResult
+auto UIContext::text(StringLiteral text, float2 pos, float size, Color inner_color, TextConfig const& cfg) noexcept -> TextResult
 {
   if (text.empty()) return {};
 

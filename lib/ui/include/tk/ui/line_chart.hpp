@@ -7,23 +7,23 @@ namespace tk::ui {
 
 struct LineChart
 {
-  std::string_view             x_axis_label;
-  std::string_view             y_axis_label;
-  std::span<float>             x_axis_tick_values;
-  std::span<float>             y_axis_tick_values;
-  std::span<std::string const> x_axis_tick_labels;
-  std::span<std::string const> y_axis_tick_labels;
-  float2                       x_tick_label_padding;
-  float2                       y_tick_label_padding;
-  Color                        axis_color;
-  float                        tick_label_size;
-  std::optional<Color>         grid_color;
-  float                        label_size;
-  float                        x_label_padding;
-  float                        y_label_padding;
-  std::string_view             origin_point_text;
-  std::string_view             font_family;
-  FontStyle                    font_style{};
+  StringLiteral          x_axis_label;
+  StringLiteral          y_axis_label;
+  std::span<float>       x_axis_tick_values;
+  std::span<float>       y_axis_tick_values;
+  std::span<std::string> x_axis_tick_labels;
+  std::span<std::string> y_axis_tick_labels;
+  float2                 x_tick_label_padding;
+  float2                 y_tick_label_padding;
+  Color                  axis_color;
+  float                  tick_label_size;
+  std::optional<Color>   grid_color;
+  float                  label_size;
+  float                  x_label_padding;
+  float                  y_label_padding;
+  StringLiteral          origin_point_text;
+  std::string_view       font_family;
+  FontStyle              font_style{};
 
   struct Data
   {

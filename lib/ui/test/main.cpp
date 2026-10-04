@@ -4,7 +4,6 @@
 #include "tk/ui/ui.hpp"
 #include "tk/ui/transform.hpp"
 
-#include <string>
 #include <span>
 #include <format>
 
@@ -249,17 +248,17 @@ void load_font(std::string_view path) noexcept
 
 struct ButtonConfig
 {
-  std::string_view text;
-  float            text_size{};
-  ui::Color        text_color{};
-  float4           padding{};
+  StringLiteral text;
+  float         text_size{};
+  ui::Color     text_color{};
+  float4        padding{};
 
-  ui::Color        button_color{};
-  ui::Color        hover_color{};
-  ui::Color        click_color{};
+  ui::Color     button_color{};
+  ui::Color     hover_color{};
+  ui::Color     click_color{};
 };
 
-auto button(std::string_view name, float2 pos, float width, float height, ButtonConfig const& cfg) noexcept
+auto button(StringID name, float2 pos, float width, float height, ButtonConfig const& cfg) noexcept
 {
   auto text_res = ui::text(cfg.text, cfg.text_size);
   auto res = button(name, pos.x, pos.y, width + cfg.padding.x + cfg.padding.z, (height ? height : text_res.extent.y) + cfg.padding.y + cfg.padding.w,
@@ -287,7 +286,7 @@ struct SelectListConfig
   ui::Color text_color;
 };
 
-auto select_list(std::string_view name, float2 pos, std::span<std::string_view> items, SelectListConfig const& cfg) noexcept
+auto select_list(StringLiteral name, float2 pos, std::span<StringLiteral> items, SelectListConfig const& cfg) noexcept
 {
   auto id_name = "tk::ui::select_list::";
 
@@ -316,7 +315,7 @@ auto select_list(std::string_view name, float2 pos, std::span<std::string_view> 
       .hover_color  = cfg.hover_color,
       .click_color  = cfg.click_color,
     };
-    button(id_name + std::string(name) + std::to_string(i), { pos.x, pos_y }, max_width, 0, btn_cfg);
+    button(id_name + std::string(name.view()) + std::to_string(i), { pos.x, pos_y }, max_width, 0, btn_cfg);
     pos_y += ext.y + cfg.padding.y + cfg.padding.w;
   }
 
@@ -339,7 +338,7 @@ void select_font() noexcept
     .click_color  = 0xe2e5e9ff,
     .text_color   = 0x000000ff,
   };
-  auto items = std::vector<std::string_view>{
+  auto items = std::vector<StringLiteral>{
     "一覧",
     "により",
     "三回",

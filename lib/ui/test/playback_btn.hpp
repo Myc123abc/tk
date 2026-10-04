@@ -7,17 +7,17 @@ using namespace tk;
 class PlaybackButton
 {
 public:
-  void init(std::string_view name) noexcept
+  void init(StringLiteral name) noexcept
   {
-    _name = name;
-    _lerp_name = std::string(name) + "lerp value";
+    _name      = name;
+    _lerp_name = std::string(name.view()) + "lerp value";
   }
 
   auto operator()(float2 p0, float2 p1, float2 p2, ui::Color color, ui::Color hovered_color, float thickness) noexcept -> bool
   {
     auto width  = p1.x - p0.x;
     auto height = p2.y - p0.y;
-    auto [clicked, hovered, move_out, down] = ui::button(_name, p0.x, p0.y, width, height);
+    auto [clicked, hovered, move_out, down] = ui::button(_name.id(), p0.x, p0.y, width, height);
     if (hovered) color = hovered_color;
 
     if (clicked) _paused = !_paused;
@@ -80,7 +80,7 @@ private:
     float2 p1{};
   };
 
-  std::string            _name;
+  StringLiteral          _name;
   std::string            _lerp_name;
   std::vector<LerpPoint> _lerp_pts;
   std::vector<float2>    _pts{};

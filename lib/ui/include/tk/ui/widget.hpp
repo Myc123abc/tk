@@ -1,8 +1,8 @@
 #pragma once
 
 #include "color.hpp"
+#include "tk/string_id.hpp"
 
-#include <string_view>
 #include <functional>
 
 namespace tk::ui {
@@ -33,7 +33,7 @@ struct ButtonState
  * @param height
  * @return button state
  */
-auto button(std::string_view name, float x, float y, float width, float height) noexcept -> ButtonState;
+auto button(StringID name, float x, float y, float width, float height) noexcept -> ButtonState;
 
 /**
  * normal button
@@ -48,14 +48,14 @@ auto button(std::string_view name, float x, float y, float width, float height) 
  * @return button state
  */
 auto button(
-  std::string_view name,
-  float            x,
-  float            y,
-  float            width,
-  float            height,
-  Color            color,
-  Color            hover_color,
-  Color            click_color = {}) noexcept -> ButtonState;
+  StringID name,
+  float    x,
+  float    y,
+  float    width,
+  float    height,
+  Color    color,
+  Color    hover_color,
+  Color    click_color = {}) noexcept -> ButtonState;
 
 /**
  * draw a button, can draw an icon in the center of button
@@ -77,7 +77,7 @@ auto button(
  * @return button state
  */
 auto button(
-  std::string_view                         name,
+  StringID                                 name,
   float                                    x,
   float                                    y,
   float                                    width,

@@ -59,8 +59,8 @@ public:
 
   void render_on(float x, float y, std::move_only_function<void()>&& func) noexcept;
 
-  auto generic_id(std::string_view name) noexcept -> size_t;
-  auto get_id(std::string_view name) const noexcept -> size_t;
+  auto generic_id(StringID name) noexcept -> size_t;
+  auto get_id(StringID name) const noexcept -> size_t;
 
   auto delta_time() const noexcept { return _delta_time; }
 
@@ -72,7 +72,7 @@ public:
   auto ping_pong(bool b, size_t id, double dur, Tween::Ease ease = {}) noexcept { return ping_pong(b, id, dur, dur, ease); }
 
   auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha, std::optional<ImageConfig> cfg) noexcept -> std::expected<void, ImageLoadErrorType>;
-  auto text(std::string_view text, float2 pos, float size, Color inner_color, TextConfig const& cfg) noexcept -> TextResult;
+  auto text(StringLiteral text, float2 pos, float size, Color inner_color, TextConfig const& cfg) noexcept -> TextResult;
   void render(TextLayout const& layout) noexcept;
 
   void fullscreen_window() noexcept;

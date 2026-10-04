@@ -3,6 +3,7 @@ add_library(tk-benchmark src/benchmark.cpp)
 add_library(tk::benchmark ALIAS tk-benchmark)
 target_include_directories(tk-benchmark PUBLIC include)
 target_link_libraries(tk-benchmark PRIVATE tk::ui)
+target_link_libraries(tk-benchmark PUBLIC tk::util)
 
 add_executable(benchmark-test test/test.cpp)
 target_link_libraries(benchmark-test PRIVATE tk::benchmark)

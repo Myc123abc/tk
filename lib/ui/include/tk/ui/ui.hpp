@@ -113,14 +113,14 @@ using BackdropStyle = WindowConfig::BlurBackdrop::Style;
  * @param ease ease funcation for tween
  * @return lerp value (0.0 ~ 1.0)
  */
-auto ping_pong(std::string_view name, bool b, double forward_dur, double reverse_dur, Tween::Ease ease = Tween::linear) noexcept -> double;
-inline auto ping_pong(std::string_view name, bool b, double duration, Tween::Ease ease = Tween::linear) noexcept { return ping_pong(name, b, duration, duration, ease); }
+auto ping_pong(StringID name, bool b, double forward_dur, double reverse_dur, Tween::Ease ease = Tween::linear) noexcept -> double;
+inline auto ping_pong(StringID name, bool b, double duration, Tween::Ease ease = Tween::linear) noexcept { return ping_pong(name, b, duration, duration, ease); }
 
 /**
  * reset tween
  * @param name name of tween
  */
-void reset_tween(std::string_view name) noexcept;
+void reset_tween(StringID name) noexcept;
 
 /**
  * get cursor position
@@ -272,7 +272,7 @@ struct TextResult
  * @param cfg text config
  * @return text parse result
  */
-auto text(std::string_view text, float2 pos, float size, Color color, TextConfig const& cfg = {}) noexcept -> TextResult;
+auto text(StringLiteral text, float2 pos, float size, Color color, TextConfig const& cfg = {}) noexcept -> TextResult;
 
 /**
  * get parse result of text with sepcific config
@@ -281,7 +281,7 @@ auto text(std::string_view text, float2 pos, float size, Color color, TextConfig
  * @param cfg text config
  * @return text parse result
  */
-auto text(std::string_view text, float size, TextConfig const& cfg = {}) noexcept -> TextResult;
+auto text(StringLiteral text, float size, TextConfig const& cfg = {}) noexcept -> TextResult;
 
 /**
  * Get bounding rectangle of the text in specific size.
@@ -290,7 +290,7 @@ auto text(std::string_view text, float size, TextConfig const& cfg = {}) noexcep
  * @param cfg text config
  * @return bounding rectangle if text generation complete.
  */
-auto get_text_bounding_rect(StringID text, float size, TextConfig const& cfg = {}) noexcept -> std::optional<Rect>;
+auto get_text_bounding_rect(StringLiteral text, float size, TextConfig const& cfg = {}) noexcept -> std::optional<Rect>;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                             Window

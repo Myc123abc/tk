@@ -97,9 +97,16 @@ void LineChart::calc_layout() noexcept
   _layout.x_unit_interval_len = x_unit_interval_len;
   _layout.y_unit_interval_len = y_unit_interval_len;
 
+  auto to_string_laterials = [](std::span<std::string> strs)
+  {
+    return strs
+      | std::views::transform([] (std::string_view str){ return StringLiteral{ str }; })
+      | std::ranges::to<std::vector<StringLiteral>>();
+  };
+
   // get y layout
   auto& y_layout = _layout.y_layout;
-  y_layout = TextLayout(y_axis_tick_labels, font_family, font_style)
+  y_layout = TextLayout(to_string_laterials(y_axis_tick_labels), font_family, font_style)
     .set_color(axis_color)
     .adjust_size(tick_label_size)
     .set_padding(y_tick_label_padding)
@@ -109,7 +116,7 @@ void LineChart::calc_layout() noexcept
 
   // get x layout
   auto& x_layout = _layout.x_layout;
-  x_layout = TextLayout(x_axis_tick_labels, font_family, font_style)
+  x_layout = TextLayout(to_string_laterials(x_axis_tick_labels), font_family, font_style)
     .set_color(axis_color)
     .adjust_size(tick_label_size)
     .set_padding(x_tick_label_padding)

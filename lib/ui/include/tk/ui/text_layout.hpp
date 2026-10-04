@@ -30,7 +30,7 @@ public:
 
   TextLayout() = default;
 
-  TextLayout(std::span<std::string const> texts, std::string_view family = {}, FontStyle style = {}, TextDirection direction = {}) noexcept;
+  TextLayout(std::vector<StringLiteral> const& texts, std::string_view family = {}, FontStyle style = {}, TextDirection direction = {}) noexcept;
 
   auto adjust_size(float size) noexcept -> TextLayout&;
 

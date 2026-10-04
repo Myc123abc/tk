@@ -270,7 +270,6 @@ auto Compositor::CreateNoiceBrush() -> winrt::Windows::UI::Composition::IComposi
 	ComPtr<IStream> stream{SHCreateMemStream(pbResource, dwResourceSize)};
 	ThrowIfFailed(stream ? S_OK : HRESULT_FROM_WIN32(GetLastError()));
 
-	UnlockResource(hGlobal);
 	FreeResource(hGlobal);
 	FreeLibrary(hModule);
 

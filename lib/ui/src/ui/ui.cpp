@@ -98,34 +98,34 @@ auto load_font(std::string_view path) noexcept -> std::expected<FontInfo, FontLo
   return g_text_engine.load_font(path);
 }
 
-auto text(std::string_view text, float2 pos, float size, Color color, TextConfig const& cfg) noexcept -> TextResult
+auto text(StringLiteral text, float2 pos, float size, Color color, TextConfig const& cfg) noexcept -> TextResult
 {
   if (text.empty()) return {};
   adjust_pos(pos); adjust_scale(size);
   return g_ui_ctx.text(text, pos, size, color, cfg);
 }
 
-auto text(std::string_view text, float size, TextConfig const& cfg) noexcept -> TextResult
+auto text(StringLiteral text, float size, TextConfig const& cfg) noexcept -> TextResult
 {
   if (text.empty()) return {};
   adjust_scale(size);
   return g_ui_ctx.text(text, {}, size, {}, cfg);
 }
 
-auto get_text_bounding_rect(StringID text, float size, TextConfig const& cfg) noexcept -> std::optional<Rect>
+auto get_text_bounding_rect(StringLiteral text, float size, TextConfig const& cfg) noexcept -> std::optional<Rect>
 {
-  if (!text) return {};
+  if (text.empty()) return {};
   adjust_scale(size);
   auto id = get_text_id(text, cfg.family, cfg.style, cfg.direction);
   return g_text_engine.get_text_bounding_rect(id, size);
 }
 
-auto ping_pong(std::string_view name, bool b, double forward_dur, double reverse_dur, Tween::Ease ease) noexcept -> double
+auto ping_pong(StringID name, bool b, double forward_dur, double reverse_dur, Tween::Ease ease) noexcept -> double
 {
   return g_ui_ctx.ping_pong(b, g_ui_ctx.generic_id(name), forward_dur, reverse_dur, ease);
 }
 
-void reset_tween(std::string_view name) noexcept
+void reset_tween(StringID name) noexcept
 {
   g_ui_ctx.reset_tween(g_ui_ctx.get_id(name));
 }
