@@ -95,25 +95,31 @@ void TextEngine::regenerate_missing_glyphs(Font* font, FontStyleKey key) noexcep
   }
 }
 
+auto TextEngine::try_to_get_parse_result(uint64 text_id, uint64 text_hash) noexcept -> std::optional<TextParseResultHandle>
+{
+  if (auto it = _cached_text_parse_results.find(text_id); it != _cached_text_parse_results.end())
+  {
+    auto const& result = _parse_result_pool[it->second];
+    if (result.generate_complete())
+    {
+      _last_ready_text_parse_results[text_hash] = it->second;
+      return it->second;
+    }
+    if (auto fallback_it = _last_ready_text_parse_results.find(text_hash); fallback_it != _last_ready_text_parse_results.end())
+      return fallback_it->second;
+    return it->second;
+  }
+  return {};
+}
+
 auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction) noexcept -> TextParseResultHandle
 {
   assert(!text.empty());
 
   auto id = get_text_id(text, family, style, direction);
 
-  // try to get cached text advances
-  if (auto it = _cached_text_parse_results.find(id); it != _cached_text_parse_results.end())
-  {
-    auto const& result = _parse_result_pool[it->second];
-    if (result.generating_glyph_info_keys.empty())
-    {
-      _last_ready_text_parse_results[text.id()] = it->second;
-      return it->second;
-    }
-    if (auto fallback_it = _last_ready_text_parse_results.find(text.id()); fallback_it != _last_ready_text_parse_results.end())
-      return fallback_it->second;
-    return it->second;
-  }
+  if (auto res = try_to_get_parse_result(id, text.id()))
+    return res.value();
 
   auto res  = ParseResult{};
   auto size = codepoint_cnt(text.view());
@@ -623,36 +629,40 @@ void TextEngine::upload_bitmaps(PendingCopyGlyphsInfoType const& info) noexcept
   }
 }
 
-auto TextEngine::get_bounding_rect(TextParseResultHandle handle) noexcept -> std::optional<Rect>
+auto TextEngine::get_bounding_rect(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction) noexcept -> std::optional<Rect>
 {
-  auto& res = _parse_result_pool[handle];
-  if (!res.generating_glyph_info_keys.empty()) return {};
-  if (res.bounding_rect) return res.bounding_rect;
+  auto  handle = parse(text, family, style, direction);
+  auto& res    = _parse_result_pool[handle];
 
-  auto rect = Rect{};
-  auto pos  = float2{};
-  auto ascender = res.is_vertical ? 0.f : res.ascender;
-  for (auto i = 0uz; i < res.glyph_info_keys.size(); ++i)
+  // If bitmap generation complete
+  if (res.generate_complete())
   {
-    auto const& info = get_glyph_info(res.glyph_info_keys[i]);
-    auto p0 = pos + res.offsets[i] + info.pos_offset;
-    p0.y += ascender;
-    rect.expand(p0);
-    rect.expand(p0 + info.extent);
+    // Directly use cache result
+    if (res.bounding_rect)
+      return res.bounding_rect.value();
 
-    pos += res.advances[i];
+    // Otherwise, calculate bounding rect
+    auto rect = Rect{};
+    auto pos  = float2{};
+    auto ascender = res.is_vertical ? 0.f : res.ascender;
+    // TODO: maybe MSVC impled bug
+    // for (auto [i, key] : res.glyph_info_keys | std::views::enumerate)
+    for (auto i = 0; i < res.glyph_info_keys.size(); ++i)
+    {
+      auto const& info = get_glyph_info(res.glyph_info_keys[i]);
+      auto p0 = pos + res.offsets[i] + info.pos_offset;
+      p0.y += ascender;
+      rect.expand(p0);
+      rect.expand(p0 + info.extent);
+
+      pos += res.advances[i];
+    }
+
+    res.bounding_rect = rect;
+
+    return rect;
   }
 
-  res.bounding_rect = rect;
-
-  return rect;
-}
-
-auto TextEngine::get_text_bounding_rect(uint64 text_id, float size) noexcept -> std::optional<Rect>
-{
-  assert(text_id);
-  // TODO: whether need generate bitmaps in here if text never be parsed
-  
   return {};
 }
 

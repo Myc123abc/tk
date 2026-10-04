@@ -11,7 +11,7 @@ namespace tk::ui {
 
 using PendingCopyGlyphsInfoType = std::unordered_map<uint, std::vector<std::pair<MSDFBitmap, float2>>>;
 
-constexpr auto get_text_id(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction) noexcept
+constexpr auto get_text_id(StringLiteral text, std::string_view family = {}, FontStyle style = {}, TextDirection direction = {}) noexcept
 {
   return hash(text.id(), family, style, direction);
 }
@@ -37,14 +37,16 @@ public:
     std::optional<Rect>   bounding_rect;
 
     ParseResult() noexcept = default;
+
+    auto generate_complete() const noexcept { return generating_glyph_info_keys.empty(); }
   };
   using ParseResultPool       = ObjectPool<ParseResult>;
   using TextParseResultHandle = ParseResultPool::Handle;
   auto parse(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction) noexcept -> TextParseResultHandle;
   auto& get_parse_result(TextParseResultHandle handle) const noexcept { return _parse_result_pool[handle]; }
+  auto try_to_get_parse_result(uint64 text_id, uint64 text_hash) noexcept -> std::optional<TextParseResultHandle>;
 
-  auto get_bounding_rect(TextParseResultHandle handle) noexcept -> std::optional<Rect>;
-  auto get_text_bounding_rect(uint64 text_id, float size) noexcept -> std::optional<Rect>;
+  auto get_bounding_rect(StringLiteral text, std::string_view family = {}, FontStyle style = {}, TextDirection direction = {}) noexcept -> std::optional<Rect>;
 
   void update() noexcept;
 

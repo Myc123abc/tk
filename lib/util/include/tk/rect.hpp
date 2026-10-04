@@ -67,6 +67,16 @@ struct Rect : Replaceable
     return rc;
   }
 
+  auto operator*(float scale) const noexcept
+  {
+    auto rc = *this;
+    rc.left   *= scale;
+    rc.top    *= scale;
+    rc.right  *= scale;
+    rc.bottom *= scale;
+    return rc;
+  }
+
   template <Vec2 T>
   auto& operator+=(T offset) noexcept { left += offset.x; top += offset.y; right += offset.x; bottom += offset.y; return *this; }
 

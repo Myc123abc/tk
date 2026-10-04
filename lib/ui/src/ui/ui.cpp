@@ -100,24 +100,23 @@ auto load_font(std::string_view path) noexcept -> std::expected<FontInfo, FontLo
 
 auto text(StringLiteral text, float2 pos, float size, Color color, TextConfig const& cfg) noexcept -> TextResult
 {
-  if (text.empty()) return {};
+  assert(!text.empty());
   adjust_pos(pos); adjust_scale(size);
   return g_ui_ctx.text(text, pos, size, color, cfg);
 }
 
 auto text(StringLiteral text, float size, TextConfig const& cfg) noexcept -> TextResult
 {
-  if (text.empty()) return {};
+  assert(!text.empty());
   adjust_scale(size);
   return g_ui_ctx.text(text, {}, size, {}, cfg);
 }
 
 auto get_text_bounding_rect(StringLiteral text, float size, TextConfig const& cfg) noexcept -> std::optional<Rect>
 {
-  if (text.empty()) return {};
+  assert(!text.empty());
   adjust_scale(size);
-  auto id = get_text_id(text, cfg.family, cfg.style, cfg.direction);
-  return g_text_engine.get_text_bounding_rect(id, size);
+  return g_ui_ctx.get_text_bounding_rect(text, size, cfg);
 }
 
 auto ping_pong(StringID name, bool b, double forward_dur, double reverse_dur, Tween::Ease ease) noexcept -> double

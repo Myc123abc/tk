@@ -560,8 +560,7 @@ auto UIContext::image(std::string_view path, float2 left_top, float2 right_botto
 
 auto UIContext::text(StringLiteral text, float2 pos, float size, Color inner_color, TextConfig const& cfg) noexcept -> TextResult
 {
-  if (text.empty()) return {};
-
+  assert(!text.empty());
   check_draw();
 
   auto const  result_handle = g_text_engine.parse(text, cfg.family, cfg.style, cfg.direction);
@@ -572,7 +571,7 @@ auto UIContext::text(StringLiteral text, float2 pos, float size, Color inner_col
   auto ascender   = result.ascender * scale;
   auto extent     = result.extent   * scale;
 
-  if (result.generating_glyph_info_keys.empty() && inner_color.a)
+  if (result.generate_complete() && inner_color.a)
   {
     if (cfg.pos_as_baseline)
     {
@@ -585,6 +584,15 @@ auto UIContext::text(StringLiteral text, float2 pos, float size, Color inner_col
   }
 
   return { extent, ascender };
+}
+
+auto UIContext::get_text_bounding_rect(StringLiteral text, float size, TextConfig const& cfg) noexcept -> std::optional<Rect>
+{
+  assert(!text.empty());
+  check_draw();
+  if (auto res = g_text_engine.get_bounding_rect(text, cfg.family, cfg.style, cfg.direction))
+    return res.value() * (size / FT_Pixel_Size / _wnd->scale());
+  return {};
 }
 
 void UIContext::render(TextLayout const& layout) noexcept

@@ -21,7 +21,7 @@ struct StringID
   StringID(std::string_view str) noexcept
     : _id(hash(str)) {}
   
-  constexpr operator uint64_t() const noexcept { return _id;  }
+  constexpr operator uint64_t() const noexcept { return _id; }
 
 private:
   uint64_t _id{};

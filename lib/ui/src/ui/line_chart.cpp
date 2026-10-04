@@ -127,11 +127,8 @@ void LineChart::calc_layout() noexcept
   // get x label info
   auto x_label_extent = text(x_axis_label, label_size, text_cfg).extent;
   _layout.x_label_width = x_label_extent.x;
-  if (!x_axis_label.empty())
-  {
-    auto bounding = g_text_engine.get_bounding_rect(g_text_engine.parse(x_axis_label, {}, {}, {}));
-    if (bounding) _layout.x_label_y_offset = -bounding->top * label_size / FT_Pixel_Size;
-  }
+  if (auto bounding = get_text_bounding_rect(x_axis_label, label_size, text_cfg))
+    _layout.x_label_y_offset = -bounding->top;
 
   // get extent
   auto y_label_extent = text(y_axis_label, label_size, text_cfg).extent;
