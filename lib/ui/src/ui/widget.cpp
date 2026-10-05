@@ -33,7 +33,8 @@ auto is_hover_on(float2 left_top, float2 right_bottom) noexcept -> bool
   auto p = g_ui_ctx.window()->cursor_pos();
   return g_ui_ctx.cursor_on_window == g_ui_ctx.window()->handle() &&
          !g_ui_ctx.window()->is_move_from_maximize()              &&
-         Rect{ left_top, right_bottom }.contains(p);
+          // Actually, cursor position always need - 1, like 0~1919 in range 0~1920
+         Rect{ left_top, right_bottom - float2(1) }.contains(p);
 }
 
 auto button(size_t id, float x, float y, float width, float height) noexcept -> ButtonState

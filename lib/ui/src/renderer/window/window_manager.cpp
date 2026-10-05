@@ -258,7 +258,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     {
       // limit cursor move area
       auto rect = get_virtual_workarea_rect();
-      auto rc = rect.to_RECT();
+      auto rc   = rect.to_RECT();
       ClipCursor(&rc);
 
       // moving
