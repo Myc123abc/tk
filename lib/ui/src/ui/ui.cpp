@@ -144,7 +144,7 @@ auto get_cursor_pos_on_window() noexcept -> float2
 ///                             Window
 ////////////////////////////////////////////////////////////////////////////////
 
-void begin(std::string_view name, int x, int y, uint width, uint height, bool* is_closed, WindowConfig const& cfg) noexcept
+void begin(StringID name, int x, int y, uint width, uint height, bool* is_closed, WindowConfig const& cfg) noexcept
 {
 	g_ui_ctx.begin(name, x, y, width, height, is_closed, cfg);
 }

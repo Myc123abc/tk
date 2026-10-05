@@ -308,7 +308,7 @@ auto get_text_bounding_rect(StringLiteral text, float size, TextConfig const& cf
  *                  if you want to close the window, stop call the begin and end of this window
  * @param cfg window config
  */
-void begin(std::string_view name, int x, int y, uint width, uint height, bool* is_closed = {}, WindowConfig const& cfg = {}) noexcept;
+void begin(StringID name, int x, int y, uint width, uint height, bool* is_closed = {}, WindowConfig const& cfg = {}) noexcept;
 
 // end a window
 void end() noexcept;

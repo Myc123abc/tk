@@ -45,7 +45,7 @@ public:
 
   void close_window() noexcept;
 
-  void begin(std::string_view name, int x, int y, uint width, uint height, bool* is_closed, WindowConfig const& cfg) noexcept;
+  void begin(StringID name, int x, int y, uint width, uint height, bool* is_closed, WindowConfig const& cfg) noexcept;
   void end() noexcept;
 
   void check_draw() const noexcept;
@@ -102,8 +102,8 @@ private:
   void window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer::Window const& wnd, Rect scissor_rect) noexcept;
 
 private:
-  std::unordered_map<std::string, WindowContext> _wnd_ctxs;
-  std::unordered_map<HWND, std::string>          _wnd_names;
+  std::unordered_map<StringID, WindowContext> _wnd_ctxs;
+  std::unordered_map<HWND, StringID>          _wnd_names;
 
   renderer::Window* _wnd{};
   WindowContext*    _wnd_ctx{};

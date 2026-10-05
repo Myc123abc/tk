@@ -24,6 +24,7 @@ struct LineChartData
     std::span<float> xs;
     std::span<float> ys;
     uint32_t         color;
+    StringLiteral    legend;
   };
   std::vector<Points> points;
   bool                rendered{};
@@ -86,10 +87,10 @@ void set_labels(StringLiteral x_label, StringLiteral y_label) noexcept
   g_y_label = y_label;
 }
 
-void present(std::span<float> xs, std::span<float> ys, uint32_t color) noexcept
+void present(std::span<float> xs, std::span<float> ys, uint32_t color, StringLiteral legend) noexcept
 {
   assert(xs.size() == ys.size());
-  get_line_chart()->points.emplace_back(xs, ys, color);
+  get_line_chart()->points.emplace_back(xs, ys, color, legend);
 }
 
 auto to_all_vs = [](auto&& range, auto&& mem)
@@ -117,29 +118,65 @@ void render_line_chart(LineChartData& data) noexcept
   g_line_chart.x_axis_tick_labels = x_ts;
   g_line_chart.y_axis_tick_labels = y_ts;
  
-  auto datas = std::vector<ui::LineChart::Data>{};
+  // get draw information
+  struct Legend
+  {
+    StringLiteral name;
+    uint32_t      color;
+    Rect          text_rect;
+  };
+  auto datas   = std::vector<ui::LineChart::Data>{};
+  auto pss     = std::vector<std::vector<float2>>{};
+  auto legends = std::vector<Legend>{};
   datas.reserve(data.points.size());
-  auto pss = std::vector<std::vector<float2>>{};
   pss.reserve(data.points.size());
-  for (auto [xs, ys, color] : data.points)
+  legends.reserve(data.points.size());
+  for (auto [xs, ys, color, legend] : data.points)
   {
     pss.emplace_back(std::views::zip_transform([](auto x, auto y) { return float2{ x, y }; }, xs, ys)
       | std::ranges::to<std::vector<float2>>());
     datas.emplace_back(pss.back(), color);
+    legends.emplace_back(legend, color);
   }
   g_line_chart.datas = datas;
  
+  // draw line chart
   g_line_chart.calc_layout();
   g_line_chart.render(g_pos);
  
-  // draw data label
-  auto line_chart_ext = g_line_chart.extent();
-  auto pos = float2{ g_pos.x + line_chart_ext.x + 10, g_pos.y };
-  if (auto rect = ui::get_text_bounding_rect("123", 12))
+  // get legends max height
+  auto max_height = 0.f;
+  auto max_width  = 0.f;
+  for (auto& [legend, color, rect] : legends)
   {
-    ui::rectangle(pos, pos + float2(rect->height()), 0xff0000ff);
-    ui::text("123", pos + float2{ rect->height() + 5, -rect->top } , 12, 0xffffffff);
+    if (auto rc = ui::get_text_bounding_rect(legend, g_line_chart.label_size))
+    {
+      rect = rc.value();
+      max_height = std::max(max_height, rect.height());
+      max_width  = std::max(max_width, rect.width());
+    }
   }
+
+  // draw legends
+  auto line_chart_ext = g_line_chart.extent();
+  auto padding        = 5;
+  auto beg_pos        = float2{ g_pos.x + line_chart_ext.x + 10, g_pos.y };
+  auto extent         = float2{ padding + max_height + padding + max_width + padding, padding };
+  auto pos            = beg_pos + float2(padding);
+  for (auto& [legend, color, rect] : legends)
+  {
+    if (!rect.empty())
+    {
+      ui::rectangle(pos, pos + float2(max_height), color);
+      auto offset = (max_height - rect.height()) / 2;
+      ui::text(legend, pos + float2{ max_height + padding, offset - rect.top }, g_line_chart.label_size, g_line_chart.axis_color);
+      offset    = max_height + padding;
+      pos.y    += offset;
+      extent.y += offset;
+    }
+  }
+  // draw legends border
+  ui::rectangle(beg_pos, beg_pos + extent, g_line_chart.axis_color, 1);
 
   g_pos.y += g_line_chart.extent().y + 10;
 }

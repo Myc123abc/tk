@@ -32,24 +32,24 @@ void UIContext::destroy() noexcept
   g_wnd_mgr.close_fullscreen_window();
 }
 
-void UIContext::begin(std::string_view name, int x, int y, uint width, uint height, bool* is_closed, WindowConfig const& cfg) noexcept
+void UIContext::begin(StringID name, int x, int y, uint width, uint height, bool* is_closed, WindowConfig const& cfg) noexcept
 {
   err_if(_call_begin, "begin is called but end not be called");
   _call_begin = true;
 
   // create window if not have
-  if (!_wnd_ctxs.contains(name.data()))
+  if (!_wnd_ctxs.contains(name))
   {
     auto handle = g_wnd_mgr.create_window(x, y, width, height, cfg.backdrop);
-    _wnd_ctxs.emplace(name.data(), handle);
+    _wnd_ctxs.emplace(name, handle);
     _wnd_names.emplace(handle, name);
-    _wnd_ctx = &_wnd_ctxs[name.data()];
+    _wnd_ctx = &_wnd_ctxs[name];
     _wnd_ctx->can_be_closed = is_closed;
     _wnd = g_wnd_mgr.get_window(_wnd_ctx->handle);
   }
   else 
   {
-    _wnd_ctx = &_wnd_ctxs[name.data()];
+    _wnd_ctx = &_wnd_ctxs[name];
     _wnd = g_wnd_mgr.get_window(_wnd_ctx->handle);
   }
   _wnd_ctx->is_called = true;

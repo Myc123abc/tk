@@ -1,7 +1,6 @@
 #include "tk/benchmark.hpp"
 
 #include <vector>
-#include <print>
 #include <chrono>
 #include <functional>
 #include <ranges>
@@ -92,11 +91,11 @@ auto main() -> int
 
   while (tk::benchmark::running())
   {
-    tk::benchmark::present(alloc_sizes, alloc_results, 0x0000ffff);
-    tk::benchmark::present(alloc_sizes, free_results, 0x00ff00ff);
+    tk::benchmark::present(alloc_sizes, alloc_results, 0x0000ffff, "allocate");
+    tk::benchmark::present(alloc_sizes, free_results, 0x00ff00ff, "free");
 
     tk::benchmark::new_line_chart();
-    tk::benchmark::present(alloc_sizes, reuse_results, 0x00ff00ff);
+    tk::benchmark::present(alloc_sizes, reuse_results, 0x00ff00ff, "resue");
 
     tk::benchmark::update();
   }
