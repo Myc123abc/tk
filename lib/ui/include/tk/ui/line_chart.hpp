@@ -32,8 +32,12 @@ struct LineChart
   };
   std::span<Data> datas;
 
-  // Calculate layout of the line chart.
-  void calc_layout() noexcept;
+  /**
+   * Calculate layout of the line chart.
+   * @param limit_extent
+   * @return tick counts adjusted by limit_extent
+   */
+  auto calc_layout(float2 limit_extent = {}) noexcept -> uint2;
 
   /**
    * Render line chart.
@@ -77,6 +81,13 @@ auto get_tick_values(std::span<float> vs, uint cnt) noexcept -> std::pair<std::v
  * @return tick values and step value
  */
 inline auto get_tick_values(std::span<float> vs) noexcept { return get_tick_values(vs, vs.size()); }
+
+/**
+ * Adjust tick values by count.
+ * @param vs values
+ * @param cnt count
+ */
+void adjust_tick_values(std::vector<float>& vs, uint cnt) noexcept;
 
 /**
  * Convert tick values to format string.

@@ -36,6 +36,29 @@ auto get_ratios(std::span<float> nums) noexcept
   return std::pair{ ratios, unit_interval_len };
 }
 
+constexpr float nice_steps[] =
+{
+  1.f,
+  1.2f,
+  1.5f,
+  2.f,
+  2.5f,
+  3.f,
+  4.f,
+  5.f,
+  6.f,
+  8.f,
+  10.f
+};
+
+void get_nice_step(float& step) noexcept
+{
+  auto magnitude = std::pow(10.f, std::floor(std::log10(step)));
+  auto normalized = step / magnitude;
+  auto it = std::ranges::find_if(nice_steps, [normalized](float x) { return x >= normalized; });
+  step = it == std::ranges::end(nice_steps) ? 10.f * magnitude : step = *it * magnitude;
+}
+
 }
 
 auto split_x_y_values(std::span<float2> ps) noexcept -> std::pair<std::vector<float>, std::vector<float>>
@@ -56,15 +79,7 @@ auto get_tick_values(std::span<float> vs, uint cnt) noexcept -> std::pair<std::v
   auto range      = max - min;
   assert(cnt > 1 && range > 0);
   auto step       = range / (cnt - 1);
-
-  auto magnitude = std::pow(10.f, std::floor(std::log10(step)));
-  auto normalized = step / magnitude;
-  if (normalized <= 1.f)  normalized = 1.f;
-  else if (normalized <= 2.f) normalized = 2.f;
-  else if (normalized <= 5.f) normalized = 5.f;
-  else normalized = 10.f;
-  step = normalized * magnitude;
-
+  get_nice_step(step);
   min = std::floor(min / step) * step;
   max = std::ceil(max / step) * step;
   cnt = std::round((max - min) / step) + 1;
@@ -74,6 +89,21 @@ auto get_tick_values(std::span<float> vs, uint cnt) noexcept -> std::pair<std::v
 
   return { ticks, step };
 }
+
+void adjust_tick_values(std::vector<float>& vs, uint cnt) noexcept
+{
+  assert(vs.size() > 1 && cnt > 1);
+  auto beg_val = vs.front();
+  auto step    = (vs.back() - beg_val) / (cnt - 1);
+  get_nice_step(step);
+  vs.resize(cnt);
+  for (auto& v : vs)
+  {
+    v = beg_val;
+    beg_val += step;
+  }
+}
+
 
 auto get_tick_labels(std::span<float> vs, float step) noexcept -> std::vector<std::string>
 {
@@ -85,7 +115,7 @@ auto get_tick_labels(std::span<float> vs, float step) noexcept -> std::vector<st
   return labels;
 }
 
-void LineChart::calc_layout() noexcept
+auto LineChart::calc_layout(float2 limit_extent) noexcept -> uint2
 {
   auto text_cfg = TextConfig{};
   text_cfg.family = font_family;
@@ -131,12 +161,23 @@ void LineChart::calc_layout() noexcept
     _layout.x_label_y_offset = -bounding->top;
 
   // get extent
-  auto y_label_extent = text(y_axis_label, label_size, text_cfg).extent;
+  auto y_label_extent         = text(y_axis_label, label_size, text_cfg).extent;
+  auto x_width_exclude_ticks  = y_label_extent.y  + y_layout.width() - x_layout.unit_width()  / 2 + y_label_padding;
+  auto y_height_exclude_ticks = x_layout.height() + x_label_extent.y - y_layout.unit_height() / 2 + x_label_padding + _layout.x_label_y_offset;
   _layout.extent =
   {
-    y_label_extent.y + y_layout.width() + x_layout.width() - x_layout.unit_width() / 2 + y_label_padding,
-    y_layout.height() + x_layout.height() + x_label_extent.y - y_layout.unit_height() / 2 + x_label_padding + _layout.x_label_y_offset
+    x_layout.width()  + x_width_exclude_ticks,
+    y_layout.height() + y_height_exclude_ticks
   };
+
+  // adjust ticks count by limit size
+  auto advice_x_tick_count = 0u;
+  auto advice_y_tick_count = 0u;
+  if (limit_extent.x > 0 && _layout.extent.x > limit_extent.x)
+    advice_x_tick_count = std::max(2, static_cast<int>(std::floor((limit_extent.x - x_width_exclude_ticks) / x_layout.unit_width())));
+  if (limit_extent.y > 0 && _layout.extent.y > limit_extent.y)
+    advice_y_tick_count = std::max(2, static_cast<int>(std::floor((limit_extent.y - y_height_exclude_ticks) / y_layout.unit_height())));
+  return { advice_x_tick_count, advice_y_tick_count };
 }
 
 void LineChart::render(float2 pos) noexcept

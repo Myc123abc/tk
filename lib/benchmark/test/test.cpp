@@ -88,6 +88,7 @@ auto main() -> int
 
   tk::benchmark::init();
   tk::benchmark::set_labels("size (B)", "Time (us)");
+  tk::benchmark::limit_size(450, 450);
 
   while (tk::benchmark::running())
   {

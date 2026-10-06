@@ -16,6 +16,7 @@ auto g_is_closed  = false;
 auto g_x_label    = StringLiteral{};
 auto g_y_label    = StringLiteral{};
 auto g_pos        = float2(10);
+auto g_limit_size = float2{};
 
 struct LineChartData
 {
@@ -87,6 +88,11 @@ void set_labels(StringLiteral x_label, StringLiteral y_label) noexcept
   g_y_label = y_label;
 }
 
+void limit_size(float width, float height) noexcept
+{
+  g_limit_size = { width, height };
+}
+
 void present(std::span<float> xs, std::span<float> ys, uint32_t color, StringLiteral legend) noexcept
 {
   assert(xs.size() == ys.size());
@@ -141,7 +147,22 @@ void render_line_chart(LineChartData& data) noexcept
   g_line_chart.datas = datas;
  
   // draw line chart
-  g_line_chart.calc_layout();
+  auto advice_counts = g_line_chart.calc_layout(g_limit_size);
+  if (advice_counts.x)
+  {
+    ui::adjust_tick_values(x_vs, advice_counts.x);
+    x_ts = ui::get_tick_labels(x_vs, x_step);
+    g_line_chart.x_axis_tick_values = x_vs;
+    g_line_chart.x_axis_tick_labels = x_ts;
+  }
+  if (advice_counts.y)
+  {
+    ui::adjust_tick_values(y_vs, advice_counts.y);
+    y_ts = ui::get_tick_labels(y_vs, y_step);
+    g_line_chart.y_axis_tick_values = y_vs;
+    g_line_chart.y_axis_tick_labels = y_ts;
+  }
+  if (advice_counts.x || advice_counts.y) g_line_chart.calc_layout();
   g_line_chart.render(g_pos);
  
   // get legends max height
