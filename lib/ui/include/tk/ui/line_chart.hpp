@@ -47,6 +47,8 @@ struct LineChart
 
   auto extent() const noexcept { return _layout.extent; }
 
+  auto origin_point() const noexcept { return _origin_point; }
+
 private:
   struct Layout
   {
@@ -58,6 +60,8 @@ private:
     float      y_unit_interval_len{};
     float      x_label_y_offset{};
   } _layout;
+
+  float2 _origin_point;
 };
 
 /**
@@ -84,10 +88,11 @@ inline auto get_tick_values(std::span<float> vs) noexcept { return get_tick_valu
 
 /**
  * Adjust tick values by count.
+ * @param ts tick values
  * @param vs values
  * @param cnt count
  */
-void adjust_tick_values(std::vector<float>& vs, uint cnt) noexcept;
+void adjust_tick_values(std::vector<float>& ts, std::span<float> vs, uint cnt) noexcept;
 
 /**
  * Convert tick values to format string.

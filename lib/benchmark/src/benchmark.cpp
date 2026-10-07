@@ -11,33 +11,50 @@ using namespace tk;
 namespace tk::benchmark {
 
 auto g_wndCfg     = ui::WindowConfig{};
-auto g_line_chart = ui::LineChart{};
 auto g_is_closed  = false;
 auto g_x_label    = StringLiteral{};
 auto g_y_label    = StringLiteral{};
-auto g_pos        = float2(10);
 auto g_limit_size = float2{};
 
-struct LineChartData
+struct LineChartInfo
 {
-  struct Points
+  struct Data
   {
     std::span<float> xs;
     std::span<float> ys;
     uint32_t         color;
     StringLiteral    legend;
+    Rect             text_rect;
   };
-  std::vector<Points> points;
-  bool                rendered{};
 
-  void clear() noexcept
-  {
-    rendered = {};
-    points.clear();
-  }
+  ui::LineChart                    line_chart;
+  std::vector<Data>                datas;
+  std::vector<ui::LineChart::Data> line_chart_datas;
+  std::vector<std::vector<float2>> points;
+  std::vector<float>               x_tick_values;
+  std::vector<float>               y_tick_values;
+
+  void set_datas() noexcept;
+  void render(float2 pos) noexcept;
 };
 
-auto g_line_chart_datas = std::vector<LineChartData>{};
+auto g_line_chart_infos = std::vector<LineChartInfo>{};
+
+void init_line_chart(ui::LineChart& line_chart) noexcept
+{
+  line_chart.x_tick_label_padding = { 32, 8 };
+  line_chart.y_tick_label_padding = { 16, 32 };
+  line_chart.axis_color           = 0xffffffff;
+  line_chart.tick_label_size      = 12;
+  line_chart.grid_color           = 0x404040ff;
+  line_chart.label_size           = 14;
+  line_chart.y_label_padding      = 4;
+}
+
+void init_line_chart_info() noexcept
+{
+  init_line_chart(g_line_chart_infos.emplace_back(ui::LineChart{}).line_chart);
+}
 
 void init() noexcept
 {
@@ -50,13 +67,7 @@ void init() noexcept
   g_wndCfg.display_wireframe_only_active = true;
   g_wndCfg.wireframe_color               = 0x0000ffff;
 
-  g_line_chart.x_tick_label_padding = { 32, 8 };
-  g_line_chart.y_tick_label_padding = { 16, 32 };
-  g_line_chart.axis_color           = 0xffffffff;
-  g_line_chart.tick_label_size      = 12;
-  g_line_chart.grid_color           = 0x404040ff;
-  g_line_chart.label_size           = 14;
-  g_line_chart.y_label_padding      = 4;
+  init_line_chart_info();
 }
 
 void destroy() noexcept
@@ -69,17 +80,6 @@ auto running() noexcept -> bool
   ui::begin("Benchmark", 0, 0, 200, 200, &g_is_closed, g_wndCfg);
   ui::rectangle({}, ui::window_drawable_extent(), 0x000000ff);
   return !g_is_closed;
-}
-
-auto get_line_chart() noexcept
-{
-  LineChartData* data{};
-  auto it = std::ranges::find_if(g_line_chart_datas, [](auto const& data) { return !data.rendered; });
-  if (it == g_line_chart_datas.end())
-    data = &g_line_chart_datas.emplace_back(LineChartData());
-  else
-    data = &*it;
-  return data;
 }
 
 void set_labels(StringLiteral x_label, StringLiteral y_label) noexcept
@@ -96,7 +96,7 @@ void limit_size(float width, float height) noexcept
 void present(std::span<float> xs, std::span<float> ys, uint32_t color, StringLiteral legend) noexcept
 {
   assert(xs.size() == ys.size());
-  get_line_chart()->points.emplace_back(xs, ys, color, legend);
+  g_line_chart_infos.back().datas.emplace_back(xs, ys, color, legend);
 }
 
 auto to_all_vs = [](auto&& range, auto&& mem)
@@ -104,122 +104,124 @@ auto to_all_vs = [](auto&& range, auto&& mem)
   return range | std::views::transform(mem) | std::views::join | std::ranges::to<std::vector<float>>();
 };
 
-void render_line_chart(LineChartData& data) noexcept
+void LineChartInfo::set_datas() noexcept
 {
-  assert(!data.rendered);
-  data.rendered = true;
-
-  auto xs = to_all_vs(data.points, &LineChartData::Points::xs);
-  auto ys = to_all_vs(data.points, &LineChartData::Points::ys);
+  auto xs = to_all_vs(datas, &LineChartInfo::Data::xs);
+  auto ys = to_all_vs(datas, &LineChartInfo::Data::ys);
  
   auto [x_vs, x_step] = ui::get_tick_values(xs);
   auto [y_vs, y_step] = ui::get_tick_values(ys);
   auto x_ts = ui::get_tick_labels(x_vs, x_step);
   auto y_ts = ui::get_tick_labels(y_vs, y_step);
  
-  g_line_chart.x_axis_label       = g_x_label;
-  g_line_chart.y_axis_label       = g_y_label;
-  g_line_chart.x_axis_tick_values = x_vs;
-  g_line_chart.y_axis_tick_values = y_vs;
-  g_line_chart.x_axis_tick_labels = x_ts;
-  g_line_chart.y_axis_tick_labels = y_ts;
+  x_tick_values = std::move(x_vs);
+  y_tick_values = std::move(y_vs);
+
+  line_chart.x_axis_label       = g_x_label;
+  line_chart.y_axis_label       = g_y_label;
+  line_chart.x_axis_tick_values = x_tick_values;
+  line_chart.y_axis_tick_values = y_tick_values;
+  line_chart.x_axis_tick_labels = x_ts;
+  line_chart.y_axis_tick_labels = y_ts;
  
   // get draw information
-  struct Legend
+  line_chart_datas.reserve(datas.size());
+  points.reserve(datas.size());
+  for (auto const& data : datas)
   {
-    StringLiteral name;
-    uint32_t      color;
-    Rect          text_rect;
-  };
-  auto datas   = std::vector<ui::LineChart::Data>{};
-  auto pss     = std::vector<std::vector<float2>>{};
-  auto legends = std::vector<Legend>{};
-  datas.reserve(data.points.size());
-  pss.reserve(data.points.size());
-  legends.reserve(data.points.size());
-  for (auto [xs, ys, color, legend] : data.points)
-  {
-    pss.emplace_back(std::views::zip_transform([](auto x, auto y) { return float2{ x, y }; }, xs, ys)
+    points.emplace_back(std::views::zip_transform([](auto x, auto y) { return float2{ x, y }; }, data.xs, data.ys)
       | std::ranges::to<std::vector<float2>>());
-    datas.emplace_back(pss.back(), color);
-    legends.emplace_back(legend, color);
+    line_chart_datas.emplace_back(points.back(), data.color);
   }
-  g_line_chart.datas = datas;
+  line_chart.datas = line_chart_datas;
  
   // draw line chart
-  auto advice_counts = g_line_chart.calc_layout(g_limit_size);
+  auto advice_counts = line_chart.calc_layout(g_limit_size);
   if (advice_counts.x)
   {
-    ui::adjust_tick_values(x_vs, advice_counts.x);
-    x_ts = ui::get_tick_labels(x_vs, x_step);
-    g_line_chart.x_axis_tick_values = x_vs;
-    g_line_chart.x_axis_tick_labels = x_ts;
+    ui::adjust_tick_values(x_tick_values, xs, advice_counts.x);
+    x_ts = ui::get_tick_labels(x_tick_values, x_step);
+    line_chart.x_axis_tick_values = x_tick_values;
+    line_chart.x_axis_tick_labels = x_ts;
   }
   if (advice_counts.y)
   {
-    ui::adjust_tick_values(y_vs, advice_counts.y);
-    y_ts = ui::get_tick_labels(y_vs, y_step);
-    g_line_chart.y_axis_tick_values = y_vs;
-    g_line_chart.y_axis_tick_labels = y_ts;
+    ui::adjust_tick_values(y_tick_values, ys, advice_counts.y);
+    y_ts = ui::get_tick_labels(y_tick_values, y_step);
+    line_chart.y_axis_tick_values = y_tick_values;
+    line_chart.y_axis_tick_labels = y_ts;
   }
-  if (advice_counts.x || advice_counts.y) g_line_chart.calc_layout();
-  g_line_chart.render(g_pos);
+  if (advice_counts.x || advice_counts.y) line_chart.calc_layout();
+}
+
+void LineChartInfo::render(float2 pos) noexcept
+{
+  line_chart.render(pos);
  
   // get legends max height
   auto max_height = 0.f;
   auto max_width  = 0.f;
-  for (auto& [legend, color, rect] : legends)
+  for (auto& [xs, ys, color, legend, text_rect] : datas)
   {
-    if (auto rc = ui::get_text_bounding_rect(legend, g_line_chart.label_size))
+    if (auto rc = ui::get_text_bounding_rect(legend, line_chart.label_size))
     {
-      rect = rc.value();
-      max_height = std::max(max_height, rect.height());
-      max_width  = std::max(max_width, rect.width());
+      text_rect  = rc.value();
+      max_height = std::max(max_height, text_rect.height());
+      max_width  = std::max(max_width, text_rect.width());
     }
   }
 
   // draw legends
-  auto line_chart_ext = g_line_chart.extent();
+  auto line_chart_ext = line_chart.extent();
   auto padding        = 5;
-  auto beg_pos        = float2{ g_pos.x + line_chart_ext.x + 10, g_pos.y };
+  auto beg_pos        = float2{ pos.x + line_chart_ext.x + 10, pos.y };
   auto extent         = float2{ padding + max_height + padding + max_width + padding, padding };
-  auto pos            = beg_pos + float2(padding);
-  for (auto& [legend, color, rect] : legends)
+  auto p              = beg_pos + float2(padding);
+  for (auto& [xs, ys, color, legend, text_rect] : datas)
   {
-    if (!rect.empty())
+    if (!text_rect.empty())
     {
-      ui::rectangle(pos, pos + float2(max_height), color);
-      auto offset = (max_height - rect.height()) / 2;
-      ui::text(legend, pos + float2{ max_height + padding, offset - rect.top }, g_line_chart.label_size, g_line_chart.axis_color);
+      ui::rectangle(p, p + float2(max_height), color);
+      auto offset = (max_height - text_rect.height()) / 2;
+      ui::text(legend, p + float2{ max_height + padding, offset - text_rect.top }, line_chart.label_size, line_chart.axis_color);
       offset    = max_height + padding;
-      pos.y    += offset;
+      p.y      += offset;
       extent.y += offset;
     }
   }
   // draw legends border
-  ui::rectangle(beg_pos, beg_pos + extent, g_line_chart.axis_color, 1);
-
-  g_pos.y += g_line_chart.extent().y + 10;
+  ui::rectangle(beg_pos, beg_pos + extent, line_chart.axis_color, 1);
 }
 
 void update() noexcept
 {
-  for (auto& data : g_line_chart_datas)
+  auto pos = float2(10);
+
+  // set last data for line chart
+  g_line_chart_infos.back().set_datas();
+
+  // render line charts
+  auto max_origin_point_x = 0.f;
+  for (auto const& info : g_line_chart_infos)
+    max_origin_point_x = std::max(max_origin_point_x, info.line_chart.origin_point().x);
+  for (auto& info : g_line_chart_infos)
   {
-    if (data.rendered) continue;
-    render_line_chart(data);
+    auto offset = max_origin_point_x - info.line_chart.origin_point().x;
+    info.render({ pos.x + offset, pos.y });
+    pos.y += info.line_chart.extent().y + 10;
   }
 
   ui::end();
   tk::update();
 
-  for (auto& data : g_line_chart_datas) data.clear();
-  g_pos = float2(10);
+  g_line_chart_infos.clear();
+  init_line_chart_info();
 }
 
 void new_line_chart() noexcept
 {
-  render_line_chart(*get_line_chart());
+  g_line_chart_infos.back().set_datas();
+  init_line_chart_info();
 }
 
 }

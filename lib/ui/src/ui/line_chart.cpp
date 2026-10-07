@@ -90,20 +90,24 @@ auto get_tick_values(std::span<float> vs, uint cnt) noexcept -> std::pair<std::v
   return { ticks, step };
 }
 
-void adjust_tick_values(std::vector<float>& vs, uint cnt) noexcept
+void adjust_tick_values(std::vector<float>& ts, std::span<float> vs, uint cnt) noexcept
 {
-  assert(vs.size() > 1 && cnt > 1);
-  auto beg_val = vs.front();
-  auto step    = (vs.back() - beg_val) / (cnt - 1);
+  assert(ts.size() > 1 && vs.size() > 1 && cnt > 1);
+
+  auto step = (ts.back() - ts.front()) / (cnt - 1);
   get_nice_step(step);
-  vs.resize(cnt);
-  for (auto& v : vs)
+
+  auto [min, max] = std::ranges::minmax(vs);
+  auto tick_min = std::floor(min / step) * step;
+  auto tick_max = std::ceil(max / step) * step;
+  cnt = (tick_max - tick_min) / step + 1;
+  ts.resize(cnt);
+  for (auto& t : ts)
   {
-    v = beg_val;
-    beg_val += step;
+    t = tick_min;
+    tick_min += step;
   }
 }
-
 
 auto get_tick_labels(std::span<float> vs, float step) noexcept -> std::vector<std::string>
 {
@@ -159,6 +163,13 @@ auto LineChart::calc_layout(float2 limit_extent) noexcept -> uint2
   _layout.x_label_width = x_label_extent.x;
   if (auto bounding = get_text_bounding_rect(x_axis_label, label_size, text_cfg))
     _layout.x_label_y_offset = -bounding->top;
+  
+  // get origin point
+  _origin_point =
+  {
+    text(y_axis_label, label_size, text_cfg).extent.y + y_label_padding + y_layout.width(),
+    y_layout.height() - y_layout.unit_height() / 2
+  };
 
   // get extent
   auto y_label_extent         = text(y_axis_label, label_size, text_cfg).extent;
@@ -198,10 +209,8 @@ void LineChart::render(float2 pos) noexcept
 
   // get y axis layout info
   y_layout.set_pos(pos.x + y_label_extent.y + y_label_padding, pos.y);
-  auto y_axis_beg_point        = float2{ y_layout.pos().x + y_layout.width(), pos.y };
-  auto y_axis_unit_height      = y_layout.unit_height();
-  auto y_axis_half_unit_height = y_axis_unit_height / 2;
-  auto origin_point            = float2{ y_axis_beg_point.x, pos.y + y_layout.height() - y_axis_half_unit_height };
+  auto y_axis_beg_point = float2{ y_layout.pos().x + y_layout.width(), pos.y };
+  auto origin_point     = _origin_point + pos;
 
   // get x axis info
   auto x_axis_unit_width      = x_layout.unit_width();
