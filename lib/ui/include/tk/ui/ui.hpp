@@ -557,4 +557,14 @@ struct GetKeyResult
  */
 auto get_key(Key key) noexcept -> GetKeyResult;
 
+/**
+ * Start a scissor area.
+ * @param pos
+ * @param extent
+ */
+void scissor_area_begin(float2 pos, float2 extent) noexcept;
+
+// End a scissor area
+void scissor_area_end() noexcept;
+
 }

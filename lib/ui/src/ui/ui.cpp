@@ -227,6 +227,22 @@ void transform_end() noexcept
   g_ui_ctx.frame_data()->transform_end();
 }
 
+void scissor_area_begin(float2 pos, float2 extent) noexcept
+{
+  g_ui_ctx.check_draw();
+
+  auto left_top     = pos;
+  auto right_bottom = pos + extent;
+  adjust_pos(left_top, right_bottom);
+
+  g_ui_ctx.scissor_area_begin(Rect{ left_top, right_bottom });
+}
+
+void scissor_area_end() noexcept
+{
+  g_ui_ctx.check_draw();
+  g_ui_ctx.scissor_area_end();
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                            Shape Operator

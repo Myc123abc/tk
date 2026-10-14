@@ -10,7 +10,6 @@
 #include <windows.h>
 
 #include <unordered_map>
-#include <string>
 #include <optional>
 #include <unordered_set>
 
@@ -58,6 +57,9 @@ public:
   auto get_render_pos() const noexcept { return _wnd_ctx->render_pos; }
 
   void render_on(float x, float y, std::move_only_function<void()>&& func) noexcept;
+
+  void scissor_area_begin(Rect rect) noexcept;
+  void scissor_area_end() noexcept;
 
   auto generic_id(StringID name) noexcept -> size_t;
   auto get_id(StringID name) const noexcept -> size_t;
@@ -107,6 +109,7 @@ private:
 
   renderer::Window* _wnd{};
   WindowContext*    _wnd_ctx{};
+  std::vector<Rect> _scissor_area_stack;
   HWND              _fullscreen_window{};
   bool              _fullscreen_window_need_clear{};
 

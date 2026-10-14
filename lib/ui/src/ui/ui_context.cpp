@@ -112,6 +112,7 @@ void UIContext::fullscreen_process() noexcept
 void UIContext::end() noexcept
 {
   err_if(!_call_begin, "begin is not called but end is called");
+  err_if(!_scissor_area_stack.empty(), "scissor_area_begin is called but scissor_area_end not be called");
   if (is_use_title_bar_now())
     add_title_bar();
   _call_begin = false;
@@ -329,6 +330,25 @@ void UIContext::render_on(float x, float y, std::move_only_function<void()>&& fu
   g_ui_ctx.set_render_pos(x, y);
   func();
   g_ui_ctx.set_render_pos(org_pos.x - Window_Shadow_Thickness, org_pos.y - Window_Shadow_Thickness);
+}
+
+void UIContext::scissor_area_begin(Rect rect) noexcept
+{
+  auto const is_resizing = _wnd->is_resizing();
+  auto const content_rect = is_resizing ? _wnd->rect() : _wnd->content_rect();
+  auto const current_rect = _scissor_area_stack.empty() ? content_rect : _scissor_area_stack.back();
+  frame_data()->add_scissor_rect(current_rect);
+
+  if (is_resizing) rect += _wnd->real_pos();
+  rect = intersect(rect, current_rect);
+  _scissor_area_stack.emplace_back(rect);
+}
+
+void UIContext::scissor_area_end() noexcept
+{
+  assert(!_scissor_area_stack.empty());
+  frame_data()->add_scissor_rect(_scissor_area_stack.back());
+  _scissor_area_stack.pop_back();
 }
 
 auto UIContext::is_hover_on(size_t id, float2 left_top, float2 right_bottom) noexcept -> bool
