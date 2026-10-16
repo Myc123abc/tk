@@ -60,8 +60,10 @@ public:
     _indices.clear();
     _render_cmds.clear();
     _render_cmd_rect_idxs.clear();
+    _render_cmd_clip_rect_idxs.clear();
     _sampled_images.clear();
     _transform_stack.clear();
+    _cull_rect_stack.clear();
     _points.clear();
     _normals.clear();
     _vertex_beg                    = {};
@@ -71,6 +73,7 @@ public:
     _draw_index_beg                = {};
     _window_pos                    = {};
     _window_shadow_info            = {};
+    _base_cull_rect                = {};
     _build_mode                    = {};
     _using_discard_shapes          = {};
     _discard_beg_idx               = {};
@@ -103,6 +106,8 @@ public:
       add_scissor_rect,
       transform_beg,
       transform_end,
+      cull_rect_beg,
+      cull_rect_end,
       discard_beg,
       discard_end,
     } type{};
@@ -270,6 +275,11 @@ public:
 
       struct
       {
+        Rect rect;
+      } cull_rect_beg;
+
+      struct
+      {
         uint count{};
       } discard_beg;
 
@@ -304,7 +314,11 @@ public:
   void add_scissor_rect(Rect rect) noexcept;
 
   void transform_beg(Matrix const& transform) noexcept;
+  void transform_beg(Transform const& transform) noexcept { transform_beg(transform.matrix()); }
   void transform_end() noexcept;
+
+  void cull_rect_beg(Rect rect) noexcept;
+  void cull_rect_end() noexcept;
 
   void discard_beg(std::function<void()> func) noexcept;
   void discard_end() noexcept;
@@ -312,6 +326,7 @@ public:
   void build_render_cmds() noexcept;
 
   void set_window_pos(float2 pos) noexcept { _window_pos = pos; }
+  void set_cull_rect(Rect rect) noexcept { _base_cull_rect = rect; }
   void set_window_shadow(Rect scissor_rect, uint2 window_extent, float shadow_thickness, Color color, float radius, float softness, std::optional<float4> wireframe_color) noexcept
   {
     _window_shadow_info = { scissor_rect, window_extent, shadow_thickness, { color.r, color.g, color.b }, radius, softness, wireframe_color };
@@ -324,10 +339,14 @@ public:
   auto& sampled_images()     const noexcept { return _sampled_images;     }
 
   auto window_pos() const noexcept { return _window_pos;                   }
-  auto check()      const noexcept { return _render_cmd_rect_idxs.empty(); }
+  auto check() const noexcept
+  {
+    return _render_cmd_rect_idxs.empty() && _render_cmd_clip_rect_idxs.empty();
+  }
 
 private:
   void _add_rect(float2 left_top, float2 right_bottom, Color color, float thickness, float rounding, Flag<CornerFlag> flags) noexcept;
+  void _add_transformed_rect(float2 left_top, float2 right_bottom, Color color, float thickness, float rounding, Flag<CornerFlag> flags, float scale) noexcept;
   void _add_triangle(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept;
   void _add_circle(float2 center, float radius, Color color, float thickness) noexcept;
   void _add_line(float2 p0, float2 p1, Color color, float thickness) noexcept;
@@ -349,6 +368,8 @@ private:
   void _add_scissor_rect(Rect rect) noexcept;
   void _transform_beg(Matrix const& transform) noexcept;
   void _transform_end() noexcept;
+  void _cull_rect_beg(Rect rect) noexcept;
+  void _cull_rect_end() noexcept;
 
   void _discard_beg(uint count, uint& idx) noexcept;
   void _discard_end() noexcept;
@@ -379,6 +400,10 @@ private:
   void add_rect(float2 left_top, float2 right_bottom, Color color = {}) noexcept;
   void transform_vertices(uint vtx_beg) noexcept;
   auto transform_point(float2 p) const noexcept -> float2;
+  auto should_cull(std::span<float2 const> points, float padding = 0) const noexcept -> bool;
+  auto should_cull(Rect bounds, float padding = 0) const noexcept -> bool;
+  auto uniform_transform_scale() const noexcept -> std::optional<float>;
+  auto axis_aligned_uniform_transform_scale() const noexcept -> std::optional<float>;
 
   void push_render_cmd(RenderCmdType type) noexcept;
   void push_render_cmd_clear_rect(RenderCmdType type, Rect rect = {}) noexcept;
@@ -390,10 +415,10 @@ private:
   static auto get_circle_segment_count(float radius) noexcept -> uint;
 
   void add_poly_line(Color color, float thickness, bool is_closed) noexcept;
-  void path_rect(float2 left_top, float2 right_bottom, float rounding, Flag<CornerFlag> flags) noexcept;
-  void path_arc_to(float2 center, float radius, float min, float max) noexcept;
+  void path_rect(float2 left_top, float2 right_bottom, float rounding, Flag<CornerFlag> flags, float tessellation_scale = 1.f) noexcept;
+  void path_arc_to(float2 center, float radius, float min, float max, float tessellation_scale = 1.f) noexcept;
   void _path_arc_to(float2 center, float radius, int min, int max) noexcept;
-  void _path_arc_to(float2 center, float radius, int min, int max, int segment_cnt) noexcept;
+  void _path_arc_to(float2 center, float radius, float min, float max, int segment_cnt) noexcept;
 
   void path_bezier_quad_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float tess_tol, int level) noexcept;
   void path_bezier_cubic_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float2 p3, float tess_tol, int level) noexcept;
@@ -410,14 +435,17 @@ private:
 
   std::vector<RenderCmd>          _render_cmds;
   std::vector<uint>               _render_cmd_rect_idxs;
+  std::vector<uint>               _render_cmd_clip_rect_idxs;
   std::unordered_set<ImageHandle> _sampled_images;
   uint                            _draw_index_beg{};
 
   std::vector<Matrix> _transform_stack;
+  std::vector<Rect>   _cull_rect_stack;
 
   float2 _window_pos{};
 
   std::optional<WindowShadowInfo> _window_shadow_info;
+  std::optional<Rect>             _base_cull_rect;
 
   std::vector<float2> _points;
   std::vector<float2> _normals;

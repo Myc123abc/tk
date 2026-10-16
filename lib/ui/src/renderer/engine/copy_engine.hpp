@@ -14,6 +14,7 @@ class UploadBuffer
 public:
   void init() noexcept;
   void destroy() noexcept;
+  void trim() noexcept;
 
   void upload(Command* cmd) noexcept;
 

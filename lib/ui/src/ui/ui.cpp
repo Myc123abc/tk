@@ -51,7 +51,7 @@ void adjust_transform(Matrix& transform) noexcept
 namespace tk::ui {
 
 ////////////////////////////////////////////////////////////////////////////////
-///                              Misc
+///                              Animation
 ////////////////////////////////////////////////////////////////////////////////
 
 auto lerp(Color x, Color y, float v) noexcept -> float4
@@ -75,6 +75,20 @@ auto delta_time() noexcept -> double
   return g_ui_ctx.delta_time();
 }
 
+auto ping_pong(StringID name, bool b, double forward_dur, double reverse_dur, Tween::Ease ease) noexcept -> double
+{
+  return g_ui_ctx.ping_pong(b, g_ui_ctx.generic_id(name), forward_dur, reverse_dur, ease);
+}
+
+void reset_tween(StringID name) noexcept
+{
+  g_ui_ctx.reset_tween(g_ui_ctx.get_id(name));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///                              Image
+////////////////////////////////////////////////////////////////////////////////
+
 auto image_extent(std::string_view path) noexcept -> float2
 {
   return g_img_mgr.extent(path);
@@ -92,6 +106,10 @@ auto load_image(std::string_view path) noexcept -> std::expected<void, ImageLoad
 {
   return g_img_mgr.try_load(path, {}, {}).transform([](auto&&) {});
 }
+
+////////////////////////////////////////////////////////////////////////////////
+///                              Text
+////////////////////////////////////////////////////////////////////////////////
 
 auto load_font(std::string_view path) noexcept -> std::expected<FontInfo, FontLoadErrorType>
 {
@@ -119,15 +137,9 @@ auto get_text_bounding_rect(StringLiteral text, float size, TextConfig const& cf
   return g_ui_ctx.get_text_bounding_rect(text, size, cfg);
 }
 
-auto ping_pong(StringID name, bool b, double forward_dur, double reverse_dur, Tween::Ease ease) noexcept -> double
-{
-  return g_ui_ctx.ping_pong(b, g_ui_ctx.generic_id(name), forward_dur, reverse_dur, ease);
-}
-
-void reset_tween(StringID name) noexcept
-{
-  g_ui_ctx.reset_tween(g_ui_ctx.get_id(name));
-}
+////////////////////////////////////////////////////////////////////////////////
+///                             Window
+////////////////////////////////////////////////////////////////////////////////
 
 auto get_cursor_pos() noexcept -> float2
 {
@@ -139,10 +151,6 @@ auto get_cursor_pos_on_window() noexcept -> float2
   g_ui_ctx.check_draw();
   return get_cursor_pos() - g_ui_ctx.window()->pos();
 }
-
-////////////////////////////////////////////////////////////////////////////////
-///                             Window
-////////////////////////////////////////////////////////////////////////////////
 
 void begin(StringID name, int x, int y, uint width, uint height, bool* is_closed, WindowConfig const& cfg) noexcept
 {
@@ -208,6 +216,10 @@ void restore_fullscreen_window() noexcept
   g_ui_ctx.restore_fullscreen_window();
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///                            Shape Operator
+////////////////////////////////////////////////////////////////////////////////
+
 void transform_beg(Matrix const& transform) noexcept
 {
   g_ui_ctx.check_draw();
@@ -227,27 +239,6 @@ void transform_end() noexcept
   g_ui_ctx.frame_data()->transform_end();
 }
 
-void scissor_area_begin(float2 pos, float2 extent) noexcept
-{
-  g_ui_ctx.check_draw();
-
-  auto left_top     = pos;
-  auto right_bottom = pos + extent;
-  adjust_pos(left_top, right_bottom);
-
-  g_ui_ctx.scissor_area_begin(Rect{ left_top, right_bottom });
-}
-
-void scissor_area_end() noexcept
-{
-  g_ui_ctx.check_draw();
-  g_ui_ctx.scissor_area_end();
-}
-
-////////////////////////////////////////////////////////////////////////////////
-///                            Shape Operator
-////////////////////////////////////////////////////////////////////////////////
-
 void discard_beg(std::function<void()> func) noexcept
 {
   g_ui_ctx.frame_data()->discard_beg(func);
@@ -256,6 +247,38 @@ void discard_beg(std::function<void()> func) noexcept
 void discard_end() noexcept
 {
   g_ui_ctx.frame_data()->discard_end();
+}
+
+auto get_rect(float2 pos, float2 extent) noexcept -> Rect
+{
+  auto left_top     = pos;
+  auto right_bottom = pos + extent;
+  adjust_pos(left_top, right_bottom);
+  return { left_top, right_bottom };
+}
+
+void scissor_area_begin(float2 pos, float2 extent) noexcept
+{
+  g_ui_ctx.check_draw();
+  g_ui_ctx.scissor_area_begin(get_rect(pos, extent));
+}
+
+void scissor_area_end() noexcept
+{
+  g_ui_ctx.check_draw();
+  g_ui_ctx.scissor_area_end();
+}
+
+void viewport_begin(StringID name, float2 pos, float2 extent) noexcept
+{
+  g_ui_ctx.check_draw();
+  g_ui_ctx.viewport_begin(name, get_rect(pos, extent));
+}
+
+void viewport_end() noexcept
+{
+  g_ui_ctx.check_draw();
+  g_ui_ctx.viewport_end();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -298,8 +321,6 @@ void line(float2 p0, float2 p1, Color color, float thickness) noexcept
   if (p0 == p1) return;
   if (thickness < 1) thickness = 1;
   adjust_pos(p0, p1); adjust_scale(thickness);
-  p0 = floor(p0) + .5f;
-  p1 = floor(p1) + .5f;
   g_ui_ctx.frame_data()->add_line(p0, p1, color, thickness);
 }
 
@@ -308,9 +329,6 @@ void arc(float2 center, float2 p0, float2 p1, bool ccw, Color color, float thick
   g_ui_ctx.check_draw();
   if (thickness < 1) thickness = 1;
   adjust_pos(center, p0, p1); adjust_scale(thickness);
-  center = floor(center) + .5f;
-  p0     = floor(p0)     + .5f;
-  p1     = floor(p1)     + .5f;
   if (ccw) std::swap(p0, p1);
   g_ui_ctx.frame_data()->add_arc(center, p0, p1, color, thickness);
 }
@@ -388,24 +406,6 @@ void union_end(Color color, float thickness) noexcept
   g_ui_ctx.check_draw();
   adjust_scale(thickness);
   g_ui_ctx.frame_data()->union_end(color, thickness);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-///                               Key
-////////////////////////////////////////////////////////////////////////////////
-
-auto GetKeyResult::is_uppercase() const noexcept -> bool
-{
-  if (is_caps_locked()) return !get_key(Key::Shift).has_down();
-  return get_key(Key::Shift).has_down();
-}
-
-auto get_key(Key key) noexcept -> GetKeyResult
-{
-  g_ui_ctx.check_draw();
-  if (g_ui_ctx.window()->is_active())
-    return { g_ui_ctx.get_key(key) };
-  return {};
 }
 
 }

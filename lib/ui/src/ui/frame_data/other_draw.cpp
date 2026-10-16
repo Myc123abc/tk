@@ -2,6 +2,8 @@
 #include "util.hpp"
 #include "../ui_context.hpp"
 
+#include <cmath>
+
 namespace tk::ui {
 
 void FrameData::add_scissor_rect(Rect rect) noexcept
@@ -17,6 +19,11 @@ void FrameData::_add_scissor_rect(Rect rect) noexcept
   for (auto idx : _render_cmd_rect_idxs)
     _render_cmds[idx].rect = rect;
   _render_cmd_rect_idxs.clear();
+
+  auto const local_rect = rect + -_window_pos;
+  for (auto idx : _render_cmd_clip_rect_idxs)
+    _render_cmds[idx].rect = intersect(_render_cmds[idx].rect, local_rect);
+  _render_cmd_clip_rect_idxs.clear();
 }
 
 void FrameData::transform_beg(Matrix const& transform) noexcept
@@ -44,6 +51,30 @@ void FrameData::_transform_end() noexcept
   _transform_stack.pop_back();
 }
 
+void FrameData::cull_rect_beg(Rect rect) noexcept
+{
+  auto& cmd = _draw_cmds.emplace_back(DrawCmd::Type::cull_rect_beg);
+  cmd.data.cull_rect_beg = { rect };
+}
+
+void FrameData::_cull_rect_beg(Rect rect) noexcept
+{
+  if (!_cull_rect_stack.empty())
+    rect = intersect(rect, _cull_rect_stack.back());
+  _cull_rect_stack.emplace_back(rect);
+}
+
+void FrameData::cull_rect_end() noexcept
+{
+  _draw_cmds.emplace_back(DrawCmd::Type::cull_rect_end);
+}
+
+void FrameData::_cull_rect_end() noexcept
+{
+  assert(!_cull_rect_stack.empty());
+  _cull_rect_stack.pop_back();
+}
+
 void FrameData::transform_vertices(uint vtx_beg) noexcept
 {
   if (_transform_stack.empty())
@@ -59,6 +90,54 @@ auto FrameData::transform_point(float2 p) const noexcept -> float2
   if (_transform_stack.empty())
     return p;
   return _transform_stack.back() * p;
+}
+
+auto FrameData::should_cull(std::span<float2 const> points, float padding) const noexcept -> bool
+{
+  if (_cull_rect_stack.empty() || _build_mode.contains(BuildMode::discard))
+    return false;
+
+  auto bounds = Rect{};
+  for (auto const point : points)
+  {
+    auto const transformed = transform_point(point);
+    if (!std::isfinite(transformed.x) || !std::isfinite(transformed.y))
+      return true;
+    bounds.expand(transformed);
+  }
+
+  auto const scale = _transform_stack.empty() ? 1.f : _transform_stack.back().scale_bound();
+  return should_cull(bounds, std::abs(padding) * scale + 2.f);
+}
+
+auto FrameData::should_cull(Rect bounds, float padding) const noexcept -> bool
+{
+  if (_cull_rect_stack.empty() || _build_mode.contains(BuildMode::discard))
+    return false;
+  bounds += _window_pos;
+  if (!std::isfinite(bounds.left) || !std::isfinite(bounds.top) ||
+      !std::isfinite(bounds.right) || !std::isfinite(bounds.bottom))
+    return true;
+
+  auto const& clip = _cull_rect_stack.back();
+  return bounds.right  + padding < clip.left ||
+         bounds.bottom + padding < clip.top ||
+         bounds.left   - padding > clip.right ||
+         bounds.top    - padding > clip.bottom;
+}
+
+auto FrameData::uniform_transform_scale() const noexcept -> std::optional<float>
+{
+  if (_transform_stack.empty())
+    return {};
+  return _transform_stack.back().uniform_scale();
+}
+
+auto FrameData::axis_aligned_uniform_transform_scale() const noexcept -> std::optional<float>
+{
+  if (_transform_stack.empty())
+    return {};
+  return _transform_stack.back().axis_aligned_uniform_scale();
 }
 
 void FrameData::add_image(ImageHandle handle, float2 p0, float2 p1, float2 p2, float2 p3, uint8 alpha, std::span<float2> uvs) noexcept

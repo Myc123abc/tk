@@ -14,6 +14,11 @@ void main(uint3 id : SV_DispatchThreadID)
   uint width, height, mip_level_count;
   src.GetDimensions(0, width, height, mip_level_count);
 
+  uint dst_width, dst_height;
+  dst.GetDimensions(dst_width, dst_height);
+  if (id.x >= dst_width || id.y >= dst_height)
+    return;
+
   uint2 pos = id.xy * 2;
 
   float4 color = 0;

@@ -237,14 +237,14 @@ void LineChart::render(float2 pos) noexcept
   // draw y tick labels
   g_ui_ctx.render(y_layout);
 
-  // draw y axis
-  line(y_axis_beg_point, origin_point, axis_color);
-
   // draw x tick labels
   g_ui_ctx.render(x_layout);
 
-  // draw x axis
-  line(origin_point, x_axis_end_point, axis_color);
+  // draw axes with a shared join
+  path_begin(y_axis_beg_point);
+  path_line_to(origin_point);
+  path_line_to(x_axis_end_point);
+  path_end(false, axis_color, 1);
 
   // draw origin point
   if (!origin_point_text.empty())
@@ -290,12 +290,12 @@ void LineChart::render(float2 pos) noexcept
 
   for (auto const& [points, color] : datas)
   {
-    for (auto [a, b] : points | std::views::pairwise)
-    {
-      auto p0 = float2{ get_x(a.x), get_y(a.y) };
-      auto p1 = float2{ get_x(b.x), get_y(b.y) };
-      line(p0, p1, color);
-    }
+    if (points.size() < 2) continue;
+
+    path_begin({ get_x(points.front().x), get_y(points.front().y) });
+    for (auto point : points | std::views::drop(1))
+      path_line_to({ get_x(point.x), get_y(point.y) });
+    path_end(false, color, 1);
   }
 }
 

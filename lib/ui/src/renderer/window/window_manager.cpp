@@ -4,6 +4,7 @@
 #include "../renderer.hpp"
 #include "monitor.hpp"
 #include "compositor.hpp"
+#include "../../ui/input_system.hpp"
 
 #include <shellscalingapi.h>
 
@@ -51,6 +52,48 @@ void set_cursor(ResizeType type) noexcept
   SetCursor(LoadCursorA(nullptr, cursor));
 }
 
+auto key_pair(WPARAM w_param, LPARAM l_param) noexcept -> std::pair<Key, Key>
+{
+  auto key          = static_cast<Key>(w_param);
+  auto specific_key = key;
+
+  switch (w_param)
+  {
+  case VK_SHIFT:
+  {
+    auto scan_code = static_cast<UINT>((l_param >> 16) & 0xff);
+    specific_key = static_cast<Key>(MapVirtualKeyW(scan_code, MAPVK_VSC_TO_VK_EX));
+    break;
+  }
+  case VK_CONTROL:
+    specific_key = (l_param & (1LL << 24)) ? Key::Right_Control : Key::Left_Control;
+    break;
+  case VK_MENU:
+    specific_key = (l_param & (1LL << 24)) ? Key::Right_Alt : Key::Left_Alt;
+    break;
+  }
+
+  return { key, specific_key };
+}
+
+auto is_modifier_down(Key key) noexcept -> bool
+{
+  switch (key)
+  {
+  case Key::Shift:
+    return (GetAsyncKeyState(VK_LSHIFT) & 0x8000) ||
+           (GetAsyncKeyState(VK_RSHIFT) & 0x8000);
+  case Key::Control:
+    return (GetAsyncKeyState(VK_LCONTROL) & 0x8000) ||
+           (GetAsyncKeyState(VK_RCONTROL) & 0x8000);
+  case Key::Alt:
+    return (GetAsyncKeyState(VK_LMENU) & 0x8000) ||
+           (GetAsyncKeyState(VK_RMENU) & 0x8000);
+  default:
+    return false;
+  }
+}
+
 }
 
 namespace tk::renderer {
@@ -80,6 +123,8 @@ void WindowManager::init() noexcept
 
 void WindowManager::message_process() noexcept
 {
+  g_input_sys.update();
+
   MSG msg{};
   while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE))
   {
@@ -123,7 +168,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   static auto& wnd_mgr = WindowManager::instance();
   static auto& windows = wnd_mgr._windows;
 
-  static auto last_cursor_pos                    = int2{};
+  static auto last_cursor_pos                    = get_cursor_pos();
   static auto left_button_down_window_cursor_pos = int2{};
   static auto left_button_down_resize_type       = ResizeType{};
   static auto left_button_down                   = false;
@@ -181,8 +226,9 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     if (LOWORD(w_param) == WA_INACTIVE)
     {
       finish_moving_or_resizing(handle);
+      g_input_sys.release_all();
       if (GetAsyncKeyState(VK_LBUTTON) >= 0)
-        g_ui_ctx.clear_state();
+        g_ui_ctx.clear_state_unfocused_window();
     }
 
     if (windows.contains(handle))
@@ -218,8 +264,76 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     return 0;
   }
 
+  case WM_KEYDOWN:
+  case WM_SYSKEYDOWN:
+  {
+    auto repeat = (l_param & (1LL << 30)) != 0;
+    auto [key, specific_key] = key_pair(w_param, l_param);
+    g_input_sys.key_down(key, repeat);
+    if (specific_key != key)
+      g_input_sys.key_down(specific_key, repeat);
+    break;
+  }
+
+  case WM_KEYUP:
+  case WM_SYSKEYUP:
+  {
+    auto [key, specific_key] = key_pair(w_param, l_param);
+    g_input_sys.key_up(specific_key);
+    if (specific_key == key || !is_modifier_down(key))
+      g_input_sys.key_up(key);
+    break;
+  }
+
+  case WM_RBUTTONDOWN:
+  {
+    g_input_sys.key_down(Key::Mouse_Right_Button);
+    break;
+  }
+
+  case WM_RBUTTONUP:
+  {
+    g_input_sys.key_up(Key::Mouse_Right_Button);
+    break;
+  }
+
+  case WM_MBUTTONDOWN:
+  {
+    g_input_sys.key_down(Key::Mouse_Middle_Button);
+    break;
+  }
+
+  case WM_MBUTTONUP:
+  {
+    g_input_sys.key_up(Key::Mouse_Middle_Button);
+    break;
+  }
+
+  case WM_XBUTTONDOWN:
+  {
+    auto key = GET_XBUTTON_WPARAM(w_param) == XBUTTON1 ? Key::Mouse_X1_Button : Key::Mouse_X2_Button;
+    g_input_sys.key_down(key);
+    return TRUE;
+  }
+
+  case WM_XBUTTONUP:
+  {
+    auto key = GET_XBUTTON_WPARAM(w_param) == XBUTTON1 ? Key::Mouse_X1_Button : Key::Mouse_X2_Button;
+    g_input_sys.key_up(key);
+    return TRUE;
+  }
+
+  case WM_MOUSEWHEEL:
+  {
+    auto delta = static_cast<float>(GET_WHEEL_DELTA_WPARAM(w_param)) / WHEEL_DELTA;
+    g_input_sys.add_mouse_wheel_delta(delta);
+    return 0;
+  }
+
   case WM_LBUTTONDOWN:
   {
+    g_input_sys.key_down(Key::Mouse_Left_Button);
+
     SetCapture(handle);
     auto& window = windows[handle];
     last_cursor_pos                    = get_cursor_pos();
@@ -254,6 +368,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     }
 
     auto pos = get_cursor_pos();
+    g_input_sys.add_mouse_move_delta(pos - last_cursor_pos);
     if (left_button_down)
     {
       // limit cursor move area
@@ -296,8 +411,10 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
 
   case WM_LBUTTONUP:
   {
+    g_input_sys.key_up(Key::Mouse_Left_Button);
+
     if (finish_moving_or_resizing(handle))
-      g_ui_ctx.clear_state();
+      g_ui_ctx.clear_state_unfocused_window();
     else
       g_ui_ctx.is_last_mouse_up = true;
     break;
@@ -306,7 +423,8 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   case WM_CANCELMODE:
   {
     finish_moving_or_resizing(handle);
-    g_ui_ctx.clear_state();
+    g_input_sys.release_all();
+    g_ui_ctx.clear_state_unfocused_window();
     break;
   }
 

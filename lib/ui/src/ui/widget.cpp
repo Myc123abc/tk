@@ -1,6 +1,7 @@
 #include "ui/widget.hpp"
 #include "ui_context.hpp"
 #include "../renderer/window/window_manager.hpp"
+#include "input_system.hpp"
 
 using namespace tk;
 using namespace tk::ui;
@@ -14,27 +15,29 @@ auto is_click_on(float2 left_top, float2 right_bottom) noexcept -> bool
   auto window = g_ui_ctx.window();
   if (!window->is_active()             ||
 		   window->is_moving_or_resizing() ||
-      !g_ui_ctx.mouse_down_pos         ||
-      !g_ui_ctx.mouse_up_pos           ||
+      !g_ui_ctx.mouse_down_window_pos  ||
+      !g_ui_ctx.mouse_up_window_pos    ||
        g_ui_ctx.mouse_down_window != g_ui_ctx.mouse_up_window) return false;
   auto rc = Rect{ left_top, right_bottom };
   return !g_ui_ctx.is_move_from_maximize               &&
-          rc.contains(g_ui_ctx.mouse_down_pos.value()) &&
-          rc.contains(g_ui_ctx.mouse_up_pos.value());
+          rc.contains(g_ui_ctx.mouse_down_window_pos.value()) &&
+          rc.contains(g_ui_ctx.mouse_up_window_pos.value());
 }
 
 }
 
 namespace tk::ui {
 
-auto is_hover_on(float2 left_top, float2 right_bottom) noexcept -> bool
+auto is_hover_on(Rect rc) noexcept -> bool
 {
   g_ui_ctx.check_draw();
-  auto p = g_ui_ctx.window()->cursor_pos();
-  return g_ui_ctx.cursor_on_window == g_ui_ctx.window()->handle() &&
-         !g_ui_ctx.window()->is_move_from_maximize()              &&
+  auto const& wnd = g_ui_ctx.window();
+  auto        p   = wnd->cursor_pos();
+  return g_ui_ctx.cursor_on_window == wnd->handle()     &&
+         !wnd->is_move_from_maximize()                  &&
+         wnd->rect().contains(p + wnd->pos())           &&
           // Actually, cursor position always need - 1, like 0~1919 in range 0~1920
-         Rect{ left_top, right_bottom - float2(1) }.contains(p);
+         rc.adjust_right_bottom(float2(-1)).contains(p);
 }
 
 auto button(size_t id, float x, float y, float width, float height) noexcept -> ButtonState
@@ -54,6 +57,9 @@ auto button(size_t id, float x, float y, float width, float height) noexcept -> 
   auto scale = g_ui_ctx.window()->scale();
   left_top     *= scale;
   right_bottom *= scale;
+  auto rect = g_ui_ctx.transform_widget_rect({ left_top, right_bottom });
+  left_top     = rect.left_top();
+  right_bottom = rect.right_bottom();
 
   auto is_last_mouse_down_id = g_ui_ctx.is_last_mouse_down_id(id);
 
@@ -61,12 +67,12 @@ auto button(size_t id, float x, float y, float width, float height) noexcept -> 
   auto is_hovered  = g_ui_ctx.is_hover_on(id, left_top, right_bottom) && g_wnd_mgr.is_normal_cursor();
   auto is_move_out = g_ui_ctx.is_cursor_move_out(id);
   auto is_down     = is_last_mouse_down_id && get_key(Key::Mouse_Left_Button).has_down();
-  if (is_hovered && (g_ui_ctx.is_last_mouse_up ? false : g_ui_ctx.mouse_down_pos.has_value()))
+  if (is_hovered && (g_ui_ctx.is_last_mouse_up ? false : g_ui_ctx.mouse_down_window_pos.has_value()))
   {
     g_ui_ctx.add_mouse_left_button_state(id, left_top, right_bottom);
     is_hovered = is_down                                                                  &&
                  !is_move_out                                                             &&
-                 Rect{ left_top, right_bottom }.contains(g_ui_ctx.mouse_down_pos.value()) &&
+                 Rect{ left_top, right_bottom }.contains(g_ui_ctx.mouse_down_window_pos.value()) &&
                  g_ui_ctx.mouse_down_window == g_ui_ctx.window()->handle();
   }
 
@@ -97,7 +103,7 @@ auto button(
 
   if (click_color.a && state.hovered)
   {
-    auto state = g_ui_ctx.get_key(Key::Mouse_Left_Button);
+    auto state = g_input_sys[Key::Mouse_Left_Button];
     if (state.contains(KeyState::down) || state == KeyState::press)
       color = click_color;
   }
@@ -130,7 +136,7 @@ auto button(
   // when mouse down, color also change
   if (mouse_down_color.a && state.hovered)
   {
-    auto state = g_ui_ctx.get_key(Key::Mouse_Left_Button);
+    auto state = g_input_sys[Key::Mouse_Left_Button];
     if (state.contains(KeyState::down) || state == KeyState::press)
       button_color = mouse_down_color;
   }

@@ -7,7 +7,9 @@ constexpr auto Title_Bar_Button_Width       = 46;
 constexpr auto Title_Bar_Button_Icon_Width  = 10;
 constexpr auto Title_Bar_Button_Icon_Height = 10;
 
-constexpr auto Key_Repeate_Start_Duration  = 400'000;
+constexpr auto Viewport_Zoom_Factor        = 1.1f;
+// Limit zoom before float geometry loses pixel precision and destabilizes tessellation.
+constexpr auto Viewport_Max_Scale          = 8192.f;
 constexpr auto Window_Active_Response_Time = 200'000;
 
 constexpr auto Image_Pool_Init_Capacity = 32;

@@ -4,6 +4,9 @@
 #include "../renderer/renderer.hpp"
 #include "tk/hash.hpp"
 #include "text_engine/text_engine.hpp"
+#include "input_system.hpp"
+
+#include <cmath>
 
 using namespace tk::renderer;
 
@@ -113,6 +116,7 @@ void UIContext::end() noexcept
 {
   err_if(!_call_begin, "begin is not called but end is called");
   err_if(!_scissor_area_stack.empty(), "scissor_area_begin is called but scissor_area_end not be called");
+  err_if(!_viewport_stack.empty(), "viewport_begin is called but viewport_end not be called");
   if (is_use_title_bar_now())
     add_title_bar();
   _call_begin = false;
@@ -176,6 +180,7 @@ void UIContext::render() noexcept
 
     if (!_wnd->is_resizing())
     {
+      data->set_cull_rect(_wnd->content_rect());
       data->add_scissor_rect(_wnd->content_rect());
       if (!_wnd->is_fullscreen() && !_wnd->is_maximized())
         window_shadow_wireframe_process(wnd_ctx, *_wnd, _wnd->shadow_rect());
@@ -191,6 +196,7 @@ void UIContext::render() noexcept
         g_renderer.need_vsync();
       }
       data->set_window_pos(_wnd->real_pos());
+      data->set_cull_rect(_wnd->rect());
       data->add_scissor_rect(_wnd->rect());
       window_shadow_wireframe_process(wnd_ctx, *_wnd, _wnd->real_rect());
       data->build_render_cmds();
@@ -214,18 +220,26 @@ void UIContext::clear_state() noexcept
 {
   mouse_down_window     = {};
   mouse_up_window       = {};
-  mouse_down_pos        = {};
-  mouse_up_pos          = {};
+  mouse_down_window_pos = {};
+  mouse_up_window_pos   = {};
   is_move_from_maximize = {};
   _btn_state            = {};
   is_last_mouse_up      = {};
 }
 
+void UIContext::clear_state_unfocused_window() noexcept
+{
+  clear_state();
+  _dragging_viewport_id = {};
+}
+
 void UIContext::postprocess_render() noexcept
 {
+  auto cursor_pos = get_cursor_pos();
+
   // clear state
   _ids.clear();
-  if (mouse_up_pos) clear_state();
+  if (mouse_up_window_pos) clear_state();
 
   // update cursor hovered widget id
   if (!_hovered_widget_ids.empty())
@@ -235,7 +249,7 @@ void UIContext::postprocess_render() noexcept
   }
 
   // update mouse state
-  auto mouse_left_button_state = get_key(Key::Mouse_Left_Button);
+  auto mouse_left_button_state = g_input_sys[Key::Mouse_Left_Button];
   auto wnds                    = g_wnd_mgr.windows_view();
   if (cursor_on_window)
   {
@@ -243,34 +257,47 @@ void UIContext::postprocess_render() noexcept
     if (mouse_left_button_state == KeyState::down)
     {
       mouse_down_window = wnd->handle();
-      mouse_down_pos    = wnd->cursor_pos();
+      mouse_down_window_pos = wnd->cursor_pos();
       if (!is_move_from_maximize)
         is_move_from_maximize = wnd->is_move_from_maximize();
     }
     else if (mouse_left_button_state == KeyState::up)
     {
       mouse_up_window = wnd->handle();
-      mouse_up_pos    = wnd->cursor_pos();
+      mouse_up_window_pos = wnd->cursor_pos();
     }
   }
-  else if (mouse_left_button_state == KeyState::up && mouse_down_pos)
+  else if (mouse_left_button_state == KeyState::up && mouse_down_window_pos)
     clear_state();
+
+  if (mouse_left_button_state == KeyState::up)
+    _dragging_viewport_id = {};
 
   // update button state
   if (_btn_state.id)
   {
-    auto pos = get_cursor_pos();
-    if (!Rect{ _btn_state.left_top, _btn_state.right_bottom }.contains(get_cursor_pos()))
+    if (!Rect{ _btn_state.left_top, _btn_state.right_bottom }.contains(cursor_pos))
       _btn_state.move_out = true;
   }
-
-  update_keys();
 
   // update delta time
   static auto tp = std::chrono::steady_clock::now();
   auto now = std::chrono::steady_clock::now();
   _delta_time = static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(now - tp).count());
   tp          = now;
+
+  // Clear unnecessary viewport infos
+  for (auto it = _viewport_infos.begin(); it != _viewport_infos.end();)
+  {
+    auto& cnt = it->second.call_cnt;
+    if (cnt == 0)
+      it = _viewport_infos.erase(it);
+    else
+    {
+      --cnt;
+      ++it;
+    }
+  }
 }
 
 void UIContext::window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer::Window const& wnd, Rect scissor_rect) noexcept
@@ -332,34 +359,27 @@ void UIContext::render_on(float x, float y, std::move_only_function<void()>&& fu
   g_ui_ctx.set_render_pos(org_pos.x - Window_Shadow_Thickness, org_pos.y - Window_Shadow_Thickness);
 }
 
-void UIContext::scissor_area_begin(Rect rect) noexcept
+auto UIContext::is_hover_on(size_t id, Rect rc) noexcept -> bool
 {
-  auto const is_resizing = _wnd->is_resizing();
-  auto const content_rect = is_resizing ? _wnd->rect() : _wnd->content_rect();
-  auto const current_rect = _scissor_area_stack.empty() ? content_rect : _scissor_area_stack.back();
-  frame_data()->add_scissor_rect(current_rect);
-
-  if (is_resizing) rect += _wnd->real_pos();
-  rect = intersect(rect, current_rect);
-  _scissor_area_stack.emplace_back(rect);
-}
-
-void UIContext::scissor_area_end() noexcept
-{
-  assert(!_scissor_area_stack.empty());
-  frame_data()->add_scissor_rect(_scissor_area_stack.back());
-  _scissor_area_stack.pop_back();
-}
-
-auto UIContext::is_hover_on(size_t id, float2 left_top, float2 right_bottom) noexcept -> bool
-{
-  if (ui::is_hover_on(left_top, right_bottom))
+  if (ui::is_hover_on(rc))
   {
     _hovered_widget_ids.emplace(id);
     _last_hovered_widget_id = id;
     return id == _prev_hovered_widget_id;
   }
   return false;
+}
+
+auto UIContext::transform_widget_rect(Rect rect) const noexcept -> Rect
+{
+  if (_viewport_stack.empty())
+    return rect;
+
+  auto const& viewport    = _viewport_stack.back();
+  auto const  content_pos = _wnd->content_pos();
+  auto const  frame_rect  = rect + content_pos;
+  auto const  screen_rect = viewport.transform.transform_bounds(frame_rect) + -content_pos;
+  return intersect(screen_rect, viewport.interaction_rect);
 }
 
 void UIContext::add_title_bar() noexcept
@@ -494,60 +514,6 @@ auto UIContext::ping_pong(bool b, size_t id, double forward_dur, double reverse_
   return value;
 }
 
-void UIContext::update_keys() noexcept
-{
-  using enum KeyState;
-
-  for (auto it = _down_keys.begin(); it != _down_keys.end();)
-  {
-    auto& ctx = _keys[*it];
-
-    if (ctx.state == down)
-    {
-      ctx.state = down_idle;
-      ctx.dur += delta_time();
-    }
-    else if (ctx.state == down_idle)
-    {
-      ctx.dur += delta_time();
-      if (ctx.dur > Key_Repeate_Start_Duration)
-      {
-        ctx.dur   = {};
-        ctx.state = press;
-      }
-    }
-    
-    if (ctx.state == up)
-    {
-      ctx.state = idle;
-      it = _down_keys.erase(it);
-      continue;
-    }
-    else if (GetAsyncKeyState(static_cast<SHORT>(*it)) == 0)
-    {
-      ctx.state = up;
-      ctx.dur   = {};
-    }
-
-    ++it;
-  }
-}
-
-auto UIContext::get_key(Key key) noexcept -> Flag<KeyState>
-{
-  using enum KeyState;
-
-  auto& ctx = _keys[key];
-  if (ctx.state == idle && GetAsyncKeyState(static_cast<SHORT>(key)) < 0)
-  {
-    assert(!_down_keys.contains(key));
-    ctx.state = down;
-    _down_keys.emplace(key);
-  }
-
-  return ctx.state;
-}
-
 auto UIContext::image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha, std::optional<ImageConfig> cfg) noexcept -> std::expected<void, ImageLoadErrorType>
 {
   check_draw();
@@ -634,6 +600,105 @@ void UIContext::render(TextLayout const& layout) noexcept
 void UIContext::postprocess() const noexcept
 {
   g_text_engine.postprocess();
+}
+
+void UIContext::scissor_area_begin(Rect rect) noexcept
+{
+  auto const is_resizing = _wnd->is_resizing();
+  auto const content_rect = is_resizing ? _wnd->rect() : _wnd->content_rect();
+  auto const current_rect = _scissor_area_stack.empty() ? content_rect : _scissor_area_stack.back();
+  frame_data()->add_scissor_rect(current_rect);
+
+  if (!_viewport_stack.empty())
+  {
+    auto const& viewport = _viewport_stack.back();
+    rect = rect == viewport.rect ? viewport.screen_rect : viewport.transform.transform_bounds(rect);
+  }
+  if (is_resizing) rect += _wnd->real_pos();
+  rect = intersect(rect, current_rect);
+  _scissor_area_stack.emplace_back(rect);
+  frame_data()->cull_rect_beg(rect);
+}
+
+void UIContext::scissor_area_end() noexcept
+{
+  assert(!_scissor_area_stack.empty());
+  frame_data()->cull_rect_end();
+  frame_data()->add_scissor_rect(_scissor_area_stack.back());
+  _scissor_area_stack.pop_back();
+}
+
+void UIContext::viewport_begin(StringID name, Rect rect) noexcept
+{
+  auto const parent_transform = _viewport_stack.empty() ? Matrix{} : _viewport_stack.back().transform;
+  auto const screen_rect      = parent_transform.transform_bounds(rect);
+  auto       cull_rect        = screen_rect;
+  if (_wnd->is_resizing())
+    cull_rect += _wnd->real_pos();
+  frame_data()->cull_rect_beg(cull_rect);
+
+  auto id = generic_id(name);
+
+  auto& info = _viewport_infos[id];
+  info.call_cnt += 1;
+  
+  // Because viewport operation only run on non-resizing window,
+  // so we not need to process resizing process for rect.
+
+  auto const content_pos      = _wnd->content_pos();
+  auto       interaction_rect = screen_rect + -content_pos;
+  if (!_viewport_stack.empty())
+    interaction_rect = intersect(interaction_rect, _viewport_stack.back().interaction_rect);
+  auto const is_hovered = is_hover_on(id, interaction_rect);
+
+  auto const cursor_pos        = float2(_wnd->cursor_pos()) + content_pos;
+  auto const parent_inverse    = parent_transform.inverse().value_or(Matrix{});
+  auto const parent_cursor_pos = parent_inverse * cursor_pos;
+
+  auto mouse_state = g_input_sys[Key::Mouse_Left_Button];
+  if (!_dragging_viewport_id && is_hovered && mouse_state == KeyState::down)
+    _dragging_viewport_id = id;
+  if (_dragging_viewport_id == id)
+  {
+    auto const previous_cursor_pos = cursor_pos - float2(g_input_sys.mouse_move_delta());
+    info.offset += parent_cursor_pos - parent_inverse * previous_cursor_pos;
+  }
+
+  if (is_hovered && _wnd->is_active())
+  {
+    auto wheel_delta = g_input_sys.mouse_wheel_delta();
+    if (wheel_delta)
+    {
+      auto scale_ratio   = std::pow(Viewport_Zoom_Factor, wheel_delta);
+      auto new_scale     = std::min(info.scale * scale_ratio, Viewport_Max_Scale);
+      auto applied_ratio = new_scale / info.scale;
+      info.offset = parent_cursor_pos + (info.offset - parent_cursor_pos) * applied_ratio;
+      info.scale  = new_scale;
+    }
+  }
+
+  auto const viewport_transform = Matrix::ScaleTranslate(info.scale, info.offset);
+  auto const using_transform    = !viewport_transform.empty();
+  if (using_transform)
+    frame_data()->transform_beg(viewport_transform);
+
+  _viewport_stack.emplace_back(ViewportScope
+  {
+    .rect             = rect,
+    .screen_rect      = screen_rect,
+    .interaction_rect = interaction_rect,
+    .transform        = viewport_transform * parent_transform,
+    .using_transform  = using_transform,
+  });
+}
+
+void UIContext::viewport_end()
+{
+  err_if(_viewport_stack.empty(), "viewport_begin is not called but viewport_end is called");
+  if (_viewport_stack.back().using_transform)
+    frame_data()->transform_end();
+  _viewport_stack.pop_back();
+  frame_data()->cull_rect_end();
 }
 
 }

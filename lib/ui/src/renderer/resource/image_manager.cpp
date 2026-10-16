@@ -68,10 +68,6 @@ auto ImageManager::try_load(std::string_view path, uint width, uint height) noex
 
         // for new image with mipmap, we need to copy the old image's content to new image
         g_copy_engine.move(handle, new_handle);
-        handle = new_handle;
-
-        // then generate mipmaps
-        g_comp_engine.add_generate_mipmap_image(handle);
       }
     }
     return _loaded_images[filename];

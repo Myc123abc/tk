@@ -57,12 +57,17 @@ target_link_libraries(tk-ui
 )
 
 function(tk_ui_copy_shader target)
-  add_custom_command(TARGET ${target} POST_BUILD
+  file(GLOB_RECURSE TK_UI_SHADER_FILES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/shader/*"
+  )
+  add_custom_target(${target}-shaders
     COMMAND ${CMAKE_COMMAND} -E copy_directory
       "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/shader"
       "$<TARGET_FILE_DIR:${target}>/shader"
+    DEPENDS ${TK_UI_SHADER_FILES}
     VERBATIM
   )
+  add_dependencies(${target} ${target}-shaders)
 endfunction()
 
 if (BUILD_TK_UI_TEST)

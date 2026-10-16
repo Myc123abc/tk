@@ -1,7 +1,5 @@
 #include "copy_engine.hpp"
 #include "../resource/image.hpp"
-#include "graphics_engine.hpp"
-#include "compute_engine.hpp"
 #include "../renderer.hpp"
 #include "../../util/align.hpp"
 #include "../../ui/text_engine/text_engine.hpp"
@@ -26,13 +24,21 @@ void UploadBuffer::init() noexcept
 
 void UploadBuffer::destroy() noexcept
 {
-  assert(_buf);
-  g_buf_pool.destroy(_buf);
+  if (_buf) g_buf_pool.destroy(_buf);
+}
+
+void UploadBuffer::trim() noexcept
+{
+  constexpr auto Max_Retained_Capacity = 8u * 1024 * 1024;
+  if (_buf && g_buf_pool[_buf].capacity() > Max_Retained_Capacity)
+    g_buf_pool.destroy(_buf);
 }
 
 void UploadBuffer::upload(Command* cmd) noexcept
 {
   if (_infos.empty()) return;
+
+  if (!_buf) init();
 
   // calculate required intermediate sizes
   auto intermediate_sizes = std::vector<uint>{};
@@ -96,6 +102,9 @@ void UploadBuffer::upload(Command* cmd) noexcept
 
 void CopyEngine::update() noexcept
 {
+  for (auto& slot : _slots)
+    if (_slots.is_idle(slot)) slot.data.upload_buf.trim();
+
   auto slot = _slots.slot();
 
   auto& [upload_buf, moved_imgs] = slot->data;

@@ -17,7 +17,7 @@ auto fix_rect_flags(Flag<CornerFlag> flags) noexcept -> Flag<CornerFlag>
 
 }
 
-void FrameData::path_rect(float2 left_top, float2 right_bottom, float rounding, Flag<CornerFlag> flags) noexcept
+void FrameData::path_rect(float2 left_top, float2 right_bottom, float rounding, Flag<CornerFlag> flags, float tessellation_scale) noexcept
 {
   if (rounding >= .5f)
   {
@@ -43,10 +43,10 @@ void FrameData::path_rect(float2 left_top, float2 right_bottom, float rounding, 
   auto const rounding_bottom_right = flags.contains(CornerFlag::bottom_right) ? rounding : 0.f;
   auto const rounding_bottom_left  = flags.contains(CornerFlag::bottom_left)  ? rounding : 0.f;
 
-  path_arc_to({ left_top.x     + rounding_top_left,     left_top.y     + rounding_top_left     }, rounding_top_left,     pi,        pi * 1.5f);
-  path_arc_to({ right_bottom.x - rounding_top_right,    left_top.y     + rounding_top_right    }, rounding_top_right,    pi * 1.5f, pi * 2.f);
-  path_arc_to({ right_bottom.x - rounding_bottom_right, right_bottom.y - rounding_bottom_right }, rounding_bottom_right, 0,         pi * .5f);
-  path_arc_to({ left_top.x     + rounding_bottom_left,  right_bottom.y - rounding_bottom_left  }, rounding_bottom_left,  pi * .5f,  pi);
+  path_arc_to({ left_top.x     + rounding_top_left,     left_top.y     + rounding_top_left     }, rounding_top_left,     pi,        pi * 1.5f, tessellation_scale);
+  path_arc_to({ right_bottom.x - rounding_top_right,    left_top.y     + rounding_top_right    }, rounding_top_right,    pi * 1.5f, pi * 2.f,  tessellation_scale);
+  path_arc_to({ right_bottom.x - rounding_bottom_right, right_bottom.y - rounding_bottom_right }, rounding_bottom_right, 0,         pi * .5f,  tessellation_scale);
+  path_arc_to({ left_top.x     + rounding_bottom_left,  right_bottom.y - rounding_bottom_left  }, rounding_bottom_left,  pi * .5f,  pi,        tessellation_scale);
 }
 
 void FrameData::add_rect(float2 left_top, float2 right_bottom, Color color, float thickness, float rounding, Flag<CornerFlag> flags) noexcept
@@ -81,6 +81,29 @@ void FrameData::_add_rect(float2 left_top, float2 right_bottom, Color color, flo
   }
 
   add_rect(left_top, right_bottom, color);
+}
+
+void FrameData::_add_transformed_rect(float2 left_top, float2 right_bottom, Color color, float thickness, float rounding, Flag<CornerFlag> flags, float scale) noexcept
+{
+  if (_using_discard_shapes) color.a = 1.f;
+  else if (color.a == 0) return;
+
+  if (thickness > 0)
+  {
+    auto const inset = .5f / scale;
+    left_top     += inset;
+    right_bottom -= inset;
+  }
+
+  assert(_points.empty());
+  path_rect(left_top, right_bottom, rounding, flags, scale);
+  for (auto& point : _points)
+    point = transform_point(point);
+
+  if (thickness > 0)
+    add_poly_line(color, thickness * scale, true);
+  else
+    add_convex_poly_filled(color);
 }
 
 void FrameData::add_rect(float2 left_top, float2 right_bottom, Color color) noexcept
@@ -157,6 +180,9 @@ void FrameData::_add_line(float2 p0, float2 p1, Color color, float thickness) no
   if (_using_discard_shapes) color.a = 1.f;
   else if (color.a == 0) return;
 
+  p0 = floor(p0) + .5f;
+  p1 = floor(p1) + .5f;
+
   assert(_points.empty());
   _points.emplace_back(p0);
   _points.emplace_back(p1);
@@ -173,6 +199,10 @@ void FrameData::_add_arc(float2 center, float2 p0, float2 p1, Color color, float
 {
   if (_using_discard_shapes) color.a = 1.f;
   else if (color.a == 0) return;
+
+  center = floor(center) + .5f;
+  p0     = floor(p0)     + .5f;
+  p1     = floor(p1)     + .5f;
 
   auto radius = length(p0 - center);
   if (radius < .5f)
@@ -331,11 +361,20 @@ auto FrameData::get_circle_segment_count(float radius) noexcept -> uint
   return static_cast<uint>(calc_circle_segment_count(radius));
 }
 
-void FrameData::path_arc_to(float2 center, float radius, float min, float max) noexcept
+void FrameData::path_arc_to(float2 center, float radius, float min, float max, float tessellation_scale) noexcept
 {
   if (radius < .5f)
   {
     _points.emplace_back(center);
+    return;
+  }
+
+  if (tessellation_scale != 1.f)
+  {
+    auto const arc_len            = std::abs(max - min);
+    auto const circle_segment_cnt = calc_circle_segment_count(radius * tessellation_scale);
+    auto const arc_segment_cnt    = std::max(std::ceil(circle_segment_cnt * arc_len / (std::numbers::pi * 2.f)), 1.0);
+    _path_arc_to(center, radius, min, max, static_cast<int>(arc_segment_cnt));
     return;
   }
 
@@ -432,7 +471,7 @@ void FrameData::_path_arc_to(float2 center, float radius, int min, int max) noex
   }
 }
 
-void FrameData::_path_arc_to(float2 center, float radius, int min, int max, int segment_cnt) noexcept
+void FrameData::_path_arc_to(float2 center, float radius, float min, float max, int segment_cnt) noexcept
 {
   if (radius < .5f)
   {

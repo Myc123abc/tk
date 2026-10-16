@@ -445,7 +445,7 @@ int main()
     {
       ui::begin("wnd1", 50, 50, 200, 200, &wnd1_is_closed, cfg);
 
-      if (ui::get_key(ui::Key::F11))
+      if (ui::get_key(ui::Key::F11).is_down())
       {
         if (ui::is_fullscreen_window())
           ui::restore_fullscreen_window();
@@ -507,7 +507,7 @@ int main()
       auto wnd_ext = ui::window_drawable_extent();
       ui::rectangle({}, wnd_ext, 0x282c34ff);
 
-      if (ui::get_key(ui::Key::Q)) wnd2_is_closed = true;
+      if (ui::get_key(ui::Key::Q).is_down()) wnd2_is_closed = true;
 
       // playback button
       auto p0 = float2{ 5, 5 };

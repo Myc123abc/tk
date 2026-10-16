@@ -15,7 +15,9 @@
 
 namespace tk::ui {
 
-auto is_hover_on(float2 left_top, float2 right_bottom) noexcept -> bool;
+auto is_hover_on(Rect rect) noexcept -> bool;
+inline auto is_hover_on(float2 left_top, float2 right_bottom) noexcept { return is_hover_on({ left_top, right_bottom }); }
+
 auto is_caps_locked() noexcept -> bool;
 
 struct WindowContext
@@ -34,8 +36,6 @@ struct WindowContext
   FrameData frame_data;
 };
 
-#define KEY_ENTRY_INIT(name, _) { Key::name, {} },
-
 Singleton(UIContext, g_ui_ctx,
   friend struct WindowContext;
 public:
@@ -51,15 +51,14 @@ public:
 
   void render() noexcept;
 
-  auto is_hover_on(size_t id, float2 left_top, float2 right_bottom) noexcept -> bool;
+  auto is_hover_on(size_t id, Rect rc) noexcept -> bool;
+  auto is_hover_on(size_t id, float2 left_top, float2 right_bottom) noexcept { return is_hover_on(id, { left_top, right_bottom }); }
+  auto transform_widget_rect(Rect rect) const noexcept -> Rect;
 
   void set_render_pos(float x, float y) noexcept { _wnd_ctx->render_pos = { x + renderer::Window_Shadow_Thickness, y + renderer::Window_Shadow_Thickness }; }
   auto get_render_pos() const noexcept { return _wnd_ctx->render_pos; }
 
   void render_on(float x, float y, std::move_only_function<void()>&& func) noexcept;
-
-  void scissor_area_begin(Rect rect) noexcept;
-  void scissor_area_end() noexcept;
 
   auto generic_id(StringID name) noexcept -> size_t;
   auto get_id(StringID name) const noexcept -> size_t;
@@ -87,11 +86,17 @@ public:
   void clear_fullscreen_window() noexcept { _fullscreen_window_need_clear = true; }
   void close_window(HWND handle) noexcept { get_window_context(handle)->is_closed = true; }
   void clear_state() noexcept;
+  void clear_state_unfocused_window() noexcept;
 
   auto window() const noexcept { return _wnd; }
   auto frame_data() noexcept { return &_wnd_ctx->frame_data; }
 
   void postprocess() const noexcept;
+
+  void scissor_area_begin(Rect rect) noexcept;
+  void scissor_area_end() noexcept;
+  void viewport_begin(StringID name, Rect rect) noexcept;
+  void viewport_end();
 
 private:
   void update_window_config(WindowConfig const& cfg) noexcept;
@@ -109,7 +114,6 @@ private:
 
   renderer::Window* _wnd{};
   WindowContext*    _wnd_ctx{};
-  std::vector<Rect> _scissor_area_stack;
   HWND              _fullscreen_window{};
   bool              _fullscreen_window_need_clear{};
 
@@ -133,8 +137,8 @@ public:
   HWND                cursor_on_window{};
   HWND                mouse_down_window{};
   HWND                mouse_up_window{};
-  std::optional<int2> mouse_down_pos;
-  std::optional<int2> mouse_up_pos;
+  std::optional<int2> mouse_down_window_pos;
+  std::optional<int2> mouse_up_window_pos;
   bool                is_move_from_maximize{};
   bool                draw_title_bar{};
   bool                is_last_mouse_up{};
@@ -157,24 +161,30 @@ public:
   auto is_last_mouse_down_id(size_t id) const noexcept { return _btn_state.id == id; }
 
   //
-  // key state
+  // Shape Operation
   //
 private:
-  void update_keys() noexcept;
+  std::vector<Rect> _scissor_area_stack;
 
-  struct KeyContext
+  struct ViewPortInfo
   {
-    KeyState state{};
-    double   dur{};
+    float2 offset;
+    float  scale{ 1 };
+    uint call_cnt{};
   };
-  std::unordered_map<Key, KeyContext> _keys
-  {
-    KEY_LIST(KEY_ENTRY_INIT)
-  };
-  std::unordered_set<Key> _down_keys;
 
-public:
-  auto get_key(Key key) noexcept -> Flag<KeyState>;
+  struct ViewportScope
+  {
+    Rect   rect;
+    Rect   screen_rect;
+    Rect   interaction_rect;
+    Matrix transform;
+    bool   using_transform{};
+  };
+
+  std::unordered_map<uint64, ViewPortInfo> _viewport_infos;
+  std::vector<ViewportScope>               _viewport_stack;
+  size_t                                   _dragging_viewport_id{};
 )
 
 }

@@ -201,6 +201,8 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
 
   auto clear_resize_render_target = [this, cmd](ImageHandle& handle, Rect rect)
   {
+    if (rect.empty()) return;
+
     auto& img = g_img_mgr[handle];
     auto required_width  = static_cast<uint>(std::ceil(rect.width()));
     auto required_height = static_cast<uint>(std::ceil(rect.height()));
@@ -216,6 +218,8 @@ void Renderer::render(RenderResource& res, ui::FrameData const* frame_data) noex
 
   auto graphics_draw = [&](ui::RenderCmd const& cmd, PipelineType type, ImageHandle rt, ImageHandle ds, Rect scissor, std::vector<PipelineDescriptorInfo> const& descs = {})
   {
+    if (scissor.empty()) return;
+
     auto& rt_img = g_img_mgr[rt];
     constants.render_target_extent = rt_img.extent();
     g_ctx.graphics_draw(GraphicsDrawInfo

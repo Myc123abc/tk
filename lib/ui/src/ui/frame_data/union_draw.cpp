@@ -23,7 +23,8 @@ void FrameData::_union_beg(uint& idx) noexcept
   assert(!_build_mode.contains(BuildMode::uni));
   _build_mode.add(BuildMode::uni);
 
-  auto subjects = PathsD{};
+  auto subjects     = PathsD{};
+  auto union_bounds = Rect{};
 
   auto add_current_path = [&]
   {
@@ -42,6 +43,7 @@ void FrameData::_union_beg(uint& idx) noexcept
     {
       auto const transformed = transform_point(p);
       path.emplace_back(static_cast<double>(transformed.x), static_cast<double>(transformed.y));
+      union_bounds.expand(transformed);
     }
 
     _points.clear();
@@ -149,8 +151,16 @@ void FrameData::_union_beg(uint& idx) noexcept
   if (_using_discard_shapes) union_color.a = 1.f;
   else if (union_color.a == 0) return;
 
-  auto solution = Union(subjects, FillRule::NonZero, 2);
-  for (auto const& path : solution)
+  if (union_thickness > 0)
+  {
+    if (auto scale = uniform_transform_scale())
+      union_thickness *= scale.value();
+  }
+
+  if (should_cull(union_bounds, std::abs(union_thickness) + 2.f))
+    return;
+
+  for (auto const& path : Union(subjects, FillRule::NonZero, 2))
   {
     if (path.size() < 3)
       continue;

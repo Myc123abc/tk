@@ -1,6 +1,5 @@
 #pragma once
 
-#include "tk/flag.hpp"
 #include "tk/base.hpp"
 #include "tk/variant.hpp"
 #include "color.hpp"
@@ -9,8 +8,7 @@
 #include "widget.hpp"
 #include "tk/string_id.hpp"
 #include "tk/rect.hpp"
-
-#include <windows.h>
+#include "input.hpp"
 
 #include <string>
 #include <optional>
@@ -19,7 +17,7 @@
 namespace tk::ui {
 
 ////////////////////////////////////////////////////////////////////////////////
-///                                Misc
+///                              Animation
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
@@ -40,70 +38,6 @@ auto lerp(Color x, Color y, float v) noexcept -> float4;
  */
 auto lerp(float2 x, float2 y, float v) noexcept -> float2;
 
-struct WindowConfig
-{
-  bool                 display_title_bar{};
-  bool                 display_window_shadow{};
-  std::optional<Color> wireframe_color{};
-  bool                 display_wireframe_only_active{};
-  bool                 no_resize{};
-  bool                 no_move{};
-
-  struct BlurBackdrop
-  {
-    enum class Style
-    {
-      none,
-      blur,
-      acrylic,
-    } style;
-
-    union
-    {
-      float blur_radius{};
-      struct Acrylic
-      {
-        float opacity{};
-        float blur{};
-        float4 tint_color{};
-        float4 luminosity_color{};
-      } acrylic;
-    };
-
-    void default_blur() noexcept
-    {
-      style       = Style::blur;
-      blur_radius = 4.f;
-    }
-
-    void default_acrylic() noexcept
-    {
-      style                    = Style::acrylic;
-      acrylic.opacity          = .02f;
-      acrylic.blur             = 30.f;
-      acrylic.tint_color       = { .125f, .125f, .125f, .4f };
-      acrylic.luminosity_color = { .125f, .125f, .125f, .8f };
-    }
-
-    auto operator!=(BlurBackdrop const& b) const noexcept
-    {
-      if (style != b.style) return true;
-      if (style == Style::blur)
-        return blur_radius != b.blur_radius;
-      else if (style == Style::acrylic)
-        return acrylic.opacity          != b.acrylic.opacity    ||
-               acrylic.blur             != b.acrylic.blur       ||
-               acrylic.tint_color       != b.acrylic.tint_color ||
-               acrylic.luminosity_color != b.acrylic.luminosity_color;
-      return false;
-    }
-
-  } backdrop;
-};
-
-using Backdrop      = WindowConfig::BlurBackdrop;
-using BackdropStyle = WindowConfig::BlurBackdrop::Style;
-
 /**
  * get a lerp value in ping pong
  * @param name unique global name
@@ -122,17 +56,9 @@ inline auto ping_pong(StringID name, bool b, double duration, Tween::Ease ease =
  */
 void reset_tween(StringID name) noexcept;
 
-/**
- * get cursor position
- * @return cursor position
- */
-auto get_cursor_pos() noexcept -> float2;
-
-/**
- * get cursor position on window
- * @return cursor position
- */
-auto get_cursor_pos_on_window() noexcept -> float2;
+////////////////////////////////////////////////////////////////////////////////
+///                              Image
+////////////////////////////////////////////////////////////////////////////////
 
 /**
  * get extent of image
@@ -208,6 +134,10 @@ auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 al
  * @return false if image is unexist, or loading, or load failed
  */
 auto load_image(std::string_view path) noexcept -> std::expected<void, ImageLoadErrorType>;
+
+////////////////////////////////////////////////////////////////////////////////
+///                              Text
+////////////////////////////////////////////////////////////////////////////////
 
 enum class FontStyle
 {
@@ -296,6 +226,82 @@ auto get_text_bounding_rect(StringLiteral text, float size, TextConfig const& cf
 ///                             Window
 ////////////////////////////////////////////////////////////////////////////////
 
+struct WindowConfig
+{
+  bool                 display_title_bar{};
+  bool                 display_window_shadow{};
+  std::optional<Color> wireframe_color{};
+  bool                 display_wireframe_only_active{};
+  bool                 no_resize{};
+  bool                 no_move{};
+
+  struct BlurBackdrop
+  {
+    enum class Style
+    {
+      none,
+      blur,
+      acrylic,
+    } style;
+
+    union
+    {
+      float blur_radius{};
+      struct Acrylic
+      {
+        float opacity{};
+        float blur{};
+        float4 tint_color{};
+        float4 luminosity_color{};
+      } acrylic;
+    };
+
+    void default_blur() noexcept
+    {
+      style       = Style::blur;
+      blur_radius = 4.f;
+    }
+
+    void default_acrylic() noexcept
+    {
+      style                    = Style::acrylic;
+      acrylic.opacity          = .02f;
+      acrylic.blur             = 30.f;
+      acrylic.tint_color       = { .125f, .125f, .125f, .4f };
+      acrylic.luminosity_color = { .125f, .125f, .125f, .8f };
+    }
+
+    auto operator!=(BlurBackdrop const& b) const noexcept
+    {
+      if (style != b.style) return true;
+      if (style == Style::blur)
+        return blur_radius != b.blur_radius;
+      else if (style == Style::acrylic)
+        return acrylic.opacity          != b.acrylic.opacity    ||
+               acrylic.blur             != b.acrylic.blur       ||
+               acrylic.tint_color       != b.acrylic.tint_color ||
+               acrylic.luminosity_color != b.acrylic.luminosity_color;
+      return false;
+    }
+
+  } backdrop;
+};
+
+using Backdrop      = WindowConfig::BlurBackdrop;
+using BackdropStyle = WindowConfig::BlurBackdrop::Style;
+
+/**
+ * get cursor position
+ * @return cursor position
+ */
+auto get_cursor_pos() noexcept -> float2;
+
+/**
+ * get cursor position on window
+ * @return cursor position
+ */
+auto get_cursor_pos_on_window() noexcept -> float2;
+
 /**
  * begin a window
  * @param name window name cannot be duplicated
@@ -347,6 +353,10 @@ void fullscreen_window() noexcept;
 // restore window if fullscreen
 void restore_fullscreen_window() noexcept;
 
+////////////////////////////////////////////////////////////////////////////////
+///                            Shape Operator
+////////////////////////////////////////////////////////////////////////////////
+
 /**
  * begin a transform scope for following draw commands
  * @param transform affine transform applied in draw order
@@ -362,10 +372,6 @@ void transform_beg(Transform const& transform) noexcept;
 /// end current transform scope
 void transform_end() noexcept;
 
-////////////////////////////////////////////////////////////////////////////////
-///                            Shape Operator
-////////////////////////////////////////////////////////////////////////////////
-
 /**
  * discard the pixel of specific shapes
  * @param func function of discard shapes
@@ -374,6 +380,29 @@ void discard_beg(std::function<void()> func) noexcept;
 
 /// discard operation over
 void discard_end() noexcept;
+
+/**
+ * Start a scissor area.
+ * @param pos
+ * @param extent
+ */
+void scissor_area_begin(float2 pos, float2 extent) noexcept;
+
+// End a scissor area
+void scissor_area_end() noexcept;
+
+/**
+ * Start a viewport which can be dragged with the left mouse button and scaled
+ * around the cursor with the mouse wheel. Nested viewport bounds are expressed
+ * in the parent viewport's content coordinates.
+ * @param name
+ * @param pos
+ * @param extent
+ */
+void viewport_begin(StringID name, float2 pos, float2 extent) noexcept;
+
+// End the viewport
+void viewport_end() noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                            Geometry
@@ -506,65 +535,5 @@ void union_beg() noexcept;
  * @param thickness
  */
 void union_end(Color color = {}, float thickness = {}) noexcept;
-
-////////////////////////////////////////////////////////////////////////////////
-///                               Key
-////////////////////////////////////////////////////////////////////////////////
-
-#define KEY_LIST(X)                \
-  X(Q,                 'Q')        \
-  X(F11,               VK_F11)     \
-  X(Shift,             VK_SHIFT)   \
-  X(Space,             VK_SPACE)   \
-  X(Mouse_Left_Button, VK_LBUTTON)
-
-enum class Key
-{
-#define X(name, value) name = value,
-  KEY_LIST(X)
-#undef X
-};
-
-enum class KeyState
-{
-  idle      = 0b0000,
-  down      = 0b0001,
-  down_idle = 0b0011,
-  press     = 0b0101,
-  up        = 0b1000,
-};
-
-struct GetKeyResult
-{
-  Flag<KeyState> state{};
-
-  constexpr operator bool() const noexcept
-  {
-    return state == KeyState::down ||
-           state == KeyState::press;
-  }
-
-  auto has_down() const noexcept { return state.contains(KeyState::down); }
-
-  auto is_uppercase() const noexcept -> bool;
-  auto is_lowercase() const noexcept -> bool { return !is_uppercase(); }
-};
-
-/**
- * get key state
- * @param key
- * @return result of key state
- */
-auto get_key(Key key) noexcept -> GetKeyResult;
-
-/**
- * Start a scissor area.
- * @param pos
- * @param extent
- */
-void scissor_area_begin(float2 pos, float2 extent) noexcept;
-
-// End a scissor area
-void scissor_area_end() noexcept;
 
 }

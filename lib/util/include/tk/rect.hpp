@@ -109,10 +109,15 @@ struct Rect : Replaceable
 
   Rect(std::span<float2> pts) noexcept { expand(pts); }
 
-  auto width()  const noexcept { return right  - left;               }
-  auto height() const noexcept { return bottom - top;                }
-  auto pos()    const noexcept { return float2{ left, top };         }
-  auto extent() const noexcept { return float2{ width(), height() }; }
+  auto& adjust_left_top(float2 offset)     noexcept { left  += offset.x; top    += offset.y; return *this; }
+  auto& adjust_right_bottom(float2 offset) noexcept { right += offset.x; bottom += offset.y; return *this; }
+
+  auto width()        const noexcept { return right  - left;               }
+  auto height()       const noexcept { return bottom - top;                }
+  auto pos()          const noexcept { return float2{ left, top };         }
+  auto extent()       const noexcept { return float2{ width(), height() }; }
+  auto left_top()     const noexcept { return float2{ left, top };         }
+  auto right_bottom() const noexcept { return float2{ right, bottom };     }
 };
 
 inline auto intersect(Rect lhs, Rect rhs) noexcept

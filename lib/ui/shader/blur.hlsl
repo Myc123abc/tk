@@ -49,7 +49,10 @@ void horizontal_pass(uint3 group_tid    : SV_GroupThreadID,
       color += constants.weights[v / 4][v & 0x3] * g_cache[k];
     }
   }
-  dst[dispatch_tid.xy] = color;
+  uint2 dst_extent;
+  dst.GetDimensions(dst_extent.x, dst_extent.y);
+  if (dispatch_tid.x < dst_extent.x && dispatch_tid.y < dst_extent.y)
+    dst[dispatch_tid.xy] = color;
 }
 
 [numthreads(1, N, 1)]
@@ -86,5 +89,8 @@ void vertical_pass(uint3 group_tid    : SV_GroupThreadID,
       color += constants.weights[v / 4][v & 0x3] * g_cache[k];
     }
   }
-  dst[dispatch_tid.xy] = color;
+  uint2 dst_extent;
+  dst.GetDimensions(dst_extent.x, dst_extent.y);
+  if (dispatch_tid.x < dst_extent.x && dispatch_tid.y < dst_extent.y)
+    dst[dispatch_tid.xy] = color;
 }

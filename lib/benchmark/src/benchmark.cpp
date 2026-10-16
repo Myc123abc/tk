@@ -197,6 +197,11 @@ void update() noexcept
 {
   auto pos = float2(10);
 
+  auto viewport_pos = pos;
+  auto viewport_ext = float2(500);
+  ui::viewport_begin("linechart viewport", viewport_pos, viewport_ext);
+  ui::scissor_area_begin(viewport_pos, viewport_ext);
+
   // set last data for line chart
   g_line_chart_infos.back().set_datas();
 
@@ -210,6 +215,10 @@ void update() noexcept
     info.render({ pos.x + offset, pos.y });
     pos.y += info.line_chart.extent().y + 10;
   }
+
+  ui::scissor_area_end();
+  ui::viewport_end();
+  ui::rectangle(viewport_pos, viewport_pos + viewport_ext, 0xffffffff, 1);
 
   ui::end();
   tk::update();

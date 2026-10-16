@@ -102,6 +102,8 @@ void FrameData::_path_end(bool close, Color color, float thickness) noexcept
 
 void FrameData::path_bezier_quad_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float tess_tol, int level) noexcept
 {
+  assert(std::isfinite(tess_tol) && tess_tol > 0.f);
+
   auto dp  = p2 - p0;
   auto det = cross(p1 - p2, dp);
   if (det * det * 4.f < tess_tol * length_sq(dp))
@@ -118,6 +120,8 @@ void FrameData::path_bezier_quad_curve_to_casteljau(float2 p0, float2 p1, float2
 
 void FrameData::path_bezier_cubic_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float2 p3, float tess_tol, int level) noexcept
 {
+  assert(std::isfinite(tess_tol) && tess_tol > 0.f);
+
   auto dp = p3 - p0;
   auto d2 = std::abs(cross(p1 - p3, dp));
   auto d3 = std::abs(cross(p2 - p3, dp));
