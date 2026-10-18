@@ -113,9 +113,11 @@ void WindowManager::init() noexcept
   wnd_class.lpszClassName = Auxiliary_Class;
   wnd_class.lpfnWndProc   = DefWindowProcW;
   err_if(!RegisterClassExW(&wnd_class), "failed register class");
+  wnd_class.style         = CS_DBLCLKS;
   wnd_class.lpszClassName = Window_Class;
   wnd_class.lpfnWndProc   = wnd_proc;
   err_if(!RegisterClassExW(&wnd_class), "failed register class");
+  wnd_class.style         = {};
   wnd_class.lpszClassName = Blur_Class;
   wnd_class.lpfnWndProc   = blur_wnd_proc;
   err_if(!RegisterClassExW(&wnd_class), "failed register class");
@@ -285,9 +287,13 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     break;
   }
 
+  case WM_RBUTTONDBLCLK:
   case WM_RBUTTONDOWN:
   {
-    g_input_sys.key_down(Key::Mouse_Right_Button);
+    if (msg == WM_RBUTTONDBLCLK)
+      g_input_sys.key_down(Key::Mouse_Right_Button, true);
+    else
+      g_input_sys.key_down(Key::Mouse_Right_Button);
     break;
   }
 
@@ -297,9 +303,13 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     break;
   }
 
+  case WM_MBUTTONDBLCLK:
   case WM_MBUTTONDOWN:
   {
-    g_input_sys.key_down(Key::Mouse_Middle_Button);
+    if (msg == WM_MBUTTONDBLCLK)
+      g_input_sys.key_down(Key::Mouse_Middle_Button, true);
+    else
+      g_input_sys.key_down(Key::Mouse_Middle_Button);
     break;
   }
 
@@ -309,10 +319,14 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     break;
   }
 
+  case WM_XBUTTONDBLCLK:
   case WM_XBUTTONDOWN:
   {
     auto key = GET_XBUTTON_WPARAM(w_param) == XBUTTON1 ? Key::Mouse_X1_Button : Key::Mouse_X2_Button;
-    g_input_sys.key_down(key);
+    if (msg == WM_XBUTTONDBLCLK)
+      g_input_sys.key_down(key, true);
+    else
+      g_input_sys.key_down(key);
     return TRUE;
   }
 
@@ -330,18 +344,27 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     return 0;
   }
 
+  case WM_LBUTTONDBLCLK:
   case WM_LBUTTONDOWN:
   {
-    g_input_sys.key_down(Key::Mouse_Left_Button);
+    auto is_double_click = msg == WM_LBUTTONDBLCLK;
+    if (is_double_click)
+      g_input_sys.key_down(Key::Mouse_Left_Button, true);
+    else
+      g_input_sys.key_down(Key::Mouse_Left_Button);
 
-    SetCapture(handle);
     auto& window = windows[handle];
     last_cursor_pos                    = get_cursor_pos();
     left_button_down_window_cursor_pos = window.cursor_pos();
 
+    SetCapture(handle);
+
     // only moving in cursor valid areas
     if (!window._move_from_maximize &&
       std::ranges::any_of(window._move_invalid_areas, [](auto rect) { return rect.contains_bounding(left_button_down_window_cursor_pos); }))
+      break;
+
+    if (is_double_click)
       break;
 
     left_button_down_resize_type = window.get_resize_type(left_button_down_window_cursor_pos);

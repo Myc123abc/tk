@@ -17,25 +17,25 @@ public:
   {
     auto width  = p1.x - p0.x;
     auto height = p2.y - p0.y;
-    auto [clicked, hovered, move_out, down] = ui::button(_name.id(), p0.x, p0.y, width, height);
-    if (hovered) color = hovered_color;
+    auto state = ui::button(_name.id(), p0.x, p0.y, width, height);
+    if (state.hovered) color = hovered_color;
 
-    if (clicked) _paused = !_paused;
+    if (state.clicked) _paused = !_paused;
     auto v = ui::ping_pong(_lerp_name, !_paused, 100'000);
 
     _lerp_pts = std::vector<LerpPoint>
     {
       //         playback button                    pause button
-      { p0,                                p0,                              },
+      { p0,                                  p0,                                },
       { p0 + float2(width / 2,  height / 4), p0 + float2( width / 3, 0)         },
       { p2 + float2(width / 2, -height / 4), p2 + float2( width / 3, 0)         },
-      { p2,                                p2,                              },
-      { p0 + float2(width / 2,  height / 4), { p1.x - width / 3, p0.y },      },
-      { p1,                                { p1.x, p0.y },                  },
-      { p1,                                { p1.x, p2.y },                  },
-      { p2 + float2(width / 2, -height / 4), { p1.x - width / 3, p2.y },      },
-      { p1,                                p0 + float2(width / 3, height / 2) },
-      { { p0.x, p1.y },                    { p1.x - width / 3, p1.y },      },
+      { p2,                                  p2,                                },
+      { p0 + float2(width / 2,  height / 4), { p1.x - width / 3, p0.y },        },
+      { p1,                                  { p1.x, p0.y },                    },
+      { p1,                                  { p1.x, p2.y },                    },
+      { p2 + float2(width / 2, -height / 4), { p1.x - width / 3, p2.y },        },
+      { p1,                                  p0 + float2(width / 3, height / 2) },
+      { { p0.x, p1.y },                      { p1.x - width / 3, p1.y },        },
     };
 
     _pts.clear();
@@ -59,7 +59,7 @@ public:
 
     ui::union_end(color, thickness);
 
-    return clicked;
+    return state.clicked;
   }
 
   void pause() noexcept { _paused = true;  }

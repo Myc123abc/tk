@@ -14,6 +14,7 @@ namespace tk::ui {
 struct ButtonState
 {
   bool clicked{};
+  bool double_click{};
   bool hovered{};
   bool move_out{};
   bool down{};

@@ -254,7 +254,7 @@ void UIContext::postprocess_render() noexcept
   if (cursor_on_window)
   {
     auto wnd = g_wnd_mgr.get_window(cursor_on_window);
-    if (mouse_left_button_state == KeyState::down)
+    if (mouse_left_button_state == KeyState::down || mouse_left_button_state == KeyState::double_click)
     {
       mouse_down_window = wnd->handle();
       mouse_down_window_pos = wnd->cursor_pos();
@@ -410,6 +410,10 @@ void UIContext::add_title_bar() noexcept
   ui::add_move_invalid_area({ 0, btn_height }, { w, h });
 
   auto handle = _wnd->handle();
+
+  // title bar, can be double click to maximize window
+  if (button("tk::ui::title_bar", 0, 0, w, btn_height).double_click && !_wnd->cfg().no_resize)
+    _wnd->is_maximized() ? _wnd->restore() : _wnd->maximize();
 
   // minimize button
   if (button("tk::ui::title_bar_minimize_button", w - btn_width * 3, 0, btn_width, btn_height, background_color, btn_hovered_color, btn_mouse_down_color,

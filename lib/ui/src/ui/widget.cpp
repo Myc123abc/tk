@@ -61,12 +61,13 @@ auto button(size_t id, float x, float y, float width, float height) noexcept -> 
   left_top     = rect.left_top();
   right_bottom = rect.right_bottom();
 
-  auto is_last_mouse_down_id = g_ui_ctx.is_last_mouse_down_id(id);
+  auto is_last_mouse_down_id  = g_ui_ctx.is_last_mouse_down_id(id);
+  auto mouse_left_button_state = get_key(Key::Mouse_Left_Button);
 
   // when cursor hover on it, it will change color to hovered color
   auto is_hovered  = g_ui_ctx.is_hover_on(id, left_top, right_bottom) && g_wnd_mgr.is_normal_cursor();
   auto is_move_out = g_ui_ctx.is_cursor_move_out(id);
-  auto is_down     = is_last_mouse_down_id && get_key(Key::Mouse_Left_Button).has_down();
+  auto is_down     = is_last_mouse_down_id && mouse_left_button_state.has_down();
   if (is_hovered && (g_ui_ctx.is_last_mouse_up ? false : g_ui_ctx.mouse_down_window_pos.has_value()))
   {
     g_ui_ctx.add_mouse_left_button_state(id, left_top, right_bottom);
@@ -76,7 +77,10 @@ auto button(size_t id, float x, float y, float width, float height) noexcept -> 
                  g_ui_ctx.mouse_down_window == g_ui_ctx.window()->handle();
   }
 
-  return { is_hovered && is_last_mouse_down_id && is_click_on(left_top, right_bottom), is_hovered, is_move_out, is_down };
+  auto clicked      = is_hovered && is_last_mouse_down_id && is_click_on(left_top, right_bottom);
+  auto double_click = is_hovered && mouse_left_button_state.state == KeyState::double_click;
+
+  return { clicked, double_click, is_hovered, is_move_out, is_down };
 }
 
 auto button(StringID name, float x, float y, float width, float height) noexcept -> ButtonState

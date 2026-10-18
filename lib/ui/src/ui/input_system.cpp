@@ -34,7 +34,7 @@ void InputSystem::update() noexcept
       ctx.state           = up;
       ctx.release_pending = false;
     }
-    else if (ctx.state == down)
+    else if (ctx.state == down || ctx.state == double_click)
       ctx.state = is_mouse_button(key) ? press : down_idle;
     else if (ctx.state == press && !is_mouse_button(key))
       ctx.state = down_idle;
@@ -53,7 +53,10 @@ void InputSystem::key_down(Key key, bool repeat) noexcept
   auto i    = index(key);
   auto& ctx = _keys[i];
 
-  ctx.state = repeat && (ctx.state == down_idle || ctx.state == press) ? press : down;
+  if (is_mouse_button(key))
+    ctx.state = repeat ? double_click : down;
+  else
+    ctx.state = repeat && (ctx.state == down_idle || ctx.state == press) ? press : down;
   ctx.release_pending = false;
   _active_keys.set(i);
 }

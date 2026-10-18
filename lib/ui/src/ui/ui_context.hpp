@@ -154,7 +154,6 @@ private:
     float2 right_bottom{};
     bool   move_out{};
   } _btn_state;
-  bool _interrupte{};
 public:
   void add_mouse_left_button_state(size_t id, float2 left_top, float2 right_bottom) noexcept;
   auto is_cursor_move_out(size_t id) noexcept -> bool;

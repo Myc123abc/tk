@@ -188,11 +188,12 @@ enum class Key
 
 enum class KeyState
 {
-  idle      = 0b0000,
-  down      = 0b0001,
-  down_idle = 0b0011,
-  press     = 0b0101,
-  up        = 0b1000,
+  idle         = 0b00000,
+  down         = 0b00001,
+  down_idle    = 0b00011,
+  press        = 0b00101,
+  up           = 0b01000,
+  double_click = 0b10011, // Mouse only
 };
 
 struct GetKeyResult
