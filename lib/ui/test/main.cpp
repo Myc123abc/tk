@@ -435,15 +435,33 @@ int main()
   auto cfg2 = cfg;
   cfg.backdrop.default_blur();
 
-  auto fps = Fps{};
+  auto fps      = Fps{};
+  auto fps_text = std::string{""};
   fps.init(240);
   fps.start();
 
   while (!wnd1_is_closed || !wnd2_is_closed)
   {
+    // calc fps
+    static auto acc_time = 0;
+    acc_time += ui::delta_time();
+    if (acc_time >= 1000'000)
+    {
+      fps_text = std::format("{:.0f}", fps.get());
+      acc_time = 0;
+    }
+    fps.update();
+
     if (!wnd1_is_closed)
     {
       ui::begin("wnd1", 50, 50, 200, 200, &wnd1_is_closed, cfg);
+
+      // Draw fps on title bar
+      ui::draw_on_title_bar([&fps_text](float2 extent)
+      {
+        auto constexpr font_size = 12.f;
+        ui::text(fps_text, { 8, (extent.y - font_size) / 2 }, font_size, 0x000000ff);
+      });
 
       if (ui::get_key(ui::Key::F11).is_down())
       {
@@ -637,16 +655,6 @@ int main()
     }
 
     tk::update();
-
-    // fps
-    static auto acc_time = 0;
-    acc_time += ui::delta_time();
-    if (acc_time >= 1000'000)
-    {
-      info("fps {}", fps.get());
-      acc_time = 0;
-    }
-    fps.update();
   }
 
   tk::destroy();

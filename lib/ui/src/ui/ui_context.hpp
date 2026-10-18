@@ -81,6 +81,7 @@ public:
   void restore_fullscreen_window() noexcept;
 
   auto is_use_title_bar_now() const noexcept { return _wnd->cfg().display_title_bar && !_wnd->is_fullscreen(); }
+  void draw_on_title_bar(std::move_only_function<void(float2)>&& func) noexcept;
 
   auto get_window_context(HWND handle) noexcept { assert(_wnd_names.contains(handle)); return &_wnd_ctxs[_wnd_names[handle]]; }
   void clear_fullscreen_window() noexcept { _fullscreen_window_need_clear = true; }
@@ -109,6 +110,9 @@ private:
   void window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer::Window const& wnd, Rect scissor_rect) noexcept;
 
 private:
+  //
+  // misc
+  //
   std::unordered_map<StringID, WindowContext> _wnd_ctxs;
   std::unordered_map<HWND, StringID>          _wnd_names;
 
@@ -119,6 +123,8 @@ private:
 
   bool   _call_begin{};
   double _delta_time{};
+
+  std::move_only_function<void(float2)> _user_title_bar_draw_func;
 
 public:
   //

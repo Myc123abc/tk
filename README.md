@@ -8,10 +8,7 @@ A visual novel engine designed to make visual novel creation accessible to every
 Is still in the early stages of development.
 
 ## TODO
-- [ ] Customize a closed hash table with Robin Hood Hashing for better performance then `std::unordered_map`.
-- [x] Implment compile-time hashing string for performance.
 - [ ] Add more controls to the UI framework.
-- [x] Implement font selection and vertical text layout.
 - [ ] Add MSDF glyph cache files generation and preloading.
 - [ ] Add IME support.
 - [ ] Add audio processing.

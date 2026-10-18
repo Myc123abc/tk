@@ -6,8 +6,6 @@
 #include "text_engine/text_engine.hpp"
 #include "input_system.hpp"
 
-#include <cmath>
-
 using namespace tk::renderer;
 
 namespace tk::ui {
@@ -119,8 +117,16 @@ void UIContext::end() noexcept
   err_if(!_viewport_stack.empty(), "viewport_begin is called but viewport_end not be called");
   if (is_use_title_bar_now())
     add_title_bar();
+  _user_title_bar_draw_func = {};
   _call_begin = false;
   if (_wnd_ctx->first_time_call) _wnd_ctx->first_time_call = false;
+}
+
+void UIContext::draw_on_title_bar(std::move_only_function<void(float2)>&& func) noexcept
+{
+  err_if(!func, "draw_on_title_bar function is empty");
+  err_if(static_cast<bool>(_user_title_bar_draw_func), "draw_on_title_bar can only be called once per window update");
+  _user_title_bar_draw_func = std::move(func);
 }
 
 void UIContext::check_draw() const noexcept
@@ -414,6 +420,10 @@ void UIContext::add_title_bar() noexcept
   // title bar, can be double click to maximize window
   if (button("tk::ui::title_bar", 0, 0, w, btn_height).double_click && !_wnd->cfg().no_resize)
     _wnd->is_maximized() ? _wnd->restore() : _wnd->maximize();
+
+  // user title bar draw
+  if (_user_title_bar_draw_func)
+    _user_title_bar_draw_func({ std::max(0.f, w - btn_width * 3), btn_height });
 
   // minimize button
   if (button("tk::ui::title_bar_minimize_button", w - btn_width * 3, 0, btn_width, btn_height, background_color, btn_hovered_color, btn_mouse_down_color,

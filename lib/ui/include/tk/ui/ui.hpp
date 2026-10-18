@@ -320,6 +320,13 @@ void begin(StringID name, int x, int y, uint width, uint height, bool* is_closed
 void end() noexcept;
 
 /**
+ * Draw on the current window's title bar during end().
+ * The callback origin is the title bar's left-top corner.
+ * @param func receives the drawable title bar extent excluding window controls
+ */
+void draw_on_title_bar(std::move_only_function<void(float2)>&& func) noexcept;
+
+/**
  * set cursor move invalid area
  * every frame rendering will be reset
  * @param x

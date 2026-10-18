@@ -14,7 +14,7 @@ namespace tk {
 
 void init() noexcept
 {
-  // test_iocp();
+  test_iocp();
   g_thread_pool.init(std::thread::hardware_concurrency() - 2);
   g_glyph_cacher.preload();
   g_renderer.init();

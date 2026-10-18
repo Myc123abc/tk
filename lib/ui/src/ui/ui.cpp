@@ -118,21 +118,21 @@ auto load_font(std::string_view path) noexcept -> std::expected<FontInfo, FontLo
 
 auto text(StringLiteral text, float2 pos, float size, Color color, TextConfig const& cfg) noexcept -> TextResult
 {
-  assert(!text.empty());
+  if (text.empty()) return {};
   adjust_pos(pos); adjust_scale(size);
   return g_ui_ctx.text(text, pos, size, color, cfg);
 }
 
 auto text(StringLiteral text, float size, TextConfig const& cfg) noexcept -> TextResult
 {
-  assert(!text.empty());
+  if (text.empty()) return {};
   adjust_scale(size);
   return g_ui_ctx.text(text, {}, size, {}, cfg);
 }
 
 auto get_text_bounding_rect(StringLiteral text, float size, TextConfig const& cfg) noexcept -> std::optional<Rect>
 {
-  assert(!text.empty());
+  if (text.empty()) return {};
   adjust_scale(size);
   return g_ui_ctx.get_text_bounding_rect(text, size, cfg);
 }
@@ -214,6 +214,12 @@ void restore_fullscreen_window() noexcept
   g_ui_ctx.check_draw();
   if (g_ui_ctx.window()->cfg().no_resize) return;
   g_ui_ctx.restore_fullscreen_window();
+}
+
+void draw_on_title_bar(std::move_only_function<void(float2)>&& func) noexcept
+{
+  g_ui_ctx.check_draw();
+  g_ui_ctx.draw_on_title_bar(std::move(func));
 }
 
 ////////////////////////////////////////////////////////////////////////////////

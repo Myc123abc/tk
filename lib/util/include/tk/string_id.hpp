@@ -43,10 +43,17 @@ struct StringLiteral
   StringLiteral(std::string_view str) noexcept
     : _id(hash(str)), _str(str.data()) {}
   
+  StringLiteral(char const* str) noexcept
+    : StringLiteral(std::string_view{str}) {}
+  
   constexpr auto view() const noexcept { return _str; }
   constexpr auto id()   const noexcept { return _id;  }
 
-  constexpr auto empty() const noexcept { return !_str; }
+  constexpr auto empty() const noexcept
+  {
+    constexpr auto Empty_Str_ID = hash(static_cast<char const*>(""), size_t{});
+    return !_str || _id == Empty_Str_ID;
+  }
 
 private:
   uint64_t    _id{};
