@@ -4,8 +4,8 @@
 #include "ui/ui_context.hpp"
 #include "util/thread_pool.hpp"
 #include "util/file_manager.hpp"
+#include "util/iocp.hpp"
 #include "ui/text_engine/glyph_cacher.hpp"
-#include "iocp.hpp"
 
 using namespace tk::renderer;
 using namespace tk::ui;
@@ -14,7 +14,7 @@ namespace tk {
 
 void init() noexcept
 {
-  test_iocp();
+  g_iocp.init();
   g_thread_pool.init(std::thread::hardware_concurrency() - 2);
   g_glyph_cacher.preload();
   g_renderer.init();
@@ -31,6 +31,7 @@ void destroy() noexcept
   g_ui_ctx.destroy();
   g_renderer.destroy();
   g_wnd_mgr.destroy();
+  g_iocp.destroy();
   g_file_mgr.destroy();
 }
 

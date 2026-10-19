@@ -5,7 +5,7 @@ tk_copy_assets(test-tk-ui)
 
 add_executable(test-tk-ui-viewport viewport.cpp)
 target_link_libraries(test-tk-ui-viewport PRIVATE tk::ui)
-tk_ui_copy_shader(test-tk-ui-viewport)
+add_dependencies(test-tk-ui-viewport test-tk-ui-shaders)
 tk_copy_assets(test-tk-ui-viewport)
 
 add_test(
