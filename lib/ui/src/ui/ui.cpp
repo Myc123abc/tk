@@ -295,7 +295,7 @@ void rectangle(float2 left_top, float2 right_bottom, Color color, float thicknes
 {
 	g_ui_ctx.check_draw();
 
-  if (left_top.x == right_bottom.x || left_top.y == right_bottom.y) return;
+  if (left_top.x >= right_bottom.x || left_top.y >= right_bottom.y) return;
 
   adjust_pos(left_top, right_bottom); adjust_scale(thickness, rounding);
   g_ui_ctx.frame_data()->add_rect(left_top, right_bottom, color, thickness, rounding, flags);
@@ -305,7 +305,7 @@ void triangle(float2 p0, float2 p1, float2 p2, Color color, float thickness) noe
 {
 	g_ui_ctx.check_draw();
 
-  if (p0.x == p1.x == p2.x || p0.y == p1.y == p2.y) return;
+  if ((p0.x == p1.x && p1.x == p2.x) || (p0.y == p1.y && p1.y == p2.y)) return;
 
   adjust_pos(p0, p1, p2); adjust_scale(thickness);
 	g_ui_ctx.frame_data()->add_triangle(p0, p1, p2, color, thickness);
@@ -324,8 +324,7 @@ void circle(float2 center, float radius, Color color, float thickness) noexcept
 void line(float2 p0, float2 p1, Color color, float thickness) noexcept
 {
 	g_ui_ctx.check_draw();
-  if (p0 == p1) return;
-  if (thickness < 1) thickness = 1;
+  if (p0 == p1 || thickness <= 0) return;
   adjust_pos(p0, p1); adjust_scale(thickness);
   g_ui_ctx.frame_data()->add_line(p0, p1, color, thickness);
 }
@@ -333,7 +332,7 @@ void line(float2 p0, float2 p1, Color color, float thickness) noexcept
 void arc(float2 center, float2 p0, float2 p1, bool ccw, Color color, float thickness) noexcept
 {
   g_ui_ctx.check_draw();
-  if (thickness < 1) thickness = 1;
+  if (thickness <= 0) return;
   adjust_pos(center, p0, p1); adjust_scale(thickness);
   if (ccw) std::swap(p0, p1);
   g_ui_ctx.frame_data()->add_arc(center, p0, p1, color, thickness);
@@ -342,7 +341,7 @@ void arc(float2 center, float2 p0, float2 p1, bool ccw, Color color, float thick
 void quad_bezier(float2 p0, float2 p1, float2 p2, Color color, float thickness) noexcept
 {
 	g_ui_ctx.check_draw();
-  if (thickness < 1) thickness = 1;
+  if (thickness <= 0) return;
   adjust_pos(p0, p1, p2); adjust_scale(thickness);
   g_ui_ctx.frame_data()->add_quad_bezier(p0, p1, p2, color, thickness);
 }
@@ -350,7 +349,7 @@ void quad_bezier(float2 p0, float2 p1, float2 p2, Color color, float thickness) 
 void cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Color color, float thickness) noexcept
 {
 	g_ui_ctx.check_draw();
-  if (thickness < 1) thickness = 1;
+  if (thickness <= 0) return;
   adjust_pos(p0, p1, p2, p3); adjust_scale(thickness);
   g_ui_ctx.frame_data()->add_cubic_bezier(p0, p1, p2, p3, color, thickness);
 }

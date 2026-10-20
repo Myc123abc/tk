@@ -9,6 +9,7 @@ enum class VtxType
   shape,
   image,
   text,
+  line,
 };
   
 inline auto vtx_pack(VtxType type, uint img_idx) noexcept

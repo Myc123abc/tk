@@ -20,6 +20,11 @@ if(MSVC)
 endif()
 
 function(tk_copy_assets target)
+  if (CMAKE_GENERATOR MATCHES "Ninja")
+    set_property(GLOBAL PROPERTY JOB_POOLS tk_asset_copy=1)
+    set_property(TARGET ${target} PROPERTY JOB_POOL_LINK tk_asset_copy)
+  endif()
+
   add_custom_command(TARGET ${target} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
       "${CMAKE_SOURCE_DIR}/assets"

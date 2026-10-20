@@ -5,6 +5,7 @@
 #include "engine/copy_engine.hpp"
 #include "tk/error_handling.hpp"
 #include "resource/descriptor_heap_manager.hpp"
+#include "resource/line_coverage_atlas.hpp"
 #include "pipeline/pipeline_system.hpp"
 #include "window/window_manager.hpp"
 #include "context.hpp"
@@ -34,10 +35,12 @@ void Renderer::init_images() noexcept
 {
   _discard_image   = g_img_mgr.create(Default_Image_Init_Width, Default_Image_Init_Height, ImageFormat::r8_unorm,                ImageType::rtv | ImageType::srv);
   _composite_image = g_img_mgr.create(Default_Image_Init_Width, Default_Image_Init_Height, RenderResource::Render_Target_Format, ImageType::rtv | ImageType::srv);
+  g_line_coverage_atlas.init();
 }
 
 void Renderer::destroy_images() noexcept
 {
+  g_line_coverage_atlas.destroy();
   g_img_mgr.destroy(_discard_image);
   g_img_mgr.destroy(_composite_image);
 }

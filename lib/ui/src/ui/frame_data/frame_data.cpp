@@ -157,7 +157,7 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
       thickness *= scale.value();
       should_transform_vertices = false;
     }
-    if (radius >= 1.f)
+    if (radius > 0)
       _add_circle(center, radius, cmd.data.add_circle.color, thickness);
     break;
   }

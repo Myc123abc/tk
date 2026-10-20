@@ -345,21 +345,30 @@ void draw_aa_references(float2 pos) noexcept
 {
   draw_panel("AA and intersections", pos);
 
-  for (auto i = 0; i < 4; ++i)
+  for (auto i = 0; i < 3; ++i)
   {
     auto y = 60.f + i * 24.f;
     ui::line(pos + float2{ 20, y }, pos + float2{ 260, y }, Text_Color, static_cast<float>(i + 1));
   }
+  ui::line(pos + float2{ 20, 132 }, pos + float2{ 260, 132 }, Blue, .5f);
 
-  ui::path_begin(pos + float2{ 25, 190 });
-  ui::path_line_to(pos + float2{ 90, 138 });
-  ui::path_line_to(pos + float2{ 140, 195 });
-  ui::path_line_to(pos + float2{ 200, 138 });
-  ui::path_line_to(pos + float2{ 255, 190 });
-  ui::path_end(false, Yellow, 6);
+  ui::path_begin(pos + float2{ 20, 166 });
+  ui::path_line_to(pos + float2{ 72, 142 });
+  ui::path_line_to(pos + float2{ 78, 166 });
+  ui::path_line_to(pos + float2{ 134, 142 });
+  ui::path_line_to(pos + float2{ 140, 166 });
+  ui::path_line_to(pos + float2{ 195, 142 });
+  ui::path_line_to(pos + float2{ 260, 166 });
+  ui::path_end(false, Yellow, 1);
 
-  ui::line(pos + float2{ 115, 140 }, pos + float2{ 165, 200 }, Orange, 3);
-  ui::line(pos + float2{ 165, 140 }, pos + float2{ 115, 200 }, Orange, 3);
+  ui::path_begin(pos + float2{ 20, 202 });
+  ui::path_line_to(pos + float2{ 75, 176 });
+  ui::path_line_to(pos + float2{ 82, 202 });
+  ui::path_line_to(pos + float2{ 140, 176 });
+  ui::path_line_to(pos + float2{ 147, 202 });
+  ui::path_line_to(pos + float2{ 205, 176 });
+  ui::path_line_to(pos + float2{ 260, 202 });
+  ui::path_end(false, Pink, 6);
 }
 
 void draw_nested_viewport(StringID viewport_name, StringID button_name, bool& button_enabled, float2 pos) noexcept

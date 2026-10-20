@@ -5,6 +5,7 @@
 #include "../../renderer/resource/shader_type.hpp"
 #include "../../renderer/resource/image_manager.hpp"
 #include "../text_engine/text_engine.hpp"
+#include "polyline_tessellator.hpp"
 #include "tk/rect.hpp"
 #include "tk/flag.hpp"
 
@@ -66,6 +67,7 @@ public:
     _cull_rect_stack.clear();
     _points.clear();
     _normals.clear();
+    _polyline_tessellator.clear();
     _vertex_beg                    = {};
     _index_beg                     = {};
     _tmp_vertices_size             = {};
@@ -380,6 +382,7 @@ private:
 
   auto expand_beg(uint vertices_size, uint indices_size) noexcept -> std::pair<Vertex*, uint16*>
   {
+    assert(_vertex_beg + vertices_size <= std::numeric_limits<uint16>::max() + 1u);
     _tmp_vertices_size = vertices_size;
     _tmp_indices_size  = indices_size;
 
@@ -414,14 +417,14 @@ private:
   static auto calc_circle_segment_count(float radius) noexcept -> float;
   static auto get_circle_segment_count(float radius) noexcept -> uint;
 
-  void add_poly_line(Color color, float thickness, bool is_closed) noexcept;
+  void add_poly_line(Color color, float thickness, bool is_closed, bool stroke_inside = false) noexcept;
   void path_rect(float2 left_top, float2 right_bottom, float rounding, Flag<CornerFlag> flags, float tessellation_scale = 1.f) noexcept;
   void path_arc_to(float2 center, float radius, float min, float max, float tessellation_scale = 1.f) noexcept;
   void _path_arc_to(float2 center, float radius, int min, int max) noexcept;
   void _path_arc_to(float2 center, float radius, float min, float max, int segment_cnt) noexcept;
 
-  void path_bezier_quad_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float tess_tol, int level) noexcept;
-  void path_bezier_cubic_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float2 p3, float tess_tol, int level) noexcept;
+  void path_bezier_quad_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float max_error_sq, int level) noexcept;
+  void path_bezier_cubic_curve_to_casteljau(float2 p0, float2 p1, float2 p2, float2 p3, float max_error_sq, int level) noexcept;
 
 private:
   std::vector<DrawCmd> _draw_cmds;
@@ -450,6 +453,7 @@ private:
   std::vector<float2> _points;
   std::vector<float2> _normals;
   std::vector<float2> _tmp_buf;
+  PolylineTessellator _polyline_tessellator;
 
   enum class BuildMode
   {
@@ -464,11 +468,11 @@ private:
   uint _discard_vtx_beg{};
   uint _clear_composite_image_cmd_idx{};
 
-  inline static auto constexpr arc_table_size         = 48;
-  inline static auto constexpr arc_sample_max         = arc_table_size;
-  inline static auto constexpr curve_tessellation_tol = 1.25f;
-  inline static auto constexpr tessellation_max_error = 0.3f;
-  inline static auto           arc_radius_cutoff      = 0.f;
+  inline static auto constexpr arc_table_size               = 48;
+  inline static auto constexpr arc_sample_max               = arc_table_size;
+  inline static auto constexpr curve_tessellation_max_error = 1.12f;
+  inline static auto constexpr tessellation_max_error       = 0.3f;
+  inline static auto           arc_radius_cutoff            = 0.f;
   inline static std::array<int, arc_table_size + 16> _circle_segment_counts;
   inline static std::array<float2, arc_table_size>   _arc_vertices;
 };

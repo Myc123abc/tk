@@ -2,6 +2,7 @@
 #include "util.hpp"
 #include "../ui_context.hpp"
 #include "triangulator.hpp"
+#include "../../renderer/resource/line_coverage_atlas.hpp"
 
 namespace tk::ui {
 
@@ -13,6 +14,19 @@ auto fix_rect_flags(Flag<CornerFlag> flags) noexcept -> Flag<CornerFlag>
   if ((flags & mask).empty())
     flags |= CornerFlag::all;
   return flags;
+}
+
+auto calc_arc_step_and_count(int segment_count, int sample_count) noexcept -> std::pair<int, int>
+{
+  auto step = std::clamp(
+    sample_count / segment_count,
+    1,
+    sample_count / 4
+  );
+  auto step_count = (sample_count / 4) / step;
+  if (step * step_count != sample_count / 4)
+    step = (sample_count / 4) / step_count;
+  return { step, step_count };
 }
 
 }
@@ -64,15 +78,18 @@ void FrameData::_add_rect(float2 left_top, float2 right_bottom, Color color, flo
 
   if (thickness > 0)
   {
-    left_top     += .5f;
-    right_bottom -= .5f;
     assert(_points.empty());
     path_rect(left_top, right_bottom, rounding, flags);
-    add_poly_line(color, thickness, true);
+    add_poly_line(color, thickness, true, true);
     return;
   }
 
-  if (has_rounding)
+  auto const is_pixel_aligned =
+    std::trunc(left_top.x)     == left_top.x     &&
+    std::trunc(left_top.y)     == left_top.y     &&
+    std::trunc(right_bottom.x) == right_bottom.x &&
+    std::trunc(right_bottom.y) == right_bottom.y;
+  if (has_rounding || (!_using_discard_shapes && color.a < 1.f && !is_pixel_aligned))
   {
     assert(_points.empty());
     path_rect(left_top, right_bottom, rounding, flags);
@@ -88,20 +105,13 @@ void FrameData::_add_transformed_rect(float2 left_top, float2 right_bottom, Colo
   if (_using_discard_shapes) color.a = 1.f;
   else if (color.a == 0) return;
 
-  if (thickness > 0)
-  {
-    auto const inset = .5f / scale;
-    left_top     += inset;
-    right_bottom -= inset;
-  }
-
   assert(_points.empty());
   path_rect(left_top, right_bottom, rounding, flags, scale);
   for (auto& point : _points)
     point = transform_point(point);
 
   if (thickness > 0)
-    add_poly_line(color, thickness * scale, true);
+    add_poly_line(color, thickness * scale, true, true);
   else
     add_convex_poly_filled(color);
 }
@@ -142,7 +152,7 @@ void FrameData::_add_triangle(float2 p0, float2 p1, float2 p2, Color color, floa
   _points.emplace_back(p2);
 
   if (thickness > 0)
-    add_poly_line(color, thickness, true);
+    add_poly_line(color, thickness, true, true);
   else
     add_convex_poly_filled(color);
 }
@@ -158,13 +168,28 @@ void FrameData::_add_circle(float2 center, float radius, Color color, float thic
   if (_using_discard_shapes) color.a = 1.f;
   else if (color.a == 0) return;
 
+  if (thickness <= 0)
+  {
+    auto const min_radius = g_ui_ctx.window()->scale() * std::numbers::sqrt2_v<float> * .5f;
+    if (radius < min_radius)
+    {
+      color.a *= radius / min_radius;
+      radius = min_radius;
+    }
+  }
+
   assert(_points.empty());
-  path_arc_to(center, radius - .5f, 0, std::numbers::pi_v<float> * 2.f);
+  path_arc_to(center, radius, 0, std::numbers::pi_v<float> * 2.f);
   if (!_points.empty())
     _points.pop_back();
 
   if (thickness > 0)
-    add_poly_line(color, thickness, true);
+  {
+    if (thickness >= radius)
+      add_convex_poly_filled(color);
+    else
+      add_poly_line(color, thickness, true, true);
+  }
   else
     add_convex_poly_filled(color);
 }
@@ -180,8 +205,20 @@ void FrameData::_add_line(float2 p0, float2 p1, Color color, float thickness) no
   if (_using_discard_shapes) color.a = 1.f;
   else if (color.a == 0) return;
 
-  p0 = floor(p0) + .5f;
-  p1 = floor(p1) + .5f;
+  auto const aa_size         = g_ui_ctx.window()->scale();
+  auto const can_pixel_align = _transform_stack.empty() || axis_aligned_uniform_transform_scale().has_value();
+  if (!_using_discard_shapes && can_pixel_align && thickness <= aa_size)
+  {
+    auto const visual_thickness = std::max(thickness, aa_size);
+    auto const align_center     = [visual_thickness](float value)
+    {
+      return std::round(value - visual_thickness * .5f) + visual_thickness * .5f;
+    };
+    if (p0.y == p1.y)
+      p0.y = p1.y = align_center(p0.y);
+    else if (p0.x == p1.x)
+      p0.x = p1.x = align_center(p0.x);
+  }
 
   assert(_points.empty());
   _points.emplace_back(p0);
@@ -199,10 +236,6 @@ void FrameData::_add_arc(float2 center, float2 p0, float2 p1, Color color, float
 {
   if (_using_discard_shapes) color.a = 1.f;
   else if (color.a == 0) return;
-
-  center = floor(center) + .5f;
-  p0     = floor(p0)     + .5f;
-  p1     = floor(p1)     + .5f;
 
   auto radius = length(p0 - center);
   if (radius < .5f)
@@ -226,7 +259,7 @@ void FrameData::_add_quad_bezier(float2 p0, float2 p1, float2 p2, Color color, f
 
   assert(_points.empty());
   _points.emplace_back(p0);
-  path_bezier_quad_curve_to_casteljau(p0, p1, p2, curve_tessellation_tol, 0);
+  path_bezier_quad_curve_to_casteljau(p0, p1, p2, curve_tessellation_max_error * curve_tessellation_max_error, 0);
   add_poly_line(color, thickness, false);
 }
 
@@ -243,52 +276,124 @@ void FrameData::_add_cubic_bezier(float2 p0, float2 p1, float2 p2, float2 p3, Co
 
   assert(_points.empty());
   _points.emplace_back(p0);
-  path_bezier_cubic_curve_to_casteljau(p0, p1, p2, p3, curve_tessellation_tol, 0);
+  path_bezier_cubic_curve_to_casteljau(p0, p1, p2, p3, curve_tessellation_max_error * curve_tessellation_max_error, 0);
   add_poly_line(color, thickness, false);
 }
 
 void FrameData::add_convex_poly_filled(Color color) noexcept
 {
-  auto pt_cnt = static_cast<uint>(_points.size());
+  auto const pt_cnt = static_cast<uint>(_points.size());
   assert(pt_cnt > 2);
 
-  auto aa_width = g_ui_ctx.window()->scale();
-  auto aa_col   = Color{ color.r, color.g, color.b, 0.f }.to_uint();
-  auto col      = color.to_uint();
+  auto const half_aa   = g_ui_ctx.window()->scale() * .5f;
+  auto const aa_col    = Color{ color.r, color.g, color.b, 0.f }.to_uint();
+  auto const col       = color.to_uint();
+  auto const miter_max = Polyline_Miter_Limit * Polyline_Miter_Limit;
 
-  auto [vertices, indices] = expand_beg(pt_cnt * 2, (pt_cnt - 2) * 3 + pt_cnt * 6);
+  _tmp_buf.resize(pt_cnt * 2);
+  auto* normals    = _tmp_buf.data();
+  auto* sq_lengths = normals + pt_cnt;
+  auto  winding = 0.f;
+  for (auto index = 0u; index < pt_cnt; ++index)
+    winding += cross(_points[index], _points[(index + 1) % pt_cnt]);
+  auto const normal_sign = winding < 0 ? -1.f : 1.f;
+  for (uint i0 = pt_cnt - 1, i1 = 0; i1 < pt_cnt; i0 = i1++)
+  {
+    auto const delta = _points[i1] - _points[i0];
+    auto const len_sq = length_sq(delta);
+    auto const direction = len_sq > 0 ? delta / std::sqrt(len_sq) : float2{};
+    normals[i0] = float2{ direction.y, -direction.x } * normal_sign;
+    sq_lengths[i0].x = len_sq;
+  }
 
-  auto inner_idx = _vertex_beg;
-  auto outer_idx = _vertex_beg + 1;
-  for (auto i = 2; i < pt_cnt; ++i)
+  auto bevel_count = 0u;
+  for (uint i0 = pt_cnt - 1, i1 = 0; i1 < pt_cnt; i0 = i1++)
+  {
+    auto const cos_theta = dot(normals[i0], normals[i1]);
+    auto const clamped_cos = std::max(Polyline_Miter_Angle_Limit, cos_theta);
+    auto const miter_scale = std::min(1000.f, 1.f / (1.f + clamped_cos));
+    auto const miter = (normals[i0] + normals[i1]) * miter_scale;
+    bevel_count += length_sq(miter) > miter_max;
+  }
+
+  auto const vtx_cnt = pt_cnt * 2 + bevel_count;
+  auto const idx_cnt = (pt_cnt - 2) * 3 + pt_cnt * 6 + bevel_count * 3;
+  auto [vertices, indices] = expand_beg(vtx_cnt, idx_cnt);
+
+  auto const inner_idx = _vertex_beg;
+  auto  next_outer_idx = _vertex_beg + pt_cnt;
+  auto  previous_outer_idx = 0u;
+  auto* inner_vertices = vertices;
+  auto* outer_vertices = vertices + pt_cnt;
+  auto* first_fringe_indices = indices;
+
+  for (uint i0 = pt_cnt - 1, i1 = 0; i1 < pt_cnt; i0 = i1++)
+  {
+    auto const normal0 = normals[i0];
+    auto const normal1 = normals[i1];
+    auto const cos_theta = dot(normal0, normal1);
+    auto const clamped_cos = std::max(Polyline_Miter_Angle_Limit, cos_theta);
+    auto const miter_scale = std::min(1000.f, 1.f / (1.f + clamped_cos));
+    auto miter = (normal0 + normal1) * miter_scale;
+    auto const miter_distance_sq = length_sq(miter);
+    auto const bevel = miter_distance_sq > miter_max;
+    if (bevel)
+    {
+      auto const reference_half_sq = half_aa * half_aa;
+      auto const limit_sq = std::max(sq_lengths[i0].x, sq_lengths[i1].x);
+      auto const reference_miter_sq = miter_distance_sq * reference_half_sq;
+      if (reference_miter_sq > limit_sq)
+        miter *= std::sqrt(limit_sq / reference_miter_sq);
+    }
+    miter *= half_aa;
+
+    inner_vertices[i1] = { _points[i1] - miter, {}, col };
+    auto const previous_inner_idx = inner_idx + i0;
+    auto const current_inner_idx  = inner_idx + i1;
+    auto current_outer_idx = next_outer_idx;
+
+    if (bevel)
+    {
+      *outer_vertices++ = { _points[i1] + normal0 * half_aa, {}, aa_col };
+      *outer_vertices++ = { _points[i1] + normal1 * half_aa, {}, aa_col };
+      next_outer_idx += 2;
+
+      indices[0] = static_cast<uint16>(previous_outer_idx);
+      indices[1] = static_cast<uint16>(current_outer_idx);
+      indices[2] = static_cast<uint16>(current_inner_idx);
+      indices[3] = static_cast<uint16>(previous_outer_idx);
+      indices[4] = static_cast<uint16>(current_inner_idx);
+      indices[5] = static_cast<uint16>(previous_inner_idx);
+      indices[6] = static_cast<uint16>(current_outer_idx);
+      indices[7] = static_cast<uint16>(current_outer_idx + 1);
+      indices[8] = static_cast<uint16>(current_inner_idx);
+      indices += 9;
+      ++current_outer_idx;
+    }
+    else
+    {
+      *outer_vertices++ = { _points[i1] + miter, {}, aa_col };
+      ++next_outer_idx;
+
+      indices[0] = static_cast<uint16>(previous_outer_idx);
+      indices[1] = static_cast<uint16>(current_outer_idx);
+      indices[2] = static_cast<uint16>(current_inner_idx);
+      indices[3] = static_cast<uint16>(previous_outer_idx);
+      indices[4] = static_cast<uint16>(current_inner_idx);
+      indices[5] = static_cast<uint16>(previous_inner_idx);
+      indices += 6;
+    }
+    previous_outer_idx = current_outer_idx;
+  }
+
+  first_fringe_indices[0] = static_cast<uint16>(previous_outer_idx);
+  first_fringe_indices[3] = static_cast<uint16>(previous_outer_idx);
+  for (auto i = 2u; i < pt_cnt; ++i)
   {
     indices[0] = static_cast<uint16>(inner_idx);
-    indices[1] = static_cast<uint16>(inner_idx + ((i - 1) << 1));
-    indices[2] = static_cast<uint16>(inner_idx + (i << 1));
+    indices[1] = static_cast<uint16>(inner_idx + i - 1);
+    indices[2] = static_cast<uint16>(inner_idx + i);
     indices += 3;
-  }
-
-  _normals.resize(pt_cnt);
-  for (uint i0 = pt_cnt - 1, i1 = 0; i1 < pt_cnt; i0 = i1++)
-  {
-    auto dp = fast_normalize(_points[i1] - _points[i0]);
-    _normals[i0] = { dp.y, -dp.x };
-  }
-
-  for (uint i0 = pt_cnt - 1, i1 = 0; i1 < pt_cnt; i0 = i1++)
-  {
-    auto dmp = fix_normal((_normals[i0] + _normals[i1]) * .5f) * aa_width * .5f;
-    vertices[0] = { _points[i1] - dmp, {}, col    };
-    vertices[1] = { _points[i1] + dmp, {}, aa_col };
-    vertices += 2;
-
-    indices[0] = static_cast<uint16>(inner_idx + (i1 << 1));
-    indices[1] = static_cast<uint16>(inner_idx + (i0 << 1));
-    indices[2] = static_cast<uint16>(outer_idx + (i0 << 1));
-    indices[3] = static_cast<uint16>(outer_idx + (i0 << 1));
-    indices[4] = static_cast<uint16>(outer_idx + (i1 << 1));
-    indices[5] = static_cast<uint16>(inner_idx + (i1 << 1));
-    indices += 6;
   }
 
   expand_end();
@@ -381,10 +486,12 @@ void FrameData::path_arc_to(float2 center, float radius, float min, float max, f
   if (radius < arc_radius_cutoff)
   {
     auto const is_reverse = max < min;
-    auto const min_sample_f = arc_sample_max * min / (std::numbers::pi * 2.f);
-    auto const max_sample_f = arc_sample_max * max / (std::numbers::pi * 2.f);
-    auto const min_sample = is_reverse ? std::floor(min_sample_f) : std::ceil(min_sample_f);
-    auto const max_sample = is_reverse ? std::ceil(max_sample_f) : std::floor(max_sample_f);
+    auto const [arc_step, arc_step_count] = calc_arc_step_and_count(static_cast<int>(get_circle_segment_count(radius)), arc_sample_max);
+    auto const arc_segment_count = arc_step_count * 4;
+    auto const min_sample_f = arc_segment_count * min / (std::numbers::pi * 2.f);
+    auto const max_sample_f = arc_segment_count * max / (std::numbers::pi * 2.f);
+    auto const min_sample = (is_reverse ? std::floor(min_sample_f) : std::ceil(min_sample_f)) * arc_step;
+    auto const max_sample = (is_reverse ? std::ceil(max_sample_f) : std::floor(max_sample_f)) * arc_step;
     auto const mid_samples = is_reverse ? std::max(min_sample - max_sample, 0.0) : std::max(max_sample - min_sample, 0.0);
     auto const min_segment_angle = min_sample * std::numbers::pi * 2.f / arc_sample_max;
     auto const max_segment_angle = max_sample * std::numbers::pi * 2.f / arc_sample_max;
@@ -407,7 +514,7 @@ void FrameData::path_arc_to(float2 center, float radius, float min, float max, f
 
 void FrameData::_path_arc_to(float2 center, float radius, int min, int max) noexcept
 {
-  auto step = std::clamp(arc_sample_max / static_cast<int>(get_circle_segment_count(radius)), 1, arc_table_size / 4);
+  auto [step, _] = calc_arc_step_and_count(static_cast<int>(get_circle_segment_count(radius)), arc_sample_max);
   auto const sample_range = max - min;
   auto const next_step = step;
 
@@ -488,121 +595,76 @@ void FrameData::_path_arc_to(float2 center, float radius, float min, float max, 
   }
 }
 
-void FrameData::add_poly_line(Color color, float thickness, bool is_closed) noexcept
+void FrameData::add_poly_line(Color color, float thickness, bool is_closed, bool stroke_inside) noexcept
 {
-  auto pt_cnt = static_cast<uint>(_points.size());
-  assert(pt_cnt >= 2);
-
-  auto const count      = is_closed ? pt_cnt : pt_cnt - 1;
-  auto const aa_size    = g_ui_ctx.window()->scale();
-  auto const thick_line = thickness > aa_size;
-  auto col_trans = Color{ color.r, color.g, color.b, 0 }.to_uint();
-  auto col       = color.to_uint();
-
-  thickness = std::max(thickness, 1.f);
-
-  auto const idx_cnt = thick_line ? count * 18 : count * 12;
-  auto const vtx_cnt = thick_line ? pt_cnt * 4 : pt_cnt * 3;
-
-  auto [vtx, idx] = expand_beg(vtx_cnt, idx_cnt);
-
-  _tmp_buf.clear();
-  _tmp_buf.resize(pt_cnt * (thick_line ? 5 : 3));
-  auto* tmp_normals = _tmp_buf.data();
-  auto* tmp_points  = tmp_normals + pt_cnt;
-
-  for (auto i1 = 0u; i1 < count; ++i1)
+  auto const unique_end = std::unique(_points.begin(), _points.end());
+  _points.erase(unique_end, _points.end());
+  if (is_closed && _points.size() > 2 && _points.front() == _points.back())
+    _points.pop_back();
+  if (_points.size() < 2)
   {
-    auto const i2 = (i1 + 1) == pt_cnt ? 0 : i1 + 1;
-    auto dp = fast_normalize(_points[i2] - _points[i1]);
-    tmp_normals[i1] = { dp.y, -dp.x };
+    _points.clear();
+    return;
   }
-  if (!is_closed) tmp_normals[pt_cnt - 1] = tmp_normals[pt_cnt - 2];
 
-  if (thick_line)
+  is_closed &= _points.size() > 2;
+  stroke_inside &= is_closed;
+  auto const aa_size = g_ui_ctx.window()->scale();
+  if (thickness < aa_size / 255.f)
   {
-    auto const half_inner_thickness = (thickness - aa_size) * .5f;
+    _points.clear();
+    return;
+  }
+  if (thickness < aa_size)
+  {
+    color.a *= thickness / aa_size;
+    thickness = aa_size;
+  }
+  if (color.a == 0)
+  {
+    _points.clear();
+    return;
+  }
+  auto const col        = color.to_uint();
+  auto const col_trans  = Color{ color.r, color.g, color.b, 0 }.to_uint();
+  auto const texture_transform_supported = _transform_stack.empty() || uniform_transform_scale().has_value();
+  auto const texture = _using_discard_shapes || !texture_transform_supported
+    ? std::optional<renderer::LineCoverageAtlas::Selection>{}
+    : renderer::g_line_coverage_atlas.select(thickness, aa_size);
+  auto const fringe_mode = texture
+    ? PolylineTessellator::FringeMode::texture_coverage
+    : PolylineTessellator::FringeMode::geometry;
+  auto const mesh = _polyline_tessellator.build(
+    _points,
+    thickness,
+    texture ? texture->fringe : aa_size,
+    is_closed,
+    stroke_inside,
+    fringe_mode
+  );
+  auto const vtx_cnt    = static_cast<uint>(mesh.vertices.size());
+  auto const idx_cnt    = static_cast<uint>(mesh.indices.size());
+  auto [vertices, indices] = expand_beg(vtx_cnt, idx_cnt);
 
-    if (!is_closed)
+  if (texture)
+  {
+    auto const packed = renderer::vtx_pack(renderer::VtxType::line, renderer::g_img_mgr[texture->image].srv().index());
+    for (auto const& vertex : mesh.vertices)
     {
-      auto const last = pt_cnt - 1;
-      tmp_points[0] = _points[0] + tmp_normals[0] * (half_inner_thickness + aa_size);
-      tmp_points[1] = _points[0] + tmp_normals[0] * half_inner_thickness;
-      tmp_points[2] = _points[0] - tmp_normals[0] * half_inner_thickness;
-      tmp_points[3] = _points[0] - tmp_normals[0] * (half_inner_thickness + aa_size);
-      tmp_points[last * 4 + 0] = _points[last] + tmp_normals[last] * (half_inner_thickness + aa_size);
-      tmp_points[last * 4 + 1] = _points[last] + tmp_normals[last] * half_inner_thickness;
-      tmp_points[last * 4 + 2] = _points[last] - tmp_normals[last] * half_inner_thickness;
-      tmp_points[last * 4 + 3] = _points[last] - tmp_normals[last] * (half_inner_thickness + aa_size);
+      auto const uv = float2
+      {
+        std::lerp(texture->uv0.x, texture->uv1.x, vertex.coverage),
+        texture->uv0.y,
+      };
+      *vertices++ = { vertex.pos, uv, col, packed };
     }
-
-    auto idx1 = _vertex_beg;
-    for (auto i1 = 0u; i1 < count; ++i1)
-    {
-      auto const i2   = (i1 + 1) == pt_cnt ? 0 : i1 + 1;
-      auto const idx2 = ((i1 + 1) == pt_cnt) ? _vertex_beg : (idx1 + 4);
-
-      auto dm = fix_normal((tmp_normals[i1] + tmp_normals[i2]) * .5f);
-      auto dm_out = dm * (half_inner_thickness + aa_size);
-      auto dm_in  = dm * half_inner_thickness;
-
-      auto* out_vtx = &tmp_points[i2 * 4];
-      out_vtx[0] = _points[i2] + dm_out;
-      out_vtx[1] = _points[i2] + dm_in;
-      out_vtx[2] = _points[i2] - dm_in;
-      out_vtx[3] = _points[i2] - dm_out;
-
-      uint vals[] = { idx2 + 1, idx1 + 1, idx1 + 2, idx1 + 2, idx2 + 2, idx2 + 1, idx2 + 1, idx1 + 1, idx1 + 0, idx1 + 0, idx2 + 0, idx2 + 1, idx2 + 2, idx1 + 2, idx1 + 3, idx1 + 3, idx2 + 3, idx2 + 2 };
-      for (auto v : vals) *idx++ = static_cast<uint16>(v);
-
-      idx1 = idx2;
-    }
-
-    for (auto i = 0u; i < pt_cnt; ++i)
-    {
-      vtx[0] = { tmp_points[i * 4],     {}, col_trans };
-      vtx[1] = { tmp_points[i * 4 + 1], {}, col       };
-      vtx[2] = { tmp_points[i * 4 + 2], {}, col       };
-      vtx[3] = { tmp_points[i * 4 + 3], {}, col_trans };
-      vtx += 4;
-    }
+    _sampled_images.emplace(texture->image);
   }
   else
-  {
-    auto const half_draw_size = aa_size;
-    if (!is_closed)
-    {
-      tmp_points[0] = _points[0] + tmp_normals[0] * half_draw_size;
-      tmp_points[1] = _points[0] - tmp_normals[0] * half_draw_size;
-      tmp_points[(pt_cnt - 1) * 2 + 0] = _points[pt_cnt - 1] + tmp_normals[pt_cnt - 1] * half_draw_size;
-      tmp_points[(pt_cnt - 1) * 2 + 1] = _points[pt_cnt - 1] - tmp_normals[pt_cnt - 1] * half_draw_size;
-    }
-
-    auto idx1 = _vertex_beg;
-    for (auto i1 = 0u; i1 < count; ++i1)
-    {
-      auto const i2   = (i1 + 1) == pt_cnt ? 0 : i1 + 1;
-      auto const idx2 = ((i1 + 1) == pt_cnt) ? _vertex_beg : (idx1 + 3);
-
-      auto dm = fix_normal((tmp_normals[i1] + tmp_normals[i2]) * .5f) * half_draw_size;
-      auto* out_vtx = &tmp_points[i2 * 2];
-      out_vtx[0] = _points[i2] + dm;
-      out_vtx[1] = _points[i2] - dm;
-
-      uint vals[] = { idx2 + 0, idx1 + 0, idx1 + 2, idx1 + 2, idx2 + 2, idx2 + 0, idx2 + 1, idx1 + 1, idx1 + 0, idx1 + 0, idx2 + 0, idx2 + 1 };
-      for (auto v : vals) *idx++ = static_cast<uint16>(v);
-
-      idx1 = idx2;
-    }
-
-    for (auto i = 0u; i < pt_cnt; ++i)
-    {
-      vtx[0] = { _points[i],            {}, col       };
-      vtx[1] = { tmp_points[i * 2 + 0], {}, col_trans };
-      vtx[2] = { tmp_points[i * 2 + 1], {}, col_trans };
-      vtx += 3;
-    }
-  }
+    for (auto const& vertex : mesh.vertices)
+      *vertices++ = { vertex.pos, {}, vertex.opaque ? col : col_trans };
+  for (auto index : mesh.indices)
+    *indices++ = static_cast<uint16>(_vertex_beg + index);
 
   expand_end();
   _points.clear();

@@ -77,7 +77,7 @@ void FrameData::_union_beg(uint& idx) noexcept
 
     case DrawCmd::Type::add_circle:
       assert(_points.empty());
-      path_arc_to(cmd.data.add_circle.center, cmd.data.add_circle.radius - .5f, 0, std::numbers::pi_v<float> * 2.f);
+      path_arc_to(cmd.data.add_circle.center, cmd.data.add_circle.radius, 0, std::numbers::pi_v<float> * 2.f);
       if (!_points.empty())
         _points.pop_back();
       add_current_path();
@@ -170,7 +170,7 @@ void FrameData::_union_beg(uint& idx) noexcept
       _points.emplace_back(static_cast<float>(pt.x), static_cast<float>(pt.y));
 
     if (union_thickness > 0)
-      add_poly_line(union_color, union_thickness, true);
+      add_poly_line(union_color, union_thickness, true, true);
     else if (is_convex(_points))
       add_convex_poly_filled(union_color);
     else

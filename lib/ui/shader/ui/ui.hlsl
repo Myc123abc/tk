@@ -27,6 +27,7 @@ PS_Param vs(VS_Param arg)
 #define Vtx_Type_Shape 0
 #define Vtx_Type_Image 1
 #define Vtx_Type_Text  2
+#define Vtx_Type_Line  3
 
 static const float  msdf_px_range = 4.0;
 static const float2 px_range      = float2(msdf_px_range, msdf_px_range);
@@ -46,6 +47,11 @@ float4 ps(PS_Param arg) : SV_TARGET
     return arg.col;
   else if (arg.type == Vtx_Type_Image)
     return images[NonUniformResourceIndex(arg.img_idx)].Sample(g_sampler, arg.uv) * arg.col;
+  else if (arg.type == Vtx_Type_Line)
+  {
+    float coverage = images[NonUniformResourceIndex(arg.img_idx)].Sample(g_sampler, arg.uv).r;
+    return float4(arg.col.rgb, arg.col.a * coverage);
+  }
 
   //
   // text render

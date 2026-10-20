@@ -18,3 +18,18 @@ set_target_properties(benchmark-object-pool PROPERTIES
 )
 tk_ui_copy_shader(benchmark-object-pool)
 tk_copy_assets(benchmark-object-pool)
+
+add_executable(benchmark-polyline
+	test/polyline.cpp
+	../ui/src/ui/frame_data/polyline_tessellator.cpp
+)
+target_include_directories(benchmark-polyline PRIVATE
+	../ui/src
+	../ui/src/ui/frame_data
+	../util/include
+)
+if (MSVC)
+	target_compile_options(benchmark-polyline PRIVATE /O2)
+else()
+	target_compile_options(benchmark-polyline PRIVATE -O2)
+endif()
