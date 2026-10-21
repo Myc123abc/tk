@@ -1,5 +1,6 @@
 #include "frame_data.hpp"
 #include "util.hpp"
+#include "../config.hpp"
 
 #include <clipper2/clipper.h>
 
@@ -39,11 +40,12 @@ void FrameData::_union_beg(uint& idx) noexcept
 
     auto& path = subjects.emplace_back();
     path.reserve(_points.size());
+    auto const transform = _transform_stack.empty() ? Matrix{} : _transform_stack.back();
     for (auto const p : _points)
     {
-      auto const transformed = transform_point(p);
-      path.emplace_back(static_cast<double>(transformed.x), static_cast<double>(transformed.y));
-      union_bounds.expand(transformed);
+      auto const transformed = transform.transform_precise(p);
+      path.emplace_back(transformed.x, transformed.y);
+      union_bounds.expand({ static_cast<float>(transformed.x), static_cast<float>(transformed.y) });
     }
 
     _points.clear();
@@ -77,7 +79,13 @@ void FrameData::_union_beg(uint& idx) noexcept
 
     case DrawCmd::Type::add_circle:
       assert(_points.empty());
-      path_arc_to(cmd.data.add_circle.center, cmd.data.add_circle.radius, 0, std::numbers::pi_v<float> * 2.f);
+      path_arc_to(
+        cmd.data.add_circle.center,
+        cmd.data.add_circle.radius,
+        0,
+        std::numbers::pi_v<float> * 2.f,
+        Viewport_Max_Scale
+      );
       if (!_points.empty())
         _points.pop_back();
       add_current_path();
@@ -95,17 +103,31 @@ void FrameData::_union_beg(uint& idx) noexcept
 
     case DrawCmd::Type::add_path_arc_to:
       if (!_points.empty())
-        _add_path_arc_to(cmd.data.add_path_arc_to.center, cmd.data.add_path_arc_to.p1, cmd.data.add_path_arc_to.ccw);
+        _add_path_arc_to(
+          cmd.data.add_path_arc_to.center,
+          cmd.data.add_path_arc_to.p1,
+          cmd.data.add_path_arc_to.ccw,
+          Viewport_Max_Scale
+        );
       break;
 
     case DrawCmd::Type::add_path_quad_bezier_to:
       if (!_points.empty())
-        _add_path_quad_bezier_to(cmd.data.add_path_quad_bezier_to.p1, cmd.data.add_path_quad_bezier_to.p2);
+        _add_path_quad_bezier_to(
+          cmd.data.add_path_quad_bezier_to.p1,
+          cmd.data.add_path_quad_bezier_to.p2,
+          Viewport_Max_Scale
+        );
       break;
 
     case DrawCmd::Type::add_path_cubic_bezier_to:
       if (!_points.empty())
-        _add_path_cubic_bezier_to(cmd.data.add_path_cubic_bezier_to.p1, cmd.data.add_path_cubic_bezier_to.p2, cmd.data.add_path_cubic_bezier_to.p3);
+        _add_path_cubic_bezier_to(
+          cmd.data.add_path_cubic_bezier_to.p1,
+          cmd.data.add_path_cubic_bezier_to.p2,
+          cmd.data.add_path_cubic_bezier_to.p3,
+          Viewport_Max_Scale
+        );
       break;
 
     case DrawCmd::Type::path_end:
@@ -170,7 +192,7 @@ void FrameData::_union_beg(uint& idx) noexcept
       _points.emplace_back(static_cast<float>(pt.x), static_cast<float>(pt.y));
 
     if (union_thickness > 0)
-      add_poly_line(union_color, union_thickness, true, true);
+      add_poly_line(union_color, union_thickness, true, true, true);
     else if (is_convex(_points))
       add_convex_poly_filled(union_color);
     else

@@ -24,6 +24,7 @@ public:
     float2 pos;
     bool   opaque;
     float  coverage{};
+    bool   pixel_snap{};
   };
 
   struct Mesh
@@ -42,7 +43,8 @@ public:
     float                   aa_size,
     bool                    is_closed,
     bool                    stroke_inside,
-    FringeMode              fringe_mode = FringeMode::geometry
+    FringeMode              fringe_mode = FringeMode::geometry,
+    bool                    miter_only  = false
   ) noexcept -> Mesh;
 
   void clear() noexcept;
@@ -60,6 +62,7 @@ private:
     float2 pos;
     float2 offset;
     Side   side;
+    bool   pixel_snap{};
   };
 
   struct StrokeOffsets
@@ -82,12 +85,12 @@ private:
   ) noexcept -> StrokeOffsets;
 
   void calculate_normals(std::span<float2 const> points, bool is_closed) noexcept;
-  void build_core(std::span<float2 const> points, bool is_closed, float max_outer) noexcept;
+  void build_core(std::span<float2 const> points, bool is_closed, float max_outer, bool miter_only) noexcept;
   auto collect_boundary_edges() noexcept -> uint;
   void build_fringe_mesh(StrokeOffsets const& offsets, uint boundary_edge_count) noexcept;
   void build_texture_mesh(StrokeOffsets const& offsets) noexcept;
 
-  auto append_core_point(float2 pos, float2 offset, Side side) -> uint;
+  auto append_core_point(float2 pos, float2 offset, Side side, bool pixel_snap = false) -> uint;
   void append_core_triangle(uint p0, uint p1, uint p2);
 
   std::vector<float2>    _normals;

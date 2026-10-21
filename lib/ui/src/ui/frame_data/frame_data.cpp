@@ -1,5 +1,6 @@
 #include "frame_data.hpp"
 #include "util.hpp"
+#include "../config.hpp"
 
 #include <numbers>
 
@@ -332,20 +333,36 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
     break;
 
   case Type::add_path_arc_to:
-    _add_path_arc_to(cmd.data.add_path_arc_to.center, cmd.data.add_path_arc_to.p1, cmd.data.add_path_arc_to.ccw);
+    _add_path_arc_to(
+      cmd.data.add_path_arc_to.center,
+      cmd.data.add_path_arc_to.p1,
+      cmd.data.add_path_arc_to.ccw,
+      Viewport_Max_Scale
+    );
     break;
 
   case Type::add_path_quad_bezier_to:
-    _add_path_quad_bezier_to(cmd.data.add_path_quad_bezier_to.p1, cmd.data.add_path_quad_bezier_to.p2);
+    _add_path_quad_bezier_to(
+      cmd.data.add_path_quad_bezier_to.p1,
+      cmd.data.add_path_quad_bezier_to.p2,
+      Viewport_Max_Scale
+    );
     break;
 
   case Type::add_path_cubic_bezier_to:
-    _add_path_cubic_bezier_to(cmd.data.add_path_cubic_bezier_to.p1, cmd.data.add_path_cubic_bezier_to.p2, cmd.data.add_path_cubic_bezier_to.p3);
+    _add_path_cubic_bezier_to(
+      cmd.data.add_path_cubic_bezier_to.p1,
+      cmd.data.add_path_cubic_bezier_to.p2,
+      cmd.data.add_path_cubic_bezier_to.p3,
+      Viewport_Max_Scale
+    );
     break;
 
   case Type::path_end:
   {
-    auto thickness = cmd.data.path_end.thickness;
+    auto thickness          = cmd.data.path_end.thickness;
+    auto geometry_scale     = 1.f;
+    auto transform_geometry = false;
     if (should_cull(_points, thickness))
     {
       _points.clear();
@@ -353,13 +370,19 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
     }
     if (auto scale = uniform_transform_scale())
     {
-      for (auto& point : _points)
-        point = transform_point(point);
       if (thickness > 0)
-        thickness *= scale.value();
+      {
+        geometry_scale     = scale.value();
+        transform_geometry = true;
+      }
+      else
+      {
+        for (auto& point : _points)
+          point = transform_point(point);
+      }
       should_transform_vertices = false;
     }
-    _path_end(cmd.data.path_end.close, cmd.data.path_end.color, thickness);
+    _path_end(cmd.data.path_end.close, cmd.data.path_end.color, thickness, geometry_scale, transform_geometry);
     break;
   }
 

@@ -30,6 +30,15 @@ struct Matrix
     return { p.x * m11 + p.y * m21 + tx, p.x * m12 + p.y * m22 + ty };
   }
 
+  auto transform_precise(float2 p) const noexcept -> double2
+  {
+    return
+    {
+      static_cast<double>(p.x) * m11 + static_cast<double>(p.y) * m21 + tx,
+      static_cast<double>(p.x) * m12 + static_cast<double>(p.y) * m22 + ty,
+    };
+  }
+
   auto transform_bounds(Rect rect) const noexcept -> Rect
   {
     auto result = Rect{};

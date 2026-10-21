@@ -27,12 +27,12 @@ void FrameData::add_path_arc_to(float2 center, float2 p1, bool ccw) noexcept
   cmd.data.add_path_arc_to = { center, p1, ccw };
 }
 
-void FrameData::_add_path_arc_to(float2 center, float2 p1, bool ccw) noexcept
+void FrameData::_add_path_arc_to(float2 center, float2 p1, bool ccw, float tessellation_scale) noexcept
 {
   assert(!_points.empty());
   auto p0 = _points.back(); _points.pop_back();
   auto radius = length(p0 - center);
-  if (radius < .5f)
+  if (radius * tessellation_scale < .5f)
   {
     _points.emplace_back(p1);
     return;
@@ -41,7 +41,7 @@ void FrameData::_add_path_arc_to(float2 center, float2 p1, bool ccw) noexcept
   auto a0 = angle_of(center, p0);
   auto a1 = angle_of(center, p1);
   if (ccw) std::swap(a0, a1);
-  path_arc_to(center, radius, a0, a1);
+  path_arc_to(center, radius, a0, a1, tessellation_scale);
 }
 
 void FrameData::add_path_quad_bezier_to(float2 p1, float2 p2) noexcept
@@ -50,10 +50,11 @@ void FrameData::add_path_quad_bezier_to(float2 p1, float2 p2) noexcept
   cmd.data.add_path_quad_bezier_to = { p1, p2 };
 }
 
-void FrameData::_add_path_quad_bezier_to(float2 p1, float2 p2) noexcept
+void FrameData::_add_path_quad_bezier_to(float2 p1, float2 p2, float tessellation_scale) noexcept
 {
   assert(!_points.empty());
-  path_bezier_quad_curve_to_casteljau(_points.back(), p1, p2, curve_tessellation_max_error * curve_tessellation_max_error, 0);
+  auto const max_error = curve_tessellation_max_error / tessellation_scale;
+  path_bezier_quad_curve_to_casteljau(_points.back(), p1, p2, max_error * max_error, 0);
 }
 
 void FrameData::add_path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept
@@ -62,10 +63,11 @@ void FrameData::add_path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexce
   cmd.data.add_path_cubic_bezier_to = { p1, p2, p3 };
 }
 
-void FrameData::_add_path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept
+void FrameData::_add_path_cubic_bezier_to(float2 p1, float2 p2, float2 p3, float tessellation_scale) noexcept
 {
   assert(!_points.empty());
-  path_bezier_cubic_curve_to_casteljau(_points.back(), p1, p2, p3, curve_tessellation_max_error * curve_tessellation_max_error, 0);
+  auto const max_error = curve_tessellation_max_error / tessellation_scale;
+  path_bezier_cubic_curve_to_casteljau(_points.back(), p1, p2, p3, max_error * max_error, 0);
 }
 
 void FrameData::path_end(bool close, Color color, float thickness) noexcept
@@ -74,7 +76,7 @@ void FrameData::path_end(bool close, Color color, float thickness) noexcept
   cmd.data.path_end = { close, color, thickness };
 }
 
-void FrameData::_path_end(bool close, Color color, float thickness) noexcept
+void FrameData::_path_end(bool close, Color color, float thickness, float geometry_scale, bool transform_geometry) noexcept
 {
   if (_points.size() < 2)
   {
@@ -90,7 +92,7 @@ void FrameData::_path_end(bool close, Color color, float thickness) noexcept
   }
 
   if (thickness > 0)
-    add_poly_line(color, thickness, close);
+    add_poly_line(color, thickness, close, false, true, geometry_scale, transform_geometry);
   else
   {
     if (is_convex(_points))

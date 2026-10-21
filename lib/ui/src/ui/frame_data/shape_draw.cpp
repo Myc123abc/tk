@@ -468,7 +468,7 @@ auto FrameData::get_circle_segment_count(float radius) noexcept -> uint
 
 void FrameData::path_arc_to(float2 center, float radius, float min, float max, float tessellation_scale) noexcept
 {
-  if (radius < .5f)
+  if (radius * tessellation_scale < .5f)
   {
     _points.emplace_back(center);
     return;
@@ -595,7 +595,7 @@ void FrameData::_path_arc_to(float2 center, float radius, float min, float max, 
   }
 }
 
-void FrameData::add_poly_line(Color color, float thickness, bool is_closed, bool stroke_inside) noexcept
+void FrameData::add_poly_line(Color color, float thickness, bool is_closed, bool stroke_inside, bool miter_only, float geometry_scale, bool transform_geometry) noexcept
 {
   auto const unique_end = std::unique(_points.begin(), _points.end());
   _points.erase(unique_end, _points.end());
@@ -607,9 +607,10 @@ void FrameData::add_poly_line(Color color, float thickness, bool is_closed, bool
     return;
   }
 
-  is_closed &= _points.size() > 2;
+  is_closed     &= _points.size() > 2;
   stroke_inside &= is_closed;
-  auto const aa_size = g_ui_ctx.window()->scale();
+  auto const screen_aa_size = g_ui_ctx.window()->scale();
+  auto const aa_size        = screen_aa_size / geometry_scale;
   if (thickness < aa_size / 255.f)
   {
     _points.clear();
@@ -625,26 +626,34 @@ void FrameData::add_poly_line(Color color, float thickness, bool is_closed, bool
     _points.clear();
     return;
   }
-  auto const col        = color.to_uint();
-  auto const col_trans  = Color{ color.r, color.g, color.b, 0 }.to_uint();
+  auto const col                         = color.to_uint();
+  auto const col_trans                   = Color{ color.r, color.g, color.b, 0 }.to_uint();
   auto const texture_transform_supported = _transform_stack.empty() || uniform_transform_scale().has_value();
   auto const texture = _using_discard_shapes || !texture_transform_supported
     ? std::optional<renderer::LineCoverageAtlas::Selection>{}
-    : renderer::g_line_coverage_atlas.select(thickness, aa_size);
+    : renderer::g_line_coverage_atlas.select(thickness * geometry_scale, screen_aa_size);
   auto const fringe_mode = texture
     ? PolylineTessellator::FringeMode::texture_coverage
     : PolylineTessellator::FringeMode::geometry;
   auto const mesh = _polyline_tessellator.build(
     _points,
     thickness,
-    texture ? texture->fringe : aa_size,
+    texture ? texture->fringe / geometry_scale : aa_size,
     is_closed,
     stroke_inside,
-    fringe_mode
+    fringe_mode,
+    miter_only
   );
-  auto const vtx_cnt    = static_cast<uint>(mesh.vertices.size());
-  auto const idx_cnt    = static_cast<uint>(mesh.indices.size());
+  auto const vtx_cnt = static_cast<uint>(mesh.vertices.size());
+  auto const idx_cnt = static_cast<uint>(mesh.indices.size());
   auto [vertices, indices] = expand_beg(vtx_cnt, idx_cnt);
+  auto vertex_pos = [&](PolylineTessellator::Vertex const& vertex)
+  {
+    auto pos = transform_geometry ? transform_point(vertex.pos) : vertex.pos;
+    if (transform_geometry && vertex.pixel_snap)
+      pos = { std::round(pos.x - .5f) + .5f, std::round(pos.y - .5f) + .5f };
+    return pos;
+  };
 
   if (texture)
   {
@@ -656,13 +665,13 @@ void FrameData::add_poly_line(Color color, float thickness, bool is_closed, bool
         std::lerp(texture->uv0.x, texture->uv1.x, vertex.coverage),
         texture->uv0.y,
       };
-      *vertices++ = { vertex.pos, uv, col, packed };
+      *vertices++ = { vertex_pos(vertex), uv, col, packed };
     }
     _sampled_images.emplace(texture->image);
   }
   else
     for (auto const& vertex : mesh.vertices)
-      *vertices++ = { vertex.pos, {}, vertex.opaque ? col : col_trans };
+      *vertices++ = { vertex_pos(vertex), {}, vertex.opaque ? col : col_trans };
   for (auto index : mesh.indices)
     *indices++ = static_cast<uint16>(_vertex_beg + index);
 

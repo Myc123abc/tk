@@ -504,15 +504,18 @@ inline auto dot(vec<4, float> a, vec<4, float> b) noexcept -> float
 ///                               misc
 ////////////////////////////////////////////////////////////////////////////////
 
-using float2 = vec<2, float>;
-using float3 = vec<3, float>;
-using float4 = vec<4, float>;
-using int2   = vec<2, int>;
-using int3   = vec<3, int>;
-using int4   = vec<4, int>;
-using uint2  = vec<2, uint>;
-using uint3  = vec<3, uint>;
-using uint4  = vec<4, uint>;
+using float2  = vec<2, float>;
+using float3  = vec<3, float>;
+using float4  = vec<4, float>;
+using double2 = vec<2, double>;
+using double3 = vec<3, double>;
+using double4 = vec<4, double>;
+using int2    = vec<2, int>;
+using int3    = vec<3, int>;
+using int4    = vec<4, int>;
+using uint2   = vec<2, uint>;
+using uint3   = vec<3, uint>;
+using uint4   = vec<4, uint>;
 
 constexpr auto radians(float deg) noexcept
 {

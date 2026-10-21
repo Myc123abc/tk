@@ -361,10 +361,10 @@ private:
 
   void _path_begin(float2 p0) noexcept;
   void _add_path_line_to(float2 p) noexcept { if (_points.back() != p) _points.emplace_back(p); }
-  void _add_path_arc_to(float2 center, float2 p1, bool ccw) noexcept;
-  void _add_path_quad_bezier_to(float2 p1, float2 p2) noexcept;
-  void _add_path_cubic_bezier_to(float2 p1, float2 p2, float2 p3) noexcept;
-  void _path_end(bool close, Color color, float thickness) noexcept;
+  void _add_path_arc_to(float2 center, float2 p1, bool ccw, float tessellation_scale) noexcept;
+  void _add_path_quad_bezier_to(float2 p1, float2 p2, float tessellation_scale) noexcept;
+  void _add_path_cubic_bezier_to(float2 p1, float2 p2, float2 p3, float tessellation_scale) noexcept;
+  void _path_end(bool close, Color color, float thickness, float geometry_scale, bool transform_geometry) noexcept;
   void _union_beg(uint& idx) noexcept;
 
   void _add_scissor_rect(Rect rect) noexcept;
@@ -417,7 +417,7 @@ private:
   static auto calc_circle_segment_count(float radius) noexcept -> float;
   static auto get_circle_segment_count(float radius) noexcept -> uint;
 
-  void add_poly_line(Color color, float thickness, bool is_closed, bool stroke_inside = false) noexcept;
+  void add_poly_line(Color color, float thickness, bool is_closed, bool stroke_inside = false, bool miter_only = false, float geometry_scale = 1.f, bool transform_geometry = false) noexcept;
   void path_rect(float2 left_top, float2 right_bottom, float rounding, Flag<CornerFlag> flags, float tessellation_scale = 1.f) noexcept;
   void path_arc_to(float2 center, float radius, float min, float max, float tessellation_scale = 1.f) noexcept;
   void _path_arc_to(float2 center, float radius, int min, int max) noexcept;

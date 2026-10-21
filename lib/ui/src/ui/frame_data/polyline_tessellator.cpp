@@ -88,10 +88,10 @@ void PolylineTessellator::calculate_normals(std::span<float2 const> points, bool
   }
 }
 
-auto PolylineTessellator::append_core_point(float2 pos, float2 offset, Side side) -> uint
+auto PolylineTessellator::append_core_point(float2 pos, float2 offset, Side side, bool pixel_snap) -> uint
 {
   auto const index = static_cast<uint>(_core_points.size());
-  _core_points.emplace_back(pos, offset, side);
+  _core_points.emplace_back(pos, offset, side, pixel_snap);
   return index;
 }
 
@@ -105,7 +105,8 @@ void PolylineTessellator::append_core_triangle(uint p0, uint p1, uint p2)
 void PolylineTessellator::build_core(
   std::span<float2 const> points,
   bool                    is_closed,
-  float                   max_outer
+  float                   max_outer,
+  bool                    miter_only
 ) noexcept
 {
   auto const point_count = static_cast<uint>(points.size());
@@ -149,13 +150,13 @@ void PolylineTessellator::build_core(
     length_squared = _sq_lengths[point_index];
 
     auto const cos_theta = dot(previous_normal, normal);
-    auto const sin_theta = cross(previous_normal, normal);
+    auto const sin_theta = -cross(previous_normal, normal);
     auto const clamped_cos = std::max(Polyline_Miter_Angle_Limit, cos_theta);
     auto const miter_scale = std::min(1000.f, 1.f / (1.f + clamped_cos));
     auto miter = (previous_normal + normal) * miter_scale;
     auto const miter_distance_squared = length_sq(miter);
 
-    if (miter_distance_squared > Polyline_Miter_Limit * Polyline_Miter_Limit)
+    if (!miter_only && miter_distance_squared > Polyline_Miter_Limit * Polyline_Miter_Limit)
     {
       auto const reference_half_squared = max_outer * max_outer;
       auto const limit_squared = std::max({ previous_length_squared, length_squared, reference_half_squared });
@@ -164,7 +165,7 @@ void PolylineTessellator::build_core(
         miter *= std::sqrt(limit_squared / reference_miter_squared);
 
       auto const bevel_normal = normalize(previous_normal + normal);
-      auto const denominator = cross(previous_normal, bevel_normal);
+      auto const denominator = -cross(previous_normal, bevel_normal);
       auto const side_offset = denominator != 0
         ? (dot(previous_normal, bevel_normal) - 1.f) / denominator
         : 0.f;
@@ -199,8 +200,9 @@ void PolylineTessellator::build_core(
     }
     else
     {
-      auto const next_base = append_core_point(point, miter * -1.f, Side::negative);
-      append_core_point(point, miter, Side::positive);
+      auto const sharp_miter = miter_only && miter_distance_squared > Polyline_Miter_Limit * Polyline_Miter_Limit;
+      auto const next_base   = append_core_point(point, miter * -1.f, Side::negative, sharp_miter && sin_theta < 0);
+      append_core_point(point, miter, Side::positive, sharp_miter && sin_theta >= 0);
       append_core_triangle(base_index, next_base, next_base + 1);
       append_core_triangle(base_index, next_base + 1, base_index + 1);
       base_index = next_base;
@@ -271,8 +273,8 @@ void PolylineTessellator::build_fringe_mesh(
   for (auto index = 0u; index < _core_points.size(); ++index)
   {
     auto const& point = _core_points[index];
-    _vertices[index * 2]     = { point.pos + point.offset * offsets.inner(point.side), true  };
-    _vertices[index * 2 + 1] = { point.pos + point.offset * offsets.outer(point.side), false };
+    _vertices[index * 2]     = { point.pos + point.offset * offsets.inner(point.side), true,  {}, point.pixel_snap };
+    _vertices[index * 2 + 1] = { point.pos + point.offset * offsets.outer(point.side), false, {}, point.pixel_snap };
   }
 
   _indices.resize(_core_indices.size() + boundary_edge_count * 6);
@@ -307,7 +309,7 @@ void PolylineTessellator::build_texture_mesh(StrokeOffsets const& offsets) noexc
     auto const coverage = point.side == Side::negative ? 0.f
       : point.side == Side::positive ? 1.f
       : center_coverage;
-    _vertices[index] = { point.pos + point.offset * offsets.outer(point.side), true, coverage };
+    _vertices[index] = { point.pos + point.offset * offsets.outer(point.side), true, coverage, point.pixel_snap };
   }
   _indices = _core_indices;
 }
@@ -318,7 +320,8 @@ auto PolylineTessellator::build(
   float                   aa_size,
   bool                    is_closed,
   bool                    stroke_inside,
-  FringeMode              fringe_mode
+  FringeMode              fringe_mode,
+  bool                    miter_only
 ) noexcept -> Mesh
 {
   if (points.size() < 2 || aa_size <= 0 || thickness < aa_size || (stroke_inside && !is_closed))
@@ -334,7 +337,7 @@ auto PolylineTessellator::build(
 
   auto const offsets = calculate_stroke_offsets(points, thickness, aa_size, stroke_inside);
   calculate_normals(points, is_closed);
-  build_core(points, is_closed, offsets.max_outer());
+  build_core(points, is_closed, offsets.max_outer(), miter_only);
   auto boundary_edge_count = 0u;
   if (fringe_mode == FringeMode::geometry)
   {

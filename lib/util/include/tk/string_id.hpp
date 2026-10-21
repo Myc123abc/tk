@@ -43,7 +43,9 @@ struct StringLiteral
   StringLiteral(std::string_view str) noexcept
     : _id(hash(str)), _str(str.data()) {}
   
-  StringLiteral(char const* str) noexcept
+  template <typename T>
+  requires std::is_pointer_v<std::remove_reference_t<T>> && std::is_convertible_v<T, char const*>
+  StringLiteral(T&& str) noexcept
     : StringLiteral(std::string_view{str}) {}
   
   constexpr auto view() const noexcept { return _str; }
