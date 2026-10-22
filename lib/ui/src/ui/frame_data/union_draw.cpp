@@ -192,7 +192,7 @@ void FrameData::_union_beg(uint& idx) noexcept
       _points.emplace_back(static_cast<float>(pt.x), static_cast<float>(pt.y));
 
     if (union_thickness > 0)
-      add_poly_line(union_color, union_thickness, true, true, true);
+      add_poly_line(union_color, union_thickness, true, false, true);
     else if (is_convex(_points))
       add_convex_poly_filled(union_color);
     else

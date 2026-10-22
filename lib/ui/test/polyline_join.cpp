@@ -1,5 +1,6 @@
 #include "polyline_tessellator.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 
@@ -96,6 +97,44 @@ auto miter_only_preserves_closed_inside_join() noexcept -> bool
          mesh.indices.size() == points.size() * 6;
 }
 
+auto centered_miter_preserves_outline_position() noexcept -> bool
+{
+  auto const points = std::array
+  {
+    float2{  0,  0 },
+    float2{ 10,  0 },
+    float2{ 10, 10 },
+    float2{  0, 10 },
+  };
+  auto tessellator = ui::PolylineTessellator{};
+  auto const mesh = tessellator.build(
+    points,
+    1.f,
+    1.f,
+    true,
+    false,
+    ui::PolylineTessellator::FringeMode::texture_coverage,
+    true
+  );
+  if (mesh.vertices.size() != points.size() * 2 ||
+      mesh.indices.size() != points.size() * 6)
+    return false;
+
+  auto min = mesh.vertices.front().pos;
+  auto max = min;
+  for (auto const& vertex : mesh.vertices)
+  {
+    min.x = std::min(min.x, vertex.pos.x);
+    min.y = std::min(min.y, vertex.pos.y);
+    max.x = std::max(max.x, vertex.pos.x);
+    max.y = std::max(max.y, vertex.pos.y);
+  }
+  return nearly_equal(min.x, -1.f) &&
+         nearly_equal(min.y, -1.f) &&
+         nearly_equal(max.x, 11.f) &&
+         nearly_equal(max.y, 11.f);
+}
+
 }
 
 int main()
@@ -104,7 +143,8 @@ int main()
          clipped_bevel_follows_segment_edges(-1.f) &&
          miter_only_preserves_sharp_join(1.f) &&
          miter_only_preserves_sharp_join(-1.f) &&
-         miter_only_preserves_closed_inside_join()
+         miter_only_preserves_closed_inside_join() &&
+         centered_miter_preserves_outline_position()
     ? 0
     : 1;
 }
