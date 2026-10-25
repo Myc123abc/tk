@@ -17,8 +17,10 @@ public:
 
   void poll(DWORD milli = 0) noexcept;
 
-  void read(HANDLE handle) noexcept;
-  void write(HANDLE handle, std::span<uint8 const> data) noexcept;
+  void read(HANDLE handle, std::span<uint8> data) noexcept;
+  void write(HANDLE handle, std::span<uint8 const> data, uint64 offset = 0) noexcept;
+
+  auto is_complete(HANDLE handle) noexcept -> bool;
 
 private:
   struct Record;
@@ -38,7 +40,9 @@ private:
   {
     OVERLAPPED         overlapped{};
     HANDLE             file{};
-    std::vector<uint8> buf;
+    std::span<uint8>   read_buf;
+    std::vector<uint8> write_buf;
+    uint64             file_offset{};
     uint64             offset{};
     uint64             size{};
     DWORD              pending_size{};

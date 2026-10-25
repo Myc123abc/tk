@@ -2,6 +2,8 @@
 
 #include "text_engine.hpp"
 
+namespace tk { struct File; }
+
 namespace tk::ui {
 
 /*
@@ -33,9 +35,7 @@ struct PreloadGlyphData
 Singleton(GlyphCacher, g_glyph_cacher,
 public:
   void add(PendingCopyGlyphsInfoType& info) noexcept;
-  void try_save() noexcept;
-  void save() noexcept;
-  void block_save() noexcept;
+  void destroy() noexcept;
 
   void preload() noexcept;
 
@@ -47,9 +47,7 @@ private:
 
 private:
   std::vector<GlyphCacheData>   _glyphs;
-  uint                          _cache_size{};
-  HANDLE                        _file{ INVALID_HANDLE_VALUE };
-  uint64                        _write_offset{};
+  File const*                   _file{};
   GlyphKeyMap<PreloadGlyphData> _preload_glyphs;
 )
 

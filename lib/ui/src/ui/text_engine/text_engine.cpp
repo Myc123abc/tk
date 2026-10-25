@@ -1,7 +1,7 @@
 #include "text_engine.hpp"
 #include "tk/error_handling.hpp"
 #include "../../renderer/resource/image_manager.hpp"
-#include "../../util/file_manager.hpp"
+#include "../../util/file_system.hpp"
 #include "../../renderer/engine/copy_engine.hpp"
 #include "glyph_cacher.hpp"
 
@@ -49,7 +49,7 @@ auto TextEngine::load_font(std::string_view path) noexcept -> std::expected<Font
     return FontInfo{ it->get()->_family, it->get()->_style };
 
   // check whether exist
-  if (!g_file_mgr.exists(path)) return std::unexpected(FontLoadError::unexist{});
+  if (!g_file_sys.exists(path)) return std::unexpected(FontLoadError::unexist{});
 
   // create font
   auto font = std::make_unique<Font>();

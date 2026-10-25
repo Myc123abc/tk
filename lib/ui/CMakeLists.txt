@@ -30,7 +30,7 @@ if (NOT "${CMAKE_GENERATOR}" MATCHES "Visual Studio")
   set_property(TARGET freetype PROPERTY SOURCES "${TK_FREETYPE_SOURCES}")
 endif()
 
-file(GLOB_RECURSE TK_SRC src/*.cpp)
+file(GLOB_RECURSE TK_SRC CONFIGURE_DEPENDS src/*.cpp)
 
 add_library(tk-ui ${TK_SRC})
 add_library(tk::ui ALIAS tk-ui)

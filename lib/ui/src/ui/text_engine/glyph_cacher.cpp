@@ -1,8 +1,17 @@
 #include "glyph_cacher.hpp"
+#include "../../util/file_system.hpp"
+#include "../../util/iocp.hpp"
 
-#include <filesystem>
+#include <utility>
 
 namespace tk::ui {
+
+namespace {
+
+constexpr auto Cache_Path = StringLiteral{ ".cache\\glyphs.bin" };
+constexpr auto Magic      = static_cast<uint>('T') | static_cast<uint>('K') << 8 | static_cast<uint>('G') << 16 | static_cast<uint>('C') << 24;
+
+}
 
 void GlyphCacher::add(PendingCopyGlyphsInfoType& info) noexcept
 {
@@ -12,7 +21,7 @@ void GlyphCacher::add(PendingCopyGlyphsInfoType& info) noexcept
   {
     for (auto const& [bitmap, _] : bitmap_infos)
     {
-      auto& item = _glyphs.emplace_back
+      _glyphs.emplace_back
       (
         GlyphCacheHeader
         {
@@ -23,89 +32,36 @@ void GlyphCacher::add(PendingCopyGlyphsInfoType& info) noexcept
         },
         std::move(bitmap.data)
       );
-      _cache_size += sizeof(item.header) + item.bitmap.size();
     }
-  }
-}
-
-struct PendingWrite
-{
-  OVERLAPPED         overlapped;
-  std::vector<uint8> data;
-};
-static PendingWrite pending_write;
-static auto pending = false;
-
-void GlyphCacher::try_save() noexcept
-{
-  if (pending)
-  {
-    DWORD bytes_written{};
-    auto res = GetOverlappedResult(_file, &pending_write.overlapped, &bytes_written, FALSE);
-    err_if(!res && GetLastError() != ERROR_IO_INCOMPLETE, "Failed to GetOverlappedResult");
-    if (res) pending = false;
-  }
-  else if (_cache_size > Glyph_Local_Cache_Capacity)
-  {
-    pending = true;
-    save();
-  }
-}
-
-void GlyphCacher::block_save() noexcept
-{
-  save();
-  DWORD bytes_written{};
-  auto res = GetOverlappedResult(_file, &pending_write.overlapped, &bytes_written, FALSE);
-  err_if(!res && GetLastError() != ERROR_IO_INCOMPLETE, "Failed to GetOverlappedResult");
-
-  while (!res)
-  {
-    res = GetOverlappedResult(_file, &pending_write.overlapped, &bytes_written, FALSE);
-    Sleep(1);
   }
 }
 
 /*
 TODO:
 unsave Skyline packer data, directly use a new texture when preloading
-file operate should in file manageer
-shuold i use corountine with IOCP impl async read write?
 impl font pregenerate cache files
 */
-void GlyphCacher::save() noexcept
+void GlyphCacher::destroy() noexcept
 {
-  assert(_file != INVALID_HANDLE_VALUE);
+  assert(_file);
+  if (!_glyphs.empty() || _file->size() == 0)
+    err_if(!g_file_sys.write(Cache_Path, serialize(), true),
+      "failed to save glyph cache file: file I/O is still pending");
 
-  // Serialize glyphs data
-  pending_write.data = serialize();
   _glyphs.clear();
-
-  pending_write.overlapped.Offset = static_cast<DWORD>(_write_offset);
-  pending_write.overlapped.OffsetHigh = static_cast<DWORD>(_write_offset >> 32);
-  auto bytes = static_cast<DWORD>(pending_write.data.size());
-
-  auto res = WriteFile(_file, pending_write.data.data(), bytes, nullptr, &pending_write.overlapped);
-  err_if(!res && GetLastError() != ERROR_IO_PENDING, "Failed to WriteFile with overlapped");
-
-  _write_offset += bytes;
-
-  _cache_size = 0; 
-}
-
-namespace {
-
-static constexpr auto Magic = static_cast<uint>('T') | static_cast<uint>('K') << 8 | static_cast<uint>('G') << 16 | static_cast<uint>('C') << 24;
-
+  _preload_glyphs.clear();
+  _file = nullptr;
 }
 
 auto GlyphCacher::serialize() const noexcept -> std::vector<uint8>
 {
-  auto data = std::vector<uint8>(std::ranges::fold_left(_glyphs, 0u, [](auto size, auto const& glyph)
-    { return size + sizeof(glyph.header) + glyph.bitmap.size(); }) + (_write_offset ? 0 : sizeof(Magic)));
+  auto const needs_magic = _file->size() == 0;
+  auto const size = std::ranges::fold_left(_glyphs, uint64{}, [](auto size, auto const& glyph)
+    { return size + sizeof(glyph.header) + glyph.bitmap.size(); }) + (needs_magic ? sizeof(Magic) : 0);
+  auto data = std::vector<uint8>(size);
 
   auto ptr = data.data();
-  if (_write_offset == 0)
+  if (needs_magic)
   {
     memcpy(ptr, &Magic, sizeof(Magic));
     ptr += sizeof(Magic);
@@ -124,26 +80,23 @@ auto GlyphCacher::serialize() const noexcept -> std::vector<uint8>
 
 void GlyphCacher::preload() noexcept
 {
-  assert(_file == INVALID_HANDLE_VALUE);
-  std::filesystem::create_directories(".cache"); // TODO: impl auto create directory in g_file_manager
-  _file = CreateFileA(".cache/glyphs.bin", GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, nullptr);
-  assert(_file != INVALID_HANDLE_VALUE);
+  assert(!_file);
 
-  LARGE_INTEGER size{};
-  err_if(!GetFileSizeEx(_file, &size), "Failed to get file size");
-  _write_offset = size.QuadPart;
+  auto opened = g_file_sys.write(Cache_Path, {}, true);
+  err_if(!opened, "failed to open glyph cache file");
 
-  if (!_write_offset) return;
+  // TODO: change to async link calls, and only wait point when need to use glyph cacher.
+  auto result = g_file_sys.load(Cache_Path);
+  while (!result)
+  {
+    err_if(!result.error().is<FileLoadError::loading>(), "failed to load glyph cache file");
+    g_iocp.poll(INFINITE);
+    result = g_file_sys.load(Cache_Path);
+  }
 
-  auto data = std::vector<uint8>(_write_offset);
-  OVERLAPPED read{};
-  DWORD bytes_read{};
-  auto res = ReadFile(_file, data.data(), static_cast<DWORD>(data.size()), &bytes_read, &read);
-  err_if(!res && GetLastError() != ERROR_IO_PENDING, "Failed to read file");
-  res = GetOverlappedResult(_file, &read, &bytes_read, TRUE);
-  err_if(!res, "Failed to get overlapped result in read file");
-
-  deserialize(data);
+  _file = *result;
+  if (_file->size())
+    deserialize({ _file->data(), static_cast<size_t>(_file->size()) });
 }
 
 void GlyphCacher::deserialize(std::span<uint8 const> data) noexcept

@@ -53,6 +53,7 @@ void IOCP::poll(DWORD milli) noexcept
       exit_if(err == ERROR_ABANDONED_WAIT_0, "IOCP be closed!");
       exit("Failed to get IOCP completion result. {}", get_win32_err_msg());
     }
+    return;
   }
   for (auto i = 0; i < cnt; ++i)
     process(entries[i]);
@@ -87,12 +88,14 @@ void IOCP::submit(Record& record) noexcept
   auto const remaining = record.size - record.offset;
   record.pending_size  = static_cast<DWORD>(std::min<uint64>(remaining, Chunk_Size));
   record.overlapped    = {};
-  record.overlapped.Offset     = static_cast<DWORD>(record.offset);
-  record.overlapped.OffsetHigh = static_cast<DWORD>(record.offset >> 32);
+  auto const file_offset = record.file_offset + record.offset;
+  record.overlapped.Offset     = static_cast<DWORD>(file_offset);
+  record.overlapped.OffsetHigh = static_cast<DWORD>(file_offset >> 32);
 
+  auto const offset = static_cast<size_t>(record.offset);
   auto* data = record.operation == Operation::read
-    ? record.buf.data()
-    : record.buf.data() + static_cast<size_t>(record.offset);
+    ? static_cast<void*>(record.read_buf.data()  + offset)
+    : static_cast<void*>(record.write_buf.data() + offset);
   auto const succeeded = record.operation == Operation::read
     ? ReadFile(record.file, data, record.pending_size, nullptr, &record.overlapped)
     : WriteFile(record.file, data, record.pending_size, nullptr, &record.overlapped);
@@ -100,30 +103,7 @@ void IOCP::submit(Record& record) noexcept
     "Failed to start asynchronous file operation : {}", get_win32_err_msg());
 }
 
-void IOCP::read(HANDLE handle) noexcept
-{
-  assert(handle != nullptr && handle != INVALID_HANDLE_VALUE);
-  assert(!_records.contains(handle));
-
-  auto size = LARGE_INTEGER{};
-  err_if(!GetFileSizeEx(handle, &size), "Failed to get file size : {}", get_win32_err_msg());
-  err_if(size.QuadPart < 0, "Cannot read a file with a negative size");
-  if (size.QuadPart == 0)
-    return;
-
-  auto& record     = _records[handle];
-  record.file      = handle;
-  record.size      = static_cast<uint64>(size.QuadPart);
-  record.operation = Operation::read;
-  record.buf.resize(static_cast<size_t>(std::min<uint64>(record.size, Chunk_Size)));
-
-  err_if(CreateIoCompletionPort(handle, _iocp, 0, 0) != _iocp,
-    "Failed to associate handle with IOCP : {}", get_win32_err_msg());
-
-  submit(record);
-}
-
-void IOCP::write(HANDLE handle, std::span<uint8 const> data) noexcept
+void IOCP::read(HANDLE handle, std::span<uint8> data) noexcept
 {
   assert(handle != nullptr && handle != INVALID_HANDLE_VALUE);
   assert(!_records.contains(handle));
@@ -133,13 +113,39 @@ void IOCP::write(HANDLE handle, std::span<uint8 const> data) noexcept
   auto& record     = _records[handle];
   record.file      = handle;
   record.size      = data.size();
-  record.operation = Operation::write;
-  record.buf.assign(data.begin(), data.end());
+  record.operation = Operation::read;
+  record.read_buf  = data;
 
   err_if(CreateIoCompletionPort(handle, _iocp, 0, 0) != _iocp,
     "Failed to associate handle with IOCP : {}", get_win32_err_msg());
 
   submit(record);
+}
+
+void IOCP::write(HANDLE handle, std::span<uint8 const> data, uint64 offset) noexcept
+{
+  assert(handle != nullptr && handle != INVALID_HANDLE_VALUE);
+  assert(!_records.contains(handle));
+  if (data.empty())
+    return;
+
+  auto& record       = _records[handle];
+  record.file        = handle;
+  record.size        = data.size();
+  record.file_offset = offset;
+  record.operation   = Operation::write;
+  record.write_buf.assign(data.begin(), data.end());
+
+  err_if(CreateIoCompletionPort(handle, _iocp, 0, 0) != _iocp,
+    "Failed to associate handle with IOCP : {}", get_win32_err_msg());
+
+  submit(record);
+}
+
+auto IOCP::is_complete(HANDLE handle) noexcept -> bool
+{
+  assert(handle != nullptr && handle != INVALID_HANDLE_VALUE);
+  return !_records.contains(handle);
 }
 
 }

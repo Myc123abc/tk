@@ -3,7 +3,7 @@
 #include "renderer/window/window_manager.hpp"
 #include "ui/ui_context.hpp"
 #include "util/thread_pool.hpp"
-#include "util/file_manager.hpp"
+#include "util/file_system.hpp"
 #include "util/iocp.hpp"
 #include "ui/text_engine/glyph_cacher.hpp"
 
@@ -25,18 +25,19 @@ void init() noexcept
 void destroy() noexcept
 {
   update();
-  g_glyph_cacher.block_save();
+  g_glyph_cacher.destroy();
   g_renderer.wait_idle();
   g_thread_pool.destroy();
   g_ui_ctx.destroy();
   g_renderer.destroy();
   g_wnd_mgr.destroy();
   g_iocp.destroy();
-  g_file_mgr.destroy();
+  g_file_sys.destroy();
 }
 
 void update() noexcept
 {
+  g_iocp.poll();
   g_img_mgr.update();
   g_ui_ctx.render();
   g_wnd_mgr.message_process();

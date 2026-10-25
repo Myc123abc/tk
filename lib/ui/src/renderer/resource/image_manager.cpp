@@ -2,13 +2,12 @@
 #include <stb_image.h>
 
 #include "image_manager.hpp"
-#include "../../util/file_manager.hpp"
+#include "../../util/file_system.hpp"
 #include "../engine/copy_engine.hpp"
 #include "../engine/compute_engine.hpp"
 #include "../renderer.hpp"
 
 #include <algorithm>
-#include <cmath>
 
 using namespace tk::ui;
 
@@ -39,7 +38,7 @@ auto ImageManager::try_load(std::string_view path, uint width, uint height) noex
 
   if (_decoded_failed_images.contains(filename))
   {
-    if (g_file_mgr.is_updated(filename))
+    if (g_file_sys.is_updated(filename))
       _decoded_failed_images.erase(filename);
     else
       return std::unexpected(ImageLoadError::decode_failed{ _decoded_failed_images[filename] });
@@ -73,24 +72,41 @@ auto ImageManager::try_load(std::string_view path, uint width, uint height) noex
     return _loaded_images[filename];
   }
 
-  if (!g_file_mgr.exists(path)) return std::unexpected(ImageLoadError::unexist{});
+  if (!g_file_sys.exists(path)) return std::unexpected(ImageLoadError::unexist{});
 
   // load image if not loaded
   if (!_load_tasks.contains(filename))
-    _load_tasks.emplace(path, g_thread_pool.submit([path = std::string(path), width, height]
+  {
+    auto res = g_file_sys.load(path);
+    // TODO: impl link calls, so i can do like
+    // g_file_sys.load(path).then(stbi_load_memeory)...
+    // is this better impled by coroutine?
+    if (!res)
     {
-      int w, h; 
-      std::string msg;
-      auto& file = g_file_mgr[g_file_mgr.load(path)];
-      auto  data = stbi_load_from_memory(file.data<stbi_uc>(), file.size(), reinterpret_cast<int*>(&w), reinterpret_cast<int*>(&h), nullptr, 4);
-      if (!data) msg = stbi_failure_reason();
+      assert(!res.error().is<FileLoadError::unexist>());
+      if (res.error().is<FileLoadError::loading>())
+        info("loading");
+    }
+    else
+    {
+      _load_tasks.emplace(path, g_thread_pool.submit([file = res.value(), width, height]
+      {
+        if (!std::in_range<int>(file->size()))
+          return LoadResult{ nullptr, 0, 0, "image file exceeds the decoder size limit", false };
 
-      auto ratio_x    = static_cast<float>(width) / w;
-      auto ratio_y    = static_cast<float>(height) / h;
-      auto use_mipmap = false;
-      if (ratio_x > 0 && ratio_y > 0) use_mipmap = ratio_x <= 0.5 || ratio_y <= 0.5;
-      return LoadResult{ data, w, h, msg, use_mipmap };
-    }));
+        int w, h; 
+        std::string msg;
+        auto data = stbi_load_from_memory(file->data<stbi_uc>(), static_cast<int>(file->size()), reinterpret_cast<int*>(&w), reinterpret_cast<int*>(&h), nullptr, 4);
+        if (!data) msg = stbi_failure_reason();
+
+        auto ratio_x    = static_cast<float>(width) / w;
+        auto ratio_y    = static_cast<float>(height) / h;
+        auto use_mipmap = false;
+        if (ratio_x > 0 && ratio_y > 0) use_mipmap = ratio_x <= 0.5 || ratio_y <= 0.5;
+        return LoadResult{ data, w, h, msg, use_mipmap };
+      }));
+    }
+  }
 
   return std::unexpected(ImageLoadError::loading{});
 }
