@@ -63,12 +63,15 @@ struct File
   void init(std::string_view path, Flag<Access> access, Flag<Share> share, Dispostion disposition) noexcept;
   void destroy() noexcept;
 
+  auto write(std::span<uint8 const> data, bool is_append) noexcept -> bool;
+
   template <typename T>
   auto data() const noexcept { return reinterpret_cast<T*>(_data.get()); }
   auto data() const noexcept { return _data.get(); }
   auto size() const noexcept { return _size; }
 
   auto is_complete() const noexcept -> bool;
+  void wait() const noexcept;
 
 private:
   void close() noexcept;
@@ -88,8 +91,9 @@ public:
   static auto exists(std::string_view path) noexcept -> bool;
   static auto create_directories(std::string_view path) noexcept -> bool;
 
+  auto open(StringLiteral path) noexcept -> File*;
   auto load(StringLiteral path) noexcept -> std::expected<File const*, FileLoadErrorType>;
-  auto write(StringLiteral path, std::span<uint8 const> data, bool is_append) noexcept -> std::expected<File const*, FileWriteErrorType>;
+  void wait(StringLiteral path) noexcept;
 
   auto is_updated(StringLiteral path) noexcept -> bool;
 

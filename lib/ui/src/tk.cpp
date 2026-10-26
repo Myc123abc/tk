@@ -20,6 +20,7 @@ void init() noexcept
   g_renderer.init();
   g_wnd_mgr.init();
   g_ui_ctx.init();
+  g_glyph_cacher.wait_preload_complete();
 }
 
 void destroy() noexcept
@@ -31,13 +32,12 @@ void destroy() noexcept
   g_ui_ctx.destroy();
   g_renderer.destroy();
   g_wnd_mgr.destroy();
-  g_iocp.destroy();
   g_file_sys.destroy();
+  g_iocp.destroy();
 }
 
 void update() noexcept
 {
-  g_iocp.poll();
   g_img_mgr.update();
   g_ui_ctx.render();
   g_wnd_mgr.message_process();

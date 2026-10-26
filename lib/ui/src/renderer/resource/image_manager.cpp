@@ -72,40 +72,29 @@ auto ImageManager::try_load(std::string_view path, uint width, uint height) noex
     return _loaded_images[filename];
   }
 
-  if (!g_file_sys.exists(path)) return std::unexpected(ImageLoadError::unexist{});
-
   // load image if not loaded
   if (!_load_tasks.contains(filename))
   {
-    auto res = g_file_sys.load(path);
-    // TODO: impl link calls, so i can do like
-    // g_file_sys.load(path).then(stbi_load_memeory)...
-    // is this better impled by coroutine?
-    if (!res)
-    {
-      assert(!res.error().is<FileLoadError::unexist>());
-      if (res.error().is<FileLoadError::loading>())
-        info("loading");
-    }
-    else
-    {
-      _load_tasks.emplace(path, g_thread_pool.submit([file = res.value(), width, height]
-      {
-        if (!std::in_range<int>(file->size()))
-          return LoadResult{ nullptr, 0, 0, "image file exceeds the decoder size limit", false };
+    auto file = g_file_sys.load(path);
+    if (!file)
+      return std::unexpected(file.error().visit(
+        [](FileLoadError::unexist) -> ImageLoadErrorType { return ImageLoadError::unexist{}; },
+        [](FileLoadError::loading) -> ImageLoadErrorType { return ImageLoadError::loading{}; }
+      ));
 
-        int w, h; 
-        std::string msg;
-        auto data = stbi_load_from_memory(file->data<stbi_uc>(), static_cast<int>(file->size()), reinterpret_cast<int*>(&w), reinterpret_cast<int*>(&h), nullptr, 4);
-        if (!data) msg = stbi_failure_reason();
+    _load_tasks.emplace(path, g_thread_pool.submit([file = file.value(), width, height]
+    {
+      int w, h; 
+      std::string msg;
+      auto data = stbi_load_from_memory(file->data<stbi_uc>(), static_cast<int>(file->size()), reinterpret_cast<int*>(&w), reinterpret_cast<int*>(&h), nullptr, 4);
+      if (!data) msg = stbi_failure_reason();
 
-        auto ratio_x    = static_cast<float>(width) / w;
-        auto ratio_y    = static_cast<float>(height) / h;
-        auto use_mipmap = false;
-        if (ratio_x > 0 && ratio_y > 0) use_mipmap = ratio_x <= 0.5 || ratio_y <= 0.5;
-        return LoadResult{ data, w, h, msg, use_mipmap };
-      }));
-    }
+      auto ratio_x    = static_cast<float>(width) / w;
+      auto ratio_y    = static_cast<float>(height) / h;
+      auto use_mipmap = false;
+      if (ratio_x > 0 && ratio_y > 0) use_mipmap = ratio_x <= 0.5 || ratio_y <= 0.5;
+      return LoadResult{ data, w, h, msg, use_mipmap };
+    }));
   }
 
   return std::unexpected(ImageLoadError::loading{});

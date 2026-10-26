@@ -5,8 +5,12 @@
 
 #include <Windows.h>
 
+#include <condition_variable>
+#include <mutex>
 #include <span>
+#include <thread>
 #include <unordered_map>
+#include <vector>
 
 namespace tk {
 
@@ -15,17 +19,17 @@ public:
   void init() noexcept;
   void destroy() noexcept;
 
-  void poll(DWORD milli = 0) noexcept;
-
+  void associate(HANDLE handle) noexcept;
   void read(HANDLE handle, std::span<uint8> data) noexcept;
   void write(HANDLE handle, std::span<uint8 const> data, uint64 offset = 0) noexcept;
 
   auto is_complete(HANDLE handle) noexcept -> bool;
+  void wait(HANDLE handle) noexcept;
 
 private:
   struct Record;
 
-  void poll_all_events() noexcept;
+  void main() noexcept;
   void process(OVERLAPPED_ENTRY const& entry) noexcept;
   void submit(Record& record) noexcept;
 
@@ -53,6 +57,10 @@ private:
 
   HANDLE                             _iocp{ INVALID_HANDLE_VALUE };
   std::unordered_map<HANDLE, Record> _records;
+  std::thread                        _thread;
+  std::mutex                         _mutex;
+  std::condition_variable            _completed;
+  bool                               _stopping{ false };
 )
 
 }

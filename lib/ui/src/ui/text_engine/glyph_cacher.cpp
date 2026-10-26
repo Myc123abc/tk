@@ -1,6 +1,5 @@
 #include "glyph_cacher.hpp"
 #include "../../util/file_system.hpp"
-#include "../../util/iocp.hpp"
 
 #include <utility>
 
@@ -45,8 +44,10 @@ void GlyphCacher::destroy() noexcept
 {
   assert(_file);
   if (!_glyphs.empty() || _file->size() == 0)
-    err_if(!g_file_sys.write(Cache_Path, serialize(), true),
-      "failed to save glyph cache file: file I/O is still pending");
+  {
+    auto data = serialize();
+    err_if(!_file->write(data, true), "failed to save glyph cache file: file I/O is still pending");
+  }
 
   _glyphs.clear();
   _preload_glyphs.clear();
@@ -81,20 +82,14 @@ auto GlyphCacher::serialize() const noexcept -> std::vector<uint8>
 void GlyphCacher::preload() noexcept
 {
   assert(!_file);
+  _file = g_file_sys.open(Cache_Path);
+}
 
-  auto opened = g_file_sys.write(Cache_Path, {}, true);
-  err_if(!opened, "failed to open glyph cache file");
+void GlyphCacher::wait_preload_complete() noexcept
+{
+  _file->wait();
 
-  // TODO: change to async link calls, and only wait point when need to use glyph cacher.
-  auto result = g_file_sys.load(Cache_Path);
-  while (!result)
-  {
-    err_if(!result.error().is<FileLoadError::loading>(), "failed to load glyph cache file");
-    g_iocp.poll(INFINITE);
-    result = g_file_sys.load(Cache_Path);
-  }
-
-  _file = *result;
+  // TODO: move to thread process
   if (_file->size())
     deserialize({ _file->data(), static_cast<size_t>(_file->size()) });
 }

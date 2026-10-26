@@ -31,14 +31,34 @@ auto FileSystem::create_directories(std::string_view path) noexcept -> bool
   return created;
 }
 
+auto FileSystem::open(StringLiteral path) noexcept -> File*
+{
+  auto [it, inserted] = _files.try_emplace(path.id());
+  if (!inserted) return &it->second;
+  auto& file = it->second;
+
+  // create directories if unexists
+  auto const parent = fs::path(path.view()).parent_path();
+  if (!parent.empty()) create_directories(parent.string());
+
+  // create file
+  file.init(path.view(), File::Access::read | File::Access::write, File::Share::read, File::Dispostion::open_always);
+  file._last_write_time = fs::last_write_time(path.view());
+
+  return &file;
+}
+
 auto FileSystem::load(StringLiteral path) noexcept -> std::expected<File const*, FileLoadErrorType>
 {
+  auto it = _files.find(path.id());
+  if (it != _files.end() && !it->second.is_complete())
+    return std::unexpected(FileLoadError::loading{});
+
   if (!exists(path.view())) return std::unexpected(FileLoadError::unexist{});
 
-  auto [it, inserted] = _files.try_emplace(path.id());
+  auto const inserted = it == _files.end();
+  if (inserted) it = _files.try_emplace(path.id()).first;
   auto& file = it->second;
-  if (!inserted && !file.is_complete())
-    return std::unexpected(FileLoadError::loading{});
 
   auto const last_write_time = fs::last_write_time(path.view());
   if (inserted || file._needs_read || file._last_write_time != last_write_time)
@@ -53,36 +73,44 @@ auto FileSystem::load(StringLiteral path) noexcept -> std::expected<File const*,
   return &file;
 }
 
-auto FileSystem::write(StringLiteral path, std::span<uint8 const> data, bool is_append) noexcept -> std::expected<File const*, FileWriteErrorType>
+auto File::write(std::span<uint8 const> data, bool is_append) noexcept -> bool
 {
-  auto& file = _files[path.id()];
-  if (!file.is_complete()) return std::unexpected(FileWriteError::writing{});
+  assert(_handle != INVALID_HANDLE_VALUE);
+  if (!is_complete()) return false;
 
-  auto const parent = fs::path(path.view()).parent_path();
-  if (!parent.empty())
-    create_directories(parent.string());
-
-  // Save file data, avoiding data be released which is current file's data.
-  auto previous_data = std::move(file._data);
-  file.destroy();
-  file.init(path.view(), File::Access::write, File::Share::read,
-    is_append ? File::Dispostion::open_always : File::Dispostion::create_always);
-
-  auto const offset = file._size;
+  auto const offset = is_append ? _size : uint64{};
   err_if(data.size() > std::numeric_limits<uint64>::max() - offset,
-    "file {} exceeds the supported size", path.view());
-  g_iocp.write(file._handle, data, offset);
-  file._size       = offset + static_cast<uint64>(data.size());
-  file._needs_read = true;
-  return &file;
+    "file exceeds the supported size");
+  auto const size = offset + static_cast<uint64>(data.size());
+
+  if (!is_append)
+  {
+    auto file_size = FILE_END_OF_FILE_INFO{};
+    file_size.EndOfFile.QuadPart = static_cast<LONGLONG>(size);
+    err_if(!SetFileInformationByHandle(_handle, FileEndOfFileInfo, &file_size, sizeof(file_size)),
+      "failed to resize file");
+  }
+
+  g_iocp.write(_handle, data, offset);
+  _size       = size;
+  _needs_read = true;
+  return true;
+}
+
+void FileSystem::wait(StringLiteral path) noexcept
+{
+  auto const it = _files.find(path.id());
+  assert(it != _files.end());
+  auto const handle = it->second._handle;
+  if (handle != INVALID_HANDLE_VALUE)
+    g_iocp.wait(handle);
 }
 
 auto FileSystem::is_updated(StringLiteral path) noexcept -> bool
 {
-  if (!exists(path.view())) return true;
   auto const it = _files.find(path.id());
-  return it == _files.end() || it->second._needs_read
-    || it->second._last_write_time != fs::last_write_time(path.view());
+  err_if(it == _files.end(), "failed to check update on file {}, is not be loaded", path.view());
+  return it->second._needs_read || it->second._last_write_time != fs::last_write_time(path.view());
 }
 
 void File::init(std::string_view path, Flag<Access> access, Flag<Share> share, Dispostion disposition) noexcept
@@ -93,6 +121,7 @@ void File::init(std::string_view path, Flag<Access> access, Flag<Share> share, D
   _handle = CreateFileA(path.data(), access.to<DWORD>(), share.to<DWORD>(), nullptr, static_cast<DWORD>(disposition),
     FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, nullptr);
   err_if(_handle == INVALID_HANDLE_VALUE, "failed to create file {}", path);
+  g_iocp.associate(_handle);
 
   // get size
   auto li = LARGE_INTEGER{};
@@ -119,8 +148,7 @@ void File::close() noexcept
 {
   if (_handle != INVALID_HANDLE_VALUE)
   {
-    while (!is_complete())
-      g_iocp.poll(INFINITE);
+    g_iocp.wait(_handle);
     err_if(!CloseHandle(_handle), "failed to close file handle");
     _handle = INVALID_HANDLE_VALUE;
   }
@@ -129,6 +157,11 @@ void File::close() noexcept
 auto File::is_complete() const noexcept -> bool
 {
   return _handle == INVALID_HANDLE_VALUE || g_iocp.is_complete(_handle);
+}
+
+void File::wait() const noexcept
+{
+  if (!is_complete()) g_iocp.wait(_handle);
 }
 
 }

@@ -38,6 +38,7 @@ public:
   void destroy() noexcept;
 
   void preload() noexcept;
+  void wait_preload_complete() noexcept;
 
   auto& preload_glyphs() noexcept { return _preload_glyphs; }
 
@@ -47,7 +48,7 @@ private:
 
 private:
   std::vector<GlyphCacheData>   _glyphs;
-  File const*                   _file{};
+  File*                         _file{};
   GlyphKeyMap<PreloadGlyphData> _preload_glyphs;
 )
 
