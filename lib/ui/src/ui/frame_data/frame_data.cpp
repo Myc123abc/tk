@@ -74,6 +74,130 @@ void FrameData::push_render_cmd_clear_rect(RenderCmdType type, Rect rect) noexce
   cmd.rect = rect;
 }
 
+void FrameData::validate_draw_cmds() const noexcept
+{
+  using Type = DrawCmd::Type;
+
+  auto path_open             = false;
+  auto union_open            = false;
+  auto discard_open          = false;
+  auto transform_depth       = 0u;
+  auto cull_depth            = 0u;
+  auto union_transform_depth = 0u;
+
+  for (auto index = 0uz; index < _draw_cmds.size(); ++index)
+  {
+    auto const type = _draw_cmds[index].type;
+    auto const reject_path_overlap = [&]
+    {
+      err_if(path_open, "draw command {} cannot appear before path_end", index);
+    };
+    auto const reject_unsupported_union_command = [&]
+    {
+      err_if(union_open, "draw command {} is not supported inside union", index);
+    };
+
+    switch (type)
+    {
+    case Type::path_begin:
+      err_if(path_open, "path_begin called before path_end at draw command {}", index);
+      path_open = true;
+      break;
+
+    case Type::add_path_line_to:
+    case Type::add_path_arc_to:
+    case Type::add_path_quad_bezier_to:
+    case Type::add_path_cubic_bezier_to:
+      err_if(!path_open, "path command {} called before path_begin", index);
+      break;
+
+    case Type::path_end:
+      err_if(!path_open, "path_end called without path_begin at draw command {}", index);
+      path_open = false;
+      break;
+
+    case Type::union_beg:
+      reject_path_overlap();
+      err_if(union_open, "nested union_beg at draw command {}", index);
+      union_open = true;
+      union_transform_depth = transform_depth;
+      break;
+
+    case Type::union_end:
+      err_if(!union_open, "union_end called without union_beg at draw command {}", index);
+      reject_path_overlap();
+      err_if(transform_depth != union_transform_depth,
+        "transform scope crosses union_end at draw command {}", index);
+      union_open = false;
+      break;
+
+    case Type::transform_beg:
+      reject_path_overlap();
+      ++transform_depth;
+      break;
+
+    case Type::transform_end:
+      reject_path_overlap();
+      err_if(transform_depth == 0, "transform_end called without transform_beg at draw command {}", index);
+      err_if(union_open && transform_depth <= union_transform_depth,
+        "transform_end crosses union_beg at draw command {}", index);
+      --transform_depth;
+      break;
+
+    case Type::cull_rect_beg:
+      reject_path_overlap();
+      reject_unsupported_union_command();
+      ++cull_depth;
+      break;
+
+    case Type::cull_rect_end:
+      reject_path_overlap();
+      reject_unsupported_union_command();
+      err_if(cull_depth == 0, "cull_rect_end called without cull_rect_beg at draw command {}", index);
+      --cull_depth;
+      break;
+
+    case Type::discard_beg:
+      reject_path_overlap();
+      err_if(union_open, "discard_beg cannot appear inside union at draw command {}", index);
+      err_if(discard_open, "nested discard_beg at draw command {}", index);
+      discard_open = true;
+      break;
+
+    case Type::discard_end:
+      reject_path_overlap();
+      err_if(union_open, "discard_end cannot appear inside union at draw command {}", index);
+      err_if(!discard_open, "discard_end called without discard_beg at draw command {}", index);
+      discard_open = false;
+      break;
+
+    case Type::add_rect:
+    case Type::add_triangle:
+    case Type::add_circle:
+      reject_path_overlap();
+      break;
+
+    case Type::add_line:
+    case Type::add_arc:
+    case Type::add_quad_bezier:
+    case Type::add_cubic_bezier:
+    case Type::add_image:
+    case Type::add_image_rounded:
+    case Type::add_text:
+    case Type::add_scissor_rect:
+      reject_path_overlap();
+      reject_unsupported_union_command();
+      break;
+    }
+  }
+
+  err_if(path_open, "path_end not called");
+  err_if(union_open, "union_end not called");
+  err_if(discard_open, "discard_end not called");
+  err_if(transform_depth != 0, "transform_end not called");
+  err_if(cull_depth != 0, "cull_rect_end not called");
+}
+
 void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
 {
   using Type = DrawCmd::Type;
@@ -388,7 +512,7 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
 
   case Type::union_beg:
     should_transform_vertices = false;
-    _union_beg(idx);
+    _union_beg(cmd, idx);
     break;
 
   case Type::union_end:
@@ -436,6 +560,7 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
 
 void FrameData::build_render_cmds() noexcept
 {
+  validate_draw_cmds();
   assert(_cull_rect_stack.empty());
   if (_base_cull_rect)
     _cull_rect_stack.emplace_back(_base_cull_rect.value());

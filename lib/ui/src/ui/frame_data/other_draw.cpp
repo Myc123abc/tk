@@ -120,6 +120,7 @@ auto FrameData::should_cull(Rect bounds, float padding) const noexcept -> bool
     return true;
 
   auto const& clip = _cull_rect_stack.back();
+  if (clip.empty()) return true;
   return bounds.right  + padding < clip.left ||
          bounds.bottom + padding < clip.top ||
          bounds.left   - padding > clip.right ||

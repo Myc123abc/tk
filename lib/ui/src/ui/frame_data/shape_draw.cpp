@@ -285,7 +285,7 @@ void FrameData::add_convex_poly_filled(Color color) noexcept
   auto const pt_cnt = static_cast<uint>(_points.size());
   assert(pt_cnt > 2);
 
-  auto const half_aa   = g_ui_ctx.window()->scale() * .5f;
+  auto const half_aa   = _aa_scale * .5f;
   auto const aa_col    = Color{ color.r, color.g, color.b, 0.f }.to_uint();
   auto const col       = color.to_uint();
   auto const miter_max = Polyline_Miter_Limit * Polyline_Miter_Limit;
@@ -406,7 +406,7 @@ void FrameData::add_concave_poly_filled(Color color) noexcept
   assert(pt_cnt > 2);
 
   uint triangle[3]{};
-  auto const aa_size = g_ui_ctx.window()->scale();
+  auto const aa_size = _aa_scale;
   auto col_trans = Color{ color.r, color.g, color.b, 0 }.to_uint();
   auto col       = color.to_uint();
 

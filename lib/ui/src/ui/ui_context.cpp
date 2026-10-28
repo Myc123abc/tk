@@ -183,6 +183,7 @@ void UIContext::render() noexcept
     auto data   = &wnd_ctx.frame_data;
 
     _wnd = g_wnd_mgr.get_window(handle);
+    data->set_aa_scale(_wnd->scale());
 
     if (!_wnd->is_resizing())
     {
@@ -630,6 +631,7 @@ void UIContext::scissor_area_begin(Rect rect) noexcept
   }
   if (is_resizing) rect += _wnd->real_pos();
   rect = intersect(rect, current_rect);
+  rect = Rect{ rect.to_RECT() };
   _scissor_area_stack.emplace_back(rect);
   frame_data()->cull_rect_beg(rect);
 }

@@ -42,7 +42,7 @@ public:
     for (auto const& pt : _lerp_pts)
       _pts.emplace_back(ui::lerp(pt.p0, pt.p1, v));
 
-    ui::union_beg();
+    ui::union_beg(_name.id());
 
     ui::path_begin(_pts[0]);
     ui::path_line_to(_pts[1]);

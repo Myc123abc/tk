@@ -252,11 +252,13 @@ void transform_end() noexcept
 
 void discard_beg(std::function<void()> func) noexcept
 {
+  g_ui_ctx.check_draw();
   g_ui_ctx.frame_data()->discard_beg(func);
 }
 
 void discard_end() noexcept
 {
+  g_ui_ctx.check_draw();
   g_ui_ctx.frame_data()->discard_end();
 }
 
@@ -409,6 +411,12 @@ void union_beg() noexcept
 {
   g_ui_ctx.check_draw();
   g_ui_ctx.frame_data()->union_beg();
+}
+
+void union_beg(StringID cache_id) noexcept
+{
+  g_ui_ctx.check_draw();
+  g_ui_ctx.frame_data()->union_beg(g_ui_ctx.get_id(cache_id));
 }
 
 void union_end(Color color, float thickness) noexcept

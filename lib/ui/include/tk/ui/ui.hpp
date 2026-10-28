@@ -546,6 +546,12 @@ void path_end(bool close = true, Color color = {}, float thickness = {}) noexcep
 void union_beg() noexcept;
 
 /**
+ * start collecting closed shapes for a cached filled union
+ * @param cache_id stable ID for this logical union within the current window
+ */
+void union_beg(StringID cache_id) noexcept;
+
+/**
  * draw union result of collected closed shapes
  * @param color
  * @param thickness

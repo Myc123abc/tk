@@ -14,6 +14,9 @@ constexpr auto Window_Active_Response_Time = 200'000;
 
 constexpr auto Image_Pool_Init_Capacity = 32;
 
+constexpr auto Union_Cache_Max_Entries = 128uz;
+constexpr auto Union_Cache_Max_Bytes   = 16uz * 1024 * 1024;
+
 constexpr auto Glyph_Atlas_Width      = 1024;
 constexpr auto Glyph_Atlas_Height     = 1024;
 constexpr auto FT_Pixel_Size          = 32;

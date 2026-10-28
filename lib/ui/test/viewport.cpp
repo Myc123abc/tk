@@ -225,7 +225,7 @@ void draw_unions(float2 pos) noexcept
 {
   draw_panel("Union fill and outline", pos);
 
-  ui::union_beg();
+  ui::union_beg("viewport-union-fill");
   ui::circle(pos + float2{ 70, 102 }, 43);
   ui::circle(pos + float2{ 116, 102 }, 43);
   ui::rectangle(pos + float2{ 85, 70 }, pos + float2{ 170, 145 });

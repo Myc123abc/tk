@@ -8,7 +8,10 @@
 #include "polyline_tessellator.hpp"
 #include "tk/rect.hpp"
 #include "tk/flag.hpp"
+#include "tk/error_handling.hpp"
 
+#include <cstddef>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace tk::ui {
@@ -261,6 +264,12 @@ public:
 
       struct
       {
+        size_t cache_id{};
+        bool   cacheable{};
+      } union_beg;
+
+      struct
+      {
         Color color{};
         float thickness{};
       } union_end;
@@ -311,6 +320,7 @@ public:
   void path_end(bool close, Color color, float thickness) noexcept;
 
   void union_beg() noexcept;
+  void union_beg(size_t cache_id) noexcept;
   void union_end(Color color, float thickness) noexcept;
 
   void add_scissor_rect(Rect rect) noexcept;
@@ -328,6 +338,7 @@ public:
   void build_render_cmds() noexcept;
 
   void set_window_pos(float2 pos) noexcept { _window_pos = pos; }
+  void set_aa_scale(float scale) noexcept { _aa_scale = scale; }
   void set_cull_rect(Rect rect) noexcept { _base_cull_rect = rect; }
   void set_window_shadow(Rect scissor_rect, uint2 window_extent, float shadow_thickness, Color color, float radius, float softness, std::optional<float4> wireframe_color) noexcept
   {
@@ -365,7 +376,7 @@ private:
   void _add_path_quad_bezier_to(float2 p1, float2 p2, float tessellation_scale) noexcept;
   void _add_path_cubic_bezier_to(float2 p1, float2 p2, float2 p3, float tessellation_scale) noexcept;
   void _path_end(bool close, Color color, float thickness, float geometry_scale, bool transform_geometry) noexcept;
-  void _union_beg(uint& idx) noexcept;
+  void _union_beg(DrawCmd const& beg_cmd, uint& idx) noexcept;
 
   void _add_scissor_rect(Rect rect) noexcept;
   void _transform_beg(Matrix const& transform) noexcept;
@@ -376,13 +387,32 @@ private:
   void _discard_beg(uint count, uint& idx) noexcept;
   void _discard_end() noexcept;
 
+  void validate_draw_cmds() const noexcept;
   void build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept;
 
   using Vertex = renderer::Vertex;
 
+  struct CachedUnionGeometry
+  {
+    std::vector<std::byte> key;
+    std::vector<Vertex>    vertices;
+    std::vector<uint16>    indices;
+    Rect                   bounds;
+    uint64                 last_used{};
+
+    auto byte_size() const noexcept
+    {
+      return key.capacity()      * sizeof(std::byte) +
+             vertices.capacity() * sizeof(Vertex)    +
+             indices.capacity()  * sizeof(uint16);
+    }
+  };
+
   auto expand_beg(uint vertices_size, uint indices_size) noexcept -> std::pair<Vertex*, uint16*>
   {
-    assert(_vertex_beg + vertices_size <= std::numeric_limits<uint16>::max() + 1u);
+    auto constexpr max_vertex_count = static_cast<uint>(std::numeric_limits<uint16>::max()) + 1u;
+    err_if(_vertex_beg > max_vertex_count || vertices_size > max_vertex_count - _vertex_beg,
+      "frame geometry exceeds the 16-bit vertex limit");
     _tmp_vertices_size = vertices_size;
     _tmp_indices_size  = indices_size;
 
@@ -446,6 +476,7 @@ private:
   std::vector<Rect>   _cull_rect_stack;
 
   float2 _window_pos{};
+  float  _aa_scale{ 1.f };
 
   std::optional<WindowShadowInfo> _window_shadow_info;
   std::optional<Rect>             _base_cull_rect;
@@ -467,6 +498,10 @@ private:
   bool _using_discard_shapes{};
   uint _discard_vtx_beg{};
   uint _clear_composite_image_cmd_idx{};
+
+  std::unordered_map<size_t, CachedUnionGeometry> _union_cache;
+  uint64                                          _union_cache_clock{};
+  size_t                                          _union_cache_bytes{};
 
   inline static auto constexpr arc_table_size               = 48;
   inline static auto constexpr arc_sample_max               = arc_table_size;

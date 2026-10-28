@@ -15,197 +15,8 @@ auto point_in_circle(float2 center, float radius, float theta) noexcept -> float
   return { center.x + radius * std::cos(a), center.y + radius * std::sin(a) };
 }
 
-void circle_draw_test() noexcept
-{
-  auto [w, h] = ui::window_drawable_extent();
-  auto center = float2{ 3, h - 3 };
-  auto radius = 1.f;
-  while (center.x + radius + 2 < w)
-  {
-    ui::circle(center, radius, 0x00ff00ff);
-    auto old_radius = radius;
-    ++radius;
-    center.x += old_radius + 2 + radius;
-    center.y  = h - 2 - radius;
-  }
-}
-
-void line_draw_test() noexcept
-{
-  auto [w, h] = ui::window_drawable_extent();
-  auto p0 = float2{}, p1 = float2{};
-  auto t = 0.f;
-  while (p1.x < w && p0.y < h)
-  {
-    auto old_t = t;
-    ++t;
-    p1.x += old_t + t + 2;
-    p0.y += old_t + t + 2;
-    ui::line(p0, p1, 0x00ff00ff, t);
-  }
-  while (p1.y < h && p0.x < w)
-  {
-    auto old_t = t;
-    --t;
-    p1.y += old_t + t + 2;
-    p0.x += old_t + t + 2;
-    ui::line(p0, p1, 0x00ff00ff, t);
-  }
-}
-
-void test_path_draw() noexcept
-{
-  auto pos = float2{ 10, 10 };
-  ui::path_begin(pos);
-  ui::path_line_to({ pos.x + 100, pos.y + 100 });
-  ui::path_line_to({ pos.x + 50, pos.y + 75 });
-  ui::path_end(true, 0xff0000ff, 0);
-
-  pos.x += 110;
-  ui::path_begin(pos);
-  ui::path_line_to({ pos.x + 100, pos.y + 100 });
-  ui::path_line_to({ pos.x + 50, pos.y + 75 });
-  ui::path_end(true, 0xff0000ff, 1);
-
-  pos.x += 110;
-  ui::path_begin(pos);
-  ui::path_line_to({ pos.x + 100, pos.y + 100 });
-  ui::path_line_to({ pos.x + 50, pos.y + 75 });
-  ui::path_end(false, 0xff0000ff, 1);
-
-  pos = float2{ 10, 10 };
-  pos.y += 110;
-  ui::path_begin({ pos.x + 50, pos.y + 25 });
-  ui::path_arc_to({ pos.x + 50, pos.y + 50 }, { pos.x + 25, pos.y + 50 }, false);
-  ui::path_end(false, 0xff0000ff, 0);
-
-  pos.x += 110;
-  ui::path_begin({ pos.x + 15, pos.y + 85 });
-  ui::path_line_to({ pos.x + 40, pos.y + 35 });
-  ui::path_arc_to({ pos.x + 60, pos.y + 35 }, { pos.x + 80, pos.y + 35 }, false);
-  ui::path_line_to({ pos.x + 105, pos.y + 85 });
-  ui::path_end(false, 0xff0000ff, 3);
-
-  pos.x += 110;
-  ui::path_begin({ pos.x + 50, pos.y + 25 });
-  ui::path_arc_to({ pos.x + 50, pos.y + 50 }, { pos.x + 25, pos.y + 50 }, false);
-  ui::path_end(false, 0xff0000ff, 3);
-
-  pos = float2{ 10, 10 };
-  pos.y += 110 * 2;
-  ui::path_begin(pos);
-  ui::path_line_to({ pos.x, pos.y + 100 });
-  ui::path_quad_bezier_to({ pos.x + 100, pos.y + 50 }, pos);
-  ui::path_end(false, 0xff0000ff, 0);
-
-  pos.x += 110;
-  ui::path_begin(pos);
-  ui::path_line_to({ pos.x, pos.y + 100 });
-  ui::path_quad_bezier_to({ pos.x + 100, pos.y + 50 }, pos);
-  ui::path_end(false, 0xff0000ff, 3);
-
-  pos.x += 110;
-  ui::path_begin({ pos.x, pos.y + 100 });
-  ui::path_quad_bezier_to({ pos.x + 100, pos.y + 50 }, pos);
-  ui::path_end(false, 0xff0000ff, 3);
-
-  pos = float2{ 10, 10 };
-  pos.y += 110 * 3;
-  ui::path_begin(pos);
-  ui::path_line_to({ pos.x + 100, pos.y });
-  ui::path_line_to({ pos.x + 50, pos.y + 40 });
-  ui::path_line_to({ pos.x + 100, pos.y + 100 });
-  ui::path_line_to({ pos.x, pos.y + 100 });
-  ui::path_end(true, 0xff0000ff, 0);
-
-  pos.x += 110;
-  ui::path_begin(pos);
-  ui::path_line_to({ pos.x + 100, pos.y });
-  ui::path_line_to({ pos.x + 50, pos.y + 40 });
-  ui::path_line_to({ pos.x + 100, pos.y + 100 });
-  ui::path_line_to({ pos.x, pos.y + 100 });
-  ui::path_end(true, 0xff0000ff, 3);
-
-  pos.x += 110;
-  ui::path_begin(pos);
-  ui::path_line_to({ pos.x + 100, pos.y });
-  ui::path_line_to({ pos.x + 50, pos.y + 40 });
-  ui::path_line_to({ pos.x + 100, pos.y + 100 });
-  ui::path_line_to({ pos.x, pos.y + 100 });
-  ui::path_end(false, 0xff0000ff, 3);
-
-  pos = float2{ 10, 10 };
-  pos.y += 110 * 4;
-  ui::path_begin(pos);
-  ui::path_cubic_bezier_to({ pos.x + 50, pos.y }, { pos.x + 100, pos.y + 100 }, { pos.x + 50, pos.y + 100 });
-  ui::path_end(true, 0xff0000ff, 0);
-
-  pos.x += 110;
-  ui::path_begin(pos);
-  ui::path_cubic_bezier_to({ pos.x + 50, pos.y }, { pos.x + 100, pos.y + 100 }, { pos.x + 50, pos.y + 100 });
-  ui::path_end(true, 0xff0000ff, 3);
-
-  pos.x += 110;
-  ui::path_begin(pos);
-  ui::path_cubic_bezier_to({ pos.x + 50, pos.y }, { pos.x + 100, pos.y + 100 }, { pos.x + 50, pos.y + 100 });
-  ui::path_end(false, 0xff0000ff, 3);
-
-  pos = float2{ 10, 10 };
-  pos.y += 110 * 5;
-  ui::path_begin(pos);
-  ui::path_line_to({ pos.x + 100, pos.y });
-  ui::path_arc_to({ pos.x + 50, pos.y + 50 }, { pos.x + 100, pos.y + 100 }, false);
-  ui::path_line_to({ pos.x, pos.y + 100 });
-  ui::path_end(true, 0x00ffffff, 3);
-}
-
 inline auto img1 = "assets/image/test.jpg";
 inline auto img2 = "assets/image/test.png";
-
-void test_discard(uint fmt) noexcept
-{
-  auto _ = std::expected<void, ui::ImageLoadErrorType>{};
-  ui::discard_beg([]{ ui::circle({ 50, 50 }, 25); });
-  auto r = fmt % 7;
-  switch (r)
-  {
-  case 0:
-    ui::rectangle({}, { 100, 100 }, 0xffffffff);
-    break;
-
-  case 1:
-    _ = ui::image(img1, {}, { 100, 100 }, 0x44);
-    break;
-
-  case 2:
-    _ = ui::image(img1, {}, { 50, 50 });
-    _ = ui::image(img1, { 50, 50 }, { 100, 100 });
-    break;
-
-  case 3:
-    ui::rectangle({}, { 50, 50 }, 0xffffffff);
-    _ = ui::image(img1, { 50, 50 }, { 100, 100 });
-    break;
-
-  case 4:
-    _ = ui::image(img1, {}, { 50, 50 });
-    ui::rectangle({ 50, 50 }, {}, 0xffffffff);
-    break;
-
-  case 5:
-    ui::rectangle({}, { 50, 50 }, 0xffff00ff);
-    _ = ui::image(img1, { 25, 25 }, { 70, 75 });
-    ui::rectangle({ 50, 50 }, {}, 0xffffffff);
-    break;
-
-  case 6:
-    _ = ui::image(img1, {}, { 50, 50 });
-    ui::rectangle({ 25, 25 }, { 70, 75 }, 0xffff00ff);
-    _ = ui::image(img1, { 50, 50 }, { 100, 100 });
-    break;
-  }
-  ui::discard_end();
-}
 
 auto load_image(std::string_view path) noexcept
 {
@@ -488,10 +299,6 @@ int main()
       auto size = ui::window_drawable_extent();
       // ui::triangle({ size.x / 2, size.y * .1f }, size * .9f, { size.y * .1f, size.y * .9 }, 0x00ff0044, 10);
 
-      static auto fmt = 0;
-
-      if (ui::button("btn1", 0, 0, 100, 100, 0xffffffff, 0x00ff00ff))
-        ++fmt;
       if (ui::button("btn2", 50, 50, 100, 100, 0xffffffff, 0x00ff00ff))
         wnd2_is_closed = !wnd2_is_closed;
       ui::add_move_invalid_area({}, { 150, 150 });
@@ -515,18 +322,6 @@ int main()
       ui::rectangle({ 30, 0 }, { 30 + res.extent.x, res.extent.y }, 0x00ff00ff, 1);
       ui::line({ 30 + res.ascender, 0 }, { 30 + res.ascender, res.extent.y }, 0xff0000ff);
       ui::transform_end();
-
-      // circle_draw_test();
-      // line_draw_test();
-      // test_path_draw();
-      // test_discard(fmt);
-
-      // ui::discard_beg([]{ ui::rectangle({70, 70}, {300, 90});});
-      // ui::union_beg();
-      // ui::circle({50, 50}, 40);
-      // ui::circle({90, 90}, 40);
-      // ui::union_end(0xff0000ff, 3);
-      // ui::discard_end();
 
       ui::end();
     }
