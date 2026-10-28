@@ -161,7 +161,7 @@ private:
   void create_compute_pipelines(std::initializer_list<ComputePipelineInfo> infos) noexcept { for (auto const& info : infos) create_compute_pipeline(info); }
   void compile_pipelines() noexcept;
 
-  auto find_root_param(std::span<CD3DX12_ROOT_PARAMETER1> params) const noexcept -> ID3D12RootSignature*;
+  auto get_root_signature(Compiler::CompileResult& compile_result) noexcept -> ID3D12RootSignature*;
 
   struct Pipeline
   {
@@ -171,17 +171,20 @@ private:
 
     Pipeline() = default;
 
-    Pipeline(PipelineCreateInfo const& info, Compiler::CompileResult&& compile_result) noexcept
+    Pipeline(
+      PipelineCreateInfo const&   info,
+      Compiler::CompileResult&&   compile_result,
+      ID3D12RootSignature*        resolved_root_signature) noexcept
     {
       info.info.visit(
-        [&](PipelineCreateInfo::Graphics) { init_graphics(info, std::move(compile_result)); },
-        [&](PipelineCreateInfo::Compute) { init_compute(info, std::move(compile_result)); },
+        [&](PipelineCreateInfo::Graphics) { init_graphics(info, std::move(compile_result), resolved_root_signature); },
+        [&](PipelineCreateInfo::Compute) { init_compute(info, std::move(compile_result), resolved_root_signature); },
         VariantUnreachableCase
       );
     }
 
-    void init_graphics(PipelineCreateInfo const& info, Compiler::CompileResult&& compile_result) noexcept;
-    void init_compute(PipelineCreateInfo const& info, Compiler::CompileResult&& compile_result) noexcept;
+    void init_graphics(PipelineCreateInfo const& info, Compiler::CompileResult&& compile_result, ID3D12RootSignature* resolved_root_signature) noexcept;
+    void init_compute(PipelineCreateInfo const& info, Compiler::CompileResult&& compile_result, ID3D12RootSignature* resolved_root_signature) noexcept;
   
     auto root_param_idx(std::string_view name) noexcept { return _root_param_idxs[name.data()]; }
   private:
@@ -189,7 +192,7 @@ private:
   };
   std::unordered_map<PipelineType, Pipeline> _pipes;
   std::vector<std::pair<PipelineType, PipelineCreateInfo>> _pipeline_create_infos;
-  std::vector<std::pair<Microsoft::WRL::ComPtr<ID3D12RootSignature>, std::vector<CD3DX12_ROOT_PARAMETER1>>> _root_signatures;
+  std::vector<Microsoft::WRL::ComPtr<ID3D12RootSignature>> _root_signatures;
 )
 
 }

@@ -154,12 +154,12 @@ void PipelineSystem::init() noexcept
 
 void PipelineSystem::compile_pipelines() noexcept
 {
-  auto tasks = std::vector<Task<Compiler::CompileResult>>{};
-  tasks.reserve(_pipeline_create_infos.size());
+  auto compile_tasks = std::vector<Task<Compiler::CompileResult>>{};
+  compile_tasks.reserve(_pipeline_create_infos.size());
 
   for (auto const& [type, info] : _pipeline_create_infos)
   {
-    tasks.emplace_back(g_thread_pool.run([info]
+    compile_tasks.emplace_back(g_thread_pool.run([info]
     {
       if (info.info.is<PipelineCreateInfo::Graphics>())
       {
@@ -172,42 +172,61 @@ void PipelineSystem::compile_pipelines() noexcept
     }));
   }
 
-  for (auto i = 0uz; i < tasks.size(); ++i)
+  auto compile_results = std::vector<Compiler::CompileResult>{};
+  compile_results.reserve(compile_tasks.size());
+  for (auto& task : compile_tasks)
+    compile_results.emplace_back(task.take_result());
+
+  auto root_signatures = std::vector<ID3D12RootSignature*>{};
+  root_signatures.reserve(compile_results.size());
+  for (auto& compile_result : compile_results)
+    root_signatures.emplace_back(get_root_signature(compile_result));
+
+  auto pipeline_tasks = std::vector<Task<Pipeline>>{};
+  pipeline_tasks.reserve(_pipeline_create_infos.size());
+  for (auto i = 0uz; i < _pipeline_create_infos.size(); ++i)
   {
-    auto compile_result = tasks[i].take_result();
-    auto& [type, info] = _pipeline_create_infos[i];
-    auto [_, inserted] = _pipes.emplace(type, Pipeline{ info, std::move(compile_result) });
+    auto const& info = _pipeline_create_infos[i].second;
+    pipeline_tasks.emplace_back(g_thread_pool.run([
+      info,
+      root_signature = root_signatures[i],
+      compile_result = std::move(compile_results[i])
+    ]() mutable
+    {
+      return Pipeline{ info, std::move(compile_result), root_signature };
+    }));
+  }
+
+  for (auto i = 0uz; i < pipeline_tasks.size(); ++i)
+  {
+    auto& type = _pipeline_create_infos[i].first;
+    auto [_, inserted] = _pipes.emplace(type, pipeline_tasks[i].take_result());
     assert(inserted);
   }
   _pipeline_create_infos.clear();
 }
 
-auto PipelineSystem::find_root_param(std::span<CD3DX12_ROOT_PARAMETER1> params) const noexcept -> ID3D12RootSignature*
+auto PipelineSystem::get_root_signature(Compiler::CompileResult& compile_result) noexcept -> ID3D12RootSignature*
 {
-  auto it = std::ranges::find_if(_root_signatures, [&](auto const& pair)
+  auto root_signature = compile_result.root_signature.Get();
+  auto it = std::ranges::find(_root_signatures, root_signature, &Microsoft::WRL::ComPtr<ID3D12RootSignature>::Get);
+  if (it == _root_signatures.end())
   {
-    auto const& cur_params = pair.second;
-    if (cur_params.size() != params.size()) return false;
-    for (auto i = 0; i < cur_params.size(); ++i)
-    {
-      if (memcmp(&cur_params[i], &params[i], sizeof(CD3DX12_ROOT_PARAMETER1)))
-        return false;
-    }
-    return true;
-  });
-  if (it == _root_signatures.end()) return {};
-  return it->first.Get();
+    auto& root_signature = _root_signatures.emplace_back(std::move(compile_result.root_signature));
+    return root_signature.Get();
+  }
+  return it->Get();
 }
 
-void PipelineSystem::Pipeline::init_graphics(PipelineCreateInfo const& info, Compiler::CompileResult&& compile_result) noexcept
+void PipelineSystem::Pipeline::init_graphics(
+  PipelineCreateInfo const& info,
+  Compiler::CompileResult&& compile_result,
+  ID3D12RootSignature*      resolved_root_signature) noexcept
 {
   auto const& graphics = info.info.get<PipelineCreateInfo::Graphics>();
-  
-  if (auto res = g_pipe_sys.find_root_param(compile_result.root_params))
-    root_signature = res;
-  else
-    root_signature = g_pipe_sys._root_signatures.emplace_back(compile_result.root_signature, compile_result.root_params).first.Get();
-  _root_param_idxs = compile_result.root_param_indices;
+
+  root_signature   = resolved_root_signature;
+  _root_param_idxs = std::move(compile_result.root_param_indices);
 
   auto stream = CD3DX12_PIPELINE_STATE_STREAM{};
   
@@ -279,13 +298,13 @@ void PipelineSystem::Pipeline::init_graphics(PipelineCreateInfo const& info, Com
           "failed to create pipeline state");
 }
 
-void PipelineSystem::Pipeline::init_compute(PipelineCreateInfo const& info, Compiler::CompileResult&& compile_result) noexcept
+void PipelineSystem::Pipeline::init_compute(
+  PipelineCreateInfo const& info,
+  Compiler::CompileResult&& compile_result,
+  ID3D12RootSignature*      resolved_root_signature) noexcept
 {
-  if (auto res = g_pipe_sys.find_root_param(compile_result.root_params))
-    root_signature = res;
-  else
-    root_signature = g_pipe_sys._root_signatures.emplace_back(compile_result.root_signature, compile_result.root_params).first.Get();
-  _root_param_idxs = compile_result.root_param_indices;
+  root_signature   = resolved_root_signature;
+  _root_param_idxs = std::move(compile_result.root_param_indices);
 
   auto stream = CD3DX12_PIPELINE_STATE_STREAM{};
   stream.pRootSignature = root_signature;
