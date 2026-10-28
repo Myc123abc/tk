@@ -232,9 +232,19 @@ auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 al
 
 auto fonts = std::vector<ui::FontInfo>{};
 
-void load_font(std::string_view path) noexcept
+inline constexpr std::string_view startup_font_paths[]{
+  "assets/font/NotoSansJP-Regular.ttf",
+  "assets/font/NotoSansJP-Bold.ttf",
+  "assets/font/YuGothR.ttc",
+  "assets/font/SourceCodePro-Regular.ttf",
+};
+inline constexpr std::string_view fallback_font_paths[]{
+  "assets/font/NotoSansJP-Regular.ttf",
+  "assets/font/NotoSansSC-Regular.ttf",
+};
+
+void store_font_result(std::string_view path, std::expected<ui::FontInfo, ui::FontLoadErrorType> res) noexcept
 {
-  auto res = ui::load_font(path);
   if (!res.has_value())
   {
     res.error().visit(
@@ -244,6 +254,14 @@ void load_font(std::string_view path) noexcept
   }
   else
     fonts.emplace_back(res.value());
+}
+
+void load_fonts(std::span<std::string_view const> paths) noexcept
+{
+  auto results = ui::load_fonts(paths);
+  assert(results.size() == paths.size());
+  for (auto i = 0uz; i < paths.size(); ++i)
+    store_font_result(paths[i], std::move(results[i]));
 }
 
 struct ButtonConfig
@@ -405,12 +423,7 @@ int main()
   load_image(img1);
   load_image(img2);
 
-  load_font("assets/font/NotoSansJP-Regular.ttf");
-  load_font("assets/font/NotoSansJP-Bold.ttf");
-  load_font("assets/font/YuGothR.ttc");
-  // load_font("assets/font/NotoSansSC-Regular.ttf");
-  // load_font("assets/font/SitkaVF-Italic.ttf");
-  load_font("assets/font/SourceCodePro-Regular.ttf");
+  load_fonts(startup_font_paths);
 
   auto playback_btn = PlaybackButton{};
   playback_btn.init("playback button");
@@ -640,8 +653,7 @@ int main()
         else if (cfg.backdrop.style == ui::BackdropStyle::acrylic)
           cfg.backdrop.default_blur();
         blur_img_2 = !blur_img_2;
-        load_font("assets/font/NotoSansJP-Regular.ttf");
-        load_font("assets/font/NotoSansSC-Regular.ttf");
+        load_fonts(fallback_font_paths);
         if (text_cfg.style == ui::FontStyle::regular)
           text_cfg.style = ui::FontStyle::bold;
         else

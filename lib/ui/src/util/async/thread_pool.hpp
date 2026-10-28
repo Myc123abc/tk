@@ -5,34 +5,11 @@
 #include <queue>
 #include <functional>
 #include <mutex>
-#include <algorithm>
 #include <cassert>
 
+#include "task.hpp"
+
 namespace tk {
-
-template <typename T>
-struct Task
-{
-  auto is_completed() const noexcept { return _impl->complete.load(std::memory_order_acquire); }
-  auto take_result() noexcept
-  {
-    assert(is_completed());
-    return std::move(_impl->result);
-  }
-
-private:
-  struct Impl
-  {
-    T                result;
-    std::atomic_bool complete;
-  };
-  std::shared_ptr<Impl> _impl;
-
-  friend class ThreadPool;
-
-  void complete() noexcept { _impl->complete.store(true, std::memory_order_release); }
-  void set_result(T&& v) noexcept { _impl->result = std::move(v); }
-};
 
 class ThreadPool
 {
@@ -47,14 +24,45 @@ public:
 
   void init(int size) noexcept
   {
+    assert(_threads.empty());
+    assert(_tasks.empty());
+    _exit.store(false, std::memory_order_release);
     _threads.resize(size);
   }
 
   void destroy() noexcept
   {
-    _exit.store(true, std::memory_order_release);
+    {
+      auto lock = std::lock_guard{ _mutex };
+      _exit.store(true, std::memory_order_release);
+    }
     _cv.notify_all();
     _threads.clear();
+    assert(_tasks.empty());
+  }
+
+  template <typename Func>
+  [[nodiscard]] auto run(Func func) -> Task<std::invoke_result_t<Func&>>
+  {
+    using Result = std::invoke_result_t<Func&>;
+
+    struct Awaiter
+    {
+      ThreadPool& pool;
+    
+      auto await_ready() const noexcept { return false; }
+      void await_suspend(std::coroutine_handle<> h) noexcept
+      {
+        pool.enqueue([h] { h.resume(); });
+      }
+      void await_resume() const noexcept {}
+    };
+    co_await Awaiter{ *this };
+
+    if constexpr (std::is_void_v<Result>)
+      std::invoke(func);
+    else
+      co_return std::invoke(func);
   }
 
 private:
@@ -76,7 +84,7 @@ private:
     void main() noexcept
     {
       auto& pool = instance();
-      while (!pool._exit.load(std::memory_order_acquire))
+      while (true)
       {
         auto task = std::move_only_function<void()>{};
 
@@ -87,7 +95,11 @@ private:
                   !pool._tasks.empty();
           });
 
-          if (pool._exit.load(std::memory_order_acquire)) return;
+          if (pool._tasks.empty())
+          {
+            assert(pool._exit.load(std::memory_order_acquire));
+            return;
+          }
 
           task = std::move(pool._tasks.front());
           pool._tasks.pop();
@@ -101,40 +113,19 @@ private:
     std::thread _thread;
   };
 
-private:
   void enqueue(std::move_only_function<void()> f) noexcept
   {
-    assert(!_exit.load(std::memory_order_acquire));
     {
-      std::lock_guard lock(_mutex);
+      auto lock = std::lock_guard{ _mutex };
+      err_if(_exit.load(std::memory_order_acquire),
+        "failed to enqueue task because the thread pool is stopped");
       _tasks.emplace(std::move(f));
     }
     _cv.notify_one();
   }
 
-public:
-  template <typename Func>
-  auto submit(Func&& f) noexcept
-  {
-    using T = std::invoke_result_t<Func>;
- 
-    auto task = Task<T>{};
-    task._impl = std::make_shared<typename Task<T>::Impl>();
-
-    enqueue([task, f = std::forward<Func>(f)] mutable
-    {
-      if constexpr (std::is_void_v<T>)
-        f();
-      else
-        task.set_result(f());
-      task.complete();
-    });
-
-    return task;
-  }
-
 private:
-  std::atomic_bool                            _exit;
+  std::atomic_bool                            _exit{ true };
   std::vector<Thread>                         _threads;
   std::queue<std::move_only_function<void()>> _tasks;
   std::mutex                                  _mutex;

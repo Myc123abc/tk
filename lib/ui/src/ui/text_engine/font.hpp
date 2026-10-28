@@ -43,8 +43,9 @@ class Font
 {
   friend class TextEngine;
 public:
-  auto init(std::string_view path) noexcept -> uint8;
-  void destroy() const noexcept;
+  ~Font() noexcept;
+
+  auto init(std::string const& path) noexcept -> uint8;
 
   auto name()  const noexcept { return _name;  }
   auto style() const noexcept { return _style; }
@@ -64,6 +65,7 @@ private:
   std::string  _name;
   std::string  _family;
   FontStyle    _style;
+  FT_Library   _ft{};
   FT_Face      _face{};
   hb_font_t*   _hb_font{};
   float        _ascender{};

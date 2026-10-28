@@ -2,7 +2,7 @@
 
 #include "../../util/object_pool.hpp"
 #include "../../renderer/resource/image_manager.hpp"
-#include "../../util/thread_pool.hpp"
+#include "../../util/async/task.hpp"
 #include "font.hpp"
 #include "glyph.hpp"
 #include "packer.hpp"
@@ -24,6 +24,7 @@ public:
   void destroy() noexcept;
 
   auto load_font(std::string_view path) noexcept -> std::expected<FontInfo, FontLoadErrorType>;
+  auto load_fonts(std::span<std::string_view const> paths) noexcept -> std::vector<std::expected<FontInfo, FontLoadErrorType>>;
 
   struct ParseResult
   {
@@ -57,6 +58,7 @@ public:
   void postprocess() noexcept;
 
 private:
+  auto install_font(std::unique_ptr<Font> font) noexcept -> FontInfo;
   auto split_text(std::string_view text, FontStyleKey key) noexcept -> std::vector<std::pair<std::string_view, Font*>>;
   auto find_font(uint unicode, FontStyleKey key) noexcept -> Font*;
   auto find_notdef_glyph_font() noexcept -> Font*;
@@ -80,7 +82,6 @@ private:
   using FallbackFontIdxMap  = FontStyleMap<std::unordered_map<uint, uint>>;
   using TextIDTextHashPairs = std::vector<std::pair<uint64, uint64>>;
 
-  FT_Library                                 _ft{};
   hb_buffer_t*                               _hb_buf{};
   std::vector<ImageHandle>                   _glyph_atlas;
   Font*                                      _notdef_font{};

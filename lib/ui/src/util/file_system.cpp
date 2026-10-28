@@ -1,5 +1,5 @@
 #include "file_system.hpp"
-#include "iocp.hpp"
+#include "async/iocp.hpp"
 
 #include "tk/error_handling.hpp"
 
@@ -31,21 +31,26 @@ auto FileSystem::create_directories(std::string_view path) noexcept -> bool
   return created;
 }
 
-auto FileSystem::open(StringLiteral path) noexcept -> File*
+auto FileSystem::open(StringLiteral path) noexcept -> Task<File*>
 {
   auto [it, inserted] = _files.try_emplace(path.id());
-  if (!inserted) return &it->second;
   auto& file = it->second;
 
-  // create directories if unexists
-  auto const parent = fs::path(path.view()).parent_path();
-  if (!parent.empty()) create_directories(parent.string());
+  if (inserted || file._handle == INVALID_HANDLE_VALUE)
+  {
+    if (!inserted) file.destroy();
 
-  // create file
-  file.init(path.view(), File::Access::read | File::Access::write, File::Share::read, File::Dispostion::open_always);
-  file._last_write_time = fs::last_write_time(path.view());
+    // create directories if unexists
+    auto const parent = fs::path(path.view()).parent_path();
+    if (!parent.empty()) create_directories(parent.string());
 
-  return &file;
+    // create file
+    file.init(path.view(), File::Access::read | File::Access::write, File::Share::read, File::Dispostion::open_always);
+    file._last_write_time = fs::last_write_time(path.view());
+  }
+
+  co_await g_iocp.completion(file._handle);
+  co_return &file;
 }
 
 auto FileSystem::load(StringLiteral path) noexcept -> std::expected<File const*, FileLoadErrorType>

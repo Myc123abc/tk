@@ -3,6 +3,7 @@
 #include "../resource/render_resource.hpp"
 #include "tk/error_handling.hpp"
 #include "../resource/shader_type.hpp"
+#include "../../util/async/thread_pool.hpp"
 
 namespace tk::renderer {
 
@@ -19,7 +20,7 @@ void PipelineSystem::create_graphics_pipeline(GraphicsPipelineInfo const& info) 
   graphics.ps         = info.ps;
   graphics.rtv_format = info.rt_fmt;
   graphics.blend      = info.blend;
-  _pipes.emplace(info.type, create_info);
+  _pipeline_create_infos.emplace_back(info.type, std::move(create_info));
 }
 
 void PipelineSystem::create_compute_pipeline(ComputePipelineInfo const& info) noexcept
@@ -32,13 +33,11 @@ void PipelineSystem::create_compute_pipeline(ComputePipelineInfo const& info) no
   create_info.info = PipelineCreateInfo::Compute{};
   auto& compute = create_info.info.get<PipelineCreateInfo::Compute>();
   compute.cs = info.cs;
-  _pipes.emplace(info.type, create_info);
+  _pipeline_create_infos.emplace_back(info.type, std::move(create_info));
 }
   
 void PipelineSystem::init() noexcept
 {
-  g_compiler.init();
-
   using enum DescriptorInfo::Type;
 
   auto ui_res = generate_root_signature(
@@ -149,6 +148,38 @@ void PipelineSystem::init() noexcept
     .includes  = {},
     .root_sign = blur_res,
   }});
+
+  compile_pipelines();
+}
+
+void PipelineSystem::compile_pipelines() noexcept
+{
+  auto tasks = std::vector<Task<Compiler::CompileResult>>{};
+  tasks.reserve(_pipeline_create_infos.size());
+
+  for (auto const& [type, info] : _pipeline_create_infos)
+  {
+    tasks.emplace_back(g_thread_pool.run([info]
+    {
+      if (info.info.is<PipelineCreateInfo::Graphics>())
+      {
+        auto const& graphics = info.info.get<PipelineCreateInfo::Graphics>();
+        return g_compiler.compile(info.shader, graphics.vs, graphics.ps, info.includes, info.root_signature_result, info.volatile_descs);
+      }
+
+      auto const& compute = info.info.get<PipelineCreateInfo::Compute>();
+      return g_compiler.compile(info.shader, compute.cs, info.includes, info.root_signature_result, info.volatile_descs);
+    }));
+  }
+
+  for (auto i = 0uz; i < tasks.size(); ++i)
+  {
+    auto compile_result = tasks[i].take_result();
+    auto& [type, info] = _pipeline_create_infos[i];
+    auto [_, inserted] = _pipes.emplace(type, Pipeline{ info, std::move(compile_result) });
+    assert(inserted);
+  }
+  _pipeline_create_infos.clear();
 }
 
 auto PipelineSystem::find_root_param(std::span<CD3DX12_ROOT_PARAMETER1> params) const noexcept -> ID3D12RootSignature*
@@ -168,10 +199,9 @@ auto PipelineSystem::find_root_param(std::span<CD3DX12_ROOT_PARAMETER1> params) 
   return it->first.Get();
 }
 
-void PipelineSystem::Pipeline::init_graphics(PipelineCreateInfo const& info) noexcept
+void PipelineSystem::Pipeline::init_graphics(PipelineCreateInfo const& info, Compiler::CompileResult&& compile_result) noexcept
 {
   auto const& graphics = info.info.get<PipelineCreateInfo::Graphics>();
-  auto compile_result = g_compiler.compile(info.shader, graphics.vs, graphics.ps, info.includes, info.root_signature_result, info.volatile_descs);
   
   if (auto res = g_pipe_sys.find_root_param(compile_result.root_params))
     root_signature = res;
@@ -249,10 +279,8 @@ void PipelineSystem::Pipeline::init_graphics(PipelineCreateInfo const& info) noe
           "failed to create pipeline state");
 }
 
-void PipelineSystem::Pipeline::init_compute(PipelineCreateInfo const& info) noexcept
+void PipelineSystem::Pipeline::init_compute(PipelineCreateInfo const& info, Compiler::CompileResult&& compile_result) noexcept
 {
-  auto const& compute = info.info.get<PipelineCreateInfo::Compute>();
-  auto compile_result = g_compiler.compile(info.shader, compute.cs, info.includes, info.root_signature_result, info.volatile_descs);
   if (auto res = g_pipe_sys.find_root_param(compile_result.root_params))
     root_signature = res;
   else

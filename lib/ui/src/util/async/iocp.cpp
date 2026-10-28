@@ -1,6 +1,6 @@
 #include "iocp.hpp"
 #include "tk/error_handling.hpp"
-#include "unicode.hpp"
+#include "../unicode.hpp"
 
 #include <array>
 
@@ -87,9 +87,11 @@ void IOCP::process(OVERLAPPED_ENTRY const& entry) noexcept
   record->offset += transferred;
   if (record->offset == record->size)
   {
+    auto const continuation = record->continuation;
     _records.erase(record->file);
     lock.unlock();
     _completed.notify_all();
+    if (continuation) continuation.resume();
   }
   else
     submit(*record);
@@ -161,6 +163,25 @@ void IOCP::write(HANDLE handle, std::span<uint8 const> data, uint64 offset) noex
   record.write_buf.assign(data.begin(), data.end());
 
   submit(record);
+}
+
+auto IOCP::Awaiter::await_ready() const noexcept -> bool
+{
+  assert(handle != nullptr && handle != INVALID_HANDLE_VALUE);
+  auto lock = std::lock_guard{ iocp._mutex };
+  return !iocp._records.contains(handle);
+}
+
+auto IOCP::Awaiter::await_suspend(std::coroutine_handle<> continuation) const noexcept -> bool
+{
+  assert(handle != nullptr && handle != INVALID_HANDLE_VALUE);
+  auto lock = std::lock_guard{ iocp._mutex };
+  auto const it = iocp._records.find(handle);
+  if (it == iocp._records.end()) return false;
+
+  assert(!it->second.continuation);
+  it->second.continuation = continuation;
+  return true;
 }
 
 auto IOCP::is_complete(HANDLE handle) noexcept -> bool

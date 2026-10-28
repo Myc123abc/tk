@@ -13,6 +13,8 @@
 #include <string>
 #include <optional>
 #include <expected>
+#include <span>
+#include <vector>
 
 namespace tk::ui {
 
@@ -176,6 +178,13 @@ using FontLoadErrorType = FontLoadError::Type;
  * @return font info
  */
 auto load_font(std::string_view path) noexcept -> std::expected<FontInfo, FontLoadErrorType>;
+
+/**
+ * load fonts in parallel
+ * @param paths font paths
+ * @return font info or error for each input path, in input order
+ */
+auto load_fonts(std::span<std::string_view const> paths) noexcept -> std::vector<std::expected<FontInfo, FontLoadErrorType>>;
 
 struct TextConfig
 {

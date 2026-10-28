@@ -159,6 +159,7 @@ private:
   void create_compute_pipeline(ComputePipelineInfo const& info) noexcept;
   void create_graphics_pipelines(std::initializer_list<GraphicsPipelineInfo> infos) noexcept { for (auto const& info : infos) create_graphics_pipeline(info); }
   void create_compute_pipelines(std::initializer_list<ComputePipelineInfo> infos) noexcept { for (auto const& info : infos) create_compute_pipeline(info); }
+  void compile_pipelines() noexcept;
 
   auto find_root_param(std::span<CD3DX12_ROOT_PARAMETER1> params) const noexcept -> ID3D12RootSignature*;
 
@@ -170,23 +171,24 @@ private:
 
     Pipeline() = default;
 
-    Pipeline(PipelineCreateInfo const& info) noexcept
+    Pipeline(PipelineCreateInfo const& info, Compiler::CompileResult&& compile_result) noexcept
     {
       info.info.visit(
-        [&](PipelineCreateInfo::Graphics) { init_graphics(info); },
-        [&](PipelineCreateInfo::Compute) { init_compute(info); },
+        [&](PipelineCreateInfo::Graphics) { init_graphics(info, std::move(compile_result)); },
+        [&](PipelineCreateInfo::Compute) { init_compute(info, std::move(compile_result)); },
         VariantUnreachableCase
       );
     }
 
-    void init_graphics(PipelineCreateInfo const& info) noexcept;
-    void init_compute(PipelineCreateInfo const& info) noexcept;
+    void init_graphics(PipelineCreateInfo const& info, Compiler::CompileResult&& compile_result) noexcept;
+    void init_compute(PipelineCreateInfo const& info, Compiler::CompileResult&& compile_result) noexcept;
   
     auto root_param_idx(std::string_view name) noexcept { return _root_param_idxs[name.data()]; }
   private:
     std::unordered_map<std::string, uint> _root_param_idxs;
   };
   std::unordered_map<PipelineType, Pipeline> _pipes;
+  std::vector<std::pair<PipelineType, PipelineCreateInfo>> _pipeline_create_infos;
   std::vector<std::pair<Microsoft::WRL::ComPtr<ID3D12RootSignature>, std::vector<CD3DX12_ROOT_PARAMETER1>>> _root_signatures;
 )
 

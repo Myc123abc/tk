@@ -1,7 +1,7 @@
 #include "font.hpp"
 #include "glyph.hpp"
 #include "../config.hpp"
-#include "text_engine.hpp"
+#include "tk/error_handling.hpp"
 
 #include FT_OUTLINE_H
 #include <hb-ft.h>
@@ -157,11 +157,13 @@ auto generate_msdf(msdfgen::Shape& shape) noexcept -> std::pair<msdfgen::Bitmap<
 
 namespace tk::ui {
 
-auto Font::init(std::string_view path) noexcept -> uint8
+auto Font::init(std::string const& path) noexcept -> uint8
 {
   _name = path;
 
-  auto res = FT_New_Face(g_text_engine._ft, path.data(), 0, &_face);
+  auto res = FT_Init_FreeType(&_ft);
+  if (res) return res;
+  res = FT_New_Face(_ft, path.data(), 0, &_face);
   if (res) return res;
   res = FT_Set_Pixel_Sizes(_face, 0, FT_Pixel_Size);
   if (res) return res;
@@ -194,10 +196,11 @@ auto Font::init(std::string_view path) noexcept -> uint8
   return res;
 }
 
-void Font::destroy() const noexcept
+Font::~Font() noexcept
 {
-  hb_font_destroy(_hb_font);
-  check(FT_Done_Face(_face), "failed to destroy font");
+  if (_hb_font) hb_font_destroy(_hb_font);
+  if (_face)    check(FT_Done_Face(_face), "failed to destroy font");
+  if (_ft)      check(FT_Done_FreeType(_ft), "failed to destroy freetype");
 }
 
 auto Font::generate_msdf_bitmap(uint glyph_idx, GlyphKey const& key) const noexcept -> MSDFBitmap

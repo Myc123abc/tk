@@ -1,11 +1,12 @@
 #pragma once
 
-#include "singleton.hpp"
+#include "../singleton.hpp"
 #include "tk/base.hpp"
 
 #include <Windows.h>
 
 #include <condition_variable>
+#include <coroutine>
 #include <mutex>
 #include <span>
 #include <thread>
@@ -22,6 +23,18 @@ public:
   void associate(HANDLE handle) noexcept;
   void read(HANDLE handle, std::span<uint8> data) noexcept;
   void write(HANDLE handle, std::span<uint8 const> data, uint64 offset = 0) noexcept;
+
+  struct Awaiter
+  {
+    IOCP&  iocp;
+    HANDLE handle;
+
+    auto await_ready() const noexcept -> bool;
+    auto await_suspend(std::coroutine_handle<> continuation) const noexcept -> bool;
+    void await_resume() const noexcept {}
+  };
+
+  auto completion(HANDLE handle) noexcept { return Awaiter{ *this, handle }; }
 
   auto is_complete(HANDLE handle) noexcept -> bool;
   void wait(HANDLE handle) noexcept;
@@ -42,15 +55,16 @@ private:
 
   struct Record
   {
-    OVERLAPPED         overlapped{};
-    HANDLE             file{};
-    std::span<uint8>   read_buf;
-    std::vector<uint8> write_buf;
-    uint64             file_offset{};
-    uint64             offset{};
-    uint64             size{};
-    DWORD              pending_size{};
-    Operation          operation{};
+    OVERLAPPED              overlapped{};
+    HANDLE                  file{};
+    std::span<uint8>        read_buf;
+    std::vector<uint8>      write_buf;
+    uint64                  file_offset{};
+    uint64                  offset{};
+    uint64                  size{};
+    DWORD                   pending_size{};
+    Operation               operation{};
+    std::coroutine_handle<> continuation{};
   };
 
   static constexpr auto Chunk_Size = DWORD{ 64 * 1024 * 1024 };

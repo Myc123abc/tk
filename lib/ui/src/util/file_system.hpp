@@ -5,6 +5,7 @@
 #include "tk/flag.hpp"
 #include "tk/variant.hpp"
 #include "tk/base.hpp"
+#include "async/task.hpp"
 
 #include <unordered_map>
 #include <expected>
@@ -91,7 +92,7 @@ public:
   static auto exists(std::string_view path) noexcept -> bool;
   static auto create_directories(std::string_view path) noexcept -> bool;
 
-  auto open(StringLiteral path) noexcept -> File*;
+  auto open(StringLiteral path) noexcept -> Task<File*>;
   auto load(StringLiteral path) noexcept -> std::expected<File const*, FileLoadErrorType>;
   void wait(StringLiteral path) noexcept;
 

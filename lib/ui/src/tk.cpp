@@ -2,9 +2,9 @@
 #include "renderer/renderer.hpp"
 #include "renderer/window/window_manager.hpp"
 #include "ui/ui_context.hpp"
-#include "util/thread_pool.hpp"
+#include "util/async/thread_pool.hpp"
 #include "util/file_system.hpp"
-#include "util/iocp.hpp"
+#include "util/async/iocp.hpp"
 #include "ui/text_engine/glyph_cacher.hpp"
 
 using namespace tk::renderer;
@@ -15,12 +15,13 @@ namespace tk {
 void init() noexcept
 {
   g_iocp.init();
-  g_thread_pool.init(std::thread::hardware_concurrency() - 2);
-  g_glyph_cacher.preload();
+  // reserve one thread for main, and one thread for audio
+  g_thread_pool.init(std::max(1u, std::thread::hardware_concurrency() - 2));
+  auto glyph_preload_task = g_glyph_cacher.preload();
   g_renderer.init();
   g_wnd_mgr.init();
   g_ui_ctx.init();
-  g_glyph_cacher.wait_preload_complete();
+  glyph_preload_task.wait();
 }
 
 void destroy() noexcept

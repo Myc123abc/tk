@@ -1,5 +1,6 @@
 #include "glyph_cacher.hpp"
 #include "../../util/file_system.hpp"
+#include "../../util/async/thread_pool.hpp"
 
 #include <utility>
 
@@ -79,19 +80,15 @@ auto GlyphCacher::serialize() const noexcept -> std::vector<uint8>
   return data;
 }
 
-void GlyphCacher::preload() noexcept
+auto GlyphCacher::preload() noexcept -> Task<>
 {
   assert(!_file);
-  _file = g_file_sys.open(Cache_Path);
-}
-
-void GlyphCacher::wait_preload_complete() noexcept
-{
-  _file->wait();
-
-  // TODO: move to thread process
-  if (_file->size())
-    deserialize({ _file->data(), static_cast<size_t>(_file->size()) });
+  _file = co_await g_file_sys.open(Cache_Path);
+  co_await g_thread_pool.run([this]
+  {
+    if (_file->size())
+      deserialize({ _file->data(), static_cast<size_t>(_file->size()) });
+  });
 }
 
 void GlyphCacher::deserialize(std::span<uint8 const> data) noexcept

@@ -48,8 +48,6 @@ auto generate_root_signature(std::vector<DescriptorInfo> const& desc_infos, bool
 
 Singleton(Compiler, g_compiler,
 public:
-  void init() noexcept;
-
   struct CompileResult
   {
     D3D12_SHADER_BYTECODE                       vs;
@@ -63,7 +61,7 @@ public:
   private:
     friend class Compiler;
 
-    auto get_shader_reflection(IDxcResult* result) noexcept -> Microsoft::WRL::ComPtr<ID3D12ShaderReflection>;
+    auto get_shader_reflection(IDxcUtils* utils, IDxcResult* result) noexcept -> Microsoft::WRL::ComPtr<ID3D12ShaderReflection>;
 
     void get_vertex_input_layout(ID3D12ShaderReflection* shader_reflection) noexcept;
 
@@ -117,12 +115,15 @@ public:
     std::unordered_set<std::string_view> const& volatile_descs = {}) noexcept -> CompileResult;
 
 private:
-  auto compile(std::string_view shader_path, std::vector<std::string_view> const& includes, std::wstring_view profile, std::string_view entry_point) noexcept -> std::pair<Microsoft::WRL::ComPtr<IDxcResult>, Microsoft::WRL::ComPtr<IDxcBlob>>;
-
-private:
-  Microsoft::WRL::ComPtr<IDxcCompiler3>      _compiler;
-  Microsoft::WRL::ComPtr<IDxcUtils>          _utils;
-  Microsoft::WRL::ComPtr<IDxcIncludeHandler> _include_handler;
+  auto compile(
+    IDxcCompiler3*                       compiler,
+    IDxcUtils*                           utils,
+    IDxcIncludeHandler*                  include_handler,
+    std::string_view                     shader_path,
+    std::vector<std::string_view> const& includes,
+    std::wstring_view                    profile,
+    std::string_view                     entry_point) noexcept
+    -> std::pair<Microsoft::WRL::ComPtr<IDxcResult>, Microsoft::WRL::ComPtr<IDxcBlob>>;
 )
 
 }

@@ -13,6 +13,23 @@ using namespace Microsoft::WRL;
 namespace
 {
 
+struct DxcContext
+{
+  DxcContext() noexcept
+  {
+    err_if(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler)),
+      "failed to create dxc compiler");
+    err_if(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils)),
+      "failed to create dxc utils");
+    err_if(utils->CreateDefaultIncludeHandler(&include_handler),
+      "failed to create default include handler in dxc");
+  }
+
+  ComPtr<IDxcCompiler3>      compiler;
+  ComPtr<IDxcUtils>          utils;
+  ComPtr<IDxcIncludeHandler> include_handler;
+};
+
 auto read_file(std::string_view path) noexcept -> std::string
 {
   FILE* file{};
@@ -133,16 +150,6 @@ auto create_root_signature(std::span<CD3DX12_ROOT_PARAMETER1> root_params, bool 
 
 namespace tk::renderer {
 
-void Compiler::init() noexcept
-{
-  err_if(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&_compiler)),
-          "failed to create dxc compiler");
-  err_if(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&_utils)),
-          "failed to create dxc utils");
-  err_if(_utils->CreateDefaultIncludeHandler(&_include_handler),
-          "failed to create default include handler in dxc");
-}
-
 auto generate_root_signature(std::vector<DescriptorInfo> const& desc_infos, bool is_graphics, bool use_sampler) noexcept -> RootSignatureResult
 {
   auto res        = RootSignatureResult{};
@@ -209,8 +216,14 @@ auto generate_root_signature(std::vector<DescriptorInfo> const& desc_infos, bool
 }
 
 
-auto Compiler::compile(std::string_view shader_path, std::vector<std::string_view> const& includes,
-  std::wstring_view profile, std::string_view entry_point) noexcept
+auto Compiler::compile(
+  IDxcCompiler3*                       compiler,
+  IDxcUtils*                           utils,
+  IDxcIncludeHandler*                  include_handler,
+  std::string_view                     shader_path,
+  std::vector<std::string_view> const& includes,
+  std::wstring_view                    profile,
+  std::string_view                     entry_point) noexcept
 -> std::pair<Microsoft::WRL::ComPtr<IDxcResult>, Microsoft::WRL::ComPtr<IDxcBlob>>
 {
   auto buffer = DxcBuffer{};
@@ -242,11 +255,11 @@ auto Compiler::compile(std::string_view shader_path, std::vector<std::string_vie
   }
 
   auto dxc_args = ComPtr<IDxcCompilerArgs>{};
-  err_if(_utils->BuildArguments(nullptr, to_wstring(entry_point).data(), profile.data(), args.data(), args.size(), nullptr, 0, dxc_args.GetAddressOf()),
+    err_if(utils->BuildArguments(nullptr, to_wstring(entry_point).data(), profile.data(), args.data(), args.size(), nullptr, 0, dxc_args.GetAddressOf()),
           "failed to create dxc args");
 
   auto result = ComPtr<IDxcResult>{};
-  err_if(_compiler->Compile(&buffer, dxc_args->GetArguments(), dxc_args->GetCount(), _include_handler.Get(), IID_PPV_ARGS(&result)),
+    err_if(compiler->Compile(&buffer, dxc_args->GetArguments(), dxc_args->GetCount(), include_handler, IID_PPV_ARGS(&result)),
           "failed to compile {} of {}", entry_point, shader_path);
 
   auto hr = HRESULT{};
@@ -272,9 +285,11 @@ auto Compiler::compile(
   std::optional<RootSignatureResult>          res,
   std::unordered_set<std::string_view> const& volatile_descs) noexcept -> CompileResult
 {
+  auto dxc = DxcContext{};
+
   // compile shaders
-  auto [vs_res, vs_cso] = compile(shader, includes, L"vs_6_5", vertex_shader_entry_point);
-  auto [ps_res, ps_cso] = compile(shader, includes, L"ps_6_5", pixel_shader_entry_point);
+  auto [vs_res, vs_cso] = compile(dxc.compiler.Get(), dxc.utils.Get(), dxc.include_handler.Get(), shader, includes, L"vs_6_5", vertex_shader_entry_point);
+  auto [ps_res, ps_cso] = compile(dxc.compiler.Get(), dxc.utils.Get(), dxc.include_handler.Get(), shader, includes, L"ps_6_5", pixel_shader_entry_point);
 
   // get reflection
   auto compile_result = CompileResult{};
@@ -282,7 +297,7 @@ auto Compiler::compile(
   compile_result._ps_cso = ps_cso;
   compile_result.vs      = { vs_cso->GetBufferPointer(), vs_cso->GetBufferSize() };
   compile_result.ps      = { ps_cso->GetBufferPointer(), ps_cso->GetBufferSize() };
-  auto vs_reflection = compile_result.get_shader_reflection(vs_res.Get());
+  auto vs_reflection = compile_result.get_shader_reflection(dxc.utils.Get(), vs_res.Get());
 
   // get vertex input layout
   compile_result.get_vertex_input_layout(vs_reflection.Get());
@@ -290,7 +305,7 @@ auto Compiler::compile(
   if (!res)
   {
     compile_result.get_root_parameters(vs_reflection.Get(), false, volatile_descs, true);
-    auto ps_reflection = compile_result.get_shader_reflection(ps_res.Get());
+    auto ps_reflection = compile_result.get_shader_reflection(dxc.utils.Get(), ps_res.Get());
     compile_result.get_root_parameters(ps_reflection.Get(), false, volatile_descs, false);
     compile_result.root_signature = create_root_signature(compile_result.root_params, compile_result._has_sampler, true);
   }
@@ -311,7 +326,8 @@ auto Compiler::compile(
   std::optional<RootSignatureResult>          res,
   std::unordered_set<std::string_view> const& volatile_descs) noexcept -> CompileResult
 {
-  auto [comp_res, cso] = compile(shader, includes, L"cs_6_5", compute_shader_entry_point);
+  auto dxc = DxcContext{};
+  auto [comp_res, cso] = compile(dxc.compiler.Get(), dxc.utils.Get(), dxc.include_handler.Get(), shader, includes, L"cs_6_5", compute_shader_entry_point);
 
   auto compile_result = CompileResult{};
   compile_result._cs_cso = cso;
@@ -319,7 +335,7 @@ auto Compiler::compile(
 
   if (!res)
   {
-    auto reflection = compile_result.get_shader_reflection(comp_res.Get());
+    auto reflection = compile_result.get_shader_reflection(dxc.utils.Get(), comp_res.Get());
     compile_result.get_root_parameters(reflection.Get(), true, volatile_descs, false);
     compile_result.root_signature = create_root_signature(compile_result.root_params, compile_result._has_sampler, false);
   }
@@ -333,7 +349,7 @@ auto Compiler::compile(
   return compile_result;
 }
 
-auto Compiler::CompileResult::get_shader_reflection(IDxcResult* result) noexcept -> Microsoft::WRL::ComPtr<ID3D12ShaderReflection>
+auto Compiler::CompileResult::get_shader_reflection(IDxcUtils* utils, IDxcResult* result) noexcept -> Microsoft::WRL::ComPtr<ID3D12ShaderReflection>
 {
   // get reflection interface
   auto reflection = ComPtr<IDxcBlob>{};
@@ -345,7 +361,7 @@ auto Compiler::CompileResult::get_shader_reflection(IDxcResult* result) noexcept
 
   // get shader reflection information
   auto shader_reflection = ComPtr<ID3D12ShaderReflection>{};
-  err_if(g_compiler._utils->CreateReflection(&buffer, IID_PPV_ARGS(&shader_reflection)), "failed to create shader reflection");
+  err_if(utils->CreateReflection(&buffer, IID_PPV_ARGS(&shader_reflection)), "failed to create shader reflection");
 
   return shader_reflection;
 }

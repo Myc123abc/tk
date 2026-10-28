@@ -3,6 +3,7 @@
 
 #include "image_manager.hpp"
 #include "../../util/file_system.hpp"
+#include "../../util/async/thread_pool.hpp"
 #include "../engine/copy_engine.hpp"
 #include "../engine/compute_engine.hpp"
 #include "../renderer.hpp"
@@ -82,7 +83,7 @@ auto ImageManager::try_load(std::string_view path, uint width, uint height) noex
         [](FileLoadError::loading) -> ImageLoadErrorType { return ImageLoadError::loading{}; }
       ));
 
-    _load_tasks.emplace(path, g_thread_pool.submit([file = file.value(), width, height]
+    _load_tasks.emplace(path, g_thread_pool.run([file = file.value(), width, height]
     {
       int w, h; 
       std::string msg;

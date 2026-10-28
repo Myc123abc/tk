@@ -1,6 +1,7 @@
 #pragma once
 
 #include "text_engine.hpp"
+#include "../../util/async/task.hpp"
 
 namespace tk { struct File; }
 
@@ -37,8 +38,7 @@ public:
   void add(PendingCopyGlyphsInfoType& info) noexcept;
   void destroy() noexcept;
 
-  void preload() noexcept;
-  void wait_preload_complete() noexcept;
+  auto preload() noexcept -> Task<>;
 
   auto& preload_glyphs() noexcept { return _preload_glyphs; }
 

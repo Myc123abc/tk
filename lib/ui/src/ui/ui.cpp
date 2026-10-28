@@ -116,6 +116,11 @@ auto load_font(std::string_view path) noexcept -> std::expected<FontInfo, FontLo
   return g_text_engine.load_font(path);
 }
 
+auto load_fonts(std::span<std::string_view const> paths) noexcept -> std::vector<std::expected<FontInfo, FontLoadErrorType>>
+{
+  return g_text_engine.load_fonts(paths);
+}
+
 auto text(StringLiteral text, float2 pos, float size, Color color, TextConfig const& cfg) noexcept -> TextResult
 {
   if (text.empty()) return {};

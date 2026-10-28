@@ -1,9 +1,10 @@
 #include "text_engine.hpp"
 #include "tk/error_handling.hpp"
-#include "../../renderer/resource/image_manager.hpp"
-#include "../../util/file_system.hpp"
-#include "../../renderer/engine/copy_engine.hpp"
 #include "glyph_cacher.hpp"
+#include "../../renderer/resource/image_manager.hpp"
+#include "../../renderer/engine/copy_engine.hpp"
+#include "../../util/file_system.hpp"
+#include "../../util/async/thread_pool.hpp"
 
 #include "../../util/unicode.hpp"
 
@@ -20,7 +21,6 @@ void TextEngine::init() noexcept
 {
   _packer.reset({ Glyph_Atlas_Width, Glyph_Atlas_Height });
 
-  check(FT_Init_FreeType(&_ft), "failed to initialize freetype");
   _hb_buf = hb_buffer_create();
 
   // create the first glyph atlas
@@ -30,7 +30,7 @@ void TextEngine::init() noexcept
 void TextEngine::destroy() noexcept
 {
   for (auto handle : _glyph_atlas) g_img_mgr.destroy(handle);
-  for (auto const& font : _fonts) font->destroy();
+  _fonts.clear();
   for (auto& h : _cached_text_parse_results | std::views::values)
   {
     assert(h.valid());
@@ -38,7 +38,6 @@ void TextEngine::destroy() noexcept
   }
 
   hb_buffer_destroy(_hb_buf);
-  check(FT_Done_FreeType(_ft), "failed to destroy freetype");
 }
 
 auto TextEngine::load_font(std::string_view path) noexcept -> std::expected<FontInfo, FontLoadErrorType>
@@ -52,9 +51,79 @@ auto TextEngine::load_font(std::string_view path) noexcept -> std::expected<Font
   if (!g_file_sys.exists(path)) return std::unexpected(FontLoadError::unexist{});
 
   // create font
+  auto owned_path = std::string{ path };
   auto font = std::make_unique<Font>();
-  if (auto res = font->init(path); res) return std::unexpected(FontLoadError::freetype_err{ res });
+  if (auto res = font->init(owned_path); res) return std::unexpected(FontLoadError::freetype_err{ res });
 
+  return install_font(std::move(font));
+}
+
+auto TextEngine::load_fonts(std::span<std::string_view const> paths) noexcept -> std::vector<std::expected<FontInfo, FontLoadErrorType>>
+{
+  using Result     = std::expected<FontInfo, FontLoadErrorType>;
+  using TaskResult = std::pair<std::unique_ptr<Font>, uint8>;
+
+  auto results      = std::vector<std::optional<Result>>(paths.size());
+  auto task_indices = std::vector<std::optional<size_t>>(paths.size());
+  auto tasks        = std::vector<Task<TaskResult>>{};
+  auto pending      = std::unordered_map<std::string, size_t>{};
+  tasks.reserve(paths.size());
+  pending.reserve(paths.size());
+
+  for (auto i = 0uz; i < paths.size(); ++i)
+  {
+    auto const path = paths[i];
+    if (auto it = std::ranges::find_if(_fonts, [&](auto const& font) { return font->name() == path; });
+        it != _fonts.end())
+    {
+      results[i].emplace(FontInfo{ it->get()->_family, it->get()->_style });
+      continue;
+    }
+
+    if (!g_file_sys.exists(path))
+    {
+      results[i].emplace(std::unexpected(FontLoadErrorType{ FontLoadError::unexist{} }));
+      continue;
+    }
+
+    auto owned_path = std::string{ path };
+    auto [it, inserted] = pending.try_emplace(owned_path, tasks.size());
+    task_indices[i] = it->second;
+    if (!inserted) continue;
+
+    tasks.emplace_back(g_thread_pool.run([path = std::move(owned_path)]() mutable
+    {
+      auto font = std::make_unique<Font>();
+      auto const error = font->init(path);
+      return TaskResult{ std::move(font), error };
+    }));
+  }
+
+  auto task_results = std::vector<Result>{};
+  task_results.reserve(tasks.size());
+  for (auto& task : tasks)
+  {
+    auto [font, error] = task.take_result();
+    if (error)
+      task_results.emplace_back(std::unexpected(FontLoadErrorType{ FontLoadError::freetype_err{ error } }));
+    else
+      task_results.emplace_back(install_font(std::move(font)));
+  }
+
+  auto ordered_results = std::vector<Result>{};
+  ordered_results.reserve(paths.size());
+  for (auto i = 0uz; i < paths.size(); ++i)
+  {
+    if (results[i])
+      ordered_results.emplace_back(std::move(*results[i]));
+    else
+      ordered_results.emplace_back(task_results[*task_indices[i]]);
+  }
+  return ordered_results;
+}
+
+auto TextEngine::install_font(std::unique_ptr<Font> font) noexcept -> FontInfo
+{
   // create font info
   auto info = FontInfo{ font->_family, font->_style };
 
@@ -427,7 +496,7 @@ void TextEngine::submit_bitmap_generation_tasks() noexcept
 
   auto generate_bitmap_task = [this]<std::ranges::sized_range R>(R&& glyphs)
   {
-    _generate_bitmap_tasks.emplace_back(g_thread_pool.submit([glyphs = std::move(glyphs)]
+    _generate_bitmap_tasks.emplace_back(g_thread_pool.run([glyphs = std::move(glyphs)]
     {
       auto bitmaps = std::vector<MSDFBitmap>{};
       bitmaps.reserve(std::ranges::size(glyphs));
@@ -645,8 +714,6 @@ auto TextEngine::get_bounding_rect(StringLiteral text, std::string_view family, 
     auto rect = Rect{};
     auto pos  = float2{};
     auto ascender = res.is_vertical ? 0.f : res.ascender;
-    // TODO: maybe MSVC impled bug
-    // for (auto [i, key] : res.glyph_info_keys | std::views::enumerate)
     for (auto i = 0; i < res.glyph_info_keys.size(); ++i)
     {
       auto const& info = get_glyph_info(res.glyph_info_keys[i]);
