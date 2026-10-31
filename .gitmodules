@@ -22,3 +22,6 @@
 [submodule "vendor/constexpr-xxh3"]
 	path = vendor/constexpr-xxh3
 	url = https://github.com/chys87/constexpr-xxh3
+[submodule "vendor/zstd"]
+	path = vendor/zstd
+	url = https://github.com/meta/zstd

@@ -7,11 +7,6 @@ namespace tk { struct File; }
 
 namespace tk::ui {
 
-/*
-TODO:
-can use zstd to partition compressing cache files
-*/
-
 struct GlyphCacheHeader
 {
   GlyphKey key;
@@ -43,7 +38,7 @@ public:
   auto& preload_glyphs() noexcept { return _preload_glyphs; }
 
 private:
-  auto serialize() const noexcept -> std::vector<uint8>;
+  auto serialize(File* file, std::span<GlyphCacheData> glyphs) const noexcept -> std::vector<uint8>;
   void deserialize(std::span<uint8 const> data) noexcept;
 
 private:

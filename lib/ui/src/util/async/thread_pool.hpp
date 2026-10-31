@@ -42,7 +42,7 @@ public:
   }
 
   template <typename Func>
-  [[nodiscard]] auto run(Func func) -> Task<std::invoke_result_t<Func&>>
+  [[nodiscard]] auto run(Func func) noexcept -> Task<std::invoke_result_t<Func&>>
   {
     using Result = std::invoke_result_t<Func&>;
 
@@ -63,6 +63,12 @@ public:
       std::invoke(func);
     else
       co_return std::invoke(func);
+  }
+
+  template <typename Func>
+  void submit(Func func) noexcept
+  {
+    enqueue([func = std::move(func)] mutable { std::invoke(func); });
   }
 
 private:

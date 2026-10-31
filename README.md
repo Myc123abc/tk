@@ -17,6 +17,7 @@ Is still in the early stages of development.
 - [ ] Implement a video player for testing.
 - [ ] Design the visual novel runtime system.
 - [ ] Implement a scripting language for creating visual novels.
+- [ ] For dedicate script language, the display text should be pregenerate glyph cache file when release the game.
 
 ## Libraries
 - [tk-ui](lib/ui/README.md)
@@ -35,6 +36,7 @@ Is still in the early stages of development.
 |msdfgen|MIT|https://github.com/Chlumsky/msdfgen|
 |xxHash|BSD 2-Clause|https://github.com/Cyan4973/xxHash|
 |constexpr-xxh3|BSD 2-Clause|https://github.com/chys87/constexpr-xxh3|
+|zstd|BSD/GPLv2|https://github.com/meta/zstd|
 
 ## License
 The following licenses are available:

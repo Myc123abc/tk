@@ -1,6 +1,7 @@
 #include "glyph_cacher.hpp"
 #include "../../util/file_system.hpp"
 #include "../../util/async/thread_pool.hpp"
+#include "../../util/compressor/compressor.hpp"
 
 #include <utility>
 
@@ -38,27 +39,32 @@ void GlyphCacher::add(PendingCopyGlyphsInfoType& info) noexcept
 
 /*
 TODO:
-unsave Skyline packer data, directly use a new texture when preloading
-impl font pregenerate cache files
+1. pregenerate glyph cache file
+2. batch upload glyph cache before really use them
+3. specific language
+4. add grapheme clusters support
+5. add entirely text api support, like line break, cursor move, selection, IME
 */
 void GlyphCacher::destroy() noexcept
 {
   assert(_file);
   if (!_glyphs.empty() || _file->size() == 0)
-  {
-    auto data = serialize();
-    err_if(!_file->write(data, true), "failed to save glyph cache file: file I/O is still pending");
-  }
+    g_thread_pool.submit([this, file = _file, glyphs = std::move(_glyphs)] mutable
+    {
+      auto data = serialize(file, glyphs);
+      data = g_compressor.compression(data);
+      err_if(!file->write(data, true), "failed to save glyph cache file: file I/O is still pending");
+    });
 
   _glyphs.clear();
   _preload_glyphs.clear();
   _file = nullptr;
 }
 
-auto GlyphCacher::serialize() const noexcept -> std::vector<uint8>
+auto GlyphCacher::serialize(File* file, std::span<GlyphCacheData> glyphs) const noexcept -> std::vector<uint8>
 {
-  auto const needs_magic = _file->size() == 0;
-  auto const size = std::ranges::fold_left(_glyphs, uint64{}, [](auto size, auto const& glyph)
+  auto const needs_magic = file->size() == 0;
+  auto const size = std::ranges::fold_left(glyphs, uint64{}, [](auto size, auto const& glyph)
     { return size + sizeof(glyph.header) + glyph.bitmap.size(); }) + (needs_magic ? sizeof(Magic) : 0);
   auto data = std::vector<uint8>(size);
 
@@ -69,7 +75,7 @@ auto GlyphCacher::serialize() const noexcept -> std::vector<uint8>
     ptr += sizeof(Magic);
   }
 
-  for (auto const& glyph : _glyphs)
+  for (auto const& glyph : glyphs)
   {
     memcpy(ptr, &glyph.header, sizeof(glyph.header));
     ptr += sizeof(glyph.header);
@@ -84,11 +90,12 @@ auto GlyphCacher::preload() noexcept -> Task<>
 {
   assert(!_file);
   _file = co_await g_file_sys.open(Cache_Path);
-  co_await g_thread_pool.run([this]
-  {
-    if (_file->size())
-      deserialize({ _file->data(), static_cast<size_t>(_file->size()) });
-  });
+  if (_file->size())
+    co_await g_thread_pool.run([this]
+    {
+      auto data = g_compressor.decompression({ _file->data(), _file->size() });
+      deserialize(data);
+    });
 }
 
 void GlyphCacher::deserialize(std::span<uint8 const> data) noexcept
