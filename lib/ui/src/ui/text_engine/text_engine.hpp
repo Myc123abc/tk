@@ -58,7 +58,15 @@ public:
   void postprocess() noexcept;
 
 private:
+  struct ShapedGlyph
+  {
+    uint   glyph_index{};
+    float2 advance;
+    float2 offset;
+  };
+
   auto install_font(std::unique_ptr<Font> font) noexcept -> FontInfo;
+  auto shape_text(std::string_view text, Font* font, TextDirection direction) noexcept -> std::vector<ShapedGlyph>;
   auto split_text(std::string_view text, FontStyleKey key) noexcept -> std::vector<std::pair<std::string_view, Font*>>;
   auto find_font(uint unicode, FontStyleKey key) noexcept -> Font*;
   auto find_notdef_glyph_font() noexcept -> Font*;

@@ -15,12 +15,12 @@ namespace tk::ui {
 
 struct FontStyleKey
 {
-  size_t    family_hash{};
+  uint64    family_hash{};
   FontStyle style{};
 
   FontStyleKey() = default;
-  FontStyleKey(std::string_view family, FontStyle style) noexcept
-    : family_hash(hash(family)), style(style) {}
+  FontStyleKey(StringID family, FontStyle style) noexcept
+    : family_hash(family), style(style) {}
 
   auto operator==(FontStyleKey const&) const noexcept -> bool = default;
 };

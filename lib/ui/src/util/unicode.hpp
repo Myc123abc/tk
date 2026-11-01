@@ -3,6 +3,8 @@
 #include "tk/error_handling.hpp"
 #include "tk/base.hpp"
 
+// TODO: abstract UnicodeString
+
 namespace tk {
 
 inline auto to_string(std::wstring_view wstr) noexcept
@@ -29,39 +31,36 @@ inline auto to_wstring(std::string_view str) noexcept
   return wstr;
 }
 
+inline constexpr uint  UTF8_Min_Codepoints[]     { 0, 0,    0x80, 0x800, 0x10000 };
+inline constexpr uint8 UTF8_First_Byte_Masks[]   { 0, 0x7f, 0x1f, 0x0f,  0x07    };
+inline constexpr uint8 UTF8_First_Byte_Prefixes[]{ 0, 0,    0xc0, 0xe0,  0xf0    };
+
+inline auto utf8_sequence_size(uint8 first_byte) noexcept -> uint
+{
+  if (first_byte <= 0x7f)          return 1;
+  if ((first_byte & 0xe0) == 0xc0) return 2;
+  if ((first_byte & 0xf0) == 0xe0) return 3;
+  if ((first_byte & 0xf8) == 0xf0) return 4;
+  return 0;
+}
+
+inline auto utf8_codepoint_size(uint codepoint) noexcept -> uint
+{
+  if (codepoint <= 0x7f)   return 1;
+  if (codepoint <= 0x7ff)  return 2;
+  if (codepoint <= 0xffff) return 3;
+  return 4;
+}
+
 inline auto next_codepoint(std::string_view str, uint idx) -> std::pair<uint, uint>
 {
   if (idx >= str.size()) return {};
 
-  auto const beg = idx;
-  auto const c   = static_cast<uint8>(str[idx]);
+  auto const first_byte = static_cast<uint8>(str[idx]);
+  auto const size       = utf8_sequence_size(first_byte);
+  if (!size) return { 0xfffd, 1 };
 
-  auto res  = 0u;
-  auto size = 0u;
-
-  if (c <= 0x7f)
-  {
-    res  = c;
-    size = 1;
-  }
-  else if ((c & 0xe0) == 0xc0)
-  {
-    res  = c & 0x1f;
-    size = 2;
-  }
-  else if ((c & 0xf0) == 0xe0)
-  {
-    res  = c & 0x0f;
-    size = 3;
-  }
-  else if ((c & 0xf8) == 0xf0)
-  {
-    res  = c & 0x07;
-    size = 4;
-  }
-  else
-    // Skip invalid byte
-    return { 0xfffd, 1 };
+  auto res = static_cast<uint>(first_byte & UTF8_First_Byte_Masks[size]);
 
   // Truncated sequence
   if (idx + size > str.size())
@@ -78,9 +77,7 @@ inline auto next_codepoint(std::string_view str, uint idx) -> std::pair<uint, ui
   }
 
   // Reject overlong encoding
-  if ((size == 2 && res < 0x80)  ||
-      (size == 3 && res < 0x800) ||
-      (size == 4 && res < 0x10000))
+  if (res < UTF8_Min_Codepoints[size])
     return { 0xfffd, 1 };
 
   // Reject utf16 surrogate range
@@ -92,6 +89,19 @@ inline auto next_codepoint(std::string_view str, uint idx) -> std::pair<uint, ui
     return { 0xfffd, 1 };
 
   return { res, size };
+}
+
+inline void append_codepoint(std::string& str, uint codepoint) noexcept
+{
+  auto const size = utf8_codepoint_size(codepoint);
+  char bytes[4]{};
+  for (auto i = size - 1; i; --i)
+  {
+    bytes[i] = static_cast<char>(0x80 | codepoint & 0x3f);
+    codepoint >>= 6;
+  }
+  bytes[0] = static_cast<char>(UTF8_First_Byte_Prefixes[size] | codepoint);
+  str.append(bytes, size);
 }
 
 inline auto codepoint_cnt(std::string_view str) -> uint

@@ -181,6 +181,48 @@ auto TextEngine::try_to_get_parse_result(uint64 text_id, uint64 text_hash) noexc
   return {};
 }
 
+auto TextEngine::shape_text(std::string_view text, Font* font, TextDirection direction) noexcept -> std::vector<ShapedGlyph>
+{
+  assert(font);
+  assert(!text.empty());
+
+  auto result = std::vector<ShapedGlyph>{};
+  {
+    std::lock_guard lock{ font->_mutex };
+    hb_buffer_reset(_hb_buf);
+    hb_buffer_add_utf8(_hb_buf, text.data(), static_cast<int>(text.size()), 0, -1);
+    if (direction == TextDirection::vertical)
+      hb_buffer_set_direction(_hb_buf, HB_DIRECTION_TTB);
+    hb_buffer_guess_segment_properties(_hb_buf);
+    hb_shape(font->_hb_font, _hb_buf, nullptr, 0);
+
+    auto const glyph_count     = hb_buffer_get_length(_hb_buf);
+    auto const glyph_infos     = hb_buffer_get_glyph_infos(_hb_buf, nullptr);
+    auto const glyph_positions = hb_buffer_get_glyph_positions(_hb_buf, nullptr);
+    result.reserve(glyph_count);
+    for (auto i = 0u; i < glyph_count; ++i)
+    {
+      auto advance = float2
+      {
+        static_cast<float>(glyph_positions[i].x_advance) / 64,
+        static_cast<float>(glyph_positions[i].y_advance) / 64,
+      };
+      auto offset = float2
+      {
+        static_cast<float>(glyph_positions[i].x_offset) / 64,
+        static_cast<float>(glyph_positions[i].y_offset) / 64,
+      };
+      if (direction == TextDirection::vertical)
+      {
+        advance.y = -advance.y;
+        offset.y  = -offset.y;
+      }
+      result.emplace_back(glyph_infos[i].codepoint, advance, offset);
+    }
+  }
+  return result;
+}
+
 auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction) noexcept -> TextParseResultHandle
 {
   assert(!text.empty());
@@ -207,44 +249,18 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
     // use hb calculate advances
     if (font)
     {
+      for (auto const& glyph : shape_text(text, font, direction))
       {
-        std::lock_guard lock{ font->_mutex };
-        hb_buffer_reset(_hb_buf);
-        hb_buffer_add_utf8(_hb_buf, text.data(), text.size(), 0, -1);
-        if (direction == TextDirection::vertical)
-          hb_buffer_set_direction(_hb_buf, HB_DIRECTION_TTB);
-        hb_buffer_guess_segment_properties(_hb_buf);
-        hb_shape(font->_hb_font, _hb_buf, nullptr, 0);
-      }
+        auto key = GlyphKey{ font->key(), glyph.glyph_index };
 
-      auto glyph_count     = hb_buffer_get_length(_hb_buf);
-      auto glyph_infos     = hb_buffer_get_glyph_infos(_hb_buf, nullptr);
-      auto glyph_positions = hb_buffer_get_glyph_positions(_hb_buf, nullptr);
-      for (auto i = 0u; i < glyph_count; ++i)
-      {
-        auto advance = float2{
-          static_cast<float>(glyph_positions[i].x_advance) / 64,
-          static_cast<float>(glyph_positions[i].y_advance) / 64,
-        };
-        auto offset = float2{
-          static_cast<float>(glyph_positions[i].x_offset) / 64,
-          static_cast<float>(glyph_positions[i].y_offset) / 64,
-        };
-        if (direction == TextDirection::vertical)
-        {
-          advance.y = -advance.y;
-          offset.y  = -offset.y;
-        }
-        auto key = GlyphKey{ font->key(), glyph_infos[i].codepoint };
-
-        res.advances.emplace_back(advance);
-        res.offsets.emplace_back(offset);
+        res.advances.emplace_back(glyph.advance);
+        res.offsets.emplace_back(glyph.offset);
         res.glyph_info_keys.emplace_back(key);
         if (direction == TextDirection::horizontal)
-          res.extent.x += advance.x;
+          res.extent.x += glyph.advance.x;
         else
-          res.extent.y += advance.y;
-        add_uncached_glyph(font, glyph_infos[i].codepoint, key, res);
+          res.extent.y += glyph.advance.y;
+        add_uncached_glyph(font, glyph.glyph_index, key, res);
       }
     }
     // if not have font, the text is missing glyphs
@@ -254,42 +270,16 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
       auto notdef_glyph_font = find_notdef_glyph_font();
       assert(notdef_glyph_font);
 
-      {
-        std::lock_guard lock{ notdef_glyph_font->_mutex };
-        hb_buffer_reset(_hb_buf);
-        hb_buffer_add_utf8(_hb_buf, text.data(), text.size(), 0, -1);
-        if (direction == TextDirection::vertical)
-          hb_buffer_set_direction(_hb_buf, HB_DIRECTION_TTB);
-        hb_buffer_guess_segment_properties(_hb_buf);
-        hb_shape(notdef_glyph_font->_hb_font, _hb_buf, nullptr, 0);
-      }
-
-      auto glyph_count     = hb_buffer_get_length(_hb_buf);
-      auto glyph_positions = hb_buffer_get_glyph_positions(_hb_buf, nullptr);
       auto k = GlyphKey{ notdef_glyph_font->key(), 0 };
-      for (auto i = 0u; i < glyph_count; ++i)
+      for (auto const& glyph : shape_text(text, notdef_glyph_font, direction))
       {
-        auto advance = float2{
-          static_cast<float>(glyph_positions[i].x_advance) / 64,
-          static_cast<float>(glyph_positions[i].y_advance) / 64,
-        };
-        auto offset = float2{
-          static_cast<float>(glyph_positions[i].x_offset) / 64,
-          static_cast<float>(glyph_positions[i].y_offset) / 64,
-        };
-        if (direction == TextDirection::vertical)
-        {
-          advance.y = -advance.y;
-          offset.y  = -offset.y;
-        }
-
-        res.advances.emplace_back(advance);
-        res.offsets.emplace_back(offset);
+        res.advances.emplace_back(glyph.advance);
+        res.offsets.emplace_back(glyph.offset);
         res.glyph_info_keys.emplace_back(k);
         if (direction == TextDirection::horizontal)
-          res.extent.x += advance.x;
+          res.extent.x += glyph.advance.x;
         else
-          res.extent.y += advance.y;
+          res.extent.y += glyph.advance.y;
       }
       _max_ascender = std::max(_max_ascender, notdef_glyph_font->_ascender);
       _max_height   = std::max(_max_height,   notdef_glyph_font->_height);

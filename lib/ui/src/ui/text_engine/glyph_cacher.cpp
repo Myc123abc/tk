@@ -1,94 +1,81 @@
 #include "glyph_cacher.hpp"
+#include "ideographs.hpp"
 #include "../../util/file_system.hpp"
 #include "../../util/async/thread_pool.hpp"
 #include "../../util/compressor/compressor.hpp"
-
-#include <utility>
+#include "../../util/unicode.hpp"
+#include "../../util/binary_file_format.hpp"
 
 namespace tk::ui {
 
 namespace {
 
 constexpr auto Cache_Path = StringLiteral{ ".cache\\glyphs.bin" };
-constexpr auto Magic      = static_cast<uint>('T') | static_cast<uint>('K') << 8 | static_cast<uint>('G') << 16 | static_cast<uint>('C') << 24;
+constexpr auto Magic_Text = StringID{ "tk::ui::glyph_cacher::glyph_cache_file" };
 
+struct CommonGlyphInfoRecord
+{
+  uint64 font_family{};
+  uint   language{};
+  uint   font_style{};
+  uint   direction{};
+};
+
+void append_range(std::string& text, uint first, uint last) noexcept
+{
+  for (auto codepoint = first; codepoint <= last; ++codepoint)
+    append_codepoint(text, codepoint);
 }
 
-void GlyphCacher::add(PendingCopyGlyphsInfoType& info) noexcept
+auto common_glyph_text(language lang) noexcept -> std::string
 {
-  if (info.empty()) return;
-  _glyphs.reserve(_glyphs.size() + std::ranges::distance(info | std::views::values | std::views::join));
-  for (auto const& bitmap_infos : info | std::views::values)
+  auto text = std::string{};
+  append_range(text, 0x0020, 0x00ff);
+
+  auto ideographs = std::string_view{};
+  switch (lang)
   {
-    for (auto const& [bitmap, _] : bitmap_infos)
-    {
-      _glyphs.emplace_back
-      (
-        GlyphCacheHeader
-        {
-          bitmap.glyph_key,
-          bitmap.extent,
-          bitmap.pos_offset,
-          static_cast<uint>(bitmap.data.size()),
-        },
-        std::move(bitmap.data)
-      );
-    }
+  case language::en:
+    break;
+  case language::ch:
+    append_range(text, 0x2000, 0x206f);
+    append_range(text, 0x3000, 0x30ff);
+    append_range(text, 0x31f0, 0x31ff);
+    append_range(text, 0xff00, 0xffef);
+    append_codepoint(text, 0xfffd);
+    ideographs = Chinese_Common_Ideographs;
+    break;
+  case language::jp:
+    append_range(text, 0x3000, 0x30ff);
+    append_range(text, 0x31f0, 0x31ff);
+    append_range(text, 0xff00, 0xffef);
+    append_codepoint(text, 0xfffd);
+    ideographs = Japanese_Common_Ideographs;
+    break;
+  default:
+    std::unreachable();
   }
+
+  text += ideographs;
+  return text;
+}
+
 }
 
 /*
 TODO:
-1. pregenerate glyph cache file
 2. batch upload glyph cache before really use them
 3. specific language
 4. add grapheme clusters support
 5. add entirely text api support, like line break, cursor move, selection, IME
 */
-void GlyphCacher::destroy() noexcept
+void GlyphCacher::init() noexcept
 {
-  assert(_file);
-  if (!_glyphs.empty() || _file->size() == 0)
-    g_thread_pool.submit([this, file = _file, glyphs = std::move(_glyphs)] mutable
-    {
-      auto data = serialize(file, glyphs);
-      data = g_compressor.compression(data);
-      err_if(!file->write(data, true), "failed to save glyph cache file: file I/O is still pending");
-    });
-
-  _glyphs.clear();
-  _preload_glyphs.clear();
-  _file = nullptr;
-}
-
-auto GlyphCacher::serialize(File* file, std::span<GlyphCacheData> glyphs) const noexcept -> std::vector<uint8>
-{
-  auto const needs_magic = file->size() == 0;
-  auto const size = std::ranges::fold_left(glyphs, uint64{}, [](auto size, auto const& glyph)
-    { return size + sizeof(glyph.header) + glyph.bitmap.size(); }) + (needs_magic ? sizeof(Magic) : 0);
-  auto data = std::vector<uint8>(size);
-
-  auto ptr = data.data();
-  if (needs_magic)
-  {
-    memcpy(ptr, &Magic, sizeof(Magic));
-    ptr += sizeof(Magic);
-  }
-
-  for (auto const& glyph : glyphs)
-  {
-    memcpy(ptr, &glyph.header, sizeof(glyph.header));
-    ptr += sizeof(glyph.header);
-    memcpy(ptr, glyph.bitmap.data(), glyph.bitmap.size());
-    ptr += glyph.bitmap.size();
-  }
-
-  return data;
+  _preload_task = preload();
 }
 
 auto GlyphCacher::preload() noexcept -> Task<>
 {
-  assert(!_file);
   _file = co_await g_file_sys.open(Cache_Path);
   if (_file->size())
     co_await g_thread_pool.run([this]
@@ -98,33 +85,59 @@ auto GlyphCacher::preload() noexcept -> Task<>
     });
 }
 
-void GlyphCacher::deserialize(std::span<uint8 const> data) noexcept
+void GlyphCacher::deserialize(std::span<uint8> data) noexcept
 {
-  assert(data.size() >= sizeof(Magic));
-  err_if(memcmp(data.data(), &Magic, sizeof(Magic)) != 0,
-    "Failed to deserialize glyph cache file, magic wrong");
-  data = data.subspan(sizeof(Magic));
-  
-  while (!data.empty())
+  auto file_fmt = BinaryFileFormat{};
+  file_fmt.set_magic(Magic_Text);
+  file_fmt.read(data);
+  file_fmt.read_magic();
+  while (!file_fmt.is_read_data_empty())
   {
-    err_if(data.size() < sizeof(GlyphCacheHeader),
-      "Failed to deserialize, glyph cache file incomplete");
-
-    auto header = GlyphCacheHeader{};
-    memcpy(&header, data.data(), sizeof(header));
-    data = data.subspan(sizeof(header));
-
-    err_if(header.bitmap_size > data.size(),
-      "Failed to deserialize, glyph cache file bitmap information wrong");
-    
-    auto& glyph = _preload_glyphs[header.key];
-    glyph.extent     = header.extent;
-    glyph.pos_offset = header.pos_offset;
-    glyph.bitmap.resize(header.bitmap_size);
-    memcpy(glyph.bitmap.data(), data.data(), glyph.bitmap.size());
-
-    data = data.subspan(glyph.bitmap.size());
+    auto [header, data] = file_fmt.read_field<GlyphCacheHeader>();
+    _preload_glyphs[header.key] = { header.extent, header.pos_offset, data | std::ranges::to<std::vector<uint8>>() };
   }
 }
+
+void GlyphCacher::destroy() noexcept
+{
+  write_cache();
+}
+
+void serialize(BinaryFileFormat& fmt, std::span<GlyphCacheField> glyphs, bool has_magic) noexcept
+{
+  if (!has_magic) fmt.set_magic(Magic_Text);
+  for (auto const& [header, glyph] : glyphs)
+    fmt.append(header, glyph);
+  fmt.build();
+}
+
+void GlyphCacher::write_cache() noexcept
+{
+  if (_glyphs.empty()) return;
+  g_thread_pool.submit([this, file = _file, glyphs = std::move(_glyphs)] mutable
+  {
+    auto file_fmt = BinaryFileFormat{};
+    serialize(file_fmt, glyphs, _file->size());
+    auto data = g_compressor.compression(file_fmt.data());
+    err_if(!file->append(data), "failed to save glyph cache file: file I/O is still pending");
+  });
+}
+
+void GlyphCacher::add(PendingCopyGlyphsInfoType& info) noexcept
+{
+  if (info.empty()) return;
+  _glyphs.reserve(_glyphs.size() + std::ranges::distance(info | std::views::values | std::views::join));
+  for (auto const& bitmap_infos : info | std::views::values)
+    for (auto const& [bitmap, _] : bitmap_infos)
+      _glyphs.emplace_back(GlyphCacheHeader{ bitmap.glyph_key, bitmap.extent, bitmap.pos_offset }, std::move(bitmap.data));
+}
+
+// auto GlyphCacher::pregenerate(std::span<PregenerateTextInfo const> infos) noexcept -> Task<>
+// {
+// }
+
+// auto GlyphCacher::pregenerate(std::span<MSDFBitmap const> bitmaps) noexcept -> Task<>
+// {
+// }
 
 }

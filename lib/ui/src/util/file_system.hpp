@@ -64,7 +64,8 @@ struct File
   void init(std::string_view path, Flag<Access> access, Flag<Share> share, Dispostion disposition) noexcept;
   void destroy() noexcept;
 
-  auto write(std::span<uint8 const> data, bool is_append) noexcept -> bool;
+  auto write(std::span<uint8 const> data) noexcept -> bool;
+  auto append(std::span<uint8 const> data) noexcept -> bool;
 
   template <typename T>
   auto data() const noexcept { return reinterpret_cast<T*>(_data.get()); }

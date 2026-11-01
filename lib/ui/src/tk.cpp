@@ -17,11 +17,10 @@ void init() noexcept
   g_iocp.init();
   // reserve one thread for main, and one thread for audio
   g_thread_pool.init(std::max(1u, std::thread::hardware_concurrency() - 2));
-  auto glyph_preload_task = g_glyph_cacher.preload();
+  g_glyph_cacher.init();
   g_renderer.init();
   g_wnd_mgr.init();
   g_ui_ctx.init();
-  glyph_preload_task.wait();
 }
 
 void destroy() noexcept

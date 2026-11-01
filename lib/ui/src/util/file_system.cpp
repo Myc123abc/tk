@@ -78,26 +78,28 @@ auto FileSystem::load(StringLiteral path) noexcept -> std::expected<File const*,
   return &file;
 }
 
-auto File::write(std::span<uint8 const> data, bool is_append) noexcept -> bool
+auto File::write(std::span<uint8 const> data) noexcept -> bool
 {
   assert(_handle != INVALID_HANDLE_VALUE);
-  if (!is_complete()) return false;
+  err_if(!is_complete(), "failed to write file, is still running in iocp");
 
-  auto const offset = is_append ? _size : uint64{};
-  err_if(data.size() > std::numeric_limits<uint64>::max() - offset,
-    "file exceeds the supported size");
-  auto const size = offset + static_cast<uint64>(data.size());
+  auto file_size = FILE_END_OF_FILE_INFO{};
+  file_size.EndOfFile.QuadPart = static_cast<LONGLONG>(data.size());
+  err_if(!SetFileInformationByHandle(_handle, FileEndOfFileInfo, &file_size, sizeof(file_size)),
+    "failed to resize file");
 
-  if (!is_append)
-  {
-    auto file_size = FILE_END_OF_FILE_INFO{};
-    file_size.EndOfFile.QuadPart = static_cast<LONGLONG>(size);
-    err_if(!SetFileInformationByHandle(_handle, FileEndOfFileInfo, &file_size, sizeof(file_size)),
-      "failed to resize file");
-  }
+  g_iocp.write(_handle, data);
+  _size       = data.size();
+  _needs_read = true;
+  return true;
+}
 
-  g_iocp.write(_handle, data, offset);
-  _size       = size;
+auto File::append(std::span<uint8 const> data) noexcept -> bool
+{
+  assert(_handle != INVALID_HANDLE_VALUE);
+  err_if(!is_complete(), "failed to append file, is still running in iocp");
+  g_iocp.write(_handle, data, _size);
+  _size       = _size + data.size();
   _needs_read = true;
   return true;
 }

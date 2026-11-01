@@ -186,6 +186,27 @@ auto load_font(std::string_view path) noexcept -> std::expected<FontInfo, FontLo
  */
 auto load_fonts(std::span<std::string_view const> paths) noexcept -> std::vector<std::expected<FontInfo, FontLoadErrorType>>;
 
+enum class language
+{
+  en,
+  ch,
+  jp,
+};
+
+struct CacheCommonGlyphInfo
+{
+  language      lang;
+  StringID      font_family;
+  FontStyle     font_style;
+  TextDirection direction{ TextDirection::horizontal };
+};
+
+/**
+ * Cache specific language glyphs to cache file.
+ * @param infos
+ */
+void cache_common_glyphs(std::span<CacheCommonGlyphInfo> infos) noexcept;
+
 struct TextConfig
 {
   std::string_view family;
