@@ -1,5 +1,6 @@
 #include "ui/text_layout.hpp"
 #include "text_engine.hpp"
+#include "../ui_context.hpp"
 
 #include <ranges>
 
@@ -124,6 +125,11 @@ auto TextLayout::adjust_ratios(std::span<float> ratios) noexcept -> TextLayout&
   }
 
   return *this;
+}
+
+void TextLayout::render() const noexcept
+{
+  g_ui_ctx.render(*this);
 }
 
 }

@@ -40,7 +40,7 @@ void TextEngine::destroy() noexcept
   hb_buffer_destroy(_hb_buf);
 }
 
-auto TextEngine::load_font(std::string_view path) noexcept -> std::expected<FontInfo, FontLoadErrorType>
+auto TextEngine::load_font(std::string const& path) noexcept -> std::expected<FontInfo, FontLoadErrorType>
 {
   // check whether already loaded
   if (auto it = std::ranges::find_if(_fonts, [&](auto const& font) { return font->name() == path; });
@@ -58,7 +58,7 @@ auto TextEngine::load_font(std::string_view path) noexcept -> std::expected<Font
   return install_font(std::move(font));
 }
 
-auto TextEngine::load_fonts(std::span<std::string_view const> paths) noexcept -> std::vector<std::expected<FontInfo, FontLoadErrorType>>
+auto TextEngine::load_fonts(std::span<std::string const> paths) noexcept -> std::vector<std::expected<FontInfo, FontLoadErrorType>>
 {
   using Result     = std::expected<FontInfo, FontLoadErrorType>;
   using TaskResult = std::pair<std::unique_ptr<Font>, uint8>;
@@ -130,7 +130,7 @@ auto TextEngine::install_font(std::unique_ptr<Font> font) noexcept -> FontInfo
   // store font
   auto font_idx    = static_cast<uint>(_fonts.size());
   auto loaded_font = _fonts.emplace_back(std::move(font)).get();
-  auto res = _font_idxs.emplace(loaded_font->key(), font_idx);
+  auto res         = _font_idxs.emplace(loaded_font->key(), font_idx);
   assert(res.second);
   _style_font_idxs[static_cast<size_t>(loaded_font->style())].emplace_back(font_idx);
 

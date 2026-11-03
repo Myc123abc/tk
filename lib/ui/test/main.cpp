@@ -3,6 +3,7 @@
 #include "playback_btn.hpp"
 #include "tk/ui/ui.hpp"
 #include "tk/ui/transform.hpp"
+#include "font_selector.hpp"
 
 #include <span>
 #include <format>
@@ -39,40 +40,6 @@ auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 al
     );
     return std::expected<void, ui::ImageLoadErrorType>{ std::unexpected(err) };
   });
-}
-
-auto fonts = std::vector<ui::FontInfo>{};
-
-inline constexpr std::string_view startup_font_paths[]{
-  "assets/font/NotoSansJP-Regular.ttf",
-  "assets/font/NotoSansJP-Bold.ttf",
-  "assets/font/YuGothR.ttc",
-  "assets/font/SourceCodePro-Regular.ttf",
-};
-inline constexpr std::string_view fallback_font_paths[]{
-  "assets/font/NotoSansJP-Regular.ttf",
-  "assets/font/NotoSansSC-Regular.ttf",
-};
-
-void store_font_result(std::string_view path, std::expected<ui::FontInfo, ui::FontLoadErrorType> res) noexcept
-{
-  if (!res.has_value())
-  {
-    res.error().visit(
-      [&](ui::FontLoadError::unexist) { warn("failed to load font {}", path); },
-      [&](ui::FontLoadError::freetype_err err) { warn("failed to load font {}, freetype error {}", path, err.code); }
-    );
-  }
-  else
-    fonts.emplace_back(res.value());
-}
-
-void load_fonts(std::span<std::string_view const> paths) noexcept
-{
-  auto results = ui::load_fonts(paths);
-  assert(results.size() == paths.size());
-  for (auto i = 0uz; i < paths.size(); ++i)
-    store_font_result(paths[i], std::move(results[i]));
 }
 
 struct ButtonConfig
@@ -234,7 +201,22 @@ int main()
   load_image(img1);
   load_image(img2);
 
-  load_fonts(startup_font_paths);
+  std::string_view startup_font_paths[]{
+    "assets/font/NotoSansJP-Regular.ttf",
+    "assets/font/NotoSansJP-Bold.ttf",
+    "assets/font/YuGothR.ttc",
+    "assets/font/SourceCodePro-Regular.ttf",
+  };
+
+  std::string_view fallback_font_paths[]{
+    "assets/font/NotoSansJP-Regular.ttf",
+    "assets/font/NotoSansSC-Regular.ttf",
+  };
+
+  auto font_selector = FontSelector{};
+  for (auto path : startup_font_paths)
+    font_selector.add(path);
+  font_selector.load_fonts();
 
   auto playback_btn = PlaybackButton{};
   playback_btn.init("playback button");
@@ -322,6 +304,8 @@ int main()
       ui::rectangle({ 30, 0 }, { 30 + res.extent.x, res.extent.y }, 0x00ff00ff, 1);
       ui::line({ 30 + res.ascender, 0 }, { 30 + res.ascender, res.extent.y }, 0xff0000ff);
       ui::transform_end();
+
+      font_selector.render({ 50, 100 }, 24, { 16, 16 });
 
       ui::end();
     }
@@ -448,12 +432,16 @@ int main()
         else if (cfg.backdrop.style == ui::BackdropStyle::acrylic)
           cfg.backdrop.default_blur();
         blur_img_2 = !blur_img_2;
-        load_fonts(fallback_font_paths);
+
+        for (auto path : fallback_font_paths)
+          font_selector.add(path);
+        font_selector.load_fonts();
+
         if (text_cfg.style == ui::FontStyle::regular)
           text_cfg.style = ui::FontStyle::bold;
         else
           text_cfg.style = ui::FontStyle::regular;
-        text_cfg.family = fonts[2].family;
+        text_cfg.family = font_selector.font_infos()[2].family;
       }
 
       select_font();

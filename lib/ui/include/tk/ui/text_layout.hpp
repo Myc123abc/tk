@@ -39,6 +39,8 @@ public:
   void ignore_text(uint idx) noexcept { _texts.at(idx).ignore = true; }
   auto adjust_ratios(std::span<float> ratios) noexcept -> TextLayout&;
 
+  void render() const noexcept;
+
   auto set_pos(float2 pos)          noexcept -> TextLayout& { _pos           = pos;      return *this; }
   auto set_pos(float x, float y)    noexcept -> TextLayout& { _pos           = { x, y }; return *this; }
   auto set_padding(float2 padding)  noexcept -> TextLayout& { _padding       = padding;  return *this; }

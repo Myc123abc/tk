@@ -23,8 +23,8 @@ public:
   void init() noexcept;
   void destroy() noexcept;
 
-  auto load_font(std::string_view path) noexcept -> std::expected<FontInfo, FontLoadErrorType>;
-  auto load_fonts(std::span<std::string_view const> paths) noexcept -> std::vector<std::expected<FontInfo, FontLoadErrorType>>;
+  auto load_font(std::string const& path) noexcept -> std::expected<FontInfo, FontLoadErrorType>;
+  auto load_fonts(std::span<std::string const> paths) noexcept -> std::vector<std::expected<FontInfo, FontLoadErrorType>>;
 
   struct ParseResult
   {

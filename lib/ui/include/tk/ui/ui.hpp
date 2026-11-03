@@ -177,14 +177,14 @@ using FontLoadErrorType = FontLoadError::Type;
  * @param path
  * @return font info
  */
-auto load_font(std::string_view path) noexcept -> std::expected<FontInfo, FontLoadErrorType>;
+auto load_font(std::string const& path) noexcept -> std::expected<FontInfo, FontLoadErrorType>;
 
 /**
  * load fonts in parallel
  * @param paths font paths
  * @return font info or error for each input path, in input order
  */
-auto load_fonts(std::span<std::string_view const> paths) noexcept -> std::vector<std::expected<FontInfo, FontLoadErrorType>>;
+auto load_fonts(std::span<std::string const> paths) noexcept -> std::vector<std::expected<FontInfo, FontLoadErrorType>>;
 
 enum class language
 {
