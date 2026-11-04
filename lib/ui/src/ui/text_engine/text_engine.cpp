@@ -457,55 +457,32 @@ auto TextEngine::calc_glyph_pos(float2 extent) noexcept -> std::pair<uint, float
   return { current_glyph_atlas_idx, res.value() };
 }
 
-namespace {
-
-template <std::ranges::sized_range R>
-auto split_range(R&& range, size_t num) noexcept
-{
-  using T = std::ranges::range_value_t<R>;
-
-  auto size     = std::ranges::size(range);
-  auto cnt      = std::min(size, num);
-  auto batches  = std::vector<std::vector<T>>(cnt);
-  auto capacity = size / cnt + (size % cnt != 0);
-  auto idx      = 0;
-  for (auto& batch : batches) batch.reserve(capacity);
-  for (auto const& value : range)
-  {
-    batches[idx].emplace_back(value);
-    idx = (idx + 1) % cnt;
-  }
-  return batches;
-}
-
-}
-
 void TextEngine::submit_bitmap_generation_tasks() noexcept
 {
   if (_ungenerated_glyphs.empty()) return;
 
-  auto generate_bitmap_task = [this]<std::ranges::sized_range R>(R&& glyphs)
+  auto const task_limit = std::min(Glyph_Max_Concurrent_Generation_Tasks, g_thread_pool.size());
+  while (!_ungenerated_glyphs.empty() && _generate_bitmap_tasks.size() < task_limit)
   {
+    auto glyphs = std::vector<GlyphKey>{};
+    glyphs.reserve(std::min(Glyphs_Per_Generation_Task, _ungenerated_glyphs.size()));
+    for (auto it = _ungenerated_glyphs.begin();
+         it != _ungenerated_glyphs.end() && glyphs.size() < Glyphs_Per_Generation_Task;)
+    {
+      glyphs.emplace_back(*it);
+      it = _ungenerated_glyphs.erase(it);
+    }
+
     _generate_bitmap_tasks.emplace_back(g_thread_pool.run([glyphs = std::move(glyphs)]
     {
       auto bitmaps = std::vector<MSDFBitmap>{};
-      bitmaps.reserve(std::ranges::size(glyphs));
+      bitmaps.reserve(glyphs.size());
       for (auto const& key : glyphs)
         // font should always be valid because I never remove font currently
         bitmaps.emplace_back(g_text_engine._fonts[g_text_engine._font_idxs.at(key.font_key)]->generate_msdf_bitmap(key.glyph_index, key));
       return bitmaps;
     }));
-  };
-
-  if (g_thread_pool.size() > 1)
-  {
-    auto batches = split_range(_ungenerated_glyphs, g_thread_pool.size());
-    for (auto& glyphs : batches)
-      generate_bitmap_task(glyphs);
   }
-  else
-    generate_bitmap_task(_ungenerated_glyphs);
-  _ungenerated_glyphs.clear();
 }
 
 auto TextEngine::upload_bitmaps() noexcept -> bool
