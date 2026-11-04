@@ -168,4 +168,14 @@ auto button(
   return state;
 }
 
+auto check_box(StringID name, float2 pos, float extent, Color color, bool& is_checked, float thickness, float inset, std::optional<Color> inner_color) noexcept -> bool
+{
+  rectangle(pos, pos + extent, color, thickness);
+  if (button(name, pos.x, pos.y, extent, extent))
+    is_checked = !is_checked;
+  if (is_checked)
+    rectangle(pos + thickness + inset, pos + extent - thickness - inset, inner_color ? inner_color.value() : color);
+  return is_checked;
+}
+
 }

@@ -41,6 +41,7 @@ void UIContext::begin(StringID name, int x, int y, uint width, uint height, bool
   // create window if not have
   if (!_wnd_ctxs.contains(name))
   {
+    if (cfg.display_title_bar) height = std::max(height, static_cast<uint>(Title_Bar_Height));
     auto handle = g_wnd_mgr.create_window(x, y, width, height, cfg.backdrop);
     _wnd_ctxs.emplace(name, handle);
     _wnd_names.emplace(handle, name);

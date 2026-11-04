@@ -7,10 +7,6 @@
 
 namespace tk::ui {
 
-////////////////////////////////////////////////////////////////////////////////
-///                               Widget
-////////////////////////////////////////////////////////////////////////////////
-
 struct ButtonState
 {
   bool clicked{};
@@ -91,5 +87,19 @@ auto button(
   float                                    icon_height,
   Color                                    icon_color,
   Color                                    icon_hover_color) noexcept -> ButtonState;
+
+/**
+ * draw a checkbox.
+ * @param name
+ * @param pos
+ * @param extent
+ * @param color
+ * @param is_checked
+ * @param thickness
+ * @param inset space between inner checked rectangle and outer rectangle frame
+ * @param inner_color if not set, use same with color
+ * @return checked value
+ */
+auto check_box(StringID name, float2 pos, float extent, Color color, bool& is_checked, float thickness = 4, float inset = 2, std::optional<Color> inner_color = {}) noexcept -> bool;
 
 }

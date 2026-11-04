@@ -265,7 +265,7 @@ struct WindowConfig
   bool                 no_resize{};
   bool                 no_move{};
 
-  struct BlurBackdrop
+  struct Backdrop
   {
     enum class Style
     {
@@ -286,22 +286,31 @@ struct WindowConfig
       } acrylic;
     };
 
-    void default_blur() noexcept
+    static auto Default_Blur() noexcept -> Backdrop
     {
-      style       = Style::blur;
-      blur_radius = 4.f;
+      return
+      {
+        .style       = Style::blur,
+        .blur_radius = 4.f,
+      };
     }
 
-    void default_acrylic() noexcept
+    static auto Default_Acrylic() noexcept -> Backdrop
     {
-      style                    = Style::acrylic;
-      acrylic.opacity          = .02f;
-      acrylic.blur             = 30.f;
-      acrylic.tint_color       = { .125f, .125f, .125f, .4f };
-      acrylic.luminosity_color = { .125f, .125f, .125f, .8f };
+      return
+      {
+        .style   = Style::acrylic,
+        .acrylic =
+        {
+          .opacity          = .02f,
+          .blur             = 30.f,
+          .tint_color       = { .125f, .125f, .125f, .4f },
+          .luminosity_color = { .125f, .125f, .125f, .8f },
+        },
+      };
     }
 
-    auto operator!=(BlurBackdrop const& b) const noexcept
+    auto operator!=(Backdrop const& b) const noexcept
     {
       if (style != b.style) return true;
       if (style == Style::blur)
@@ -317,8 +326,8 @@ struct WindowConfig
   } backdrop;
 };
 
-using Backdrop      = WindowConfig::BlurBackdrop;
-using BackdropStyle = WindowConfig::BlurBackdrop::Style;
+using Backdrop      = WindowConfig::Backdrop;
+using BackdropStyle = WindowConfig::Backdrop::Style;
 
 /**
  * get cursor position
@@ -371,6 +380,12 @@ void add_move_invalid_area(float2 left_top, float2 right_bottom) noexcept;
  * @return extent of window
  */
 auto window_extent() noexcept -> float2;
+
+/**
+ * get window position in current update function of window
+ * @return position of window
+ */
+auto window_pos() noexcept -> float2;
 
 /**
  * get window extent in current update function of window

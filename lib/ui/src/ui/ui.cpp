@@ -193,6 +193,12 @@ auto window_extent() noexcept -> float2
   return float2{ g_ui_ctx.window()->width(), g_ui_ctx.window()->height() } / g_ui_ctx.window()->scale();
 }
 
+auto window_pos() noexcept -> float2
+{
+  g_ui_ctx.check_draw();
+  return g_ui_ctx.window()->pos();
+}
+
 auto window_drawable_extent() noexcept -> float2
 {
   auto extent = window_extent();
