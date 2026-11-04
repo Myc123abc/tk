@@ -168,13 +168,22 @@ auto button(
   return state;
 }
 
-auto check_box(StringID name, float2 pos, float extent, Color color, bool& is_checked, float thickness, float inset, std::optional<Color> inner_color) noexcept -> bool
+auto check_box(StringID name, float2 pos, float extent, Color color, bool& is_checked, CheckBoxConfig const& cfg) noexcept -> bool
 {
-  rectangle(pos, pos + extent, color, thickness);
-  if (button(name, pos.x, pos.y, extent, extent))
-    is_checked = !is_checked;
+  // get button result
+  auto res = button(name, pos.x, pos.y, extent, extent);
+  if (res) is_checked = !is_checked;
+
+  // draw outer rect frame
+  rectangle(pos, pos + extent, res.hovered ? cfg.hover_color.value_or(color) : color, cfg.thickness);
+
+  // draw inner rect
   if (is_checked)
-    rectangle(pos + thickness + inset, pos + extent - thickness - inset, inner_color ? inner_color.value() : color);
+  {
+    auto t = cfg.thickness + cfg.inset;
+    auto inner_col = cfg.inner_color.value_or(color);
+    rectangle(pos + t, pos + extent - t, res.hovered ? cfg.hover_inner_color.value_or(inner_col) : inner_col);
+  }
   return is_checked;
 }
 

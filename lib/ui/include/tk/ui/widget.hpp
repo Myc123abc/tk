@@ -88,6 +88,15 @@ auto button(
   Color                                    icon_color,
   Color                                    icon_hover_color) noexcept -> ButtonState;
 
+struct CheckBoxConfig
+{
+  float                thickness{ 4 };
+  float                inset{ 2 };
+  std::optional<Color> inner_color;
+  std::optional<Color> hover_color;
+  std::optional<Color> hover_inner_color;
+};
+
 /**
  * draw a checkbox.
  * @param name
@@ -95,11 +104,8 @@ auto button(
  * @param extent
  * @param color
  * @param is_checked
- * @param thickness
- * @param inset space between inner checked rectangle and outer rectangle frame
- * @param inner_color if not set, use same with color
  * @return checked value
  */
-auto check_box(StringID name, float2 pos, float extent, Color color, bool& is_checked, float thickness = 4, float inset = 2, std::optional<Color> inner_color = {}) noexcept -> bool;
+auto check_box(StringID name, float2 pos, float extent, Color color, bool& is_checked, CheckBoxConfig const& cfg = {}) noexcept -> bool;
 
 }
