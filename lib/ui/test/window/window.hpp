@@ -15,7 +15,7 @@ public:
   BaseWindow& operator=(BaseWindow const&) = delete;
   BaseWindow& operator=(BaseWindow&&)      = default;
 
-  BaseWindow(StringID name, float2 pos, float2 ext, ui::WindowConfig const& cfg = {}) noexcept
+  BaseWindow(StringID name, float2 ext, std::optional<float2> pos = {}, ui::WindowConfig const& cfg = {}) noexcept
     : _name(name), _pos(pos), _ext(ext), _cfg(cfg) {}
 
   void operator()() noexcept
@@ -23,7 +23,7 @@ public:
     if (!_is_shown) return;
 
     auto is_closed = false;
-    ui::begin(_name, _pos.x, _pos.y, _ext.x, _ext.y, &is_closed, _cfg);
+    ui::begin(_name, _ext.x, _ext.y, _pos, &is_closed, _cfg);
     _is_shown = !is_closed;
 
     static_cast<Derived*>(this)->draw();
@@ -43,7 +43,7 @@ public:
 
 private:
   StringID         _name;
-  float2           _pos;
+  std::optional<float2> _pos;
   float2           _ext;
   bool             _is_shown{};
   ui::WindowConfig _cfg;

@@ -523,11 +523,11 @@ auto WindowManager::create_fullscreen_window() noexcept -> HWND
   return _fullscreen_window._handle;
 }
 
-auto WindowManager::create_window(int x, int y, uint width, uint height, ui::Backdrop const& backdrop) noexcept -> HWND
+auto WindowManager::create_window(std::optional<float2> pos, uint width, uint height, ui::Backdrop const& backdrop) noexcept -> HWND
 {
   // init window and set handle
   auto window = Window{};
-  window.init(x, y, width, height, backdrop);
+  window.init(pos, width, height, backdrop);
   
   if (backdrop.style != ui::BackdropStyle::none)
     _blur_windows.emplace(window._blur_window, window._handle);

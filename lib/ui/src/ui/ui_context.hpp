@@ -44,7 +44,7 @@ public:
 
   void close_window() noexcept;
 
-  void begin(StringID name, int x, int y, uint width, uint height, bool* is_closed, WindowConfig const& cfg) noexcept;
+  void begin(StringID name, uint width, uint height, std::optional<float2> pos, bool* is_closed, WindowConfig const& cfg) noexcept;
   void end() noexcept;
 
   void check_draw() const noexcept;

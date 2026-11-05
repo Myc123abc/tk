@@ -10,30 +10,59 @@ using namespace tk::ui;
 
 namespace tk::renderer {
 
-void Window::init(int x, int y, uint width, uint height, ui::Backdrop const& backdrop) noexcept
+void Window::init(std::optional<float2> pos, uint width, uint height, ui::Backdrop const& backdrop) noexcept
 {
-  auto monitor = Monitor{ { x, y, static_cast<LONG>(x + width), static_cast<LONG>(y + height) } };
+  constexpr auto window_style = WS_POPUP | WS_MINIMIZEBOX;
 
-  _monitor = monitor.name();
-  _scale   = monitor.scale();
-  _x       = x;
-  _y       = y;
-  _width   = width  * _scale;
-  _height  = height * _scale;
-  update_rect();
-
-  _handle = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP, WindowManager::Window_Class, nullptr, WS_POPUP | WS_MINIMIZEBOX,
-    real_x(), real_y(), real_width(), real_height(), 0, 0, GetModuleHandleW(nullptr), 0);
-  err_if(!_handle, "failed to create window");
-
-  // move window to primary monitor if it's not on any display monitors
-  auto work_area = monitor.work_rect();
-  if (!Rect(work_area).contains(int2{x, y}))
+  if (pos)
   {
-    _x = work_area.left;
-    _y = work_area.top;
+    auto const x = static_cast<int>(pos->x);
+    auto const y = static_cast<int>(pos->y);
+    auto const monitor = Monitor{ { x, y, static_cast<LONG>(x + width), static_cast<LONG>(y + height) } };
+
+    _monitor = monitor.name();
+    _scale   = monitor.scale();
+    _x       = x;
+    _y       = y;
+    _width   = width  * _scale;
+    _height  = height * _scale;
     update_rect();
-    SetWindowPos(_handle, 0, real_x(), real_y(), 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+
+    _handle = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP, WindowManager::Window_Class, nullptr, window_style,
+      real_x(), real_y(), real_width(), real_height(), 0, 0, GetModuleHandleW(nullptr), 0);
+    err_if(!_handle, "failed to create window");
+
+    // move window to primary monitor if it's not on any display monitors
+    auto work_area = monitor.work_rect();
+    if (!Rect(work_area).contains(int2{x, y}))
+    {
+      _x = work_area.left;
+      _y = work_area.top;
+      update_rect();
+      SetWindowPos(_handle, 0, real_x(), real_y(), 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+  }
+  else
+  {
+    _handle = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP, WindowManager::Window_Class, nullptr, WS_OVERLAPPEDWINDOW,
+      CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, 0, 0, GetModuleHandleW(nullptr), 0);
+    err_if(!_handle, "failed to create window");
+
+    auto system_rect = RECT{};
+    err_if(!GetWindowRect(_handle, &system_rect), "failed to get system window position");
+    auto const monitor = Monitor{ Rect{ system_rect } };
+
+    _monitor = monitor.name();
+    _scale   = monitor.scale();
+    _x       = system_rect.left + shadow_thickness();
+    _y       = system_rect.top  + shadow_thickness();
+    _width   = width  * _scale;
+    _height  = height * _scale;
+    update_rect();
+
+    SetWindowLongPtrW(_handle, GWL_STYLE, window_style);
+    err_if(!SetWindowPos(_handle, 0, real_x(), real_y(), real_width(), real_height(),
+      SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOACTIVATE), "failed to apply system window position");
   }
 
   // create window render resource

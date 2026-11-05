@@ -30,4 +30,4 @@ private:
   std::string fps_text{""};
 );
 
-inline TestWindow1 test_window_1("test window 1", { 50, 50 }, { 200, 200 }, wnd_cfg);
+inline TestWindow1 test_window_1("test window 1", { 200, 200 }, std::nullopt, wnd_cfg);

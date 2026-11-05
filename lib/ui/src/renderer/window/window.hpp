@@ -38,7 +38,7 @@ public:
   Window& operator=(Window const&) = default;
   Window& operator=(Window&&)      = default;
 
-  void init(int x, int y, uint width, uint height, ui::Backdrop const& backdrop) noexcept;
+  void init(std::optional<float2> pos, uint width, uint height, ui::Backdrop const& backdrop) noexcept;
   void init_auxiliary(int x, int y, uint width, uint height) noexcept;
   void destroy() const noexcept;
   
