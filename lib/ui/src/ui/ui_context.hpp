@@ -54,6 +54,7 @@ public:
   auto is_hover_on(size_t id, Rect rc) noexcept -> bool;
   auto is_hover_on(size_t id, float2 left_top, float2 right_bottom) noexcept { return is_hover_on(id, { left_top, right_bottom }); }
   auto transform_widget_rect(Rect rect) const noexcept -> Rect;
+  void add_move_invalid_area(Rect rect) noexcept;
 
   void set_render_pos(float x, float y) noexcept { _wnd_ctx->render_pos = { x + renderer::Window_Shadow_Thickness, y + renderer::Window_Shadow_Thickness }; }
   auto get_render_pos() const noexcept { return _wnd_ctx->render_pos; }

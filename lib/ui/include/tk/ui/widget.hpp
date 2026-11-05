@@ -28,9 +28,10 @@ struct ButtonState
  * @param y
  * @param width
  * @param height
+ * @param blocks_window_move whether pressing the button prevents window dragging
  * @return button state
  */
-auto button(StringID name, float x, float y, float width, float height) noexcept -> ButtonState;
+auto button(StringID name, float x, float y, float width, float height, bool blocks_window_move = true) noexcept -> ButtonState;
 
 /**
  * normal button
@@ -92,9 +93,15 @@ struct CheckBoxConfig
 {
   float                thickness{ 4 };
   float                inset{ 2 };
+  Color                color;
   std::optional<Color> inner_color;
   std::optional<Color> hover_color;
   std::optional<Color> hover_inner_color;
+  std::optional<Color> click_color;
+  std::optional<Color> click_inner_color;
+  float                text_size{};
+  Color                text_color;
+  float                text_spacing{ 4 };
 };
 
 /**
@@ -102,10 +109,21 @@ struct CheckBoxConfig
  * @param name
  * @param pos
  * @param extent
- * @param color
  * @param is_checked
+ * @param cfg checkbox config
  * @return checked value
  */
-auto check_box(StringID name, float2 pos, float extent, Color color, bool& is_checked, CheckBoxConfig const& cfg = {}) noexcept -> bool;
+auto check_box(StringID name, float2 pos, float extent, bool& is_checked, CheckBoxConfig const& cfg = {}) noexcept -> bool;
+
+/**
+ * Draw a checkbox with text on its right.
+ * @param name name cannot be duplicate in the window
+ * @param label displayed text
+ * @param pos left top of the entire control
+ * @param is_checked checked state
+ * @param cfg checkbox config
+ * @return extent of the checkbox and label
+ */
+auto check_box(StringID name, StringLiteral label, float2 pos, bool& is_checked, CheckBoxConfig const& cfg = {}) noexcept -> float2;
 
 }

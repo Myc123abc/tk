@@ -390,6 +390,19 @@ auto UIContext::transform_widget_rect(Rect rect) const noexcept -> Rect
   return intersect(screen_rect, viewport.interaction_rect);
 }
 
+void UIContext::add_move_invalid_area(Rect rect) noexcept
+{
+  check_draw();
+
+  if (is_use_title_bar_now() && !draw_title_bar)
+    rect.adjust_left_top({ 0, Title_Bar_Height }).adjust_right_bottom({ 0, Title_Bar_Height });
+
+  rect = transform_widget_rect(rect * _wnd->scale());
+  auto clipped = intersect(rect, { 0, 0, static_cast<float>(_wnd->width()), static_cast<float>(_wnd->height()) });
+  if (!clipped.empty())
+    _wnd->add_move_invalid_area(clipped);
+}
+
 void UIContext::add_title_bar() noexcept
 {
   auto btn_width   = Title_Bar_Button_Width;
@@ -420,7 +433,7 @@ void UIContext::add_title_bar() noexcept
   auto handle = _wnd->handle();
 
   // title bar, can be double click to maximize window
-  if (button("tk::ui::title_bar", 0, 0, w, btn_height).double_click && !_wnd->cfg().no_resize)
+  if (button("tk::ui::title_bar", 0, 0, w, btn_height, false).double_click && !_wnd->cfg().no_resize)
     _wnd->is_maximized() ? _wnd->restore() : _wnd->maximize();
 
   // user title bar draw

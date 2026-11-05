@@ -86,6 +86,11 @@ struct Rect : Replaceable
   template <Vec2 T>
   auto contains_bounding(T p) const noexcept { return p.x >= left && p.x <= right && p.y >= top && p.y <= bottom; }
 
+  auto contains(Rect rect) const noexcept
+  {
+    return left <= rect.left && top <= rect.top && right >= rect.right && bottom >= rect.bottom;
+  }
+
   auto to_RECT() const noexcept { return RECT{ static_cast<LONG>(left), static_cast<LONG>(top), static_cast<LONG>(right), static_cast<LONG>(bottom) }; }
 
   void expand(float2 p) noexcept

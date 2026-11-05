@@ -24,6 +24,24 @@ auto is_click_on(float2 left_top, float2 right_bottom) noexcept -> bool
           rc.contains(g_ui_ctx.mouse_up_window_pos.value());
 }
 
+void draw_check_box(float2 pos, float extent, Color color, bool is_checked, ButtonState const& state, CheckBoxConfig const& cfg) noexcept
+{
+  auto outer_color = state.hovered ? cfg.hover_color.value_or(color) : color;
+  if (state.hovered && state.down)
+    outer_color = cfg.click_color.value_or(outer_color);
+  rectangle(pos, pos + extent, outer_color, cfg.thickness);
+
+  if (!is_checked) return;
+
+  auto thickness   = cfg.thickness + cfg.inset;
+  auto inner_color = cfg.inner_color.value_or(color);
+  if (state.hovered)
+    inner_color = state.down
+      ? cfg.click_inner_color.value_or(inner_color)
+      : cfg.hover_inner_color.value_or(inner_color);
+  rectangle(pos + thickness, pos + extent - thickness, inner_color);
+}
+
 }
 
 namespace tk::ui {
@@ -40,7 +58,7 @@ auto is_hover_on(Rect rc) noexcept -> bool
          rc.adjust_right_bottom(float2(-1)).contains(p);
 }
 
-auto button(size_t id, float x, float y, float width, float height) noexcept -> ButtonState
+auto button(size_t id, float x, float y, float width, float height, bool blocks_window_move = true) noexcept -> ButtonState
 {
   g_ui_ctx.check_draw();
 
@@ -48,6 +66,9 @@ auto button(size_t id, float x, float y, float width, float height) noexcept -> 
   // button is a rectangle with width and height in specific position
   auto left_top     = float2{ x, y };
   auto right_bottom = float2{ x + width, y + height };
+  if (blocks_window_move)
+    g_ui_ctx.add_move_invalid_area({ left_top, right_bottom });
+
   if (g_ui_ctx.is_use_title_bar_now() && !g_ui_ctx.draw_title_bar)
   {
     left_top.y     += Title_Bar_Height;
@@ -83,9 +104,9 @@ auto button(size_t id, float x, float y, float width, float height) noexcept -> 
   return { clicked, double_click, is_hovered, is_move_out, is_down };
 }
 
-auto button(StringID name, float x, float y, float width, float height) noexcept -> ButtonState
+auto button(StringID name, float x, float y, float width, float height, bool blocks_window_move) noexcept -> ButtonState
 {
-  return button(g_ui_ctx.generic_id(name), x, y, width, height);
+  return button(g_ui_ctx.generic_id(name), x, y, width, height, blocks_window_move);
 }
 
 auto button(
@@ -168,23 +189,20 @@ auto button(
   return state;
 }
 
-auto check_box(StringID name, float2 pos, float extent, Color color, bool& is_checked, CheckBoxConfig const& cfg) noexcept -> bool
+auto check_box(StringID name, float2 pos, float extent, bool& is_checked, CheckBoxConfig const& cfg) noexcept -> bool
 {
-  // get button result
-  auto res = button(name, pos.x, pos.y, extent, extent);
-  if (res) is_checked = !is_checked;
-
-  // draw outer rect frame
-  rectangle(pos, pos + extent, res.hovered ? cfg.hover_color.value_or(color) : color, cfg.thickness);
-
-  // draw inner rect
-  if (is_checked)
-  {
-    auto t = cfg.thickness + cfg.inset;
-    auto inner_col = cfg.inner_color.value_or(color);
-    rectangle(pos + t, pos + extent - t, res.hovered ? cfg.hover_inner_color.value_or(inner_col) : inner_col);
-  }
+  auto state = button(name, pos.x, pos.y, extent, extent);
+  if (state) is_checked = !is_checked;
+  draw_check_box(pos, extent, cfg.color, is_checked, state, cfg);
   return is_checked;
+}
+
+auto check_box(StringID name, StringLiteral label, float2 pos, bool& is_checked, CheckBoxConfig const& cfg) noexcept -> float2
+{
+  auto text_extent = ui::text(label, cfg.text_size).extent;
+  check_box(name, pos, text_extent.y, is_checked, cfg);
+  ui::text(label, pos + float2{ text_extent.y + cfg.text_spacing, 0 }, cfg.text_size, cfg.text_color);
+  return { text_extent.y + cfg.text_spacing + text_extent.x, text_extent.y };
 }
 
 }

@@ -292,4 +292,9 @@ void TestWindow2::draw() noexcept
   }
 
   select_font();
+
+  // silder
+  // static float outline_width{};
+  // silder("silder_test", 0, 90, 100, 10, 0, 0.5, outline_width);
+  // ui::text(std::format("outline width : {}", outline_width), { 0, 90 }, 24, 0x00ff00ff);
 }

@@ -4,13 +4,19 @@
 
 void TestWindow1::draw() noexcept
 {
-  // Draw fps on title bar
+  // draw fps on title bar
   ui::draw_on_title_bar([&](float2 extent)
   {
     auto constexpr font_size = 12.f;
     ui::text(fps_text, { 8, (extent.y - font_size) / 2 }, font_size, 0x000000ff);
   });
 
+  // start positiont for drawing
+  auto pen     = float2{ 5, 5 };
+  auto padding = float2{ 5, 5 };
+
+  // fullscreen test feature
+  pen.y += ui::text("Press F11 to switch between fullscreen window and normal window.", pen, 24, 0x000000ff).extent.y;
   if (ui::get_key(ui::Key::F11).is_down())
   {
     if (ui::is_fullscreen_window())
@@ -18,34 +24,24 @@ void TestWindow1::draw() noexcept
     else
       ui::fullscreen_window();
   }
-  auto extent = ui::window_drawable_extent();
-  auto pos = float2{ extent.x / 2 - 50, extent.y - 50 };
-  auto size = ui::window_drawable_extent();
-  // ui::triangle({ size.x / 2, size.y * .1f }, size * .9f, { size.y * .1f, size.y * .9 }, 0x00ff0044, 10);
+  pen.y += padding.y;
 
-  if (ui::button("btn2", 50, 50, 100, 100, 0xffffffff, 0x00ff00ff))
-    test_window_2.display_switch();
-  ui::add_move_invalid_area({}, { 150, 150 });
+  auto check_box_cfg = ui::CheckBoxConfig
+  {
+    .color             = 0x2563ebff,
+    .hover_color       = 0x3b82f6ff,
+    .hover_inner_color = 0x3b82f6ff,
+    .click_color       = 0x1d4ed8ff,
+    .click_inner_color = 0x1d4ed8ff,
+    .text_size         = 16,
+    .text_color        = 0x000000ff,
+  };
 
-  // silder
-  // static float outline_width{};
-  // silder("silder_test", 0, 90, 100, 10, 0, 0.5, outline_width);
-  // ui::text(std::format("outline width : {}", outline_width), { 0, 90 }, 24, 0x00ff00ff);
+  // display test window 2
+  pen.y += ui::check_box("check box - test window 2", "Display test window 2", pen, test_window_2.is_shown(), check_box_cfg).y;
+  pen.y += padding.y;
 
-  auto cfg = ui::TextConfig{};
-  // cfg.outer_color = 0xff0000ff;
-  // cfg.outline_width = outline_width;
-  cfg.direction = ui::TextDirection::vertical;
-  cfg.pos_as_baseline = true;
-  auto res = ui::text("AigW.,()马钰 日本語のテスト。", 32, cfg);
-  auto p1 = float2{ 30 + res.ascender, 0 };
-  auto p2 = float2{ 30 + res.ascender, res.extent.y };
-
-  ui::transform_beg(ui::Transform{}.rotate((p1 + p2) / 2, -30));
-  ui::text("AigW.,()马钰 日本語のテスト。", { 30, 0 }, 32, 0x000000ff, cfg);
-  ui::rectangle({ 30, 0 }, { 30 + res.extent.x, res.extent.y }, 0x00ff00ff, 1);
-  ui::line({ 30 + res.ascender, 0 }, { 30 + res.ascender, res.extent.y }, 0xff0000ff);
-  ui::transform_end();
-
-  ui::check_box("check box", { 50, 150 }, 20, 0x0000ffff, font_select_window.is_shown());
+  // display font select window
+  pen.y += ui::check_box("check box - font select window", "Display font select window", pen, font_select_window.is_shown(), check_box_cfg).y;
+  pen.y += padding.y;
 }

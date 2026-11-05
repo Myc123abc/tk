@@ -99,6 +99,24 @@ void Window::update_rect() noexcept
   _rect = Rect{ _x, _y, _x + _width, _y + _height };
 }
 
+void Window::add_move_invalid_area(Rect rect) noexcept
+{
+  if (rect.empty()) return;
+
+  for (auto const& area : _move_invalid_areas)
+    if (area.contains(rect)) return;
+
+  for (size_t index = 0; index < _move_invalid_areas.size();)
+  {
+    if (rect.contains(_move_invalid_areas[index]))
+      _move_invalid_areas.erase(_move_invalid_areas.begin() + index);
+    else
+      ++index;
+  }
+
+  _move_invalid_areas.emplace_back(rect);
+}
+
 void Window::destroy() const noexcept
 {
   if (_blur_window)

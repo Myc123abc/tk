@@ -115,7 +115,7 @@ public:
   auto monitor() const noexcept { return _monitor; }
   auto set_monitor(std::string monitor) noexcept { _monitor = monitor; }
 
-  void add_move_invalid_area(Rect rect) noexcept { _move_invalid_areas.emplace_back(rect); }
+  void add_move_invalid_area(Rect rect) noexcept;
   void clear_move_invalid_areas() noexcept { _move_invalid_areas.clear(); }
 
   auto& cfg() noexcept { return _cfg; }

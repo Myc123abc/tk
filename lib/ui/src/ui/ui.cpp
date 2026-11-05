@@ -170,21 +170,7 @@ void end() noexcept
 void add_move_invalid_area(float2 left_top, float2 right_bottom) noexcept
 {
   g_ui_ctx.check_draw();
-  if (g_ui_ctx.is_use_title_bar_now() && !g_ui_ctx.draw_title_bar)
-  {
-    left_top.y     += Title_Bar_Height;
-    right_bottom.y += Title_Bar_Height;
-  }
-
-  auto scale = g_ui_ctx.window()->scale();
-  left_top     *= scale;
-  right_bottom *= scale;
-
-  auto wnd = g_ui_ctx.window();
-  if (auto rect = intersect_rect({ static_cast<LONG>(left_top.x), static_cast<LONG>(left_top.y),
-                                   static_cast<LONG>(right_bottom.x), static_cast<LONG>(right_bottom.y) },
-                                 { 0, 0, static_cast<LONG>(wnd->width()), static_cast<LONG>(wnd->height()) }))
-    g_ui_ctx.window()->add_move_invalid_area(rect.value());
+  g_ui_ctx.add_move_invalid_area({ left_top, right_bottom });
 }
 
 auto window_extent() noexcept -> float2
