@@ -392,6 +392,15 @@ auto window_pos() noexcept -> float2;
 auto window_drawable_extent() noexcept -> float2;
 
 /**
+ * whether current window is maximized
+ * @return is window fullscreen
+ */
+auto is_maximized_window() noexcept -> bool;
+
+// maximize window
+void maximize_window() noexcept;
+
+/**
  * whether current window is fullscreen
  * @return is window fullscreen
  */

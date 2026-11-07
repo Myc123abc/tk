@@ -8,7 +8,7 @@ namespace tk::ui {
 
 TextLayout::TextLayout(std::vector<StringLiteral> const& texts, std::string_view family, FontStyle style, TextDirection direction) noexcept
 {
-  assert(texts.size() > 1);
+  assert(!texts.empty());
 
   _texts.reserve(texts.size());
   for (auto text : texts)

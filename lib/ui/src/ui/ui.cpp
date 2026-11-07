@@ -199,6 +199,19 @@ auto window_drawable_extent() noexcept -> float2
   return extent;
 }
 
+auto is_maximized_window() noexcept -> bool
+{
+  g_ui_ctx.check_draw();
+  return g_ui_ctx.window()->is_maximized();
+}
+
+void maximize_window() noexcept
+{
+  g_ui_ctx.check_draw();
+  if (g_ui_ctx.window()->cfg().no_resize) return;
+  g_ui_ctx.window()->maximize();
+}
+
 auto is_fullscreen_window() noexcept -> bool
 {
   g_ui_ctx.check_draw();

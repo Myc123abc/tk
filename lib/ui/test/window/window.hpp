@@ -20,17 +20,35 @@ public:
 
   void operator()() noexcept
   {
-    if (!_is_shown) return;
+    if (!_is_shown)
+    {
+      _show_cnt = {};
+      return;
+    }
 
     auto is_closed = false;
     ui::begin(_name, _ext, _pos, &is_closed, _cfg);
     _is_shown = !is_closed;
 
+    auto is_maximized  = ui::is_maximized_window();
+    auto is_fullscreen = ui::is_fullscreen_window();
+    if (!is_maximized && !is_fullscreen)
+    {
+      _pos = ui::window_pos();
+      _ext = ui::window_extent();
+    }
+
+    if (_show_cnt == 0)
+    {
+      if (_is_maximized)  ui::maximize_window();
+      if (_is_fullscreen) ui::fullscreen_window();
+    }
+    _is_maximized  = is_maximized;
+    _is_fullscreen = is_fullscreen;
+
     static_cast<Derived*>(this)->draw();
 
-    _pos = ui::window_pos();
-    _ext = ui::window_extent();
-
+    ++_show_cnt;
     ui::end();
   }
 
@@ -39,7 +57,7 @@ public:
   auto& is_shown() noexcept { return _is_shown; }
 
   void show() noexcept { _is_shown = true; }
-  void hide() noexcept { _is_shown = false;  }
+  void hide() noexcept { _is_shown = false; }
 
 private:
   StringID              _name;
@@ -47,6 +65,9 @@ private:
   std::optional<float2> _ext;
   bool                  _is_shown{};
   ui::WindowConfig      _cfg;
+  bool                  _is_maximized{};
+  bool                  _is_fullscreen{};
+  uint64                _show_cnt{};
 };
 
 #define DefWindow(ClassName, ...)              \
