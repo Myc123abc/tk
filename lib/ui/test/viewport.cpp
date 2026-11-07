@@ -503,7 +503,7 @@ int main()
 
   while (!is_closed)
   {
-    ui::begin("Viewport shape test", 1280, 860, float2{ 100, 80 }, &is_closed, config);
+    ui::begin("Viewport shape test", float2{ 1280, 860 }, float2{ 100, 80 }, &is_closed, config);
 
     auto window_extent = ui::window_drawable_extent();
     ui::rectangle({}, window_extent, Window_Background);

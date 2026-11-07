@@ -77,7 +77,7 @@ void destroy() noexcept
 
 auto running() noexcept -> bool
 {
-  ui::begin("Benchmark", 200, 200, float2{ 0, 0 }, &g_is_closed, g_wndCfg);
+  ui::begin("Benchmark", float2{ 200, 200 }, float2{ 0, 0 }, &g_is_closed, g_wndCfg);
   ui::rectangle({}, ui::window_drawable_extent(), 0x000000ff);
   return !g_is_closed;
 }

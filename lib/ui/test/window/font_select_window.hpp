@@ -5,4 +5,4 @@
 
 DefWindow(FontSelectWindow);
 
-inline FontSelectWindow font_select_window("font select window", { 100, 30 }, {}, wnd_cfg);
+inline FontSelectWindow font_select_window("font select window", {}, {}, wnd_cfg);

@@ -25,6 +25,7 @@ struct WindowContext
   WindowContext() = default;
   WindowContext(HWND handle) noexcept : handle(handle) {}
 
+  StringID  name{};
   HWND      handle{};
   bool      is_called{};
   bool      can_be_closed{};
@@ -33,6 +34,8 @@ struct WindowContext
   bool      need_clear{};
   bool      set_fullscreen{};
   bool      first_time_call{ true };
+  bool      auto_size{};
+  Rect      content_bounds;
   FrameData frame_data;
 };
 
@@ -44,7 +47,7 @@ public:
 
   void close_window() noexcept;
 
-  void begin(StringID name, uint width, uint height, std::optional<float2> pos, bool* is_closed, WindowConfig const& cfg) noexcept;
+  void begin(StringID name, std::optional<float2> extent, std::optional<float2> pos, bool* is_closed, WindowConfig const& cfg) noexcept;
   void end() noexcept;
 
   void check_draw() const noexcept;
@@ -55,6 +58,10 @@ public:
   auto is_hover_on(size_t id, float2 left_top, float2 right_bottom) noexcept { return is_hover_on(id, { left_top, right_bottom }); }
   auto transform_widget_rect(Rect rect) const noexcept -> Rect;
   void add_move_invalid_area(Rect rect) noexcept;
+  void register_item(Rect rect) noexcept;
+  void custom_transform_beg() noexcept { ++_custom_transform_depth; }
+  void custom_transform_end() noexcept { err_if(_custom_transform_depth == 0, "transform_end called without transform_beg"); --_custom_transform_depth; }
+  auto has_custom_transform() const noexcept { return _custom_transform_depth != 0; }
 
   void set_render_pos(float x, float y) noexcept { _wnd_ctx->render_pos = { x + renderer::Window_Shadow_Thickness, y + renderer::Window_Shadow_Thickness }; }
   auto get_render_pos() const noexcept { return _wnd_ctx->render_pos; }
@@ -118,11 +125,17 @@ private:
   std::unordered_map<HWND, StringID>          _wnd_names;
 
   renderer::Window* _wnd{};
+  renderer::Window  _measurement_wnd;
   WindowContext*    _wnd_ctx{};
   HWND              _fullscreen_window{};
   bool              _fullscreen_window_need_clear{};
 
+  // auto size related variables
+  Rect                  _monitor_work_rect;
+  std::optional<float2> _wnd_init_pos;
+
   bool   _call_begin{};
+  uint   _custom_transform_depth{};
   double _delta_time{};
 
   std::move_only_function<void(float2)> _user_title_bar_draw_func;

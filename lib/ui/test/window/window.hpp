@@ -15,7 +15,7 @@ public:
   BaseWindow& operator=(BaseWindow const&) = delete;
   BaseWindow& operator=(BaseWindow&&)      = default;
 
-  BaseWindow(StringID name, float2 ext, std::optional<float2> pos = {}, ui::WindowConfig const& cfg = {}) noexcept
+  BaseWindow(StringID name, std::optional<float2> ext, std::optional<float2> pos = {}, ui::WindowConfig const& cfg = {}) noexcept
     : _name(name), _pos(pos), _ext(ext), _cfg(cfg) {}
 
   void operator()() noexcept
@@ -23,13 +23,13 @@ public:
     if (!_is_shown) return;
 
     auto is_closed = false;
-    ui::begin(_name, _ext.x, _ext.y, _pos, &is_closed, _cfg);
+    ui::begin(_name, _ext, _pos, &is_closed, _cfg);
     _is_shown = !is_closed;
 
     static_cast<Derived*>(this)->draw();
 
     _pos = ui::window_pos();
-    _ext = ui::window_drawable_extent();
+    _ext = ui::window_extent();
 
     ui::end();
   }
@@ -42,11 +42,11 @@ public:
   void hide() noexcept { _is_shown = false;  }
 
 private:
-  StringID         _name;
+  StringID              _name;
   std::optional<float2> _pos;
-  float2           _ext;
-  bool             _is_shown{};
-  ui::WindowConfig _cfg;
+  std::optional<float2> _ext;
+  bool                  _is_shown{};
+  ui::WindowConfig      _cfg;
 };
 
 #define DefWindow(ClassName, ...)              \

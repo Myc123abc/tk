@@ -97,6 +97,7 @@ auto image_extent(std::string_view path) noexcept -> float2
 auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha, std::optional<ImageConfig> cfg) noexcept -> std::expected<void, ImageLoadErrorType>
 {
   if (!alpha || left_top.x == right_bottom.x || left_top.y == right_bottom.y) return {};
+  g_ui_ctx.register_item({ left_top, right_bottom });
   adjust_pos(left_top, right_bottom);
   if (cfg && cfg->rounding_cfg) adjust_scale(cfg->rounding_cfg->radius);
   return g_ui_ctx.image(path, left_top, right_bottom, alpha, cfg);
@@ -124,15 +125,20 @@ auto load_fonts(std::span<std::string const> paths) noexcept -> std::vector<std:
 auto text(StringLiteral text, float2 pos, float size, Color color, TextConfig const& cfg) noexcept -> TextResult
 {
   if (text.empty()) return {};
+  auto const item_pos = pos;
   adjust_pos(pos); adjust_scale(size);
-  return g_ui_ctx.text(text, pos, size, color, cfg);
+  auto result = g_ui_ctx.text(text, pos, size, color, cfg);
+  g_ui_ctx.register_item({ item_pos, item_pos + result.extent });
+  return result;
 }
 
 auto text(StringLiteral text, float size, TextConfig const& cfg) noexcept -> TextResult
 {
   if (text.empty()) return {};
   adjust_scale(size);
-  return g_ui_ctx.text(text, {}, size, {}, cfg);
+  auto result = g_ui_ctx.text(text, {}, size, {}, cfg);
+  g_ui_ctx.register_item({ float2{}, result.extent });
+  return result;
 }
 
 auto get_text_bounding_rect(StringLiteral text, float size, TextConfig const& cfg) noexcept -> std::optional<Rect>
@@ -157,14 +163,14 @@ auto get_cursor_pos_on_window() noexcept -> float2
   return get_cursor_pos() - g_ui_ctx.window()->pos();
 }
 
-void begin(StringID name, uint width, uint height, std::optional<float2> pos, bool* is_closed, WindowConfig const& cfg) noexcept
+void begin(StringID name, std::optional<float2> extent, std::optional<float2> pos, bool* is_closed, WindowConfig const& cfg) noexcept
 {
-  g_ui_ctx.begin(name, width, height, pos, is_closed, cfg);
+  g_ui_ctx.begin(name, extent, pos, is_closed, cfg);
 }
 
 void end() noexcept
 {
-	g_ui_ctx.end();
+  g_ui_ctx.end();
 }
 
 void add_move_invalid_area(float2 left_top, float2 right_bottom) noexcept
@@ -226,6 +232,7 @@ void draw_on_title_bar(std::move_only_function<void(float2)>&& func) noexcept
 void transform_beg(Matrix const& transform) noexcept
 {
   g_ui_ctx.check_draw();
+  g_ui_ctx.custom_transform_beg();
   auto adjusted = transform;
   adjust_transform(adjusted);
   g_ui_ctx.frame_data()->transform_beg(adjusted);
@@ -239,6 +246,7 @@ void transform_beg(Transform const& transform) noexcept
 void transform_end() noexcept
 {
   g_ui_ctx.check_draw();
+  g_ui_ctx.custom_transform_end();
   g_ui_ctx.frame_data()->transform_end();
 }
 

@@ -61,6 +61,8 @@ auto is_hover_on(Rect rc) noexcept -> bool
 auto button(size_t id, float x, float y, float width, float height, bool blocks_window_move = true) noexcept -> ButtonState
 {
   g_ui_ctx.check_draw();
+  err_if(g_ui_ctx.has_custom_transform(), "buttons cannot be used inside transform_beg()/transform_end()");
+  g_ui_ctx.register_item({ float2{ x, y }, float2{ x + width, y + height } });
 
   // what is a button
   // button is a rectangle with width and height in specific position

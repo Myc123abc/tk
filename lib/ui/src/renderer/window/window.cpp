@@ -10,6 +10,16 @@ using namespace tk::ui;
 
 namespace tk::renderer {
 
+void Window::init_logical(int x, int y, uint width, uint height, float scale) noexcept
+{
+  _x       = x;
+  _y       = y;
+  _width   = width  * scale;
+  _height  = height * scale;
+  _scale   = scale;
+  update_rect();
+}
+
 void Window::init(std::optional<float2> pos, uint width, uint height, ui::Backdrop const& backdrop) noexcept
 {
   constexpr auto window_style = WS_POPUP | WS_MINIMIZEBOX;

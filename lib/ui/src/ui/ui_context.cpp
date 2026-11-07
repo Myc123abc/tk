@@ -5,6 +5,7 @@
 #include "tk/hash.hpp"
 #include "text_engine/text_engine.hpp"
 #include "input_system.hpp"
+#include "../renderer/window/monitor.hpp"
 
 using namespace tk::renderer;
 
@@ -33,7 +34,7 @@ void UIContext::destroy() noexcept
   g_wnd_mgr.close_fullscreen_window();
 }
 
-void UIContext::begin(StringID name, uint width, uint height, std::optional<float2> pos, bool* is_closed, WindowConfig const& cfg) noexcept
+void UIContext::begin(StringID name, std::optional<float2> extent, std::optional<float2> pos, bool* is_closed, WindowConfig const& cfg) noexcept
 {
   err_if(_call_begin, "begin is called but end not be called");
   _call_begin = true;
@@ -41,18 +42,35 @@ void UIContext::begin(StringID name, uint width, uint height, std::optional<floa
   // create window if not have
   if (!_wnd_ctxs.contains(name))
   {
-    if (cfg.display_title_bar) height = std::max(height, static_cast<uint>(Title_Bar_Height));
-    auto handle = g_wnd_mgr.create_window(pos, width, height, cfg.backdrop);
-    _wnd_ctxs.emplace(name, handle);
-    _wnd_names.emplace(handle, name);
-    _wnd_ctx = &_wnd_ctxs[name];
+    _wnd_ctx                = &_wnd_ctxs[name];
+    _wnd_ctx->name          = name;
     _wnd_ctx->can_be_closed = is_closed;
-    _wnd = g_wnd_mgr.get_window(_wnd_ctx->handle);
+    _wnd_ctx->auto_size     = !extent.has_value();
+
+    if (_wnd_ctx->auto_size)
+    {
+      auto cursor_pos = renderer::get_cursor_pos();
+      auto monitor    = pos
+        ? renderer::Monitor{ Rect{ pos.value(), pos.value() + float2{ 1, 1 } } }
+        : renderer::Monitor{ POINT{ cursor_pos.x, cursor_pos.y } };
+      auto const initial_pos = pos.value_or(float2{ cursor_pos.x, cursor_pos.y });
+      _measurement_wnd.init_logical(initial_pos.x, initial_pos.y, 1, 1, monitor.scale());
+      _measurement_wnd.cfg() = cfg;
+      _wnd               = &_measurement_wnd;
+      _monitor_work_rect = monitor.work_rect();
+      _wnd_init_pos      = pos;
+    }
+    else
+    {
+      _wnd_ctx->handle = g_wnd_mgr.create_window(pos, extent.value().x, extent.value().y, cfg.backdrop);
+      _wnd             = g_wnd_mgr.get_window(_wnd_ctx->handle);
+      _wnd_names.emplace(_wnd_ctx->handle, name);
+    }
   }
   else 
   {
     _wnd_ctx = &_wnd_ctxs[name];
-    _wnd = g_wnd_mgr.get_window(_wnd_ctx->handle);
+    _wnd     = g_wnd_mgr.get_window(_wnd_ctx->handle);
   }
   _wnd_ctx->is_called = true;
 
@@ -77,6 +95,11 @@ void UIContext::begin(StringID name, uint width, uint height, std::optional<floa
 
 void UIContext::update_window_config(WindowConfig const& cfg) noexcept
 {
+  if (!_wnd_ctx->handle)
+  {
+    _wnd->cfg() = cfg;
+    return;
+  }
   auto& wnd_cfg = _wnd->cfg();
   if (cfg.backdrop.style != ui::BackdropStyle::none)
   {
@@ -116,11 +139,35 @@ void UIContext::end() noexcept
   err_if(!_call_begin, "begin is not called but end is called");
   err_if(!_scissor_area_stack.empty(), "scissor_area_begin is called but scissor_area_end not be called");
   err_if(!_viewport_stack.empty(), "viewport_begin is called but viewport_end not be called");
+  err_if(_custom_transform_depth != 0, "transform_end not be called");
+  if (_wnd_ctx->auto_size && _wnd_ctx->first_time_call)
+  {
+    auto desired    = _wnd_ctx->content_bounds.right_bottom() + float2{ 0.f, is_use_title_bar_now() ? Title_Bar_Height : 0.f };
+    auto max_extent = float2
+    {
+      (_monitor_work_rect.width()  - _wnd->shadow_thickness() * 2) / _wnd->scale(),
+      (_monitor_work_rect.height() - _wnd->shadow_thickness() * 2) / _wnd->scale(),
+    };
+    desired.x = std::min(desired.x, max_extent.x);
+    desired.y = std::min(desired.y, max_extent.y);
+
+    _wnd_ctx->handle = g_wnd_mgr.create_window(_wnd_init_pos, desired.x, desired.y, _wnd->cfg().backdrop);
+    _wnd             = g_wnd_mgr.get_window(_wnd_ctx->handle);
+    _wnd_names.emplace(_wnd_ctx->handle, _wnd_ctx->name);
+    _wnd->cfg() = _measurement_wnd.cfg();
+  }
   if (is_use_title_bar_now())
     add_title_bar();
   _user_title_bar_draw_func = {};
   _call_begin = false;
   if (_wnd_ctx->first_time_call) _wnd_ctx->first_time_call = false;
+}
+
+void UIContext::register_item(Rect rect) noexcept
+{
+  if (!_wnd_ctx || !_wnd_ctx->auto_size || rect.empty()) return;
+  _wnd_ctx->content_bounds.expand(rect.left_top());
+  _wnd_ctx->content_bounds.expand(rect.right_bottom());
 }
 
 void UIContext::draw_on_title_bar(std::move_only_function<void(float2)>&& func) noexcept

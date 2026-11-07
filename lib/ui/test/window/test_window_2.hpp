@@ -23,4 +23,4 @@ private:
   std::string_view img2 = "assets/image/test.png";
 );
 
-inline TestWindow2 test_window_2("test window 2", { 200, 200 }, float2{ 0, 1080 }, wnd_cfg);
+inline TestWindow2 test_window_2("test window 2", float2{ 200, 200 }, float2{ 0, 1080 }, wnd_cfg);

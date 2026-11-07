@@ -344,15 +344,14 @@ auto get_cursor_pos_on_window() noexcept -> float2;
 /**
  * begin a window
  * @param name window name cannot be duplicated
- * @param width
- * @param height
+ * @param extent window client extent; controls determine it when omitted
  * @param pos window position; the system chooses it when omitted
  * @param is_closed make the window can be closed if is_closed is not nullptr,
  *                  and this is only a flag to indicate whether the window is closed,
  *                  if you want to close the window, stop call the begin and end of this window
  * @param cfg window config
  */
-void begin(StringID name, uint width, uint height, std::optional<float2> pos = {}, bool* is_closed = {}, WindowConfig const& cfg = {}) noexcept;
+void begin(StringID name, std::optional<float2> extent = {}, std::optional<float2> pos = {}, bool* is_closed = {}, WindowConfig const& cfg = {}) noexcept;
 
 // end a window
 void end() noexcept;
