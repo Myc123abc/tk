@@ -126,4 +126,9 @@ auto check_box(StringID name, float2 pos, float extent, bool& is_checked, CheckB
  */
 auto check_box(StringID name, StringLiteral label, float2 pos, bool& is_checked, CheckBoxConfig const& cfg = {}) noexcept -> float2;
 
+struct SelectListConfig
+{
+
+};
+
 }

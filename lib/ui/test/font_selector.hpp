@@ -66,8 +66,10 @@ public:
 
   auto& font_infos() const noexcept { return _font_infos; }
 
-  auto render(float2 pos, float size, float2 padding) noexcept -> float2
+  auto operator()(float2 pos, float size, float2 padding) noexcept -> float2
   {
+    _is_selected = false;
+
     _txt_layout = ui::TextLayout{ _font_name_views }
       .set_pos(pos)
       .adjust_size(size)
@@ -77,15 +79,22 @@ public:
 
     auto width  = _txt_layout.extent().x;
     auto height = _txt_layout.unit_height();
-    for (auto const& text : _txt_layout.texts())
+    for (auto i = 0; i < _txt_layout.texts().size(); ++i)
     {
-      ui::button("FontSelector" + std::string(text.text), pos.x, pos.y, width, height, 0x00ff00ff, 0x0000ffff);
+      if (ui::button("FontSelector" + std::string(_txt_layout.texts()[i].text), pos.x, pos.y, width, height, 0x00ff00ff, 0x0000ffff))
+      {
+        _is_selected  = true;
+        _selected_idx =  i;
+      }
       pos.y += height;
     }
     
     _txt_layout.render();
     return _txt_layout.extent();
   }
+
+  auto is_selected() const noexcept { return _is_selected; }
+  auto& selected_font() const noexcept { return _font_infos[_selected_idx]; }
 
 private:
   std::vector<std::string>   _added_paths;
@@ -94,4 +103,6 @@ private:
   std::deque<std::string>    _font_names;
   std::vector<StringLiteral> _font_name_views;
   ui::TextLayout             _txt_layout;
+  bool                       _is_selected{};
+  int                        _selected_idx{ -1 };
 };
