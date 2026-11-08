@@ -215,6 +215,7 @@ struct TextConfig
   Color            outer_color;
   float            outline_width{ 0.15f };
   bool             pos_as_baseline{};
+  float            limit_len{}; // 0 disables wrapping; positive limits are clamped to the widest grapheme cluster.
 };
 
 struct TextResult

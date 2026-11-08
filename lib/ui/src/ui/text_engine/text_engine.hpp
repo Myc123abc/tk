@@ -11,9 +11,14 @@ namespace tk::ui {
 
 using PendingCopyGlyphsInfoType = std::unordered_map<uint, std::vector<std::pair<MSDFBitmap, float2>>>;
 
-constexpr auto get_text_id(StringLiteral text, std::string_view family = {}, FontStyle style = {}, TextDirection direction = {}) noexcept
+constexpr auto get_text_id(
+  StringLiteral    text,
+  std::string_view family    = {},
+  FontStyle        style     = {},
+  TextDirection    direction = {},
+  float           limit_len  = {}) noexcept
 {
-  return hash(text.id(), family, style, direction);
+  return hash(text.id(), family, style, direction, limit_len);
 }
 
 Singleton(TextEngine, g_text_engine,
@@ -26,13 +31,22 @@ public:
   auto load_font(std::string const& path) noexcept -> std::expected<FontInfo, FontLoadErrorType>;
   auto load_fonts(std::span<std::string const> paths) noexcept -> std::vector<std::expected<FontInfo, FontLoadErrorType>>;
 
+  struct ShapedGlyph
+  {
+    uint   glyph_index{};
+    float2 advance;
+    float2 offset;
+    uint   cluster{};
+  };
+
   struct ParseResult
   {
     std::vector<float2>   advances;
     std::vector<float2>   offsets;
+    std::vector<uint>     clusters;
     float2                extent;
     float                 ascender{};
-    bool                  is_vertical{};
+    TextDirection         direction{};
     std::vector<GlyphKey> glyph_info_keys;
     GlyphKeySet           generating_glyph_info_keys;
     std::optional<Rect>   bounding_rect;
@@ -40,14 +54,28 @@ public:
     ParseResult() noexcept = default;
 
     auto generate_complete() const noexcept { return generating_glyph_info_keys.empty(); }
+
+    void emplace_back(ShapedGlyph const& glyph, uint cluster_offset, GlyphKey key) noexcept
+    {
+      advances.emplace_back(glyph.advance);
+      offsets.emplace_back(glyph.offset);
+      clusters.emplace_back(cluster_offset + glyph.cluster);
+      glyph_info_keys.emplace_back(key);
+      if (direction == TextDirection::horizontal)
+        extent.x += glyph.advance.x;
+      else
+        extent.y += glyph.advance.y;
+    }
+
+    void limit_length(float len) noexcept;
   };
   using ParseResultPool       = ObjectPool<ParseResult>;
   using TextParseResultHandle = ParseResultPool::Handle;
-  auto parse(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction) noexcept -> TextParseResultHandle;
+  auto parse(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction, float limit_len) noexcept -> TextParseResultHandle;
   auto& get_parse_result(TextParseResultHandle handle) const noexcept { return _parse_result_pool[handle]; }
   auto try_to_get_parse_result(uint64 text_id, uint64 text_hash) noexcept -> std::optional<TextParseResultHandle>;
 
-  auto get_bounding_rect(StringLiteral text, std::string_view family = {}, FontStyle style = {}, TextDirection direction = {}) noexcept -> std::optional<Rect>;
+  auto get_bounding_rect(StringLiteral text, std::string_view family = {}, FontStyle style = {}, TextDirection direction = {}, float limit_len = {}) noexcept -> std::optional<Rect>;
 
   void update() noexcept;
 
@@ -58,13 +86,6 @@ public:
   void postprocess() noexcept;
 
 private:
-  struct ShapedGlyph
-  {
-    uint   glyph_index{};
-    float2 advance;
-    float2 offset;
-  };
-
   auto install_font(std::unique_ptr<Font> font) noexcept -> FontInfo;
   auto shape_text(std::string_view text, Font* font, TextDirection direction) noexcept -> std::vector<ShapedGlyph>;
   auto split_text(std::string_view text, FontStyleKey key) noexcept -> std::vector<std::pair<std::string_view, Font*>>;

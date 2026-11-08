@@ -67,8 +67,7 @@ TODO:
 1. font glyphs.bin generation need
 2. batch upload glyph cache before really use them
 3. specific language
-4. add grapheme clusters support
-5. add entirely text api support, like line break, cursor move, selection, IME
+4. add entirely text api support, like line break, cursor move, selection, IME
 */
 void GlyphCacher::init() noexcept
 {

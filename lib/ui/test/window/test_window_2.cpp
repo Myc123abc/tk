@@ -288,7 +288,7 @@ void TestWindow2::draw() noexcept
       text_cfg.style = ui::FontStyle::bold;
     else
       text_cfg.style = ui::FontStyle::regular;
-    text_cfg.family = font_selector.font_infos()[2].family;
+    // text_cfg.family = font_selector.font_infos()[2].family;
   }
 
   select_font();

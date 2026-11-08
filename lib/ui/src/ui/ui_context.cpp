@@ -625,13 +625,12 @@ auto UIContext::text(StringLiteral text, float2 pos, float size, Color inner_col
   assert(!text.empty());
   check_draw();
 
-  auto const  result_handle = g_text_engine.parse(text, cfg.family, cfg.style, cfg.direction);
-  auto const& result        = g_text_engine.get_parse_result(result_handle);
-
-  auto draw_scale = size / FT_Pixel_Size;
-  auto scale      = draw_scale / _wnd->scale();
-  auto ascender   = result.ascender * scale;
-  auto extent     = result.extent   * scale;
+  auto draw_scale    = size / FT_Pixel_Size;
+  auto scale         = draw_scale / _wnd->scale();
+  auto result_handle = g_text_engine.parse(text, cfg.family, cfg.style, cfg.direction, cfg.limit_len / scale);
+  auto const& result = g_text_engine.get_parse_result(result_handle);
+  auto ascender      = result.ascender * scale;
+  auto extent        = result.extent   * scale;
 
   if (result.generate_complete() && inner_color.a)
   {
@@ -652,7 +651,7 @@ auto UIContext::get_text_bounding_rect(StringLiteral text, float size, TextConfi
 {
   assert(!text.empty());
   check_draw();
-  if (auto res = g_text_engine.get_bounding_rect(text, cfg.family, cfg.style, cfg.direction))
+  if (auto res = g_text_engine.get_bounding_rect(text, cfg.family, cfg.style, cfg.direction, cfg.limit_len / (size / FT_Pixel_Size / _wnd->scale())))
     return res.value() * (size / FT_Pixel_Size / _wnd->scale());
   return {};
 }

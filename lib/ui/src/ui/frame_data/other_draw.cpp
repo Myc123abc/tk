@@ -271,7 +271,7 @@ void FrameData::_add_text(TextParseResultHandle handle, float2 pos, float scale,
 
   auto [vertices, indices] = expand_beg(4 * cnt, 6 * cnt);
   auto vtx_offset = 0, idx_offset = 0;
-  auto ascender   = result.is_vertical ? 0 : result.ascender;
+  auto ascender   = result.direction == TextDirection::vertical ? 0 : result.ascender;
   for (auto i = 0; i < cnt; ++i)
   {
     auto const& info = g_text_engine.get_glyph_info(result.glyph_info_keys[i]);

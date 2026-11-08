@@ -191,6 +191,7 @@ auto TextEngine::shape_text(std::string_view text, Font* font, TextDirection dir
     std::lock_guard lock{ font->_mutex };
     hb_buffer_reset(_hb_buf);
     hb_buffer_add_utf8(_hb_buf, text.data(), static_cast<int>(text.size()), 0, -1);
+    hb_buffer_set_cluster_level(_hb_buf, HB_BUFFER_CLUSTER_LEVEL_MONOTONE_GRAPHEMES);
     if (direction == TextDirection::vertical)
       hb_buffer_set_direction(_hb_buf, HB_DIRECTION_TTB);
     hb_buffer_guess_segment_properties(_hb_buf);
@@ -217,17 +218,17 @@ auto TextEngine::shape_text(std::string_view text, Font* font, TextDirection dir
         advance.y = -advance.y;
         offset.y  = -offset.y;
       }
-      result.emplace_back(glyph_infos[i].codepoint, advance, offset);
+      result.emplace_back(glyph_infos[i].codepoint, advance, offset, glyph_infos[i].cluster);
     }
   }
   return result;
 }
 
-auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction) noexcept -> TextParseResultHandle
+auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction, float limit_len) noexcept -> TextParseResultHandle
 {
   assert(!text.empty());
 
-  auto id = get_text_id(text, family, style, direction);
+  auto id = get_text_id(text, family, style, direction, limit_len);
 
   if (auto res = try_to_get_parse_result(id, text.id()))
     return res.value();
@@ -240,26 +241,23 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
   // calculate advances
   res.advances.reserve(size);
   res.offsets.reserve(size);
+  res.clusters.reserve(size);
   res.glyph_info_keys.reserve(size);
+  res.direction = direction;
 
   // split text
   auto glyph_style_key = FontStyleKey(family, style);
-  for (auto [text, font] : split_text(text.view(), glyph_style_key))
+  for (auto [sub_text, font] : split_text(text.view(), glyph_style_key))
   {
+    auto const cluster_offset = static_cast<uint>(sub_text.data() - text.view());
+
     // use hb calculate advances
     if (font)
     {
-      for (auto const& glyph : shape_text(text, font, direction))
+      for (auto const& glyph : shape_text(sub_text, font, direction))
       {
         auto key = GlyphKey{ font->key(), glyph.glyph_index };
-
-        res.advances.emplace_back(glyph.advance);
-        res.offsets.emplace_back(glyph.offset);
-        res.glyph_info_keys.emplace_back(key);
-        if (direction == TextDirection::horizontal)
-          res.extent.x += glyph.advance.x;
-        else
-          res.extent.y += glyph.advance.y;
+        res.emplace_back(glyph, cluster_offset, key);
         add_uncached_glyph(font, glyph.glyph_index, key, res);
       }
     }
@@ -270,20 +268,12 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
       auto notdef_glyph_font = find_notdef_glyph_font();
       assert(notdef_glyph_font);
 
-      auto k = GlyphKey{ notdef_glyph_font->key(), 0 };
-      for (auto const& glyph : shape_text(text, notdef_glyph_font, direction))
-      {
-        res.advances.emplace_back(glyph.advance);
-        res.offsets.emplace_back(glyph.offset);
-        res.glyph_info_keys.emplace_back(k);
-        if (direction == TextDirection::horizontal)
-          res.extent.x += glyph.advance.x;
-        else
-          res.extent.y += glyph.advance.y;
-      }
+      auto key = GlyphKey{ notdef_glyph_font->key(), 0 };
+      for (auto const& glyph : shape_text(sub_text, notdef_glyph_font, direction))
+        res.emplace_back(glyph, cluster_offset, key);
       _max_ascender = std::max(_max_ascender, notdef_glyph_font->_ascender);
       _max_height   = std::max(_max_height,   notdef_glyph_font->_height);
-      if (add_notdef_glyph()) res.generating_glyph_info_keys.emplace(k);
+      if (add_notdef_glyph()) res.generating_glyph_info_keys.emplace(key);
     }
   }
 
@@ -297,12 +287,14 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
   }
   else
   {
-    res.is_vertical = true;
-    res.extent.x    = _max_height;
-    res.ascender    = res.extent.x * .5f;
+    res.extent.x = _max_height;
+    res.ascender = res.extent.x * .5f;
     for (auto& offset : res.offsets)
       offset.x += res.ascender;
   }
+
+  // adjust text lines for limited length
+  res.limit_length(limit_len);
 
   // cached calculate result
   auto handle = _parse_result_pool.alloc();
@@ -323,6 +315,83 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
     _last_ready_text_parse_results[text.id()] = handle;
 
   return handle;
+}
+
+void TextEngine::ParseResult::limit_length(float len) noexcept
+{
+  if (len <= 0.f) return;
+
+  auto cluster_end = [&](uint beg)
+  {
+    auto end = beg + 1;
+    while (end < clusters.size() && clusters[end] == clusters[beg]) ++end;
+    return end;
+  };
+  auto cluster_length = [&](uint beg, uint end)
+  {
+    auto advance = 0.f;
+    if (direction == TextDirection::horizontal)
+    {
+      for (auto i = beg; i < end; ++i)
+        advance += advances[i].x;
+    }
+    else
+    {
+      for (auto i = beg; i < end; ++i)
+        advance += advances[i].y;
+    }
+    return std::abs(advance);
+  };
+
+  // TODO: need line break to get best limit size, and we also can impl slider widget to test
+  // get max cluster length
+  auto max_cluster_length = 0.f;
+  for (auto beg = 0u; beg < advances.size();)
+  {
+    auto const end = cluster_end(beg);
+    max_cluster_length = std::max(max_cluster_length, cluster_length(beg, end));
+    beg = end;
+  }
+  len = std::max(len, max_cluster_length);
+
+  auto line_count         = 1u;
+  auto line_has_cluster   = false;
+  auto line_length        = 0.f;
+  auto max_line_length    = 0.f;
+  auto pen                = float2{};
+  auto previous_glyph_pos = float2{};
+
+  for (auto beg = 0u; beg < advances.size();)
+  {
+    auto const end    = cluster_end(beg);
+    auto const length = cluster_length(beg, end);
+    if (line_has_cluster && line_length + length > len)
+    {
+      max_line_length = std::max(max_line_length, line_length);
+      ++line_count;
+      auto next_line_pos = direction == TextDirection::horizontal
+        ? float2{ 0.f, static_cast<float>(line_count - 1) * extent.y }
+        : float2{ -static_cast<float>(line_count - 1) * extent.x, 0.f };
+      advances[beg - 1] = next_line_pos - previous_glyph_pos;
+      pen               = next_line_pos;
+      line_length       = 0.f;
+    }
+
+    line_length      += length;
+    line_has_cluster = true;
+    for (auto i = beg; i < end; ++i)
+    {
+      previous_glyph_pos = pen;
+      pen               += advances[i];
+    }
+    beg = end;
+  }
+
+  max_line_length = std::max(max_line_length, line_length);
+  if (direction == TextDirection::horizontal)
+    extent = { max_line_length, static_cast<float>(line_count) * extent.y };
+  else
+    extent = { static_cast<float>(line_count) * extent.x, max_line_length };
 }
 
 auto TextEngine::split_text(std::string_view text, FontStyleKey key) noexcept -> std::vector<std::pair<std::string_view, Font*>>
@@ -665,9 +734,9 @@ void TextEngine::upload_bitmaps(PendingCopyGlyphsInfoType const& info) noexcept
   }
 }
 
-auto TextEngine::get_bounding_rect(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction) noexcept -> std::optional<Rect>
+auto TextEngine::get_bounding_rect(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction, float limit_len) noexcept -> std::optional<Rect>
 {
-  auto  handle = parse(text, family, style, direction);
+  auto  handle = parse(text, family, style, direction, limit_len);
   auto& res    = _parse_result_pool[handle];
 
   // If bitmap generation complete
@@ -680,7 +749,7 @@ auto TextEngine::get_bounding_rect(StringLiteral text, std::string_view family, 
     // Otherwise, calculate bounding rect
     auto rect = Rect{};
     auto pos  = float2{};
-    auto ascender = res.is_vertical ? 0.f : res.ascender;
+    auto ascender = res.direction == TextDirection::vertical ? 0.f : res.ascender;
     for (auto i = 0; i < res.glyph_info_keys.size(); ++i)
     {
       auto const& info = get_glyph_info(res.glyph_info_keys[i]);

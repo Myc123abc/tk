@@ -441,7 +441,7 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
       pos + extent,
       pos + float2{ 0, extent.y },
     };
-    auto const glyph_padding = (result.is_vertical ? extent.x : extent.y) + 2.f;
+    auto const glyph_padding = (result.direction == TextDirection::vertical ? extent.x : extent.y) + 2.f;
     if (should_cull(bounds, glyph_padding))
       break;
     _add_text(cmd.data.add_text.handle, cmd.data.add_text.pos, cmd.data.add_text.scale, cmd.data.add_text.inner_color, cmd.data.add_text.outer_color, cmd.data.add_text.outline_width);
