@@ -16,6 +16,29 @@ auto fix_rect_flags(Flag<CornerFlag> flags) noexcept -> Flag<CornerFlag>
   return flags;
 }
 
+void clip_rect_path(std::vector<float2>& points, std::vector<float2>& scratch, float boundary, bool clip_x, bool keep_greater) noexcept
+{
+  scratch.clear();
+  auto previous = points.back();
+  auto previous_distance = (clip_x ? previous.x : previous.y) - boundary;
+  for (auto const point : points)
+  {
+    auto const distance = (clip_x ? point.x : point.y) - boundary;
+    if ((previous_distance < 0 && distance > 0) || (previous_distance > 0 && distance < 0))
+    {
+      auto intersection = previous + (point - previous) * (-previous_distance / (distance - previous_distance));
+      if (clip_x) intersection.x = boundary;
+      else intersection.y = boundary;
+      scratch.emplace_back(intersection);
+    }
+    if (keep_greater ? distance >= 0 : distance <= 0)
+      scratch.emplace_back(point);
+    previous = point;
+    previous_distance = distance;
+  }
+  points.swap(scratch);
+}
+
 auto calc_arc_step_and_count(int segment_count, int sample_count) noexcept -> std::pair<int, int>
 {
   auto step = std::clamp(
@@ -33,13 +56,38 @@ auto calc_arc_step_and_count(int segment_count, int sample_count) noexcept -> st
 
 void FrameData::path_rect(float2 left_top, float2 right_bottom, float rounding, Flag<CornerFlag> flags, float tessellation_scale) noexcept
 {
+  auto const clip_left_top     = left_top;
+  auto const clip_right_bottom = right_bottom;
   if (rounding >= .5f)
   {
     flags = fix_rect_flags(flags);
     auto const round_top_bottom = flags.all(CornerFlag::top_left, CornerFlag::top_right)   || flags.all(CornerFlag::bottom_left, CornerFlag::bottom_right);
     auto const round_left_right = flags.all(CornerFlag::top_left, CornerFlag::bottom_left) || flags.all(CornerFlag::top_right,   CornerFlag::bottom_right);
-    rounding = std::min(rounding, std::abs(right_bottom.x - left_top.x) * (round_top_bottom ? .5f : 1.f) - 1.f);
-    rounding = std::min(rounding, std::abs(right_bottom.y - left_top.y) * (round_left_right ? .5f : 1.f) - 1.f);
+    auto const width  = std::abs(right_bottom.x - left_top.x);
+    auto const height = std::abs(right_bottom.y - left_top.y);
+    // Subpixel arcs collapse to their centers and cannot be clipped as rounded caps.
+    auto const clip_horizontal = (flags == CornerFlag::left || flags == CornerFlag::right) &&
+      std::min(rounding, height * .5f - 1.f) * tessellation_scale >= .5f;
+    auto const clip_vertical = (flags == CornerFlag::top || flags == CornerFlag::bottom) &&
+      std::min(rounding, width * .5f - 1.f) * tessellation_scale >= .5f;
+
+    if (!clip_horizontal)
+      rounding = std::min(rounding, width * (round_top_bottom ? .5f : 1.f) - 1.f);
+    if (!clip_vertical)
+      rounding = std::min(rounding, height * (round_left_right ? .5f : 1.f) - 1.f);
+
+    if (rounding >= .5f)
+    {
+      auto const min_extent = rounding + 1.f;
+      if (clip_horizontal && flags == CornerFlag::left)
+        right_bottom.x = std::max(right_bottom.x, left_top.x + min_extent);
+      else if (clip_horizontal && flags == CornerFlag::right)
+        left_top.x = std::min(left_top.x, right_bottom.x - min_extent);
+      else if (clip_vertical && flags == CornerFlag::top)
+        right_bottom.y = std::max(right_bottom.y, left_top.y + min_extent);
+      else if (clip_vertical && flags == CornerFlag::bottom)
+        left_top.y = std::min(left_top.y, right_bottom.y - min_extent);
+    }
   }
 
   if (rounding < .5f || flags.contains(CornerFlag::none))
@@ -61,6 +109,15 @@ void FrameData::path_rect(float2 left_top, float2 right_bottom, float rounding, 
   path_arc_to({ right_bottom.x - rounding_top_right,    left_top.y     + rounding_top_right    }, rounding_top_right,    pi * 1.5f, pi * 2.f,  tessellation_scale);
   path_arc_to({ right_bottom.x - rounding_bottom_right, right_bottom.y - rounding_bottom_right }, rounding_bottom_right, 0,         pi * .5f,  tessellation_scale);
   path_arc_to({ left_top.x     + rounding_bottom_left,  right_bottom.y - rounding_bottom_left  }, rounding_bottom_left,  pi * .5f,  pi,        tessellation_scale);
+
+  if (left_top.x < clip_left_top.x)
+    clip_rect_path(_points, _tmp_buf, clip_left_top.x, true, true);
+  else if (right_bottom.x > clip_right_bottom.x)
+    clip_rect_path(_points, _tmp_buf, clip_right_bottom.x, true, false);
+  else if (left_top.y < clip_left_top.y)
+    clip_rect_path(_points, _tmp_buf, clip_left_top.y, false, true);
+  else if (right_bottom.y > clip_right_bottom.y)
+    clip_rect_path(_points, _tmp_buf, clip_right_bottom.y, false, false);
 }
 
 void FrameData::add_rect(float2 left_top, float2 right_bottom, Color color, float thickness, float rounding, Flag<CornerFlag> flags) noexcept

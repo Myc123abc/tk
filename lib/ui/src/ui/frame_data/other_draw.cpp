@@ -191,7 +191,11 @@ void FrameData::_add_image_rounded(ImageHandle handle, float2 left_top, float2 r
   assert(_points.empty());
   path_rect(left_top, right_bottom, rounding, flags);
   auto const pt_cnt = static_cast<uint>(_points.size());
-  if (pt_cnt == 4)
+  if (pt_cnt     == 4                                    &&
+      _points[0] == left_top                             &&
+      _points[1] == float2{ right_bottom.x, left_top.y } &&
+      _points[2] == right_bottom                         &&
+      _points[3] == float2{ left_top.x, right_bottom.y })
   {
     _points.clear();
     _add_image(handle, left_top, { right_bottom.x, left_top.y }, right_bottom, { left_top.x, right_bottom.y }, alpha, uv0, uv1, uv2, uv3);

@@ -14,6 +14,7 @@ struct ButtonState
   bool hovered{};
   bool move_out{};
   bool down{};
+  bool dragged{};
 
   constexpr operator bool() const noexcept
   {
@@ -125,6 +126,47 @@ auto check_box(StringID name, float2 pos, float extent, bool& is_checked, CheckB
  * @return extent of the checkbox and label
  */
 auto check_box(StringID name, StringLiteral label, float2 pos, bool& is_checked, CheckBoxConfig const& cfg = {}) noexcept -> float2;
+
+struct SliderConfig
+{
+  Color bar_color;
+  Color bar_hover_color;
+  Color progress_color;
+  Color progress_hover_color;
+  bool  is_bar_clickable{ true };
+  bool  rounding{};
+  bool  vertical{};
+  bool  reverse{};
+
+  struct DrawConfig
+  {
+    float  bar_thickness{};
+    float2 knob_extent;
+    Color  knob_color;
+    Color  knob_hover_color;
+    std::function<void(float2, float2, Color)> knob_draw;
+  };
+  std::optional<DrawConfig> draw_cfg;
+
+  static auto CircleKnob(float bar_thickness, float radius, Color color, Color hover_color) noexcept -> DrawConfig;
+  static auto RectKnob(float bar_thickness, float2 ext, Color color, Color hover_color, float rounding) noexcept -> DrawConfig;
+};
+
+/**
+ * draw a slider.
+ * horizontal grows left to right, vertical grows bottom to top, reverse flips it
+ * @param name name cannot be duplicate in the window
+ * @param x
+ * @param y
+ * @param width
+ * @param height
+ * @param beg minimum value
+ * @param end maximum value
+ * @param v slider value, clamped to [beg, end]
+ * @param cfg slider config
+ * @return whether the slider was released after dragging
+ */
+auto slider(StringID name, float x, float y, float width, float height, float beg, float end, float& v, SliderConfig const& cfg) noexcept -> bool;
 
 struct SelectListConfig
 {

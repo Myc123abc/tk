@@ -102,7 +102,8 @@ auto button(size_t id, float x, float y, float width, float height, bool blocks_
   auto is_down     = is_last_mouse_down_id && mouse_left_button_state.has_down();
   if (is_hovered && (g_ui_ctx.is_last_mouse_up ? false : g_ui_ctx.mouse_down_window_pos.has_value()))
   {
-    g_ui_ctx.add_mouse_left_button_state(id, left_top, right_bottom);
+    is_last_mouse_down_id = g_ui_ctx.add_mouse_left_button_state(id, left_top, right_bottom);
+    is_down    = is_last_mouse_down_id && mouse_left_button_state.has_down();
     is_hovered = is_down                                                                         &&
                  !is_move_out                                                                    &&
                  Rect{ left_top, right_bottom }.contains(g_ui_ctx.mouse_down_window_pos.value()) &&
@@ -111,8 +112,9 @@ auto button(size_t id, float x, float y, float width, float height, bool blocks_
 
   auto clicked      = is_hovered && is_last_mouse_down_id && is_click_on(left_top, right_bottom) && !is_move_out;
   auto double_click = is_hovered && mouse_left_button_state.state == KeyState::double_click;
+  auto dragged      = is_last_mouse_down_id && mouse_left_button_state.state == KeyState::up;
 
-  return { clicked, double_click, is_hovered, is_move_out, is_down };
+  return { clicked, double_click, is_hovered, is_move_out, is_down, dragged };
 }
 
 auto button(StringID name, float x, float y, float width, float height, bool blocks_window_move) noexcept -> ButtonState
@@ -214,6 +216,137 @@ auto check_box(StringID name, StringLiteral label, float2 pos, bool& is_checked,
   check_box(name, pos, text_extent.y, is_checked, cfg);
   ui::text(label, pos + float2{ text_extent.y + cfg.text_spacing, 0 }, cfg.text_size, cfg.text_color);
   return { text_extent.y + cfg.text_spacing + text_extent.x, text_extent.y };
+}
+
+auto SliderConfig::CircleKnob(float bar_thickness, float radius, Color color, Color hover_color) noexcept -> DrawConfig
+{
+  return { bar_thickness, { radius, radius }, color, hover_color,
+    [](float2 pos, float2 ext, Color col) { circle(pos + ext / 2, ext.x / 2, col); } };
+}
+
+auto SliderConfig::RectKnob(float bar_thickness, float2 ext, Color color, Color hover_color, float rounding) noexcept -> DrawConfig
+{
+  return { bar_thickness, ext, color, hover_color,
+    [rounding](float2 pos, float2 ext, Color col) { rectangle(pos, pos + ext, col, {}, rounding); } };
+}
+
+auto slider(StringID name, float x, float y, float width, float height, float beg, float end, float& v, SliderConfig const& cfg) noexcept -> bool
+{
+  // promise valid arguments
+  assert(std::isfinite(beg) && std::isfinite(end) && beg < end && width > 0 && height > 0);
+  assert(cfg.vertical ? height > width : width > height);
+
+  // set valid slider value
+  v = std::clamp(v, beg, end);
+
+  // main axis is the sliding direction, cross axis is the bar thickness direction
+  auto main_len  = cfg.vertical ? height : width;
+  auto cross_len = cfg.vertical ? width  : height;
+
+  // get draw config
+  auto knob_len         = 0.f;
+  auto bar_thickness    = cross_len;
+  auto has_knob         = cfg.draw_cfg.has_value();
+  auto knob_color       = Color{};
+  auto knob_hover_color = Color{};
+  if (has_knob)
+  {
+    assert(cfg.draw_cfg->bar_thickness > 0 && cfg.draw_cfg->bar_thickness <= cross_len);
+    assert(cfg.draw_cfg->knob_extent.x > 0 && cfg.draw_cfg->knob_extent.y > 0);
+    assert((cfg.vertical ? cfg.draw_cfg->knob_extent.y : cfg.draw_cfg->knob_extent.x) < main_len);
+    assert(cfg.draw_cfg->knob_draw);
+
+    knob_len         = cfg.vertical ? cfg.draw_cfg->knob_extent.y : cfg.draw_cfg->knob_extent.x;
+    bar_thickness    = cfg.draw_cfg->bar_thickness;
+    knob_color       = cfg.draw_cfg->knob_color;
+    knob_hover_color = cfg.draw_cfg->knob_hover_color;
+  }
+
+  // get base values
+  auto ratio    = (v - beg) / (end - beg);
+  auto len      = main_len - knob_len;
+  auto offset   = len * ratio;
+  auto left_top = cfg.vertical
+    ? float2{ x + (width - bar_thickness) / 2, y + knob_len / 2 }
+    : float2{ x + knob_len / 2, y + (height - bar_thickness) / 2 };
+  auto rounding = cfg.rounding ? bar_thickness / 2 : 0.f;
+
+  // default: horizontal grows left to right, vertical grows bottom to top; reverse flips it
+  auto grow_from_min = cfg.vertical == cfg.reverse;
+  auto get_knob_pos  = [&](float offset)
+  {
+    auto main_pos = grow_from_min ? offset : len - offset;
+    return cfg.vertical ? float2{ x, y + main_pos } : float2{ x + main_pos, y };
+  };
+
+  // get bar and knob button states
+  auto knob_pos   = get_knob_pos(offset);
+  auto knob_state = ButtonState{};
+  auto bar_state  = cfg.is_bar_clickable ? button(name, x, y, width, height) : ButtonState{};
+  if (has_knob)
+  {
+    if (cfg.vertical)
+      knob_pos.x = x + (width - cfg.draw_cfg->knob_extent.x) / 2;
+    else
+      knob_pos.y = y + (height - cfg.draw_cfg->knob_extent.y) / 2;
+    knob_state = button(StringID{ hash(name, 0) }, knob_pos.x, knob_pos.y, cfg.draw_cfg->knob_extent.x, cfg.draw_cfg->knob_extent.y);
+  }
+
+  // get result color
+  auto bar_color      = cfg.bar_color;
+  auto progress_color = cfg.progress_color;
+  if (bar_state.hovered)
+  {
+    bar_color = cfg.bar_hover_color;
+    if (cfg.progress_hover_color.a)
+      progress_color = cfg.progress_hover_color;
+  }
+  if (knob_state.hovered) knob_color = knob_hover_color;
+
+  // process mouse down
+  if (knob_state.down || bar_state.down)
+  {
+    knob_color = knob_hover_color;
+    auto cursor    = get_cursor_pos_on_window();
+    auto t         = cfg.vertical ? (cursor.y - y - knob_len / 2) / len : (cursor.x - x - knob_len / 2) / len;
+    auto cur_ratio = std::clamp(grow_from_min ? t : 1.f - t, 0.f, 1.f);
+    v = beg + cur_ratio * (end - beg);
+    ratio  = cur_ratio;
+    offset = len * ratio;
+    auto pos = get_knob_pos(offset);
+    if (cfg.vertical) knob_pos.y = pos.y;
+    else              knob_pos.x = pos.x;
+  }
+
+  // draw progress
+  auto right_bottom = left_top + (cfg.vertical ? float2{ bar_thickness, len } : float2{ len, bar_thickness });
+  if (progress_color.a)
+  {
+    auto progress_len = len * ratio;
+    rectangle(left_top, right_bottom, bar_color, {}, rounding);
+    auto progress_lt = left_top;
+    auto progress_rb = right_bottom;
+    auto flags       = Flag<CornerFlag>{};
+    if (cfg.vertical)
+    {
+      if (grow_from_min) { progress_rb.y = left_top.y + progress_len;     flags = CornerFlag::top;    }
+      else               { progress_lt.y = right_bottom.y - progress_len; flags = CornerFlag::bottom; }
+    }
+    else
+    {
+      if (grow_from_min) { progress_rb.x = left_top.x + progress_len;     flags = CornerFlag::left;   }
+      else               { progress_lt.x = right_bottom.x - progress_len; flags = CornerFlag::right;  }
+    }
+    rectangle(progress_lt, progress_rb, progress_color, {}, rounding, progress_len == len ? CornerFlag::all : flags);
+  }
+  else
+    rectangle(left_top, right_bottom, bar_color, {}, rounding);
+
+  // draw knob
+  if (has_knob)
+    cfg.draw_cfg->knob_draw(knob_pos, cfg.draw_cfg->knob_extent, knob_color);
+
+  return knob_state.dragged || bar_state.dragged;
 }
 
 }

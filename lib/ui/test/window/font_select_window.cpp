@@ -15,15 +15,25 @@ void FontSelectWindow::draw() noexcept
     info("selected font : {}", selected_family);
   }
 
-  constexpr auto text_limit = 320.f;
-  auto const test_pos = float2{ selector_extent.x + 32, 48 };
+  static auto text_limit = 320.f;
+  auto const test_pos = float2{ selector_extent.x + 32, 76 };
+  ui::text(std::format("limit_len = {:.0f}", text_limit), { test_pos.x, 16 }, 18, 0x000000ff);
+  ui::slider("text_limit_slider", test_pos.x, 44, 400, 16, 5, 800, text_limit, ui::SliderConfig
+  {
+    .bar_color            = 0xd0d0d0ff,
+    .bar_hover_color      = 0xc0c0c0ff,
+    .progress_color       = 0x2196f3ff,
+    .progress_hover_color = 0x1976d2ff,
+    .rounding             = true,
+    .draw_cfg             = ui::SliderConfig::CircleKnob(6, 16, 0x1976d2ff, 0x0d47a1ff),
+  });
+
   auto text_cfg = ui::TextConfig
   {
     .family    = selected_family,
     .style     = selected_style,
     .limit_len = text_limit,
   };
-  ui::text("limit_len = 320", { test_pos.x, 16 }, 18, 0x000000ff, text_cfg);
   auto const text_ext = ui::text(
     "Unicode line breaking should keep English words together. "
     "中文标点不应该出现在错误的行首或行尾。"

@@ -395,16 +395,12 @@ void UIContext::window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer
   data->set_window_shadow(scissor_rect, wnd.real_extent(), wnd.shadow_thickness(), {}, cfg.display_window_shadow ? 5 : 0, 15, get_wireframe_color());
 }
 
-void UIContext::add_mouse_left_button_state(size_t id, float2 left_top, float2 right_bottom) noexcept
+auto UIContext::add_mouse_left_button_state(size_t id, float2 left_top, float2 right_bottom) noexcept -> bool
 {
   check_draw();
   if (!_btn_state.id)
-  {
-    auto pos = _wnd->pos();
-    left_top     += pos;
-    right_bottom += pos;
-    _btn_state = { id, left_top, right_bottom };
-  }
+    _btn_state = { id, left_top + _wnd->pos(), right_bottom + _wnd->pos() };
+  return _btn_state.id == id;
 }
 
 auto UIContext::is_cursor_move_out(size_t id) noexcept -> bool

@@ -118,41 +118,6 @@ void select_font() noexcept
   // ui::button("test_b", 10, 10, 100, 100, 0x00ff00ff, 0xffff00ff);
 }
 
-void silder(StringID name, float x, float y, float width, float height, float beg, float end, float& v) noexcept
-{
-  if (beg >= end && width > 0 && height > 0) return;
-
-  v = std::clamp(v, beg, end);
-
-  auto ratio    = (v - beg) / (end - beg);
-  auto r        = height / 2;
-  auto len      = width - 2 * r;
-  auto center   = float2{ x + r + len * ratio, y + r };
-  auto left_top = float2{ x + r, y + r / 2 };
-
-  auto bar_color        = 0x808080ff;
-  auto bar_hover_color  = 0xa0a0a0ff;
-  auto knob_color       = 0xff00ffff;
-  auto knob_hover_color = 0x0000ffff;
-
-  auto bar_state  = ui::button(name, x, y, width, height);
-  auto knob_state = ui::button(hash(name, 0), center.x - r, center.y - r, r * 2, r * 2);
-
-  if (bar_state.hovered)  bar_color  = bar_hover_color;
-  if (knob_state.hovered) knob_color = knob_hover_color;
-
-  if (knob_state.down || bar_state.down)
-  {
-    knob_color = knob_hover_color;
-    auto cursor_x  = ui::get_cursor_pos_on_window().x;
-    auto cur_ratio = std::clamp((cursor_x - x - r) / len, 0.f, 1.f);
-    v = beg + cur_ratio * (end - beg);
-  }
-
-  ui::rectangle(left_top, { x + r + len, y + r / 2 + r }, bar_color);
-  ui::circle(center, r, knob_color);
-}
-
 void TestWindow2::draw() noexcept
 {
   auto wnd_ext = ui::window_drawable_extent();
@@ -187,9 +152,13 @@ void TestWindow2::draw() noexcept
 
   // progress bar
   auto p = p1 + float2{ 5, 0 };
-  auto progress = progress_tween.get() * 100;
-  ui::rectangle(p, p + float2{ 100,      3 }, 0x808080ff);
-  ui::rectangle(p, p + float2{ progress, 3 }, 0x0000ffff);
+  auto progress = static_cast<float>(progress_tween.get());
+  ui::slider("playback_progress", p.x, p.y, 100, 3, 0, 1, progress, ui::SliderConfig
+  {
+    .bar_color        = 0x808080ff,
+    .progress_color   = 0x0000ffff,
+    .is_bar_clickable = false,
+  });
 
   // image
   auto res = std::expected<void, ui::ImageLoadErrorType>{};
@@ -288,7 +257,35 @@ void TestWindow2::draw() noexcept
   select_font();
 
   // silder
+  auto slider_cfg = ui::SliderConfig
+  {
+    .bar_color            = 0x808080ff,
+    .bar_hover_color      = 0xa0a0a0ff,
+    .progress_color       = 0xff9800ff,
+    .progress_hover_color = 0xf57c00ff,
+    .is_bar_clickable     = true,
+    .rounding             = true,
+    // .draw_cfg             = ui::SliderConfig::CircleKnob(50, 100, 0xff00ffff, 0x0000ffff),
+    // .draw_cfg             = ui::SliderConfig::RectKnob(100, { 50, 100 }, 0xff00ffff, 0x0000ffff, 25),
+  };
   static float outline_width{};
-  silder("silder_test", 0, 90, 100, 10, 0, 0.5, outline_width);
+  if (ui::slider("silder_test", 0, 90, 2000, 100, 0, 0.5, outline_width, slider_cfg))
+  {
+    info("down");
+  }
   ui::text(std::format("outline width : {}", outline_width), { 0, 90 }, 24, 0x00ff00ff);
+
+  // vertical silder
+  slider_cfg.vertical = true;
+  slider_cfg.draw_cfg = ui::SliderConfig::CircleKnob(50, 100, 0xff00ffff, 0x0000ffff);
+  static float vertical_value{};
+  ui::slider("vertical_silder_test", 0, 200, 100, 800, 0, 1, vertical_value, slider_cfg);
+
+  // reverse silders
+  slider_cfg.reverse = true;
+  static float vertical_reverse_value{};
+  ui::slider("vertical_reverse_silder_test", 120, 200, 100, 800, 0, 1, vertical_reverse_value, slider_cfg);
+  slider_cfg.vertical = false;
+  static float reverse_value{};
+  ui::slider("reverse_silder_test", 240, 200, 1000, 100, 0, 1, reverse_value, slider_cfg);
 }

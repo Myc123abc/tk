@@ -477,7 +477,7 @@ void viewport_end() noexcept;
  * @param rounding corner radius
  * @param flags rounded corner selection
  */
-void rectangle(float2 left_top, float2 right_bottom, Color color = {}, float thickness = {}, float rounding = {}, Flag<CornerFlag> flags = {}) noexcept;
+void rectangle(float2 left_top, float2 right_bottom, Color color = {}, float thickness = {}, float rounding = {}, Flag<CornerFlag> flags = CornerFlag::all) noexcept;
 
 /**
  * draw a triangle (clockwise)
