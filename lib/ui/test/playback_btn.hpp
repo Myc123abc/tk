@@ -10,7 +10,7 @@ public:
   void init(StringLiteral name) noexcept
   {
     _name      = name;
-    _lerp_name = std::string(name.view()) + "lerp value";
+    _lerp_name = hash(name.id(), 0);
   }
 
   auto operator()(float2 p0, float2 p1, float2 p2, ui::Color color, ui::Color hovered_color, float thickness) noexcept -> bool
@@ -81,7 +81,7 @@ private:
   };
 
   StringLiteral          _name;
-  std::string            _lerp_name;
+  StringID               _lerp_name;
   std::vector<LerpPoint> _lerp_pts;
   std::vector<float2>    _pts{};
   bool                   _paused{ true };

@@ -65,6 +65,8 @@ public:
 
   void set_render_pos(float x, float y) noexcept { _wnd_ctx->render_pos = { x + renderer::Window_Shadow_Thickness, y + renderer::Window_Shadow_Thickness }; }
   auto get_render_pos() const noexcept { return _wnd_ctx->render_pos; }
+  auto cursor_pos_on_window() const noexcept { return _cursor_pos_on_window; }
+  auto can_hover_current_window() const noexcept { return _can_hover_current_window; }
 
   void render_on(float x, float y, std::move_only_function<void()>&& func) noexcept;
 
@@ -137,6 +139,8 @@ private:
   bool   _call_begin{};
   uint   _custom_transform_depth{};
   double _delta_time{};
+  float2 _cursor_pos_on_window{};
+  bool   _can_hover_current_window{};
 
   std::move_only_function<void(float2)> _user_title_bar_draw_func;
 

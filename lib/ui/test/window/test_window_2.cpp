@@ -47,10 +47,8 @@ struct SelectListConfig
   ui::Color text_color;
 };
 
-auto select_list(StringLiteral name, float2 pos, std::span<StringLiteral> items, SelectListConfig const& cfg) noexcept
+auto select_list(StringID name, float2 pos, std::span<StringLiteral> items, SelectListConfig const& cfg) noexcept
 {
-  auto id_name = "tk::ui::select_list::";
-
   // calc max width
   auto max_width = 0.f;
   for (auto i = 0; i < items.size(); ++i)
@@ -76,7 +74,7 @@ auto select_list(StringLiteral name, float2 pos, std::span<StringLiteral> items,
       .hover_color  = cfg.hover_color,
       .click_color  = cfg.click_color,
     };
-    button(id_name + std::string(name.view()) + std::to_string(i), { pos.x, pos_y }, max_width, 0, btn_cfg);
+    button(hash(name, i), { pos.x, pos_y }, max_width, 0, btn_cfg);
     pos_y += ext.y + cfg.padding.y + cfg.padding.w;
   }
 
@@ -120,13 +118,9 @@ void select_font() noexcept
   // ui::button("test_b", 10, 10, 100, 100, 0x00ff00ff, 0xffff00ff);
 }
 
-void silder(std::string_view name, float x, float y, float width, float height, float beg, float end, float& v) noexcept
+void silder(StringID name, float x, float y, float width, float height, float beg, float end, float& v) noexcept
 {
   if (beg >= end && width > 0 && height > 0) return;
-
-  auto id_name   = "tk::ui::silder";
-  auto bar_name  = std::format("{}::{}::{}", id_name, name, "bar");
-  auto knob_name = std::format("{}::{}::{}", id_name, name, "knob");
 
   v = std::clamp(v, beg, end);
 
@@ -141,8 +135,8 @@ void silder(std::string_view name, float x, float y, float width, float height, 
   auto knob_color       = 0xff00ffff;
   auto knob_hover_color = 0x0000ffff;
 
-  auto bar_state  = ui::button(bar_name, x, y, width, height);
-  auto knob_state = ui::button(name, center.x - r, center.y - r, r * 2, r * 2);
+  auto bar_state  = ui::button(name, x, y, width, height);
+  auto knob_state = ui::button(hash(name, 0), center.x - r, center.y - r, r * 2, r * 2);
 
   if (bar_state.hovered)  bar_color  = bar_hover_color;
   if (knob_state.hovered) knob_color = knob_hover_color;
@@ -294,7 +288,7 @@ void TestWindow2::draw() noexcept
   select_font();
 
   // silder
-  // static float outline_width{};
-  // silder("silder_test", 0, 90, 100, 10, 0, 0.5, outline_width);
-  // ui::text(std::format("outline width : {}", outline_width), { 0, 90 }, 24, 0x00ff00ff);
+  static float outline_width{};
+  silder("silder_test", 0, 90, 100, 10, 0, 0.5, outline_width);
+  ui::text(std::format("outline width : {}", outline_width), { 0, 90 }, 24, 0x00ff00ff);
 }

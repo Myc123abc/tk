@@ -432,6 +432,9 @@ void FrameData::build_render_cmd(DrawCmd const& cmd, uint& idx) noexcept
   case Type::add_text:
   {
     auto const& result = g_text_engine.get_parse_result(cmd.data.add_text.handle);
+    if (!result.generate_complete())
+      break;
+
     auto const  pos    = cmd.data.add_text.pos;
     auto const  extent = result.extent * cmd.data.add_text.scale;
     auto const  bounds = std::array

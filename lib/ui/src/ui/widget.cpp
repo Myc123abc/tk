@@ -49,27 +49,29 @@ namespace tk::ui {
 auto is_hover_on(Rect rc) noexcept -> bool
 {
   g_ui_ctx.check_draw();
+  if (!g_ui_ctx.can_hover_current_window()) return false;
+
   auto const& wnd = g_ui_ctx.window();
-  auto        p   = wnd->cursor_pos();
-  return g_ui_ctx.cursor_on_window == wnd->handle()     &&
-         !wnd->is_move_from_maximize()                  &&
-         wnd->rect().contains(p + wnd->pos())           &&
-          // Actually, cursor position always need - 1, like 0~1919 in range 0~1920
-         rc.adjust_right_bottom(float2(-1)).contains(p);
+  rc = intersect(rc, { 0, 0, wnd->width(), wnd->height() });
+  if (rc.empty()) return false;
+
+  auto p = g_ui_ctx.cursor_pos_on_window();
+  // Actually, cursor position always need - 1, like 0~1919 in range 0~1920
+  return rc.adjust_right_bottom(float2(-1)).contains(p);
 }
 
 auto button(size_t id, float x, float y, float width, float height, bool blocks_window_move = true) noexcept -> ButtonState
 {
   g_ui_ctx.check_draw();
   err_if(g_ui_ctx.has_custom_transform(), "buttons cannot be used inside transform_beg()/transform_end()");
-  g_ui_ctx.register_item({ float2{ x, y }, float2{ x + width, y + height } });
+  assert(std::isfinite(x) && std::isfinite(y) && std::isfinite(width) && std::isfinite(height) && width > 0 && height > 0);
 
   // what is a button
   // button is a rectangle with width and height in specific position
   auto left_top     = float2{ x, y };
   auto right_bottom = float2{ x + width, y + height };
-  if (blocks_window_move)
-    g_ui_ctx.add_move_invalid_area({ left_top, right_bottom });
+  auto widget_rect  = Rect{ left_top, right_bottom };
+  g_ui_ctx.register_item(widget_rect);
 
   if (g_ui_ctx.is_use_title_bar_now() && !g_ui_ctx.draw_title_bar)
   {
@@ -84,7 +86,14 @@ auto button(size_t id, float x, float y, float width, float height, bool blocks_
   left_top     = rect.left_top();
   right_bottom = rect.right_bottom();
 
-  auto is_last_mouse_down_id   = g_ui_ctx.is_last_mouse_down_id(id);
+  auto is_last_mouse_down_id = g_ui_ctx.is_last_mouse_down_id(id);
+  if (rect.empty())
+  {
+    if (!is_last_mouse_down_id) return {};
+  }
+  else if (blocks_window_move)
+    g_ui_ctx.add_move_invalid_area(widget_rect);
+
   auto mouse_left_button_state = get_key(Key::Mouse_Left_Button);
 
   // when cursor hover on it, it will change color to hovered color

@@ -160,7 +160,7 @@ auto get_cursor_pos() noexcept -> float2
 auto get_cursor_pos_on_window() noexcept -> float2
 {
   g_ui_ctx.check_draw();
-  return get_cursor_pos() - g_ui_ctx.window()->pos();
+  return g_ui_ctx.cursor_pos_on_window();
 }
 
 void begin(StringID name, std::optional<float2> extent, std::optional<float2> pos, bool* is_closed, WindowConfig const& cfg) noexcept

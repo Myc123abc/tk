@@ -81,7 +81,7 @@ public:
     auto height = _txt_layout.unit_height();
     for (auto i = 0; i < _txt_layout.texts().size(); ++i)
     {
-      if (ui::button("FontSelector" + std::string(_txt_layout.texts()[i].text), pos.x, pos.y, width, height, 0x00ff00ff, 0x0000ffff))
+      if (ui::button(hash(_name, i), pos.x, pos.y, width, height, 0x00ff00ff, 0x0000ffff))
       {
         _is_selected  = true;
         _selected_idx =  i;
@@ -102,6 +102,7 @@ private:
   std::vector<ui::FontInfo>  _font_infos;
   std::deque<std::string>    _font_names;
   std::vector<StringLiteral> _font_name_views;
+  StringID                   _name{ "FontSelector" };
   ui::TextLayout             _txt_layout;
   bool                       _is_selected{};
   int                        _selected_idx{ -1 };

@@ -80,7 +80,14 @@ void UIContext::begin(StringID name, std::optional<float2> extent, std::optional
     *is_closed = _wnd_ctx->is_closed;
 
   // fullscreen process
-  fullscreen_process();  
+  fullscreen_process();
+
+  _cursor_pos_on_window     = float2(_wnd->cursor_pos());
+  _can_hover_current_window =
+    _wnd->handle()                     &&
+    cursor_on_window == _wnd->handle() &&
+    !_wnd->is_move_from_maximize()     &&
+    Rect{ 0, 0, _wnd->width(), _wnd->height() }.contains(_cursor_pos_on_window);
 
   if (is_use_title_bar_now())
     set_render_pos(0, Title_Bar_Height);
@@ -165,7 +172,7 @@ void UIContext::end() noexcept
 
 void UIContext::register_item(Rect rect) noexcept
 {
-  if (!_wnd_ctx || !_wnd_ctx->auto_size || rect.empty()) return;
+  if (!_wnd_ctx || !_wnd_ctx->auto_size || !_wnd_ctx->first_time_call || rect.empty()) return;
   _wnd_ctx->content_bounds.expand(rect.left_top());
   _wnd_ctx->content_bounds.expand(rect.right_bottom());
 }
@@ -416,7 +423,7 @@ void UIContext::render_on(float x, float y, std::move_only_function<void()>&& fu
 
 auto UIContext::is_hover_on(size_t id, Rect rc) noexcept -> bool
 {
-  if (ui::is_hover_on(rc))
+  if (!rc.empty() && ui::is_hover_on(rc))
   {
     _hovered_widget_ids.emplace(id);
     _last_hovered_widget_id = id;
@@ -427,14 +434,26 @@ auto UIContext::is_hover_on(size_t id, Rect rc) noexcept -> bool
 
 auto UIContext::transform_widget_rect(Rect rect) const noexcept -> Rect
 {
-  if (_viewport_stack.empty())
-    return rect;
+  auto const window_rect = Rect{ 0, 0, _wnd->width(), _wnd->height() };
+  if (!_viewport_stack.empty())
+  {
+    auto const& viewport    = _viewport_stack.back();
+    auto const  content_pos = _wnd->content_pos();
+    auto const  frame_rect  = rect + content_pos;
+    rect = viewport.transform.transform_bounds(frame_rect) + -content_pos;
+    rect = intersect(rect, viewport.interaction_rect);
+  }
 
-  auto const& viewport    = _viewport_stack.back();
-  auto const  content_pos = _wnd->content_pos();
-  auto const  frame_rect  = rect + content_pos;
-  auto const  screen_rect = viewport.transform.transform_bounds(frame_rect) + -content_pos;
-  return intersect(screen_rect, viewport.interaction_rect);
+  rect = intersect(rect, window_rect);
+  if (_scissor_area_stack.empty()) return rect;
+
+  // Scissors use render coordinates, while widget hit tests use client coordinates.
+  auto scissor_rect = _scissor_area_stack.back();
+  if (_wnd->is_resizing())
+    scissor_rect += -float2(_wnd->pos());
+  else
+    scissor_rect += -_wnd->content_pos();
+  return intersect(rect, scissor_rect);
 }
 
 void UIContext::add_move_invalid_area(Rect rect) noexcept
@@ -632,7 +651,7 @@ auto UIContext::text(StringLiteral text, float2 pos, float size, Color inner_col
   auto ascender      = result.ascender * scale;
   auto extent        = result.extent   * scale;
 
-  if (result.generate_complete() && inner_color.a)
+  if (inner_color.a)
   {
     if (cfg.pos_as_baseline)
     {
@@ -664,10 +683,8 @@ void UIContext::render(TextLayout const& layout) noexcept
   auto const layout_pos = layout.pos() + _wnd_ctx->render_pos;
   for (auto const& [text, text_pos, _, handle, ignore] : layout.texts())
   {
-    if (ignore) continue;
-    auto const  h      = std::bit_cast<TextEngine::TextParseResultHandle>(handle);
-    auto const& result = g_text_engine.get_parse_result(h);
-    if (!result.generating_glyph_info_keys.empty() || !layout.color().a) continue;
+    if (ignore || !layout.color().a) continue;
+    auto const h = std::bit_cast<TextEngine::TextParseResultHandle>(handle);
     frame_data()->add_text(h, (layout_pos + text_pos) * dpi_scale, scale, layout.color(), layout.outer_color(), layout.outline_width() * dpi_scale);
   }
 }
@@ -727,7 +744,7 @@ void UIContext::viewport_begin(StringID name, Rect rect) noexcept
     interaction_rect = intersect(interaction_rect, _viewport_stack.back().interaction_rect);
   auto const is_hovered = is_hover_on(id, interaction_rect);
 
-  auto const cursor_pos        = float2(_wnd->cursor_pos()) + content_pos;
+  auto const cursor_pos        = _cursor_pos_on_window + content_pos;
   auto const parent_inverse    = parent_transform.inverse().value_or(Matrix{});
   auto const parent_cursor_pos = parent_inverse * cursor_pos;
 
