@@ -4,6 +4,7 @@
 #include "tk/error_handling.hpp"
 
 #include FT_OUTLINE_H
+#include FT_BBOX_H
 #include <hb-ft.h>
 #include <msdfgen.h>
 #include <core/ShapeDistanceFinder.h>
@@ -23,6 +24,14 @@ struct FtContext
   msdfgen::Shape   *shape{};
   msdfgen::Contour *contour{};
 };
+
+auto outline_bounds(FT_Face face) noexcept -> Rect
+{
+  auto bounds = FT_BBox{};
+  check(FT_Outline_Get_BBox(&face->glyph->outline, &bounds), "failed to get glyph outline bounds");
+  auto const scale = static_cast<float>(FT_Pixel_Size) / face->units_per_EM;
+  return { bounds.xMin * scale, -bounds.yMax * scale, bounds.xMax * scale, -bounds.yMin * scale };
+}
 
 auto ftPoint2(const FT_Vector &vector, double scale) noexcept
 {
@@ -214,12 +223,14 @@ auto Font::generate_msdf_bitmap(uint glyph_idx, GlyphKey const& key) const noexc
 
   // generate msdf bitmap
   auto shape              = get_shape(_face->glyph, glyph_idx, scale);
+  auto const visible      = outline_bounds(_face);
   lock.unlock();
   auto [msdf, pos_offset] = generate_msdf(shape);
 
   auto bitmap = MSDFBitmap{};
   bitmap.extent         = { msdf.width(), msdf.height() };
-  bitmap.visible_extent = bitmap.extent;
+  bitmap.visible_offset = visible.left_top() - pos_offset;
+  bitmap.visible_extent = visible.extent();
   bitmap.glyph_key      = key;
   bitmap.pos_offset     = pos_offset;
   bitmap.data.resize(bitmap.extent.x * bitmap.extent.y * 4);
@@ -304,6 +315,13 @@ auto Font::get_glyph_advance(uint glyph_idx) const noexcept -> float2
   check(FT_Load_Glyph(_face, glyph_idx, FT_LOAD_DEFAULT), "failed to load glyph for advance");
   auto glyph = _face->glyph;
   return { static_cast<float>(glyph->advance.x) / 64, static_cast<float>(glyph->advance.y) / 64 };
+}
+
+auto Font::get_glyph_bounds(uint glyph_idx) const noexcept -> Rect
+{
+  std::lock_guard lock{ _mutex };
+  check(FT_Load_Glyph(_face, glyph_idx, FT_LOAD_NO_SCALE | FT_LOAD_VERTICAL_LAYOUT), "failed to load glyph bounds");
+  return outline_bounds(_face);
 }
 
 

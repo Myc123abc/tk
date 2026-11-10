@@ -2,6 +2,7 @@
 
 #include "ui/ui.hpp"
 #include "tk/hash.hpp"
+#include "tk/rect.hpp"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -64,6 +65,7 @@ public:
   }
 
   auto get_glyph_advance(uint glyph_idx) const noexcept -> float2;
+  auto get_glyph_bounds(uint glyph_idx) const noexcept -> Rect;
   auto generate_bitmap(uint glyph_idx, GlyphKey const& key) const noexcept -> MSDFBitmap;
   auto generate_msdf_bitmap(uint glyph_idx, GlyphKey const& key) const noexcept -> MSDFBitmap;
 

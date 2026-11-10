@@ -25,6 +25,20 @@ Singleton(TextEngine, g_text_engine,
   friend class Font;
   friend class GlyphInfo;
 public:
+  enum class GlyphOrientation : uint8
+  {
+    upright,
+    upright_composed,
+    sideways,
+  };
+
+  static auto is_sideways(GlyphOrientation orientation) noexcept
+  {
+    return orientation == GlyphOrientation::sideways;
+  }
+
+  static auto uses_vertical_shaping(uint codepoint) noexcept -> bool;
+
   void init() noexcept;
   void destroy() noexcept;
 
@@ -33,24 +47,26 @@ public:
 
   struct ShapedGlyph
   {
-    uint   glyph_index{};
-    float2 advance;
-    float2 offset;
-    uint   cluster{};
+    uint             glyph_index{};
+    float2           advance;
+    float2           offset;
+    uint             cluster{};
+    GlyphOrientation orientation{};
   };
 
   struct ParseResult
   {
-    std::vector<float2>   advances;
-    std::vector<float2>   offsets;
-    std::vector<uint>     clusters;
-    float2                extent;
-    float                 ascender{};
-    TextDirection         direction{};
-    float2                layout_offset{};
-    std::vector<GlyphKey> glyph_info_keys;
-    GlyphKeySet           generating_glyph_info_keys;
-    std::optional<Rect>   bounding_rect;
+    std::vector<float2>           advances;
+    std::vector<float2>           offsets;
+    std::vector<uint>             clusters;
+    std::vector<GlyphOrientation> orientations;
+    float2                        extent;
+    float                         ascender{};
+    TextDirection                 direction{};
+    float2                        layout_offset{};
+    std::vector<GlyphKey>         glyph_info_keys;
+    GlyphKeySet                   generating_glyph_info_keys;
+    std::optional<Rect>           bounding_rect;
 
     ParseResult() noexcept = default;
 
@@ -61,6 +77,7 @@ public:
       advances.emplace_back(glyph.advance);
       offsets.emplace_back(glyph.offset);
       clusters.emplace_back(cluster_offset + glyph.cluster);
+      orientations.emplace_back(glyph.orientation);
       glyph_info_keys.emplace_back(key);
       if (direction == TextDirection::horizontal)
         extent.x += glyph.advance.x;
@@ -69,6 +86,7 @@ public:
     }
 
     void limit_length(std::string_view text, float len) noexcept;
+    void finalize(GlyphKeyMap<GlyphInfo> const& glyph_infos) noexcept;
   };
   using ParseResultPool       = ObjectPool<ParseResult>;
   using TextParseResultHandle = ParseResultPool::Handle;
@@ -87,12 +105,18 @@ public:
   void postprocess() noexcept;
 
 private:
+  enum class ShapingMode : uint8
+  {
+    normal,
+    horizontal_in_vertical,
+    sideways,
+  };
+
   auto install_font(std::unique_ptr<Font> font) noexcept -> FontInfo;
-  auto shape_text(std::string_view text, Font* font, TextDirection direction, bool horizontal_in_vertical = false) noexcept -> std::vector<ShapedGlyph>;
+  auto shape_text(std::string_view text, Font* font, TextDirection direction, ShapingMode mode = {}) noexcept -> std::vector<ShapedGlyph>;
   auto split_text(std::string_view text, FontStyleKey key) noexcept -> std::vector<std::pair<std::string_view, Font*>>;
   auto find_font(uint unicode, FontStyleKey key) noexcept -> Font*;
   auto find_notdef_glyph_font() noexcept -> Font*;
-  void finalize_parse_result(ParseResult& result) noexcept;
   void add_uncached_glyph(Font* font, uint glyph_idx, GlyphKey const& key, ParseResult& result) noexcept;
   auto add_notdef_glyph() noexcept -> bool;
   auto calc_glyph_pos(float2 extent) noexcept -> std::pair<uint, float2>;
@@ -134,6 +158,7 @@ private:
   PendingCopyGlyphsInfoType                  _pending_copy_glyphs;
   PendingCopyGlyphsInfoType                  _pending_copy_preload_glyphs;
   float                                      _max_ascender{};
+  float                                      _max_descender{};
   float                                      _max_height{};
   std::vector<Task<std::vector<MSDFBitmap>>> _generate_bitmap_tasks;
   SkylinePacker                              _packer;

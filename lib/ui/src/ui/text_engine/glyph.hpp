@@ -92,7 +92,7 @@ struct GlyphInfo
     max_y = (pos.y + extent.y - 0.5f) / Glyph_Atlas_Height;
   }
 
-  void set_vertices(renderer::Vertex* vtx, float2 pos, float size, float ascender, Color color, Color outer_color, float outer_width) const noexcept;
+  void set_vertices(renderer::Vertex* vtx, float2 pos, float size, float ascender, bool sideways, Color color, Color outer_color, float outer_width) const noexcept;
 };
 
 }

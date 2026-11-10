@@ -32,6 +32,7 @@ void FontSelectWindow::draw() noexcept
   {
     .family    = selected_family,
     .style     = selected_style,
+    // .direction = ui::TextDirection::vertical,
     .limit_len = text_limit,
   };
   auto const text_ext = ui::text(

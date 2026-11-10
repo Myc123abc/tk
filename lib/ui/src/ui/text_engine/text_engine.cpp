@@ -1,6 +1,7 @@
 #include "text_engine.hpp"
 #include "tk/error_handling.hpp"
 #include "glyph_cacher.hpp"
+#include "vertical_orientation.hpp"
 #include "../../renderer/resource/image_manager.hpp"
 #include "../../renderer/engine/copy_engine.hpp"
 #include "../../util/file_system.hpp"
@@ -18,6 +19,11 @@ using namespace tk;
 using namespace tk::renderer;
 
 namespace tk::ui {
+
+auto TextEngine::uses_vertical_shaping(uint codepoint) noexcept -> bool
+{
+  return tk::ui::uses_vertical_shaping(codepoint);
+}
 
 void TextEngine::init() noexcept
 {
@@ -183,11 +189,11 @@ auto TextEngine::try_to_get_parse_result(uint64 text_id, uint64 text_hash) noexc
   return {};
 }
 
-auto TextEngine::shape_text(std::string_view text, Font* font, TextDirection direction, bool horizontal_in_vertical) noexcept -> std::vector<ShapedGlyph>
+auto TextEngine::shape_text(std::string_view text, Font* font, TextDirection direction, ShapingMode mode) noexcept -> std::vector<ShapedGlyph>
 {
   assert(font);
   assert(!text.empty());
-  assert(!horizontal_in_vertical || direction == TextDirection::vertical);
+  assert(mode == ShapingMode::normal || direction == TextDirection::vertical);
 
   auto result = std::vector<ShapedGlyph>{};
   {
@@ -195,8 +201,8 @@ auto TextEngine::shape_text(std::string_view text, Font* font, TextDirection dir
     hb_buffer_reset(_hb_buf);
     hb_buffer_add_utf8(_hb_buf, text.data(), static_cast<int>(text.size()), 0, -1);
     hb_buffer_set_cluster_level(_hb_buf, HB_BUFFER_CLUSTER_LEVEL_MONOTONE_GRAPHEMES);
-    // ZWJ emoji ligatures require horizontal shaping even when embedded in vertical text.
-    if (horizontal_in_vertical)
+    // Emoji composition and sideways Latin both require horizontal shaping in vertical text.
+    if (mode != ShapingMode::normal)
       hb_buffer_set_direction(_hb_buf, HB_DIRECTION_LTR);
     else if (direction == TextDirection::vertical)
       hb_buffer_set_direction(_hb_buf, HB_DIRECTION_TTB);
@@ -221,16 +227,28 @@ auto TextEngine::shape_text(std::string_view text, Font* font, TextDirection dir
       };
       if (direction == TextDirection::vertical)
       {
-        if (!horizontal_in_vertical)
+        if (mode == ShapingMode::normal)
         {
           advance.y = -advance.y;
           offset.y  = -offset.y;
+          if (FT_HAS_COLOR(font->_face))
+            advance.y = color_glyph_vertical_advance(advance.y, font->_height);
+        }
+        else if (mode == ShapingMode::sideways)
+        {
+          advance = { 0.f, advance.x };
+          offset  = { sideways_offset_x(offset.y, _max_ascender, _max_height), offset.x };
         }
       }
-      result.emplace_back(glyph_infos[i].codepoint, advance, offset, glyph_infos[i].cluster);
+      result.emplace_back(glyph_infos[i].codepoint, advance, offset, glyph_infos[i].cluster,
+        mode == ShapingMode::sideways
+          ? GlyphOrientation::sideways
+          : mode == ShapingMode::horizontal_in_vertical
+            ? GlyphOrientation::upright_composed
+            : GlyphOrientation::upright);
     }
 
-    if (horizontal_in_vertical)
+    if (mode == ShapingMode::horizontal_in_vertical)
     {
       // Preserve the horizontal composition, then expose the whole grapheme as one vertical cell.
       auto run_advance = 0.f;
@@ -245,7 +263,7 @@ auto TextEngine::shape_text(std::string_view text, Font* font, TextDirection dir
         pen_x          += glyph.advance.x;
         glyph.advance  = {};
       }
-      result.back().advance.y = font->_height;
+      result.back().advance.y = color_glyph_vertical_advance(0.f, font->_height);
     }
   }
   return result;
@@ -269,6 +287,7 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
   res.advances.reserve(size);
   res.offsets.reserve(size);
   res.clusters.reserve(size);
+  res.orientations.reserve(size);
   res.glyph_info_keys.reserve(size);
   res.direction = direction;
 
@@ -281,9 +300,9 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
     // use hb calculate advances
     if (font)
     {
-      auto append_shaped_text = [&](std::string_view shaped_text, uint offset, bool horizontal_in_vertical)
+      auto append_shaped_text = [&](std::string_view shaped_text, uint offset, ShapingMode mode)
       {
-        for (auto const& glyph : shape_text(shaped_text, font, direction, horizontal_in_vertical))
+        for (auto const& glyph : shape_text(shaped_text, font, direction, mode))
         {
           auto key = GlyphKey{ font->key(), glyph.glyph_index };
           res.emplace_back(glyph, cluster_offset + offset, key);
@@ -291,11 +310,11 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
         }
       };
 
-      if (direction != TextDirection::vertical || !font->has_color_glyphs())
-        append_shaped_text(sub_text, 0, false);
+      if (direction != TextDirection::vertical)
+        append_shaped_text(sub_text, 0, ShapingMode::normal);
       else
       {
-        // Isolate compound graphemes so normal characters retain HarfBuzz TTB shaping.
+        // Split vertical text into upright, sideways Latin, and upright-composed emoji runs.
         auto grapheme_breaks = std::vector<char>(sub_text.size());
         set_graphemebreaks_utf8(reinterpret_cast<utf8_t const*>(sub_text.data()),
           sub_text.size(), nullptr, grapheme_breaks.data());
@@ -309,21 +328,60 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
           return end;
         };
 
-        auto run_begin = 0u;
-        for (auto begin = 0u; begin < sub_text.size();)
+        auto is_sideways_cluster = [](std::string_view cluster)
         {
-          auto const end = cluster_end(begin);
-          if (codepoint_cnt(sub_text.substr(begin, end - begin)) > 1)
+          for (auto index = 0u; index < cluster.size();)
           {
-            if (run_begin < begin)
-              append_shaped_text(sub_text.substr(run_begin, begin - run_begin), run_begin, false);
-            append_shaped_text(sub_text.substr(begin, end - begin), begin, true);
+            auto const [codepoint, size, valid] = next_codepoint(cluster, index);
+            assert(valid);
+            if (uses_vertical_shaping(codepoint))
+              return false;
+            index += size;
+          }
+          return true;
+        };
+        auto cluster_mode = [&](std::string_view cluster)
+        {
+          if (font->has_color_glyphs() && codepoint_cnt(cluster) > 1)
+            return ShapingMode::horizontal_in_vertical;
+          return is_sideways_cluster(cluster) ? ShapingMode::sideways : ShapingMode::normal;
+        };
+
+        auto run_begin = 0u;
+        auto run_end   = cluster_end(run_begin);
+        auto run_mode  = cluster_mode(sub_text.substr(run_begin, run_end - run_begin));
+        if (run_mode == ShapingMode::horizontal_in_vertical)
+        {
+          append_shaped_text(sub_text.substr(run_begin, run_end - run_begin), run_begin, run_mode);
+          run_begin = run_end;
+        }
+
+        while (run_end < sub_text.size())
+        {
+          auto const end  = cluster_end(run_end);
+          auto const mode = cluster_mode(sub_text.substr(run_end, end - run_end));
+          if (mode == ShapingMode::horizontal_in_vertical)
+          {
+            if (run_begin < run_end)
+              append_shaped_text(sub_text.substr(run_begin, run_end - run_begin), run_begin, run_mode);
+            append_shaped_text(sub_text.substr(run_end, end - run_end), run_end, mode);
             run_begin = end;
           }
-          begin = end;
+          else if (run_begin == run_end)
+          {
+            run_begin = run_end;
+            run_mode  = mode;
+          }
+          else if (mode != run_mode)
+          {
+            append_shaped_text(sub_text.substr(run_begin, run_end - run_begin), run_begin, run_mode);
+            run_begin = run_end;
+            run_mode  = mode;
+          }
+          run_end = end;
         }
         if (run_begin < sub_text.size())
-          append_shaped_text(sub_text.substr(run_begin), run_begin, false);
+          append_shaped_text(sub_text.substr(run_begin), run_begin, run_mode);
       }
     }
     // if not have font, the text is missing glyphs
@@ -336,8 +394,6 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
       auto key = GlyphKey{ notdef_glyph_font->key(), 0 };
       for (auto const& glyph : shape_text(sub_text, notdef_glyph_font, direction))
         res.emplace_back(glyph, cluster_offset, key);
-      _max_ascender = std::max(_max_ascender, notdef_glyph_font->_ascender);
-      _max_height   = std::max(_max_height,   notdef_glyph_font->_height);
       if (add_notdef_glyph()) res.generating_glyph_info_keys.emplace(key);
     }
   }
@@ -371,7 +427,7 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
     _generating_results.emplace(handle);
   else
     // Cached glyphs already have the bitmap metrics needed for final layout.
-    finalize_parse_result(res);
+    res.finalize(_glyph_infos);
 
   _parse_result_pool[handle] = std::move(res);
 
@@ -506,14 +562,16 @@ auto TextEngine::split_text(std::string_view text, FontStyleKey key) noexcept ->
   auto result = std::vector<std::pair<std::string_view, Font*>>{};
   result.reserve(text.size());
 
-  _max_ascender = {};
-  _max_height   = {};
+  _max_ascender  = {};
+  _max_descender = {};
+  _max_height    = {};
 
   auto update = [this](Font* font)
   {
-    if (!font) return;
-    _max_ascender = std::max(_max_ascender, font->_ascender);
-    _max_height   = std::max(_max_height,   font->_height);
+    if (!font) font = find_notdef_glyph_font();
+    _max_ascender  = std::max(_max_ascender, font->_ascender);
+    _max_descender = std::max(_max_descender, font->_height - font->_ascender);
+    _max_height    = _max_ascender + _max_descender;
   };
 
   auto supports_cluster = [](Font const& font, std::string_view cluster)
@@ -768,13 +826,42 @@ void TextEngine::remove_missing_glyphs(FontStyleKey key) noexcept
   _cached_texts_with_missing_glyphs[key].clear();
 }
 
-void GlyphInfo::set_vertices(renderer::Vertex* vtx, float2 pos, float scale, float ascender, Color color, Color outer_color, float outer_width) const noexcept
+auto glyph_rect(GlyphInfo const& info, float2 pos, bool sideways, bool visible) noexcept -> Rect
 {
-  auto p0 = pos + pos_offset * scale;
-  p0.y += ascender * scale;
-  auto p1 = float2{ p0.x + extent.x * scale, p0.y };
-  auto p3 = float2{ p0.x, p0.y + extent.y * scale };
-  auto p2 = float2{ p1.x, p3.y };
+  auto const offset = info.pos_offset + (visible ? info.visible_offset : float2{});
+  auto const extent = visible ? info.visible_extent : info.extent;
+  if (!sideways)
+    return { pos + offset, pos + offset + extent };
+  return
+  {
+    pos + float2{ -offset.y - extent.y, offset.x },
+    pos + float2{ -offset.y, offset.x + extent.x },
+  };
+}
+
+void GlyphInfo::set_vertices(renderer::Vertex* vtx, float2 pos, float scale, float ascender, bool sideways, Color color, Color outer_color, float outer_width) const noexcept
+{
+  auto p0 = float2{};
+  auto p1 = float2{};
+  auto p2 = float2{};
+  auto p3 = float2{};
+  if (sideways)
+  {
+    auto const offset       = pos_offset * scale;
+    auto const glyph_extent = extent     * scale;
+    p0 = pos + float2{ -offset.y,                  offset.x                  };
+    p1 = pos + float2{ -offset.y,                  offset.x + glyph_extent.x };
+    p2 = pos + float2{ -offset.y - glyph_extent.y, offset.x + glyph_extent.x };
+    p3 = pos + float2{ -offset.y - glyph_extent.y, offset.x                  };
+  }
+  else
+  {
+    p0 = pos + pos_offset * scale;
+    p0.y += ascender * scale;
+    p1 = float2{ p0.x + extent.x * scale, p0.y };
+    p3 = float2{ p0.x, p0.y + extent.y * scale };
+    p2 = float2{ p1.x, p3.y };
+  }
 
   auto& img = g_img_mgr[g_text_engine._glyph_atlas[glyph_atlas_index]];
   auto desc_handle = img.srv();
@@ -796,74 +883,199 @@ void TextEngine::postprocess() noexcept
   _discard_text_parse_result_handles.clear();
 }
 
-void TextEngine::finalize_parse_result(ParseResult& result) noexcept
+void TextEngine::ParseResult::finalize(GlyphKeyMap<GlyphInfo> const& glyph_infos) noexcept
 {
-  assert(result.generate_complete());
+  assert(generate_complete());
 
-  if (result.direction == TextDirection::vertical)
+  if (direction == TextDirection::vertical)
   {
-    // Center visible ink, not transparent bitmap padding or font-specific bearings.
-    auto const cell_height = result.ascender * 2.f;
-    for (auto begin = 0u; begin < result.glyph_info_keys.size();)
+    auto const cell_height = ascender * 2.f;
+
+    // Measure in column-local coordinates so wrapped columns share the same alignment.
+    auto sideways_left = std::optional<float>{};
+    for (auto i = 0u; i < glyph_info_keys.size(); ++i)
+    {
+      auto const& info = glyph_infos.at(glyph_info_keys[i]);
+      if (!is_sideways(orientations[i]) || info.visible_extent.x <= 0.f || info.visible_extent.y <= 0.f)
+        continue;
+      auto const bounds = glyph_rect(info, offsets[i], true, true);
+      sideways_left = sideways_left ? std::min(*sideways_left, bounds.left) : bounds.left;
+    }
+
+    auto column_left  = std::numeric_limits<float>::max();
+    auto column_right = std::numeric_limits<float>::lowest();
+    for (auto begin = 0u; begin < glyph_info_keys.size();)
     {
       auto end = begin + 1;
-      while (end < result.clusters.size() && result.clusters[end] == result.clusters[begin])
+      while (end < clusters.size() && clusters[end] == clusters[begin])
         ++end;
 
       auto has_visible_glyph = false;
+      auto has_color_glyph   = false;
+      auto ink_left          = std::numeric_limits<float>::max();
+      auto ink_right         = std::numeric_limits<float>::lowest();
+      auto render_left       = std::numeric_limits<float>::max();
+      auto render_right      = std::numeric_limits<float>::lowest();
       auto ink_top           = std::numeric_limits<float>::max();
       auto ink_bottom        = std::numeric_limits<float>::lowest();
       auto pen_y             = 0.f;
       for (auto i = begin; i < end; ++i)
       {
-        auto const& info = get_glyph_info(result.glyph_info_keys[i]);
-        if (info.visible_extent.y > 0.f)
+        auto const& info          = glyph_infos.at(glyph_info_keys[i]);
+        auto const  sideways      = is_sideways(orientations[i]);
+        auto const  glyph_pos     = float2{ 0.f, pen_y } + offsets[i];
+        auto const  render_bounds = glyph_rect(info, glyph_pos, sideways, false);
+        render_left  = std::min(render_left, render_bounds.left);
+        render_right = std::max(render_right, render_bounds.right);
+        if (info.visible_extent.x > 0.f && info.visible_extent.y > 0.f)
         {
-          auto const top = pen_y + result.offsets[i].y + info.pos_offset.y + info.visible_offset.y;
-          ink_top           = std::min(ink_top, top);
-          ink_bottom        = std::max(ink_bottom, top + info.visible_extent.y);
+          auto const bounds = glyph_rect(info, glyph_pos, sideways, true);
+          ink_left          = std::min(ink_left, bounds.left);
+          ink_right         = std::max(ink_right, bounds.right);
+          if (!sideways)
+          {
+            ink_top    = std::min(ink_top, bounds.top);
+            ink_bottom = std::max(ink_bottom, bounds.bottom);
+          }
           has_visible_glyph = true;
+          has_color_glyph  |= info.is_color;
         }
         if (i + 1 < end)
-          pen_y += result.advances[i].y;
+          pen_y += advances[i].y;
       }
 
       if (has_visible_glyph)
       {
-        auto const offset = (cell_height - (ink_bottom - ink_top)) * .5f - ink_top;
-        for (auto i = begin; i < end; ++i)
-          result.offsets[i].y += offset;
+        auto const orientation = orientations[begin];
+        auto const composed    = orientation == GlyphOrientation::upright_composed;
+        if (composed || (has_color_glyph && !is_sideways(orientation) && sideways_left))
+        {
+          // Emoji align by visible left edge with sideways text, not by bitmap center.
+          auto const offset = sideways_left
+            ? *sideways_left - ink_left
+            : cell_height * .5f - (ink_left + ink_right) * .5f;
+          for (auto i = begin; i < end; ++i)
+            offsets[i].x += offset;
+          render_left  += offset;
+          render_right += offset;
+        }
+        column_left  = std::min(column_left, render_left);
+        column_right = std::max(column_right, render_right);
+        if (ink_top <= ink_bottom)
+        {
+          auto const offset = (cell_height - (ink_bottom - ink_top)) * .5f - ink_top;
+          for (auto i = begin; i < end; ++i)
+            offsets[i].y += offset;
+        }
       }
       begin = end;
     }
+
+    // Font advances do not always contain color bitmap ink. Keep a visible gap
+    // at emoji boundaries, and compensate encoded wrap jumps for added spacing.
+    auto pen                = float2{};
+    auto column_shift       = 0.f;
+    auto previous_bottom    = std::optional<float>{};
+    auto previous_has_color = false;
+    auto const ink_gap      = cell_height / 16.f;
+    for (auto begin = 0u; begin < glyph_info_keys.size();)
+    {
+      auto end = begin + 1;
+      while (end < clusters.size() && clusters[end] == clusters[begin])
+        ++end;
+
+      if (begin && advances[begin - 1].x != 0.f)
+      {
+        previous_bottom.reset();
+        previous_has_color = false;
+      }
+
+      auto ink_top          = std::numeric_limits<float>::max();
+      auto ink_bottom       = std::numeric_limits<float>::lowest();
+      auto has_visible_ink  = false;
+      auto has_color_glyph  = false;
+      auto glyph_pen        = pen;
+      for (auto i = begin; i < end; ++i)
+      {
+        auto const& info = glyph_infos.at(glyph_info_keys[i]);
+        if (info.visible_extent.x > 0.f && info.visible_extent.y > 0.f)
+        {
+          auto const bounds = glyph_rect(info, glyph_pen + offsets[i], is_sideways(orientations[i]), true);
+          ink_top          = std::min(ink_top, bounds.top);
+          ink_bottom       = std::max(ink_bottom, bounds.bottom);
+          has_visible_ink  = true;
+          has_color_glyph |= info.is_color;
+        }
+        glyph_pen += advances[i];
+      }
+
+      if (has_visible_ink)
+      {
+        if (previous_bottom && (previous_has_color || has_color_glyph))
+        {
+          auto const spacing = *previous_bottom + ink_gap - ink_top;
+          if (spacing > 0.f)
+          {
+            advances[begin - 1].y += spacing;
+            pen.y                  += spacing;
+            ink_top               += spacing;
+            ink_bottom            += spacing;
+            column_shift          += spacing;
+          }
+        }
+        previous_bottom    = ink_bottom;
+        previous_has_color = has_color_glyph;
+      }
+
+      for (auto i = begin; i < end; ++i)
+      {
+        if (advances[i].x != 0.f)
+        {
+          advances[i].y -= column_shift;
+          column_shift   = 0.f;
+        }
+        pen += advances[i];
+      }
+      begin = end;
+    }
+
+    // Wrapping encoded column changes in advance.x using the nominal font height.
+    auto const column_width = std::max(cell_height, column_right - column_left);
+    auto const column_scale = column_width / cell_height;
+    if (column_scale > 1.f)
+    {
+      for (auto& advance : advances)
+        advance.x *= column_scale;
+      extent.x *= column_scale;
+    }
   }
 
-  auto has_color_glyph = false;
-  auto rect            = Rect{};
-  auto pos             = float2{};
-  auto ascender        = result.direction == TextDirection::vertical ? 0.f : result.ascender;
-  for (auto i = 0u; i < result.glyph_info_keys.size(); ++i)
+  auto needs_ink_bounds = false;
+  auto rect             = Rect{};
+  auto pos              = float2{};
+  auto baseline         = direction == TextDirection::vertical ? 0.f : ascender;
+  for (auto i = 0u; i < glyph_info_keys.size(); ++i)
   {
-    auto const& info = get_glyph_info(result.glyph_info_keys[i]);
-    has_color_glyph |= info.is_color;
-    auto glyph_pos = pos + result.offsets[i] + info.pos_offset;
-    glyph_pos.y += ascender;
-    rect.expand(glyph_pos);
-    rect.expand(glyph_pos + info.extent);
-    pos += result.advances[i];
+    auto const& info = glyph_infos.at(glyph_info_keys[i]);
+    auto const sideways = is_sideways(orientations[i]);
+    needs_ink_bounds |= info.is_color || sideways;
+    auto const bounds = glyph_rect(info, pos + offsets[i] + float2{ 0.f, baseline }, sideways, false);
+    rect.expand(bounds.left_top());
+    rect.expand(bounds.right_bottom());
+    pos += advances[i];
   }
 
-  if (has_color_glyph && !rect.empty())
+  if (needs_ink_bounds && !rect.empty())
   {
     // Normalize actual bitmap bounds so the reported extent contains every rendered pixel.
-    result.layout_offset = -rect.left_top();
-    result.extent        = rect.extent();
-    if (result.direction == TextDirection::horizontal)
+    layout_offset = -rect.left_top();
+    extent        = rect.extent();
+    if (direction == TextDirection::horizontal)
     {
-      result.ascender       += result.layout_offset.y;
-      result.layout_offset.y = 0.f;
+      ascender       += layout_offset.y;
+      layout_offset.y = 0.f;
     }
-    result.bounding_rect = Rect{ float2{}, result.extent };
+    bounding_rect = Rect{ float2{}, extent };
   }
 }
 
@@ -888,7 +1100,7 @@ void TextEngine::update() noexcept
       }
       result.generating_glyph_info_keys.clear();
       // The same finalization also runs immediately for parse results whose glyphs were cached.
-      finalize_parse_result(result);
+      result.finalize(_glyph_infos);
 
       it = _generating_results.erase(it);
     }
@@ -928,11 +1140,13 @@ auto TextEngine::upload_bitmaps_from_preload_glyphs() noexcept -> bool
       // Get cache content of glyph.
       auto& glyph = preload_glyphs[key];
 
-      // Add bitmap need to upload.
+      // Old cache records contain bitmap bounds only; recover ink bounds from the font.
+      auto const visible = font->get_glyph_bounds(key.glyph_index);
       auto bitmap = MSDFBitmap{};
       bitmap.data           = std::move(glyph.bitmap);
       bitmap.extent         = glyph.extent;
-      bitmap.visible_extent = bitmap.extent;
+      bitmap.visible_offset = visible.left_top() - glyph.pos_offset;
+      bitmap.visible_extent = visible.extent();
       bitmap.pos_offset     = glyph.pos_offset;
       bitmap.glyph_key      = key;
       auto [glyph_atlas_idx, cpy_pos] = calc_glyph_pos(bitmap.extent);
@@ -998,10 +1212,10 @@ auto TextEngine::get_bounding_rect(StringLiteral text, std::string_view family, 
     for (auto i = 0; i < res.glyph_info_keys.size(); ++i)
     {
       auto const& info = get_glyph_info(res.glyph_info_keys[i]);
-      auto p0 = pos + res.offsets[i] + info.pos_offset;
-      p0.y += ascender;
-      rect.expand(p0);
-      rect.expand(p0 + info.extent);
+      auto const sideways = is_sideways(res.orientations[i]);
+      auto const bounds   = glyph_rect(info, pos + res.offsets[i] + float2{ 0.f, ascender }, sideways, false);
+      rect.expand(bounds.left_top());
+      rect.expand(bounds.right_bottom());
 
       pos += res.advances[i];
     }

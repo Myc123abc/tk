@@ -284,7 +284,8 @@ void FrameData::_add_text(TextParseResultHandle handle, float2 pos, float scale,
 
     _sampled_images.emplace(g_text_engine.glyph_atlas(info.glyph_atlas_index));
 
-    info.set_vertices(vertices + vtx_offset, pos + result.offsets[i] * scale, scale, ascender, inner_color, outer_color, outline_width);
+    auto const sideways = TextEngine::is_sideways(result.orientations[i]);
+    info.set_vertices(vertices + vtx_offset, pos + result.offsets[i] * scale, scale, ascender, sideways, inner_color, outer_color, outline_width);
 
     auto vtx_beg = _vertex_beg + vtx_offset;
     indices[idx_offset + 0] = static_cast<uint16>(vtx_beg + 0);
