@@ -25,3 +25,6 @@
 [submodule "vendor/zstd"]
 	path = vendor/zstd
 	url = https://github.com/meta/zstd
+[submodule "vendor/libunibreak"]
+	path = vendor/libunibreak
+	url = https://github.com/adah1972/libunibreak

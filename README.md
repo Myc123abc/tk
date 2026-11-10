@@ -37,6 +37,7 @@ Is still in the early stages of development.
 |xxHash|BSD 2-Clause|https://github.com/Cyan4973/xxHash|
 |constexpr-xxh3|BSD 2-Clause|https://github.com/chys87/constexpr-xxh3|
 |zstd|BSD/GPLv2|https://github.com/meta/zstd|
+|libunibreak|Zlib|https://github.com/adah1972/libunibreak|
 
 ## License
 The following licenses are available:

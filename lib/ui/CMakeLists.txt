@@ -39,6 +39,23 @@ if (NOT "${CMAKE_GENERATOR}" MATCHES "Visual Studio")
   set_property(TARGET freetype PROPERTY SOURCES "${TK_FREETYPE_SOURCES}")
 endif()
 
+# Add libunibreak
+add_library(libunibreak STATIC
+  ../../vendor/libunibreak/src/unibreakbase.c
+  ../../vendor/libunibreak/src/unibreakdef.c
+  ../../vendor/libunibreak/src/linebreak.c
+  ../../vendor/libunibreak/src/linebreakdata.c
+  ../../vendor/libunibreak/src/linebreakdef.c
+  ../../vendor/libunibreak/src/eastasianwidthdef.c
+  ../../vendor/libunibreak/src/emojidef.c
+  ../../vendor/libunibreak/src/graphemebreak.c
+  ../../vendor/libunibreak/src/wordbreak.c
+)
+add_library(libunibreak::libunibreak ALIAS libunibreak)
+target_include_directories(libunibreak
+  PUBLIC ../../vendor/libunibreak/src
+)
+
 file(GLOB_RECURSE TK_SRC CONFIGURE_DEPENDS src/*.cpp)
 
 add_library(tk-ui ${TK_SRC})
@@ -62,6 +79,7 @@ target_link_libraries(tk-ui
     Clipper2
     msdfgen::msdfgen
     libzstd_static
+    libunibreak
   PUBLIC
     tk::util
 )

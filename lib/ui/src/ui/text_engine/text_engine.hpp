@@ -67,7 +67,7 @@ public:
         extent.y += glyph.advance.y;
     }
 
-    void limit_length(float len) noexcept;
+    void limit_length(std::string_view text, float len) noexcept;
   };
   using ParseResultPool       = ObjectPool<ParseResult>;
   using TextParseResultHandle = ParseResultPool::Handle;

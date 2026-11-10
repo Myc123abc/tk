@@ -35,9 +35,20 @@ void FontSelectWindow::draw() noexcept
     .limit_len = text_limit,
   };
   auto const text_ext = ui::text(
-    "Unicode line breaking should keep English words together. "
-    "中文标点不应该出现在错误的行首或行尾。"
-    "日本語の句読点も正しい位置で改行する必要があります。",
+    "Combining marks and accented letters behave as expected: Your naïveté amuses me!"
+    "Unbreakable: $(12.35) 2,1234 (12)¢ 12.54¢ (s)he file(s); breakable: ()()"
+    "Unbreakable pairs: ‘$9’, ‘$[’, ‘$-’, ‘-9’, ‘/9’, ‘99’, ‘,9’, ‘9%’, ‘]%’"
+    "Hyphenated words are breakable: server-side"
+    "Em dashes can be broken on either side, but not in the middle: A——B"
+    "NOT each space is breakable, like the last one in the following sentence (in English): He did say, “He said, ‘Good morning.’ ”"
+    "Regretfully it does not work for the alternative quoting style due to the ambiguity of “’” (quote and apostrophe): one should not insert normal spaces between the last two quotation marks in ‘He said, “Good morning.”’ — Of course, non-breaking spaces are OK: ‘He said, “Good morning.” ’"
+    "Still, the space rule makes my favourite ellipsis style work well, like ‘once upon a time . . .’."
+    "Here's an apostrophe; and there’s a right single quotation mark."
+    "Spanish inverted punctuation marks are always opening (e.g.)¡Foo bar!"
+    "There should be no break after Hebrew + Hyphen like א-ת, or between solidus and Hebrew like /ת."
+    "Lines like this should not have their punctuation broken!… "
+    "Emojis joined by ZWJs should not be broken: 👩‍❤️‍👩."
+    "Breaks can occur between Chinese characters, except before or after certain punctuation marks: 「你看過《三國演義》嗎？」他問我。",
     test_pos,
     24,
     0x000000ff,

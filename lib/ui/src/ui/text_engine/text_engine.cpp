@@ -5,8 +5,9 @@
 #include "../../renderer/engine/copy_engine.hpp"
 #include "../../util/file_system.hpp"
 #include "../../util/async/thread_pool.hpp"
-
 #include "../../util/unicode.hpp"
+
+#include <linebreak.h>
 
 #include <ranges>
 
@@ -294,7 +295,7 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
   }
 
   // adjust text lines for limited length
-  res.limit_length(limit_len);
+  res.limit_length(text.view(), limit_len);
 
   // cached calculate result
   auto handle = _parse_result_pool.alloc();
@@ -317,7 +318,7 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
   return handle;
 }
 
-void TextEngine::ParseResult::limit_length(float len) noexcept
+void TextEngine::ParseResult::limit_length(std::string_view text, float len) noexcept
 {
   if (len <= 0.f) return;
 
@@ -343,7 +344,6 @@ void TextEngine::ParseResult::limit_length(float len) noexcept
     return std::abs(advance);
   };
 
-  // TODO: need line break to get best limit size, and we also can impl slider widget to test
   // get max cluster length
   auto max_cluster_length = 0.f;
   for (auto beg = 0u; beg < advances.size();)
@@ -354,27 +354,60 @@ void TextEngine::ParseResult::limit_length(float len) noexcept
   }
   len = std::max(len, max_cluster_length);
 
+  auto line_breaks = std::vector<char>(text.size());
+  set_linebreaks_utf8(
+    reinterpret_cast<utf8_t const*>(text.data()),
+    text.size(),
+    nullptr,
+    line_breaks.data());
+
+  auto can_break_after = [&](uint end)
+  {
+    auto const text_end = end < clusters.size() ? clusters[end] : static_cast<uint>(text.size());
+    if (!text_end) return false;
+    auto const line_break = line_breaks[text_end - 1];
+    return line_break == LINEBREAK_ALLOWBREAK || line_break == LINEBREAK_MUSTBREAK;
+  };
+
   auto line_count         = 1u;
   auto line_has_cluster   = false;
   auto line_length        = 0.f;
   auto max_line_length    = 0.f;
   auto pen                = float2{};
   auto previous_glyph_pos = float2{};
+  auto line_begin         = 0u;
+  auto break_end          = 0u;
+  auto break_length       = 0.f;
+  auto break_glyph_pos    = float2{};
 
   for (auto beg = 0u; beg < advances.size();)
   {
     auto const end    = cluster_end(beg);
     auto const length = cluster_length(beg, end);
+
     if (line_has_cluster && line_length + length > len)
     {
-      max_line_length = std::max(max_line_length, line_length);
+      auto const wrap_begin        = break_end > line_begin ? break_end       : beg;
+      auto const wrapped_length    = break_end > line_begin ? break_length    : line_length;
+      auto const wrapped_glyph_pos = break_end > line_begin ? break_glyph_pos : previous_glyph_pos;
+
+      max_line_length = std::max(max_line_length, wrapped_length);
       ++line_count;
       auto next_line_pos = direction == TextDirection::horizontal
         ? float2{ 0.f, static_cast<float>(line_count - 1) * extent.y }
         : float2{ -static_cast<float>(line_count - 1) * extent.x, 0.f };
-      advances[beg - 1] = next_line_pos - previous_glyph_pos;
-      pen               = next_line_pos;
-      line_length       = 0.f;
+
+      advances[wrap_begin - 1] = next_line_pos - wrapped_glyph_pos;
+      pen          = next_line_pos;
+      line_length -= wrapped_length;
+      line_begin   = wrap_begin;
+      break_end    = {};
+
+      for (auto i = wrap_begin; i < beg; ++i)
+      {
+        previous_glyph_pos = pen;
+        pen               += advances[i];
+      }
     }
 
     line_length      += length;
@@ -383,6 +416,12 @@ void TextEngine::ParseResult::limit_length(float len) noexcept
     {
       previous_glyph_pos = pen;
       pen               += advances[i];
+    }
+    if (can_break_after(end))
+    {
+      break_end       = end;
+      break_length    = line_length;
+      break_glyph_pos = previous_glyph_pos;
     }
     beg = end;
   }

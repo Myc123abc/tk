@@ -10,6 +10,11 @@ inline std::string_view startup_font_paths[]
   "assets/font/NotoSansJP-Bold.ttf",
   "assets/font/YuGothR.ttc",
   "assets/font/SourceCodePro-Regular.ttf",
+#ifdef _WIN32
+  "C:\\Windows\\Fonts\\segoeui.ttf",
+  "C:\\Windows\\Fonts\\seguisym.ttf",
+  "C:\\Windows\\Fonts\\seguiemj.ttf",
+#endif
 };
 
 inline std::string_view fallback_font_paths[]
