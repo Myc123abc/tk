@@ -7,6 +7,7 @@
 #include "../../util/async/thread_pool.hpp"
 #include "../../util/unicode.hpp"
 
+#include <graphemebreak.h>
 #include <linebreak.h>
 
 #include <ranges>
@@ -182,10 +183,11 @@ auto TextEngine::try_to_get_parse_result(uint64 text_id, uint64 text_hash) noexc
   return {};
 }
 
-auto TextEngine::shape_text(std::string_view text, Font* font, TextDirection direction) noexcept -> std::vector<ShapedGlyph>
+auto TextEngine::shape_text(std::string_view text, Font* font, TextDirection direction, bool horizontal_in_vertical) noexcept -> std::vector<ShapedGlyph>
 {
   assert(font);
   assert(!text.empty());
+  assert(!horizontal_in_vertical || direction == TextDirection::vertical);
 
   auto result = std::vector<ShapedGlyph>{};
   {
@@ -193,7 +195,10 @@ auto TextEngine::shape_text(std::string_view text, Font* font, TextDirection dir
     hb_buffer_reset(_hb_buf);
     hb_buffer_add_utf8(_hb_buf, text.data(), static_cast<int>(text.size()), 0, -1);
     hb_buffer_set_cluster_level(_hb_buf, HB_BUFFER_CLUSTER_LEVEL_MONOTONE_GRAPHEMES);
-    if (direction == TextDirection::vertical)
+    // ZWJ emoji ligatures require horizontal shaping even when embedded in vertical text.
+    if (horizontal_in_vertical)
+      hb_buffer_set_direction(_hb_buf, HB_DIRECTION_LTR);
+    else if (direction == TextDirection::vertical)
       hb_buffer_set_direction(_hb_buf, HB_DIRECTION_TTB);
     hb_buffer_guess_segment_properties(_hb_buf);
     hb_shape(font->_hb_font, _hb_buf, nullptr, 0);
@@ -216,10 +221,31 @@ auto TextEngine::shape_text(std::string_view text, Font* font, TextDirection dir
       };
       if (direction == TextDirection::vertical)
       {
-        advance.y = -advance.y;
-        offset.y  = -offset.y;
+        if (!horizontal_in_vertical)
+        {
+          advance.y = -advance.y;
+          offset.y  = -offset.y;
+        }
       }
       result.emplace_back(glyph_infos[i].codepoint, advance, offset, glyph_infos[i].cluster);
+    }
+
+    if (horizontal_in_vertical)
+    {
+      // Preserve the horizontal composition, then expose the whole grapheme as one vertical cell.
+      auto run_advance = 0.f;
+      for (auto const& glyph : result)
+        run_advance += glyph.advance.x;
+
+      auto pen_x = 0.f;
+      for (auto& glyph : result)
+      {
+        glyph.offset.x += pen_x - run_advance * .5f;
+        glyph.offset.y += font->_ascender;
+        pen_x          += glyph.advance.x;
+        glyph.advance  = {};
+      }
+      result.back().advance.y = font->_height;
     }
   }
   return result;
@@ -255,11 +281,49 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
     // use hb calculate advances
     if (font)
     {
-      for (auto const& glyph : shape_text(sub_text, font, direction))
+      auto append_shaped_text = [&](std::string_view shaped_text, uint offset, bool horizontal_in_vertical)
       {
-        auto key = GlyphKey{ font->key(), glyph.glyph_index };
-        res.emplace_back(glyph, cluster_offset, key);
-        add_uncached_glyph(font, glyph.glyph_index, key, res);
+        for (auto const& glyph : shape_text(shaped_text, font, direction, horizontal_in_vertical))
+        {
+          auto key = GlyphKey{ font->key(), glyph.glyph_index };
+          res.emplace_back(glyph, cluster_offset + offset, key);
+          add_uncached_glyph(font, glyph.glyph_index, key, res);
+        }
+      };
+
+      if (direction != TextDirection::vertical || !font->has_color_glyphs())
+        append_shaped_text(sub_text, 0, false);
+      else
+      {
+        // Isolate compound graphemes so normal characters retain HarfBuzz TTB shaping.
+        auto grapheme_breaks = std::vector<char>(sub_text.size());
+        set_graphemebreaks_utf8(reinterpret_cast<utf8_t const*>(sub_text.data()),
+          sub_text.size(), nullptr, grapheme_breaks.data());
+
+        auto cluster_end = [&](uint begin)
+        {
+          auto end = begin;
+          do
+            end += next_codepoint(sub_text, end).size;
+          while (end < sub_text.size() && grapheme_breaks[end - 1] != GRAPHEMEBREAK_BREAK);
+          return end;
+        };
+
+        auto run_begin = 0u;
+        for (auto begin = 0u; begin < sub_text.size();)
+        {
+          auto const end = cluster_end(begin);
+          if (codepoint_cnt(sub_text.substr(begin, end - begin)) > 1)
+          {
+            if (run_begin < begin)
+              append_shaped_text(sub_text.substr(run_begin, begin - run_begin), run_begin, false);
+            append_shaped_text(sub_text.substr(begin, end - begin), begin, true);
+            run_begin = end;
+          }
+          begin = end;
+        }
+        if (run_begin < sub_text.size())
+          append_shaped_text(sub_text.substr(run_begin), run_begin, false);
       }
     }
     // if not have font, the text is missing glyphs
@@ -303,7 +367,11 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
   assert(inserted);
 
   auto const is_generating = !res.generating_glyph_info_keys.empty();
-  if (is_generating) _generating_results.emplace(handle);
+  if (is_generating)
+    _generating_results.emplace(handle);
+  else
+    // Cached glyphs already have the bitmap metrics needed for final layout.
+    finalize_parse_result(res);
 
   _parse_result_pool[handle] = std::move(res);
 
@@ -435,7 +503,6 @@ void TextEngine::ParseResult::limit_length(std::string_view text, float len) noe
 
 auto TextEngine::split_text(std::string_view text, FontStyleKey key) noexcept -> std::vector<std::pair<std::string_view, Font*>>
 {
-  // get which text use which font
   auto result = std::vector<std::pair<std::string_view, Font*>>{};
   result.reserve(text.size());
 
@@ -446,28 +513,78 @@ auto TextEngine::split_text(std::string_view text, FontStyleKey key) noexcept ->
   {
     if (!font) return;
     _max_ascender = std::max(_max_ascender, font->_ascender);
-    _max_height   = std::max(_max_height, font->_height);
+    _max_height   = std::max(_max_height,   font->_height);
   };
 
-  auto view     = UTF8View(text);
-  auto beg      = view.begin();
-  auto end      = view.end();
-  auto cur_font = find_font(*beg, key);;
+  auto supports_cluster = [](Font const& font, std::string_view cluster)
+  {
+    // Joiners and variation selectors affect shaping but do not require standalone glyphs.
+    for (auto index = 0u; index < cluster.size();)
+    {
+      auto const [codepoint, size, valid] = next_codepoint(cluster, index);
+      assert(valid);
+      if (codepoint  != 0x200d  &&
+         !(codepoint >= 0xfe00  && codepoint <= 0xfe0f)  &&
+         !(codepoint >= 0xe0100 && codepoint <= 0xe01ef) &&
+         !font.find_glyph(codepoint))
+        return false;
+      index += size;
+    }
+    return true;
+  };
+  auto find_cluster_font = [this, key, &supports_cluster](std::string_view cluster) -> Font*
+  {
+    if (auto it = _font_idxs.find(key); it != _font_idxs.end())
+    {
+      auto font = _fonts[it->second].get();
+      if (supports_cluster(*font, cluster)) return font;
+    }
+
+    for (auto font_idx : _style_font_idxs[static_cast<size_t>(key.style)])
+    {
+      auto font = _fonts[font_idx].get();
+      if (font->key() != key && supports_cluster(*font, cluster)) return font;
+    }
+    return {};
+  };
+
+  auto grapheme_breaks = std::vector<char>(text.size());
+  set_graphemebreaks_utf8(reinterpret_cast<utf8_t const*>(text.data()), text.size(), nullptr, grapheme_breaks.data());
+
+  auto cluster_end = [&](uint begin)
+  {
+    auto end = begin;
+    do
+      end += next_codepoint(text, end).size;
+    while (end < text.size() && grapheme_breaks[end - 1] != GRAPHEMEBREAK_BREAK);
+    return end;
+  };
+
+  auto run_begin = 0u;
+  auto run_end   = cluster_end(run_begin);
+  auto cur_font  = find_cluster_font(text.substr(run_begin, run_end - run_begin));
+  if (!cur_font)
+    cur_font = find_font(next_codepoint(text, run_begin).codepoint, key);
   update(cur_font);
 
-  for (auto it = beg + 1; it != end; ++it)
+  while (run_end < text.size())
   {
-    auto font = find_font(*it, key);
-    if (font == cur_font) continue;
+    auto const end = cluster_end(run_end);
+    auto font = find_cluster_font(text.substr(run_end, end - run_end));
+    if (!font)
+      font = find_font(next_codepoint(text, run_end).codepoint, key);
 
-    result.emplace_back(view.substr(beg, it), cur_font);
-    beg      = it;
-    cur_font = font;
-    update(cur_font);
+    if (font != cur_font)
+    {
+      result.emplace_back(text.substr(run_begin, run_end - run_begin), cur_font);
+      run_begin = run_end;
+      cur_font  = font;
+      update(cur_font);
+    }
+    run_end = end;
   }
 
-  assert(beg != end);
-  result.emplace_back(view.substr(beg, end), cur_font);
+  result.emplace_back(text.substr(run_begin), cur_font);
 
   return result;
 }
@@ -587,7 +704,7 @@ void TextEngine::submit_bitmap_generation_tasks() noexcept
       bitmaps.reserve(glyphs.size());
       for (auto const& key : glyphs)
         // font should always be valid because I never remove font currently
-        bitmaps.emplace_back(g_text_engine._fonts[g_text_engine._font_idxs.at(key.font_key)]->generate_msdf_bitmap(key.glyph_index, key));
+        bitmaps.emplace_back(g_text_engine._fonts[g_text_engine._font_idxs.at(key.font_key)]->generate_bitmap(key.glyph_index, key));
       return bitmaps;
     }));
   }
@@ -665,7 +782,7 @@ void GlyphInfo::set_vertices(renderer::Vertex* vtx, float2 pos, float scale, flo
 
   auto col       = color.to_uint();
   auto outer_col = outer_color.to_uint();
-  auto packed    = vtx_pack(VtxType::text, desc_handle.index());
+  auto packed    = vtx_pack(is_color ? VtxType::color_text : VtxType::text, desc_handle.index());
   vtx[0] = { p0, { min_x, min_y }, col, packed, outer_col, outer_width };
   vtx[1] = { p1, { max_x, min_y }, col, packed, outer_col, outer_width };
   vtx[2] = { p2, { max_x, max_y }, col, packed, outer_col, outer_width };
@@ -677,6 +794,77 @@ void TextEngine::postprocess() noexcept
   for (auto h : _discard_text_parse_result_handles)
     _parse_result_pool.free(h);
   _discard_text_parse_result_handles.clear();
+}
+
+void TextEngine::finalize_parse_result(ParseResult& result) noexcept
+{
+  assert(result.generate_complete());
+
+  if (result.direction == TextDirection::vertical)
+  {
+    // Center visible ink, not transparent bitmap padding or font-specific bearings.
+    auto const cell_height = result.ascender * 2.f;
+    for (auto begin = 0u; begin < result.glyph_info_keys.size();)
+    {
+      auto end = begin + 1;
+      while (end < result.clusters.size() && result.clusters[end] == result.clusters[begin])
+        ++end;
+
+      auto has_visible_glyph = false;
+      auto ink_top           = std::numeric_limits<float>::max();
+      auto ink_bottom        = std::numeric_limits<float>::lowest();
+      auto pen_y             = 0.f;
+      for (auto i = begin; i < end; ++i)
+      {
+        auto const& info = get_glyph_info(result.glyph_info_keys[i]);
+        if (info.visible_extent.y > 0.f)
+        {
+          auto const top = pen_y + result.offsets[i].y + info.pos_offset.y + info.visible_offset.y;
+          ink_top           = std::min(ink_top, top);
+          ink_bottom        = std::max(ink_bottom, top + info.visible_extent.y);
+          has_visible_glyph = true;
+        }
+        if (i + 1 < end)
+          pen_y += result.advances[i].y;
+      }
+
+      if (has_visible_glyph)
+      {
+        auto const offset = (cell_height - (ink_bottom - ink_top)) * .5f - ink_top;
+        for (auto i = begin; i < end; ++i)
+          result.offsets[i].y += offset;
+      }
+      begin = end;
+    }
+  }
+
+  auto has_color_glyph = false;
+  auto rect            = Rect{};
+  auto pos             = float2{};
+  auto ascender        = result.direction == TextDirection::vertical ? 0.f : result.ascender;
+  for (auto i = 0u; i < result.glyph_info_keys.size(); ++i)
+  {
+    auto const& info = get_glyph_info(result.glyph_info_keys[i]);
+    has_color_glyph |= info.is_color;
+    auto glyph_pos = pos + result.offsets[i] + info.pos_offset;
+    glyph_pos.y += ascender;
+    rect.expand(glyph_pos);
+    rect.expand(glyph_pos + info.extent);
+    pos += result.advances[i];
+  }
+
+  if (has_color_glyph && !rect.empty())
+  {
+    // Normalize actual bitmap bounds so the reported extent contains every rendered pixel.
+    result.layout_offset = -rect.left_top();
+    result.extent        = rect.extent();
+    if (result.direction == TextDirection::horizontal)
+    {
+      result.ascender       += result.layout_offset.y;
+      result.layout_offset.y = 0.f;
+    }
+    result.bounding_rect = Rect{ float2{}, result.extent };
+  }
 }
 
 void TextEngine::update() noexcept
@@ -699,6 +887,9 @@ void TextEngine::update() noexcept
         continue;
       }
       result.generating_glyph_info_keys.clear();
+      // The same finalization also runs immediately for parse results whose glyphs were cached.
+      finalize_parse_result(result);
+
       it = _generating_results.erase(it);
     }
 
@@ -725,6 +916,13 @@ auto TextEngine::upload_bitmaps_from_preload_glyphs() noexcept -> bool
   for (auto it = _ungenerated_glyphs.begin(); it != _ungenerated_glyphs.end();)
   {
     auto key = *it;
+    auto font = _fonts[_font_idxs.at(key.font_key)].get();
+    if (font->has_color_glyphs())
+    {
+      ++it;
+      continue;
+    }
+
     if (preload_glyphs.contains(key))
     {
       // Get cache content of glyph.
@@ -732,10 +930,11 @@ auto TextEngine::upload_bitmaps_from_preload_glyphs() noexcept -> bool
 
       // Add bitmap need to upload.
       auto bitmap = MSDFBitmap{};
-      bitmap.data       = std::move(glyph.bitmap);
-      bitmap.extent     = glyph.extent;
-      bitmap.pos_offset = glyph.pos_offset;
-      bitmap.glyph_key  = key;
+      bitmap.data           = std::move(glyph.bitmap);
+      bitmap.extent         = glyph.extent;
+      bitmap.visible_extent = bitmap.extent;
+      bitmap.pos_offset     = glyph.pos_offset;
+      bitmap.glyph_key      = key;
       auto [glyph_atlas_idx, cpy_pos] = calc_glyph_pos(bitmap.extent);
       _pending_copy_preload_glyphs[glyph_atlas_idx].emplace_back(std::move(bitmap), cpy_pos);
 
@@ -760,7 +959,14 @@ void TextEngine::upload_bitmaps(PendingCopyGlyphsInfoType const& info) noexcept
   {
     for (auto const& [bitmap, pos] : bitmap_infos)
     {
-      auto res = _glyph_infos.emplace(bitmap.glyph_key, GlyphInfo{ glyph_atlas_idx, pos, bitmap.extent, bitmap.pos_offset });
+      auto res = _glyph_infos.emplace(bitmap.glyph_key, GlyphInfo{
+        glyph_atlas_idx,
+        pos,
+        bitmap.extent,
+        bitmap.pos_offset,
+        bitmap.visible_offset,
+        bitmap.visible_extent,
+        bitmap.is_color });
       assert(res.second);
     }
 

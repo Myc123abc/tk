@@ -10,6 +10,7 @@ enum class VtxType
   image,
   text,
   line,
+  color_text,
 };
   
 inline auto vtx_pack(VtxType type, uint img_idx) noexcept

@@ -47,6 +47,7 @@ public:
     float2                extent;
     float                 ascender{};
     TextDirection         direction{};
+    float2                layout_offset{};
     std::vector<GlyphKey> glyph_info_keys;
     GlyphKeySet           generating_glyph_info_keys;
     std::optional<Rect>   bounding_rect;
@@ -87,10 +88,11 @@ public:
 
 private:
   auto install_font(std::unique_ptr<Font> font) noexcept -> FontInfo;
-  auto shape_text(std::string_view text, Font* font, TextDirection direction) noexcept -> std::vector<ShapedGlyph>;
+  auto shape_text(std::string_view text, Font* font, TextDirection direction, bool horizontal_in_vertical = false) noexcept -> std::vector<ShapedGlyph>;
   auto split_text(std::string_view text, FontStyleKey key) noexcept -> std::vector<std::pair<std::string_view, Font*>>;
   auto find_font(uint unicode, FontStyleKey key) noexcept -> Font*;
   auto find_notdef_glyph_font() noexcept -> Font*;
+  void finalize_parse_result(ParseResult& result) noexcept;
   void add_uncached_glyph(Font* font, uint glyph_idx, GlyphKey const& key, ParseResult& result) noexcept;
   auto add_notdef_glyph() noexcept -> bool;
   auto calc_glyph_pos(float2 extent) noexcept -> std::pair<uint, float2>;

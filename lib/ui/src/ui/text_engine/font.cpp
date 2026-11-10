@@ -218,9 +218,10 @@ auto Font::generate_msdf_bitmap(uint glyph_idx, GlyphKey const& key) const noexc
   auto [msdf, pos_offset] = generate_msdf(shape);
 
   auto bitmap = MSDFBitmap{};
-  bitmap.extent     = { msdf.width(), msdf.height() };
-  bitmap.glyph_key  = key;
-  bitmap.pos_offset = pos_offset;
+  bitmap.extent         = { msdf.width(), msdf.height() };
+  bitmap.visible_extent = bitmap.extent;
+  bitmap.glyph_key      = key;
+  bitmap.pos_offset     = pos_offset;
   bitmap.data.resize(bitmap.extent.x * bitmap.extent.y * 4);
 
   auto data = static_cast<msdfgen::BitmapConstSection<float, 3>>(msdf);
@@ -237,6 +238,61 @@ auto Font::generate_msdf_bitmap(uint glyph_idx, GlyphKey const& key) const noexc
       bitmap.data[dst + 2] = to(src[2]);
       bitmap.data[dst + 3] = 255;
     }
+  }
+
+  return bitmap;
+}
+
+auto Font::generate_bitmap(uint glyph_idx, GlyphKey const& key) const noexcept -> MSDFBitmap
+{
+  auto lock = std::unique_lock{ _mutex };
+  check(FT_Load_Glyph(_face, glyph_idx, FT_LOAD_COLOR | FT_LOAD_DEFAULT), "failed to load color glyph");
+  if (_face->glyph->format != FT_GLYPH_FORMAT_BITMAP)
+    check(FT_Render_Glyph(_face->glyph, FT_RENDER_MODE_NORMAL), "failed to render color glyph");
+
+  auto const& glyph  = _face->glyph;
+  auto const& source = glyph->bitmap;
+  if (source.pixel_mode != FT_PIXEL_MODE_BGRA)
+  {
+    lock.unlock();
+    return generate_msdf_bitmap(glyph_idx, key);
+  }
+
+  auto bitmap = MSDFBitmap{};
+  bitmap.extent     = { source.width, source.rows };
+  bitmap.pos_offset = { static_cast<float>(glyph->bitmap_left), static_cast<float>(-glyph->bitmap_top) };
+  bitmap.glyph_key  = key;
+  bitmap.is_color   = true;
+  bitmap.data.resize(bitmap.extent.x * bitmap.extent.y * 4);
+
+  // Keep the full bitmap for rendering, but measure non-transparent pixels for layout.
+  auto visible_min       = bitmap.extent;
+  auto visible_max       = uint2{};
+  auto has_visible_pixel = false;
+  for (auto y = 0u; y < bitmap.extent.y; ++y)
+  {
+    auto const* src = source.buffer + y * source.pitch;
+    for (auto x = 0u; x < bitmap.extent.x; ++x)
+    {
+      auto const* bgra  = src + x * 4;
+      auto const  dst   = (y * bitmap.extent.x + x) * 4;
+      auto const  alpha = bgra[3];
+      bitmap.data[dst + 0] = alpha ? static_cast<uint8>(bgra[2] * 255u / alpha) : 0;
+      bitmap.data[dst + 1] = alpha ? static_cast<uint8>(bgra[1] * 255u / alpha) : 0;
+      bitmap.data[dst + 2] = alpha ? static_cast<uint8>(bgra[0] * 255u / alpha) : 0;
+      bitmap.data[dst + 3] = alpha;
+      if (alpha)
+      {
+        visible_min       = min(visible_min, uint2{ x, y });
+        visible_max       = max(visible_max, uint2{ x + 1, y + 1 });
+        has_visible_pixel = true;
+      }
+    }
+  }
+  if (has_visible_pixel)
+  {
+    bitmap.visible_offset = visible_min;
+    bitmap.visible_extent = visible_max - visible_min;
   }
 
   return bitmap;

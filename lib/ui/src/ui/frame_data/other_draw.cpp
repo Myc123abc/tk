@@ -270,6 +270,8 @@ void FrameData::add_text(TextParseResultHandle handle, float2 pos, float scale, 
 void FrameData::_add_text(TextParseResultHandle handle, float2 pos, float scale, Color inner_color, Color outer_color, float outline_width) noexcept
 {
   auto const& result = g_text_engine.get_parse_result(handle);
+  // Color glyph ink can start outside the font-metric origin.
+  pos += result.layout_offset * scale;
 
   auto cnt = result.advances.size();
 

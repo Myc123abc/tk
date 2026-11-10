@@ -51,6 +51,11 @@ public:
   auto style() const noexcept { return _style; }
   auto family() const noexcept { return _family; }
   auto key() const noexcept { return _key; }
+  auto has_color_glyphs() const noexcept
+  {
+    std::lock_guard lock{ _mutex };
+    return FT_HAS_COLOR(_face);
+  }
 
   auto find_glyph(uint unicode) const noexcept
   {
@@ -59,6 +64,7 @@ public:
   }
 
   auto get_glyph_advance(uint glyph_idx) const noexcept -> float2;
+  auto generate_bitmap(uint glyph_idx, GlyphKey const& key) const noexcept -> MSDFBitmap;
   auto generate_msdf_bitmap(uint glyph_idx, GlyphKey const& key) const noexcept -> MSDFBitmap;
 
 private:

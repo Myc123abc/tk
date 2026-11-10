@@ -129,7 +129,9 @@ void GlyphCacher::add(PendingCopyGlyphsInfoType& info) noexcept
   _glyphs.reserve(_glyphs.size() + std::ranges::distance(info | std::views::values | std::views::join));
   for (auto const& bitmap_infos : info | std::views::values)
     for (auto const& [bitmap, _] : bitmap_infos)
-      _glyphs.emplace_back(GlyphCacheHeader{ bitmap.glyph_key, bitmap.extent, bitmap.pos_offset }, std::move(bitmap.data));
+      // Color glyphs depend on bitmap strike data and visible-alpha bounds, so regenerate them.
+      if (!bitmap.is_color)
+        _glyphs.emplace_back(GlyphCacheHeader{ bitmap.glyph_key, bitmap.extent, bitmap.pos_offset }, std::move(bitmap.data));
 }
 
 // auto GlyphCacher::pregenerate(std::span<PregenerateTextInfo const> infos) noexcept -> Task<>

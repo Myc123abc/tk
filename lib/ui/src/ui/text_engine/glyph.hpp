@@ -41,7 +41,11 @@ struct MSDFBitmap
   std::vector<uint8> data;
   uint2              extent{};
   float2             pos_offset{};
+  // Bounds of non-transparent pixels relative to the full bitmap.
+  float2             visible_offset{};
+  float2             visible_extent{};
   GlyphKey           glyph_key;
+  bool               is_color{};
 
   auto to_bitmap_view() const noexcept -> renderer::BitmapView
   {
@@ -60,11 +64,27 @@ struct GlyphInfo
   float  max_y{};
   float2 extent{};
   float2 pos_offset{};
+  // Layout uses visible bounds while rendering still uses the full atlas rectangle.
+  float2 visible_offset{};
+  float2 visible_extent{};
+  bool   is_color{};
 
   GlyphInfo() = default;
 
-  GlyphInfo(uint glyph_atlas_index, float2 pos, float2 extent, float2 pos_offset) noexcept
-    : glyph_atlas_index(glyph_atlas_index), extent(extent), pos_offset(pos_offset)
+  GlyphInfo(
+    uint   glyph_atlas_index,
+    float2 pos,
+    float2 extent,
+    float2 pos_offset,
+    float2 visible_offset,
+    float2 visible_extent,
+    bool   is_color) noexcept
+    : glyph_atlas_index(glyph_atlas_index),
+      extent(extent),
+      pos_offset(pos_offset),
+      visible_offset(visible_offset),
+      visible_extent(visible_extent),
+      is_color(is_color)
   {
     min_x = (pos.x + 0.5f) / Glyph_Atlas_Width;
     min_y = (pos.y + 0.5f) / Glyph_Atlas_Height;

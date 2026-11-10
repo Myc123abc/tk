@@ -3,8 +3,6 @@
 #include "tk/error_handling.hpp"
 #include "tk/base.hpp"
 
-// TODO: abstract UnicodeString
-
 namespace tk {
 
 inline auto to_string(std::wstring_view wstr) noexcept
@@ -52,43 +50,50 @@ inline auto utf8_codepoint_size(uint codepoint) noexcept -> uint
   return 4;
 }
 
-inline auto next_codepoint(std::string_view str, uint idx) -> std::pair<uint, uint>
+struct UTF8Codepoint
+{
+  uint codepoint{};
+  uint size{};
+  bool valid{};
+};
+
+inline auto next_codepoint(std::string_view str, uint idx) noexcept -> UTF8Codepoint
 {
   if (idx >= str.size()) return {};
 
   auto const first_byte = static_cast<uint8>(str[idx]);
   auto const size       = utf8_sequence_size(first_byte);
-  if (!size) return { 0xfffd, 1 };
+  if (!size) return { 0xfffd, 1, false };
 
   auto res = static_cast<uint>(first_byte & UTF8_First_Byte_Masks[size]);
 
   // Truncated sequence
   if (idx + size > str.size())
-    return { 0xfffd, str.size() - idx };
+    return { 0xfffd, static_cast<uint>(str.size() - idx), false };
 
   // Validate continuation bytes
   for (auto i = 1; i < size; ++i)
   {
     auto const byte = static_cast<uint8>(str[idx + i]);
     if ((byte & 0xc0) != 0x80)
-      return { 0xfffd, 1 };
+      return { 0xfffd, 1, false };
 
     res = (res << 6) | (byte & 0x3f);
   }
 
   // Reject overlong encoding
   if (res < UTF8_Min_Codepoints[size])
-    return { 0xfffd, 1 };
+    return { 0xfffd, 1, false };
 
   // Reject utf16 surrogate range
   if (res >= 0xd800 && res <= 0xdfff)
-    return { 0xfffd, 1 };
+    return { 0xfffd, 1, false };
 
   // Reject values outside unicode
   if (res > 0x10ffff)
-    return { 0xfffd, 1 };
+    return { 0xfffd, 1, false };
 
-  return { res, size };
+  return { res, size, true };
 }
 
 inline void append_codepoint(std::string& str, uint codepoint) noexcept
@@ -110,83 +115,12 @@ inline auto codepoint_cnt(std::string_view str) -> uint
   auto cnt = 0u;
   while (idx < str.size())
   {
-    auto const [res, size] = next_codepoint(str, idx);
-    err_if(res == 0xfffd, "Invalid u8string: {}", str);
-    idx += size;
+    auto const decoded = next_codepoint(str, idx);
+    err_if(!decoded.valid, "Invalid u8string: {}", str);
+    idx += decoded.size;
     ++cnt;
   }
   return cnt;
 }
-
-class UTF8Iterator
-{
-  friend class UTF8View;
-public:
-  using value_type        = uint;
-  using difference_type   = std::ptrdiff_t;
-  using iterator_category = std::forward_iterator_tag;
-
-  UTF8Iterator(std::string_view str, uint idx) noexcept
-    : _str(str.data()), _size(str.size()), _idx(idx) {}
-
-  auto operator*() const noexcept -> uint
-  {
-    return next_codepoint({ _str, _size }, _idx).first;
-  }
-
-  auto operator++() noexcept -> UTF8Iterator&
-  {
-    _idx += next_codepoint({ _str, _size }, _idx).second;
-    return *this;
-  }
-
-  auto operator==(UTF8Iterator const& rhs) const noexcept -> bool
-  {
-    return _idx == rhs._idx;
-  }
-
-  auto operator!=(UTF8Iterator const& rhs) const noexcept -> bool
-  {
-    return _idx != rhs._idx;
-  }
-
-private:
-  char const* _str;
-  uint        _size{};
-  uint        _idx{};
-};
-
-inline auto operator+(UTF8Iterator it, uint n) -> UTF8Iterator
-{
-  while (n--) ++it;
-  return it;
-}
-
-class UTF8View
-{
-public:
-  using iterator = UTF8Iterator;
-
-  UTF8View(std::string_view view) noexcept
-    : _view(view) {}
-
-  auto begin() const noexcept -> iterator
-  {
-    return { _view, 0 };
-  }
-
-  auto end() const noexcept -> iterator
-  {
-    return { _view, static_cast<uint>(_view.size()) };
-  }
-
-  auto substr(UTF8Iterator beg, UTF8Iterator end) const
-  {
-    return _view.substr(beg._idx, end._idx - beg._idx);
-  }
-
-private:
-  std::string_view _view;
-};
 
 }

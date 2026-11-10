@@ -24,10 +24,11 @@ PS_Param vs(VS_Param arg)
   return res;
 }
 
-#define Vtx_Type_Shape 0
-#define Vtx_Type_Image 1
-#define Vtx_Type_Text  2
-#define Vtx_Type_Line  3
+#define Vtx_Type_Shape      0
+#define Vtx_Type_Image      1
+#define Vtx_Type_Text       2
+#define Vtx_Type_Line       3
+#define Vtx_Type_Color_Text 4
 
 static const float  msdf_px_range = 4.0;
 static const float2 px_range      = float2(msdf_px_range, msdf_px_range);
@@ -51,6 +52,12 @@ float4 ps(PS_Param arg) : SV_TARGET
   {
     float coverage = images[NonUniformResourceIndex(arg.img_idx)].Sample(g_sampler, arg.uv).r;
     return float4(arg.col.rgb, arg.col.a * coverage);
+  }
+  else if (arg.type == Vtx_Type_Color_Text)
+  {
+    // Color glyphs already contain final RGBA pixels; only apply the requested text opacity.
+    float4 emoji = images[NonUniformResourceIndex(arg.img_idx)].Sample(g_sampler, arg.uv);
+    return float4(emoji.rgb, emoji.a * arg.col.a);
   }
 
   //
