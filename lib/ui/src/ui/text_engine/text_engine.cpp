@@ -8,8 +8,12 @@
 #include "../../util/async/thread_pool.hpp"
 #include "../../util/unicode.hpp"
 
+extern "C"
+{
 #include <graphemebreak.h>
+#include <emojidef.h>
 #include <linebreak.h>
+}
 
 #include <ranges>
 
@@ -231,18 +235,18 @@ auto TextEngine::shape_text(std::string_view text, Font* font, TextDirection dir
         {
           advance.y = -advance.y;
           offset.y  = -offset.y;
-          if (FT_HAS_COLOR(font->_face))
-            advance.y = color_glyph_vertical_advance(advance.y, font->_height);
         }
-        else if (mode == ShapingMode::sideways)
+        else if (mode == ShapingMode::sideways || mode == ShapingMode::sideways_centered)
         {
           advance = { 0.f, advance.x };
           offset  = { sideways_offset_x(offset.y, _max_ascender, _max_height), offset.x };
         }
       }
       result.emplace_back(glyph_infos[i].codepoint, advance, offset, glyph_infos[i].cluster,
-        mode == ShapingMode::sideways
-          ? GlyphOrientation::sideways
+        mode == ShapingMode::sideways || mode == ShapingMode::sideways_centered
+          ? mode == ShapingMode::sideways_centered
+            ? GlyphOrientation::sideways_centered
+            : GlyphOrientation::sideways
           : mode == ShapingMode::horizontal_in_vertical
             ? GlyphOrientation::upright_composed
             : GlyphOrientation::upright);
@@ -263,17 +267,17 @@ auto TextEngine::shape_text(std::string_view text, Font* font, TextDirection dir
         pen_x          += glyph.advance.x;
         glyph.advance  = {};
       }
-      result.back().advance.y = color_glyph_vertical_advance(0.f, font->_height);
+      result.back().advance.y = font->_height;
     }
   }
   return result;
 }
 
-auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction, float limit_len) noexcept -> TextParseResultHandle
+auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction, float tracking, float limit_len) noexcept -> TextParseResultHandle
 {
   assert(!text.empty());
 
-  auto id = get_text_id(text, family, style, direction, limit_len);
+  auto id = get_text_id(text, family, style, direction, tracking, limit_len);
 
   if (auto res = try_to_get_parse_result(id, text.id()))
     return res.value();
@@ -344,7 +348,14 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
         {
           if (font->has_color_glyphs() && codepoint_cnt(cluster) > 1)
             return ShapingMode::horizontal_in_vertical;
-          return is_sideways_cluster(cluster) ? ShapingMode::sideways : ShapingMode::normal;
+          if (!is_sideways_cluster(cluster)) return ShapingMode::normal;
+
+          auto const codepoint = next_codepoint(cluster, 0).codepoint;
+          auto const category  = hb_unicode_general_category(hb_unicode_funcs_get_default(), codepoint);
+          auto const centered  = category == HB_UNICODE_GENERAL_CATEGORY_OPEN_PUNCTUATION  ||
+                                 category == HB_UNICODE_GENERAL_CATEGORY_CLOSE_PUNCTUATION ||
+                                 codepoint == '<' || codepoint == '>';
+          return centered ? ShapingMode::sideways_centered : ShapingMode::sideways;
         };
 
         auto run_begin = 0u;
@@ -414,8 +425,25 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
       offset.x += res.ascender;
   }
 
-  // adjust text lines for limited length
-  res.limit_length(text.view(), limit_len);
+  auto deferred_vertical_layout = std::optional<DeferredVerticalLayout>{};
+  if (direction == TextDirection::horizontal)
+  {
+    res.apply_tracking(tracking);
+    res.limit_length(text.view(), limit_len);
+  }
+  else if (res.generating_glyph_info_keys.empty())
+  {
+    res.prepare_layout(_glyph_infos);
+    res.apply_tracking(tracking);
+    res.limit_length(text.view(), limit_len);
+  }
+  else if (tracking != 0.f || limit_len > 0.f)
+  {
+    deferred_vertical_layout.emplace(
+      DeferredVerticalLayout{ res.advances, res.extent, std::string{ text.view() }, tracking, limit_len });
+    res.apply_tracking(tracking);
+    res.limit_length(text.view(), limit_len);
+  }
 
   // cached calculate result
   auto handle = _parse_result_pool.alloc();
@@ -424,7 +452,11 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
 
   auto const is_generating = !res.generating_glyph_info_keys.empty();
   if (is_generating)
+  {
     _generating_results.emplace(handle);
+    if (deferred_vertical_layout)
+      _deferred_vertical_layouts.emplace(handle, std::move(*deferred_vertical_layout));
+  }
   else
     // Cached glyphs already have the bitmap metrics needed for final layout.
     res.finalize(_glyph_infos);
@@ -557,6 +589,32 @@ void TextEngine::ParseResult::limit_length(std::string_view text, float len) noe
     extent = { static_cast<float>(line_count) * extent.x, max_line_length };
 }
 
+void TextEngine::ParseResult::apply_tracking(float tracking) noexcept
+{
+  if (tracking == 0.f || advances.empty()) return;
+
+  auto cluster_count = 0u;
+  for (auto begin = 0u; begin < advances.size();)
+  {
+    auto end = begin + 1;
+    while (end < clusters.size() && clusters[end] == clusters[begin]) ++end;
+    if (end < advances.size())
+    {
+      if (direction == TextDirection::horizontal)
+        advances[end - 1].x += tracking;
+      else
+        advances[end - 1].y += tracking;
+      ++cluster_count;
+    }
+    begin = end;
+  }
+
+  if (direction == TextDirection::horizontal)
+    extent.x += tracking * cluster_count;
+  else
+    extent.y += tracking * cluster_count;
+}
+
 auto TextEngine::split_text(std::string_view text, FontStyleKey key) noexcept -> std::vector<std::pair<std::string_view, Font*>>
 {
   auto result = std::vector<std::pair<std::string_view, Font*>>{};
@@ -590,8 +648,46 @@ auto TextEngine::split_text(std::string_view text, FontStyleKey key) noexcept ->
     }
     return true;
   };
-  auto find_cluster_font = [this, key, &supports_cluster](std::string_view cluster) -> Font*
+  auto prefers_color_emoji = [](std::string_view cluster)
   {
+    auto has_emoji = false;
+    for (auto index = 0u; index < cluster.size();)
+    {
+      auto const [codepoint, size, valid] = next_codepoint(cluster, index);
+      assert(valid);
+      if (codepoint == 0xfe0e) return false;
+      has_emoji |= codepoint == 0xfe0f || ub_is_extended_pictographic(codepoint);
+      index += size;
+    }
+    return has_emoji;
+  };
+  auto find_cluster_font = [this, key, &supports_cluster, &prefers_color_emoji](std::string_view cluster) -> Font*
+  {
+    if (prefers_color_emoji(cluster))
+    {
+      auto find_color_font = [&](auto&& fonts) -> Font*
+      {
+        for (auto font_idx : fonts)
+        {
+          auto font = _fonts[font_idx].get();
+          if (font->has_color_glyphs() && supports_cluster(*font, cluster))
+            return font;
+        }
+        return {};
+      };
+
+      if (auto it = _font_idxs.find(key); it != _font_idxs.end())
+      {
+        auto font = _fonts[it->second].get();
+        if (font->has_color_glyphs() && supports_cluster(*font, cluster))
+          return font;
+      }
+      if (auto font = find_color_font(_style_font_idxs[static_cast<size_t>(key.style)]))
+        return font;
+      if (auto font = find_color_font(std::views::iota(0uz, _fonts.size())))
+        return font;
+    }
+
     if (auto it = _font_idxs.find(key); it != _font_idxs.end())
     {
       auto font = _fonts[it->second].get();
@@ -883,24 +979,13 @@ void TextEngine::postprocess() noexcept
   _discard_text_parse_result_handles.clear();
 }
 
-void TextEngine::ParseResult::finalize(GlyphKeyMap<GlyphInfo> const& glyph_infos) noexcept
+void TextEngine::ParseResult::prepare_layout(GlyphKeyMap<GlyphInfo> const& glyph_infos) noexcept
 {
   assert(generate_complete());
 
   if (direction == TextDirection::vertical)
   {
     auto const cell_height = ascender * 2.f;
-
-    // Measure in column-local coordinates so wrapped columns share the same alignment.
-    auto sideways_left = std::optional<float>{};
-    for (auto i = 0u; i < glyph_info_keys.size(); ++i)
-    {
-      auto const& info = glyph_infos.at(glyph_info_keys[i]);
-      if (!is_sideways(orientations[i]) || info.visible_extent.x <= 0.f || info.visible_extent.y <= 0.f)
-        continue;
-      auto const bounds = glyph_rect(info, offsets[i], true, true);
-      sideways_left = sideways_left ? std::min(*sideways_left, bounds.left) : bounds.left;
-    }
 
     auto column_left  = std::numeric_limits<float>::max();
     auto column_right = std::numeric_limits<float>::lowest();
@@ -919,6 +1004,7 @@ void TextEngine::ParseResult::finalize(GlyphKeyMap<GlyphInfo> const& glyph_infos
       auto ink_top           = std::numeric_limits<float>::max();
       auto ink_bottom        = std::numeric_limits<float>::lowest();
       auto pen_y             = 0.f;
+      auto cluster_advance   = 0.f;
       for (auto i = begin; i < end; ++i)
       {
         auto const& info          = glyph_infos.at(glyph_info_keys[i]);
@@ -942,18 +1028,16 @@ void TextEngine::ParseResult::finalize(GlyphKeyMap<GlyphInfo> const& glyph_infos
         }
         if (i + 1 < end)
           pen_y += advances[i].y;
+        cluster_advance += advances[i].y;
       }
 
       if (has_visible_glyph)
       {
         auto const orientation = orientations[begin];
         auto const composed    = orientation == GlyphOrientation::upright_composed;
-        if (composed || (has_color_glyph && !is_sideways(orientation) && sideways_left))
+        if (composed || has_color_glyph || orientation == GlyphOrientation::sideways_centered)
         {
-          // Emoji align by visible left edge with sideways text, not by bitmap center.
-          auto const offset = sideways_left
-            ? *sideways_left - ink_left
-            : cell_height * .5f - (ink_left + ink_right) * .5f;
+          auto const offset = cell_height * .5f - (ink_left + ink_right) * .5f;
           for (auto i = begin; i < end; ++i)
             offsets[i].x += offset;
           render_left  += offset;
@@ -961,80 +1045,23 @@ void TextEngine::ParseResult::finalize(GlyphKeyMap<GlyphInfo> const& glyph_infos
         }
         column_left  = std::min(column_left, render_left);
         column_right = std::max(column_right, render_right);
-        if (ink_top <= ink_bottom)
+        if ((composed || has_color_glyph) && ink_top <= ink_bottom)
         {
           auto const offset = (cell_height - (ink_bottom - ink_top)) * .5f - ink_top;
           for (auto i = begin; i < end; ++i)
             offsets[i].y += offset;
+          ink_bottom += offset;
         }
-      }
-      begin = end;
-    }
-
-    // Font advances do not always contain color bitmap ink. Keep a visible gap
-    // at emoji boundaries, and compensate encoded wrap jumps for added spacing.
-    auto pen                = float2{};
-    auto column_shift       = 0.f;
-    auto previous_bottom    = std::optional<float>{};
-    auto previous_has_color = false;
-    auto const ink_gap      = cell_height / 16.f;
-    for (auto begin = 0u; begin < glyph_info_keys.size();)
-    {
-      auto end = begin + 1;
-      while (end < clusters.size() && clusters[end] == clusters[begin])
-        ++end;
-
-      if (begin && advances[begin - 1].x != 0.f)
-      {
-        previous_bottom.reset();
-        previous_has_color = false;
-      }
-
-      auto ink_top          = std::numeric_limits<float>::max();
-      auto ink_bottom       = std::numeric_limits<float>::lowest();
-      auto has_visible_ink  = false;
-      auto has_color_glyph  = false;
-      auto glyph_pen        = pen;
-      for (auto i = begin; i < end; ++i)
-      {
-        auto const& info = glyph_infos.at(glyph_info_keys[i]);
-        if (info.visible_extent.x > 0.f && info.visible_extent.y > 0.f)
+        if (has_color_glyph && !is_sideways(orientation))
         {
-          auto const bounds = glyph_rect(info, glyph_pen + offsets[i], is_sideways(orientations[i]), true);
-          ink_top          = std::min(ink_top, bounds.top);
-          ink_bottom       = std::max(ink_bottom, bounds.bottom);
-          has_visible_ink  = true;
-          has_color_glyph |= info.is_color;
-        }
-        glyph_pen += advances[i];
-      }
-
-      if (has_visible_ink)
-      {
-        if (previous_bottom && (previous_has_color || has_color_glyph))
-        {
-          auto const spacing = *previous_bottom + ink_gap - ink_top;
-          if (spacing > 0.f)
+          auto const minimum_advance = std::max(0.f, ink_bottom);
+          if (cluster_advance < minimum_advance)
           {
-            advances[begin - 1].y += spacing;
-            pen.y                  += spacing;
-            ink_top               += spacing;
-            ink_bottom            += spacing;
-            column_shift          += spacing;
+            auto const adjustment = minimum_advance - cluster_advance;
+            advances[end - 1].y += adjustment;
+            extent.y            += adjustment;
           }
         }
-        previous_bottom    = ink_bottom;
-        previous_has_color = has_color_glyph;
-      }
-
-      for (auto i = begin; i < end; ++i)
-      {
-        if (advances[i].x != 0.f)
-        {
-          advances[i].y -= column_shift;
-          column_shift   = 0.f;
-        }
-        pen += advances[i];
       }
       begin = end;
     }
@@ -1049,6 +1076,12 @@ void TextEngine::ParseResult::finalize(GlyphKeyMap<GlyphInfo> const& glyph_infos
       extent.x *= column_scale;
     }
   }
+
+}
+
+void TextEngine::ParseResult::finalize(GlyphKeyMap<GlyphInfo> const& glyph_infos) noexcept
+{
+  assert(generate_complete());
 
   auto needs_ink_bounds = false;
   auto rect             = Rect{};
@@ -1067,7 +1100,24 @@ void TextEngine::ParseResult::finalize(GlyphKeyMap<GlyphInfo> const& glyph_infos
 
   if (needs_ink_bounds && !rect.empty())
   {
-    // Normalize actual bitmap bounds so the reported extent contains every rendered pixel.
+    auto line_count = 1u;
+    if (direction == TextDirection::horizontal)
+      line_count += std::ranges::count_if(advances, [](auto advance) { return advance.y != 0.f; });
+    else
+      line_count += std::ranges::count_if(advances, [](auto advance) { return advance.x != 0.f; });
+
+    auto layout_rect = Rect{};
+    if (direction == TextDirection::horizontal)
+      layout_rect = { float2{}, extent };
+    else
+    {
+      auto const column_width = extent.x / line_count;
+      layout_rect = { -static_cast<float>(line_count - 1) * column_width, 0.f, column_width, extent.y };
+    }
+    rect.expand(layout_rect.left_top());
+    rect.expand(layout_rect.right_bottom());
+
+    // Preserve nominal line cells and expand only for bitmap ink overhang.
     layout_offset = -rect.left_top();
     extent        = rect.extent();
     if (direction == TextDirection::horizontal)
@@ -1099,6 +1149,22 @@ void TextEngine::update() noexcept
         continue;
       }
       result.generating_glyph_info_keys.clear();
+      if (result.direction == TextDirection::vertical)
+      {
+        auto deferred = _deferred_vertical_layouts.find(*it);
+        if (deferred != _deferred_vertical_layouts.end())
+        {
+          result.advances = std::move(deferred->second.advances);
+          result.extent   = deferred->second.extent;
+        }
+        result.prepare_layout(_glyph_infos);
+        if (deferred != _deferred_vertical_layouts.end())
+        {
+          result.apply_tracking(deferred->second.tracking);
+          result.limit_length(deferred->second.text, deferred->second.limit_len);
+          _deferred_vertical_layouts.erase(deferred);
+        }
+      }
       // The same finalization also runs immediately for parse results whose glyphs were cached.
       result.finalize(_glyph_infos);
 
@@ -1193,9 +1259,9 @@ void TextEngine::upload_bitmaps(PendingCopyGlyphsInfoType const& info) noexcept
   }
 }
 
-auto TextEngine::get_bounding_rect(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction, float limit_len) noexcept -> std::optional<Rect>
+auto TextEngine::get_bounding_rect(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction, float tracking, float limit_len) noexcept -> std::optional<Rect>
 {
-  auto  handle = parse(text, family, style, direction, limit_len);
+  auto  handle = parse(text, family, style, direction, tracking, limit_len);
   auto& res    = _parse_result_pool[handle];
 
   // If bitmap generation complete

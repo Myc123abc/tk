@@ -13,7 +13,7 @@ TextLayout::TextLayout(std::vector<StringLiteral> const& texts, std::string_view
   _texts.reserve(texts.size());
   for (auto text : texts)
   {
-    auto handle = g_text_engine.parse(text, family, style, direction, 0);
+    auto handle = g_text_engine.parse(text, family, style, direction, 0, 0);
     auto extent = g_text_engine.get_parse_result(handle).extent;
 
     _texts.emplace_back(text.view(), float2{}, extent, std::bit_cast<uint64>(handle));

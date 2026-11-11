@@ -13,12 +13,13 @@ using PendingCopyGlyphsInfoType = std::unordered_map<uint, std::vector<std::pair
 
 constexpr auto get_text_id(
   StringLiteral    text,
-  std::string_view family    = {},
-  FontStyle        style     = {},
-  TextDirection    direction = {},
-  float           limit_len  = {}) noexcept
+  std::string_view family     = {},
+  FontStyle        style      = {},
+  TextDirection    direction  = {},
+  float            tracking   = {},
+  float            limit_len  = {}) noexcept
 {
-  return hash(text.id(), family, style, direction, limit_len);
+  return hash(text.id(), family, style, direction, tracking, limit_len);
 }
 
 Singleton(TextEngine, g_text_engine,
@@ -30,11 +31,12 @@ public:
     upright,
     upright_composed,
     sideways,
+    sideways_centered,
   };
 
   static auto is_sideways(GlyphOrientation orientation) noexcept
   {
-    return orientation == GlyphOrientation::sideways;
+    return orientation == GlyphOrientation::sideways || orientation == GlyphOrientation::sideways_centered;
   }
 
   static auto uses_vertical_shaping(uint codepoint) noexcept -> bool;
@@ -86,15 +88,25 @@ public:
     }
 
     void limit_length(std::string_view text, float len) noexcept;
+    void apply_tracking(float tracking) noexcept;
+    void prepare_layout(GlyphKeyMap<GlyphInfo> const& glyph_infos) noexcept;
     void finalize(GlyphKeyMap<GlyphInfo> const& glyph_infos) noexcept;
   };
   using ParseResultPool       = ObjectPool<ParseResult>;
   using TextParseResultHandle = ParseResultPool::Handle;
-  auto parse(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction, float limit_len) noexcept -> TextParseResultHandle;
+  struct DeferredVerticalLayout
+  {
+    std::vector<float2> advances;
+    float2              extent;
+    std::string         text;
+    float               tracking{};
+    float               limit_len{};
+  };
+  auto parse(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction, float tracking, float limit_len) noexcept -> TextParseResultHandle;
   auto& get_parse_result(TextParseResultHandle handle) const noexcept { return _parse_result_pool[handle]; }
   auto try_to_get_parse_result(uint64 text_id, uint64 text_hash) noexcept -> std::optional<TextParseResultHandle>;
 
-  auto get_bounding_rect(StringLiteral text, std::string_view family = {}, FontStyle style = {}, TextDirection direction = {}, float limit_len = {}) noexcept -> std::optional<Rect>;
+  auto get_bounding_rect(StringLiteral text, std::string_view family = {}, FontStyle style = {}, TextDirection direction = {}, float tracking = {}, float limit_len = {}) noexcept -> std::optional<Rect>;
 
   void update() noexcept;
 
@@ -110,6 +122,7 @@ private:
     normal,
     horizontal_in_vertical,
     sideways,
+    sideways_centered,
   };
 
   auto install_font(std::unique_ptr<Font> font) noexcept -> FontInfo;
@@ -162,6 +175,8 @@ private:
   float                                      _max_height{};
   std::vector<Task<std::vector<MSDFBitmap>>> _generate_bitmap_tasks;
   SkylinePacker                              _packer;
+
+  std::unordered_map<TextParseResultHandle, DeferredVerticalLayout> _deferred_vertical_layouts;
 )
 
 using TextParseResultHandle = TextEngine::TextParseResultHandle;

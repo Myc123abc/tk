@@ -39,6 +39,21 @@ void UIContext::begin(StringID name, std::optional<float2> extent, std::optional
   err_if(_call_begin, "begin is called but end not be called");
   _call_begin = true;
 
+  auto begin_auto_size_measurement = [&]
+  {
+    auto cursor_pos = renderer::get_cursor_pos();
+    auto monitor    = _wnd_ctx->init_pos
+      ? renderer::Monitor{ Rect{ *_wnd_ctx->init_pos, *_wnd_ctx->init_pos + float2{ 1, 1 } } }
+      : renderer::Monitor{ POINT{ cursor_pos.x, cursor_pos.y } };
+    auto const initial_pos = _wnd_ctx->init_pos.value_or(float2{ cursor_pos.x, cursor_pos.y });
+    _measurement_wnd.init_logical(initial_pos.x, initial_pos.y, 1, 1, monitor.scale());
+    _measurement_wnd.cfg() = cfg;
+    _wnd                         = &_measurement_wnd;
+    _wnd_ctx->monitor_work_rect  = monitor.work_rect();
+    _wnd_ctx->content_bounds     = {};
+    _wnd_ctx->auto_size_waiting_for_content = false;
+  };
+
   // create window if not have
   if (!_wnd_ctxs.contains(name))
   {
@@ -46,20 +61,10 @@ void UIContext::begin(StringID name, std::optional<float2> extent, std::optional
     _wnd_ctx->name          = name;
     _wnd_ctx->can_be_closed = is_closed;
     _wnd_ctx->auto_size     = !extent.has_value();
+    _wnd_ctx->init_pos      = pos;
 
     if (_wnd_ctx->auto_size)
-    {
-      auto cursor_pos = renderer::get_cursor_pos();
-      auto monitor    = pos
-        ? renderer::Monitor{ Rect{ pos.value(), pos.value() + float2{ 1, 1 } } }
-        : renderer::Monitor{ POINT{ cursor_pos.x, cursor_pos.y } };
-      auto const initial_pos = pos.value_or(float2{ cursor_pos.x, cursor_pos.y });
-      _measurement_wnd.init_logical(initial_pos.x, initial_pos.y, 1, 1, monitor.scale());
-      _measurement_wnd.cfg() = cfg;
-      _wnd               = &_measurement_wnd;
-      _monitor_work_rect = monitor.work_rect();
-      _wnd_init_pos      = pos;
-    }
+      begin_auto_size_measurement();
     else
     {
       _wnd_ctx->handle = g_wnd_mgr.create_window(pos, extent.value().x, extent.value().y, cfg.backdrop);
@@ -70,7 +75,10 @@ void UIContext::begin(StringID name, std::optional<float2> extent, std::optional
   else 
   {
     _wnd_ctx = &_wnd_ctxs[name];
-    _wnd     = g_wnd_mgr.get_window(_wnd_ctx->handle);
+    if (_wnd_ctx->auto_size && _wnd_ctx->first_time_call)
+      begin_auto_size_measurement();
+    else
+      _wnd = g_wnd_mgr.get_window(_wnd_ctx->handle);
   }
   _wnd_ctx->is_called = true;
 
@@ -147,18 +155,18 @@ void UIContext::end() noexcept
   err_if(!_scissor_area_stack.empty(), "scissor_area_begin is called but scissor_area_end not be called");
   err_if(!_viewport_stack.empty(), "viewport_begin is called but viewport_end not be called");
   err_if(_custom_transform_depth != 0, "transform_end not be called");
-  if (_wnd_ctx->auto_size && _wnd_ctx->first_time_call)
+  if (_wnd_ctx->auto_size && _wnd_ctx->first_time_call && !_wnd_ctx->auto_size_waiting_for_content)
   {
     auto desired    = _wnd_ctx->content_bounds.right_bottom() + float2{ 0.f, is_use_title_bar_now() ? Title_Bar_Height : 0.f };
     auto max_extent = float2
     {
-      (_monitor_work_rect.width()  - _wnd->shadow_thickness() * 2) / _wnd->scale(),
-      (_monitor_work_rect.height() - _wnd->shadow_thickness() * 2) / _wnd->scale(),
+      (_wnd_ctx->monitor_work_rect.width()  - _wnd->shadow_thickness() * 2) / _wnd->scale(),
+      (_wnd_ctx->monitor_work_rect.height() - _wnd->shadow_thickness() * 2) / _wnd->scale(),
     };
     desired.x = std::min(desired.x, max_extent.x);
     desired.y = std::min(desired.y, max_extent.y);
 
-    _wnd_ctx->handle = g_wnd_mgr.create_window(_wnd_init_pos, desired.x, desired.y, _wnd->cfg().backdrop);
+    _wnd_ctx->handle = g_wnd_mgr.create_window(_wnd_ctx->init_pos, desired.x, desired.y, _wnd->cfg().backdrop);
     _wnd             = g_wnd_mgr.get_window(_wnd_ctx->handle);
     _wnd_names.emplace(_wnd_ctx->handle, _wnd_ctx->name);
     _wnd->cfg() = _measurement_wnd.cfg();
@@ -167,7 +175,8 @@ void UIContext::end() noexcept
     add_title_bar();
   _user_title_bar_draw_func = {};
   _call_begin = false;
-  if (_wnd_ctx->first_time_call) _wnd_ctx->first_time_call = false;
+  if (_wnd_ctx->first_time_call && !_wnd_ctx->auto_size_waiting_for_content)
+    _wnd_ctx->first_time_call = false;
 }
 
 void UIContext::register_item(Rect rect) noexcept
@@ -201,8 +210,11 @@ void UIContext::close_window() noexcept
     }
     else
     {
-      _wnd_names.erase(ctx.handle);
-      g_wnd_mgr.close_window(ctx.handle);
+      if (ctx.handle)
+      {
+        _wnd_names.erase(ctx.handle);
+        g_wnd_mgr.close_window(ctx.handle);
+      }
       cursor_on_window = {};
       return true;
     }
@@ -234,6 +246,8 @@ void UIContext::render() noexcept
   // process window render datas
   for (auto& wnd_ctx : _wnd_ctxs | std::views::values)
   {
+    if (!wnd_ctx.handle) continue;
+
     auto handle = wnd_ctx.handle;
     auto data   = &wnd_ctx.frame_data;
 
@@ -642,8 +656,10 @@ auto UIContext::text(StringLiteral text, float2 pos, float size, Color inner_col
 
   auto draw_scale    = size / FT_Pixel_Size;
   auto scale         = draw_scale / _wnd->scale();
-  auto result_handle = g_text_engine.parse(text, cfg.family, cfg.style, cfg.direction, cfg.limit_len / scale);
+  auto result_handle = g_text_engine.parse(text, cfg.family, cfg.style, cfg.direction, cfg.tracking / scale, cfg.limit_len / scale);
   auto const& result = g_text_engine.get_parse_result(result_handle);
+  if (_wnd_ctx->auto_size && _wnd_ctx->first_time_call && !result.generate_complete())
+    _wnd_ctx->auto_size_waiting_for_content = true;
   auto ascender      = result.ascender * scale;
   auto extent        = result.extent   * scale;
 
@@ -666,7 +682,8 @@ auto UIContext::get_text_bounding_rect(StringLiteral text, float size, TextConfi
 {
   assert(!text.empty());
   check_draw();
-  if (auto res = g_text_engine.get_bounding_rect(text, cfg.family, cfg.style, cfg.direction, cfg.limit_len / (size / FT_Pixel_Size / _wnd->scale())))
+  auto const scale = size / FT_Pixel_Size / _wnd->scale();
+  if (auto res = g_text_engine.get_bounding_rect(text, cfg.family, cfg.style, cfg.direction, cfg.tracking / scale, cfg.limit_len / scale))
     return res.value() * (size / FT_Pixel_Size / _wnd->scale());
   return {};
 }

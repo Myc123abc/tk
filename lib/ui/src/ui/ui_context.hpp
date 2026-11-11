@@ -25,18 +25,21 @@ struct WindowContext
   WindowContext() = default;
   WindowContext(HWND handle) noexcept : handle(handle) {}
 
-  StringID  name{};
-  HWND      handle{};
-  bool      is_called{};
-  bool      can_be_closed{};
-  bool      is_closed{};
-  float2    render_pos{};
-  bool      need_clear{};
-  bool      set_fullscreen{};
-  bool      first_time_call{ true };
-  bool      auto_size{};
-  Rect      content_bounds;
-  FrameData frame_data;
+  StringID              name{};
+  HWND                  handle{};
+  bool                  is_called{};
+  bool                  can_be_closed{};
+  bool                  is_closed{};
+  float2                render_pos{};
+  bool                  need_clear{};
+  bool                  set_fullscreen{};
+  bool                  first_time_call{ true };
+  bool                  auto_size{};
+  bool                  auto_size_waiting_for_content{};
+  std::optional<float2> init_pos;
+  Rect                  monitor_work_rect;
+  Rect                  content_bounds;
+  FrameData             frame_data;
 };
 
 Singleton(UIContext, g_ui_ctx,
@@ -131,10 +134,6 @@ private:
   WindowContext*    _wnd_ctx{};
   HWND              _fullscreen_window{};
   bool              _fullscreen_window_need_clear{};
-
-  // auto size related variables
-  Rect                  _monitor_work_rect;
-  std::optional<float2> _wnd_init_pos;
 
   bool   _call_begin{};
   uint   _custom_transform_depth{};

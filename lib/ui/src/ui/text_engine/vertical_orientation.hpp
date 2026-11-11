@@ -125,12 +125,6 @@ constexpr auto uses_vertical_shaping(uint codepoint) noexcept -> bool
   return false;
 }
 
-constexpr auto color_glyph_vertical_advance(float shaped_advance, float font_height) noexcept
-{
-  constexpr auto Gap_Em = 1.f / 16.f;
-  return std::max(shaped_advance, font_height) + font_height * Gap_Em;
-}
-
 constexpr auto sideways_offset_x(float shaped_offset_y, float line_ascender, float line_height) noexcept
 {
   return shaped_offset_y - line_ascender + line_height * .5f;
