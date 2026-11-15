@@ -42,7 +42,8 @@ struct MSDFBitmap;
 
 class Font
 {
-  friend class TextEngine;
+  friend class TextShaper;
+  friend class FontRegistry;
 public:
   ~Font() noexcept;
 

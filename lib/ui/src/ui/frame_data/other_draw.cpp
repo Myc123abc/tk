@@ -282,10 +282,14 @@ void FrameData::_add_text(TextParseResultHandle handle, float2 pos, float scale,
   {
     auto const& info = g_text_engine.get_glyph_info(result.glyph_info_keys[i]);
 
-    _sampled_images.emplace(g_text_engine.glyph_atlas(info.glyph_atlas_index));
+    auto const atlas = g_text_engine.glyph_atlas(info.glyph_atlas_index);
+    _sampled_images.emplace(atlas);
+    auto const descriptor = renderer::g_img_mgr[atlas].srv();
+    assert(descriptor.is_valid());
 
     auto const sideways = TextEngine::is_sideways(result.orientations[i]);
-    info.set_vertices(vertices + vtx_offset, pos + result.offsets[i] * scale, scale, ascender, sideways, inner_color, outer_color, outline_width);
+    info.set_vertices(vertices + vtx_offset, pos + result.offsets[i] * scale,
+      scale, ascender, sideways, descriptor.index(), inner_color, outer_color, outline_width);
 
     auto vtx_beg = _vertex_beg + vtx_offset;
     indices[idx_offset + 0] = static_cast<uint16>(vtx_beg + 0);

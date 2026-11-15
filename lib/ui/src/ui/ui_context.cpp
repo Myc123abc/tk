@@ -47,10 +47,10 @@ void UIContext::begin(StringID name, std::optional<float2> extent, std::optional
       : renderer::Monitor{ POINT{ cursor_pos.x, cursor_pos.y } };
     auto const initial_pos = _wnd_ctx->init_pos.value_or(float2{ cursor_pos.x, cursor_pos.y });
     _measurement_wnd.init_logical(initial_pos.x, initial_pos.y, 1, 1, monitor.scale());
-    _measurement_wnd.cfg() = cfg;
-    _wnd                         = &_measurement_wnd;
-    _wnd_ctx->monitor_work_rect  = monitor.work_rect();
-    _wnd_ctx->content_bounds     = {};
+    _measurement_wnd.cfg()                  = cfg;
+    _wnd                                    = &_measurement_wnd;
+    _wnd_ctx->monitor_work_rect             = monitor.work_rect();
+    _wnd_ctx->content_bounds                = {};
     _wnd_ctx->auto_size_waiting_for_content = false;
   };
 
@@ -440,6 +440,15 @@ auto UIContext::is_hover_on(size_t id, Rect rc) noexcept -> bool
     return id == _prev_hovered_widget_id;
   }
   return false;
+}
+
+auto UIContext::cursor_pos_for_widget() const noexcept -> float2
+{
+  check_draw();
+  auto cursor = cursor_pos_on_window() / _wnd->scale();
+  if (is_use_title_bar_now() && !draw_title_bar)
+    cursor.y -= Title_Bar_Height;
+  return cursor;
 }
 
 auto UIContext::transform_widget_rect(Rect rect) const noexcept -> Rect

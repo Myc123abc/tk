@@ -1,18 +1,12 @@
 #pragma once
 
-#include "text_engine.hpp"
+#include "glyph.hpp"
+#include "../../util/async/task.hpp"
+#include "../../util/singleton.hpp"
 
 namespace tk { struct File; }
 
 namespace tk::ui {
-
-struct PregenerateTextInfo
-{
-  std::string_view text;
-  StringID         family;
-  FontStyle        style{};
-  TextDirection    direction{};
-};
 
 struct GlyphCacheHeader
 {
@@ -34,20 +28,26 @@ struct PreloadGlyphData
   std::vector<uint8> bitmap;
 };
 
+// Persistent cache for generated monochrome glyph bitmaps. Preload is
+// asynchronous, but generation must wait for it to complete so cached keys are
+// not regenerated and appended again.
 Singleton(GlyphCacher, g_glyph_cacher,
 public:
   void init() noexcept;
   void destroy() noexcept;
 
-  auto& preload_glyphs() noexcept
+  auto preload_complete() const noexcept
   {
-    return _preload_task.is_completed() ? _preload_glyphs : _empty_preload_glyphs;
+    return _preload_task.is_completed();
   }
 
-  void add(PendingCopyGlyphsInfoType& info) noexcept;
+  auto& preload_glyphs() noexcept
+  {
+    assert(preload_complete());
+    return _preload_glyphs;
+  }
 
-  // auto pregenerate(std::span<PregenerateTextInfo const> infos) noexcept -> Task<>;
-  // auto pregenerate(std::span<MSDFBitmap const> bitmaps) noexcept -> Task<>;
+  void store(PendingCopyGlyphsInfoType& info) noexcept;
 
 private:
   auto preload() noexcept -> Task<>;
@@ -58,7 +58,7 @@ private:
   std::vector<GlyphCacheField>  _glyphs;
   File*                         _file{};
   GlyphKeyMap<PreloadGlyphData> _preload_glyphs;
-  GlyphKeyMap<PreloadGlyphData> _empty_preload_glyphs;
+  GlyphKeySet                   _cached_glyph_keys;
   Task<>                        _preload_task;
 )
 

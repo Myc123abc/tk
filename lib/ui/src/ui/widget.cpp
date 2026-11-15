@@ -307,7 +307,7 @@ auto slider(StringID name, float x, float y, float width, float height, float be
   if (knob_state.down || bar_state.down)
   {
     knob_color = knob_hover_color;
-    auto cursor    = get_cursor_pos_on_window();
+    auto cursor    = g_ui_ctx.cursor_pos_for_widget();
     auto t         = cfg.vertical ? (cursor.y - y - knob_len / 2) / len : (cursor.x - x - knob_len / 2) / len;
     auto cur_ratio = std::clamp(grow_from_min ? t : 1.f - t, 0.f, 1.f);
     v = beg + cur_ratio * (end - beg);

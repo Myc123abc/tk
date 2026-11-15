@@ -1,10 +1,10 @@
 #include "glyph_cacher.hpp"
-#include "ideographs.hpp"
 #include "../../util/file_system.hpp"
 #include "../../util/async/thread_pool.hpp"
 #include "../../util/compressor/compressor.hpp"
-#include "../../util/unicode.hpp"
 #include "../../util/binary_file_format.hpp"
+
+#include <ranges>
 
 namespace tk::ui {
 
@@ -12,53 +12,6 @@ namespace {
 
 constexpr auto Cache_Path = StringLiteral{ ".cache\\glyphs.bin" };
 constexpr auto Magic_Text = StringID{ "tk::ui::glyph_cacher::glyph_cache_file" };
-
-struct CommonGlyphInfoRecord
-{
-  uint64 font_family{};
-  uint   language{};
-  uint   font_style{};
-  uint   direction{};
-};
-
-void append_range(std::string& text, uint first, uint last) noexcept
-{
-  for (auto codepoint = first; codepoint <= last; ++codepoint)
-    append_codepoint(text, codepoint);
-}
-
-auto common_glyph_text(language lang) noexcept -> std::string
-{
-  auto text = std::string{};
-  append_range(text, 0x0020, 0x00ff);
-
-  auto ideographs = std::string_view{};
-  switch (lang)
-  {
-  case language::en:
-    break;
-  case language::ch:
-    append_range(text, 0x2000, 0x206f);
-    append_range(text, 0x3000, 0x30ff);
-    append_range(text, 0x31f0, 0x31ff);
-    append_range(text, 0xff00, 0xffef);
-    append_codepoint(text, 0xfffd);
-    ideographs = Chinese_Common_Ideographs;
-    break;
-  case language::jp:
-    append_range(text, 0x3000, 0x30ff);
-    append_range(text, 0x31f0, 0x31ff);
-    append_range(text, 0xff00, 0xffef);
-    append_codepoint(text, 0xfffd);
-    ideographs = Japanese_Common_Ideographs;
-    break;
-  default:
-    std::unreachable();
-  }
-
-  text += ideographs;
-  return text;
-}
 
 }
 
@@ -94,6 +47,7 @@ void GlyphCacher::deserialize(std::span<uint8> data) noexcept
   while (!file_fmt.is_read_data_empty())
   {
     auto [header, data] = file_fmt.read_field<GlyphCacheHeader>();
+    _cached_glyph_keys.emplace(header.key);
     _preload_glyphs[header.key] = { header.extent, header.pos_offset, data | std::ranges::to<std::vector<uint8>>() };
   }
 }
@@ -123,23 +77,15 @@ void GlyphCacher::write_cache() noexcept
   });
 }
 
-void GlyphCacher::add(PendingCopyGlyphsInfoType& info) noexcept
+void GlyphCacher::store(PendingCopyGlyphsInfoType& info) noexcept
 {
   if (info.empty()) return;
   _glyphs.reserve(_glyphs.size() + std::ranges::distance(info | std::views::values | std::views::join));
   for (auto const& bitmap_infos : info | std::views::values)
     for (auto const& [bitmap, _] : bitmap_infos)
       // Color glyphs depend on bitmap strike data and visible-alpha bounds, so regenerate them.
-      if (!bitmap.is_color)
+      if (!bitmap.is_color && _cached_glyph_keys.emplace(bitmap.glyph_key).second)
         _glyphs.emplace_back(GlyphCacheHeader{ bitmap.glyph_key, bitmap.extent, bitmap.pos_offset }, std::move(bitmap.data));
 }
-
-// auto GlyphCacher::pregenerate(std::span<PregenerateTextInfo const> infos) noexcept -> Task<>
-// {
-// }
-
-// auto GlyphCacher::pregenerate(std::span<MSDFBitmap const> bitmaps) noexcept -> Task<>
-// {
-// }
 
 }

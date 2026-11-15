@@ -68,7 +68,11 @@ public:
 
   void set_render_pos(float x, float y) noexcept { _wnd_ctx->render_pos = { x + renderer::Window_Shadow_Thickness, y + renderer::Window_Shadow_Thickness }; }
   auto get_render_pos() const noexcept { return _wnd_ctx->render_pos; }
+  // Raw physical pixels for window-space hit testing.
   auto cursor_pos_on_window() const noexcept { return _cursor_pos_on_window; }
+  // Logical widget coordinates after DPI/title-bar conversion, without undoing
+  // viewport or custom transforms.
+  auto cursor_pos_for_widget() const noexcept -> float2;
   auto can_hover_current_window() const noexcept { return _can_hover_current_window; }
 
   void render_on(float x, float y, std::move_only_function<void()>&& func) noexcept;

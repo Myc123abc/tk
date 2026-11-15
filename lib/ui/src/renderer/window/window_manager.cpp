@@ -8,6 +8,8 @@
 
 #include <shellscalingapi.h>
 
+#include <algorithm>
+
 using namespace tk;
 using namespace tk::ui;
 using namespace tk::renderer;
@@ -22,6 +24,22 @@ auto to_64_bits(uint x, uint y) noexcept
 auto to_32_bits(uint64 x) noexcept -> std::pair<uint, uint>
 {
   return { static_cast<uint>(x >> 32), static_cast<uint>(x & 0xffffffff) };
+}
+
+auto fit_to_work_area(Rect rect, Rect work_area) noexcept -> Rect
+{
+  assert(!rect.empty() && !work_area.empty());
+  auto const extent = float2
+  {
+    std::min(rect.width(), work_area.width()),
+    std::min(rect.height(), work_area.height()),
+  };
+  auto const pos = float2
+  {
+    std::clamp(rect.left, work_area.left, work_area.right - extent.x),
+    std::clamp(rect.top, work_area.top, work_area.bottom - extent.y),
+  };
+  return { pos, pos + extent };
 }
 
 void set_cursor(ResizeType type) noexcept
@@ -211,6 +229,43 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   case WM_DISPLAYCHANGE:
   {
     wnd_mgr._update_monitors = true;
+    return 0;
+  }
+
+  case WM_DPICHANGED:
+  {
+    auto it = windows.find(handle);
+    if (it == windows.end()) break;
+
+    auto& window              = it->second;
+    auto const scale          = LOWORD(w_param) / 96.f;
+    auto const suggested_rect = Rect{ *reinterpret_cast<RECT const*>(l_param) };
+    auto const monitor        = Monitor{ handle };
+    auto const work_area      = monitor.work_rect();
+
+    if (window.is_maximized() || window.is_fullscreen())
+    {
+      auto const backup_pos = window._backup_rect.left_top();
+      window._backup_rect = fit_to_work_area({ backup_pos, backup_pos + window._backup_rect.extent() * (scale / window.scale()) }, work_area);
+    }
+
+    window.set_monitor(monitor.name());
+    // Keep the model, render targets, and blur window in sync with Windows.
+    if (window.is_maximized())
+      window.update_by_rect(work_area, scale);
+    else if (window.is_fullscreen())
+      window.update_by_rect(monitor.rect(), scale);
+    else
+    {
+      // Keep visible content on screen; the transparent shadow may extend outside.
+      auto const shadow = float2(static_cast<LONG>(Window_Shadow_Thickness * scale));
+      auto const client_rect = Rect{ suggested_rect.left_top() + shadow, suggested_rect.right_bottom() - shadow };
+      window.update_by_rect(fit_to_work_area(client_rect, work_area), scale);
+    }
+
+    // A DPI change can occur inside move_with_pos(), before the next drag step.
+    if (left_button_down && GetCapture() == handle)
+      left_button_down_window_cursor_pos = window.cursor_pos();
     return 0;
   }
 

@@ -1,26 +1,7 @@
 #include "text_engine.hpp"
-#include "tk/error_handling.hpp"
-#include "glyph_cacher.hpp"
 #include "vertical_orientation.hpp"
-#include "../../renderer/resource/image_manager.hpp"
-#include "../../renderer/engine/copy_engine.hpp"
-#include "../../util/file_system.hpp"
-#include "../../util/async/thread_pool.hpp"
-#include "../../util/unicode.hpp"
-
-extern "C"
-{
-#include <graphemebreak.h>
-#include <emojidef.h>
-#include <linebreak.h>
-}
 
 #include <ranges>
-
-#define check(x, msg) err_if(static_cast<bool>(x), "[TextEngine] {}", msg)
-
-using namespace tk;
-using namespace tk::renderer;
 
 namespace tk::ui {
 
@@ -31,246 +12,58 @@ auto TextEngine::uses_vertical_shaping(uint codepoint) noexcept -> bool
 
 void TextEngine::init() noexcept
 {
-  _packer.reset({ Glyph_Atlas_Width, Glyph_Atlas_Height });
-
-  _hb_buf = hb_buffer_create();
-
-  // create the first glyph atlas
-  _glyph_atlas.emplace_back(g_img_mgr.create(Glyph_Atlas_Width, Glyph_Atlas_Height, ImageFormat::rgba8_unorm, ImageType::srv));
+  _shaper.init();
+  _glyph_store.init();
 }
 
 void TextEngine::destroy() noexcept
 {
-  for (auto handle : _glyph_atlas) g_img_mgr.destroy(handle);
-  _fonts.clear();
-  for (auto& h : _cached_text_parse_results | std::views::values)
+  _glyph_store.destroy();
+  _font_registry.clear();
+  for (auto& handle : _cached_text_parse_results | std::views::values)
   {
-    assert(h.valid());
-    _parse_result_pool.free(h);
+    assert(handle.valid());
+    _parse_result_pool.free(handle);
   }
-
-  hb_buffer_destroy(_hb_buf);
+  _shaper.destroy();
 }
 
 auto TextEngine::load_font(std::string const& path) noexcept -> std::expected<FontInfo, FontLoadErrorType>
 {
-  // check whether already loaded
-  if (auto it = std::ranges::find_if(_fonts, [&](auto const& font) { return font->name() == path; });
-      it != _fonts.end())
-    return FontInfo{ it->get()->_family, it->get()->_style };
-
-  // check whether exist
-  if (!g_file_sys.exists(path)) return std::unexpected(FontLoadError::unexist{});
-
-  // create font
-  auto owned_path = std::string{ path };
-  auto font = std::make_unique<Font>();
-  if (auto res = font->init(owned_path); res) return std::unexpected(FontLoadError::freetype_err{ res });
-
-  return install_font(std::move(font));
+  auto result = _font_registry.load_font(path);
+  queue_pending_missing_glyphs();
+  return result;
 }
 
 auto TextEngine::load_fonts(std::span<std::string const> paths) noexcept -> std::vector<std::expected<FontInfo, FontLoadErrorType>>
 {
-  using Result     = std::expected<FontInfo, FontLoadErrorType>;
-  using TaskResult = std::pair<std::unique_ptr<Font>, uint8>;
-
-  auto results      = std::vector<std::optional<Result>>(paths.size());
-  auto task_indices = std::vector<std::optional<size_t>>(paths.size());
-  auto tasks        = std::vector<Task<TaskResult>>{};
-  auto pending      = std::unordered_map<std::string, size_t>{};
-  tasks.reserve(paths.size());
-  pending.reserve(paths.size());
-
-  for (auto i = 0uz; i < paths.size(); ++i)
-  {
-    auto const path = paths[i];
-    if (auto it = std::ranges::find_if(_fonts, [&](auto const& font) { return font->name() == path; });
-        it != _fonts.end())
-    {
-      results[i].emplace(FontInfo{ it->get()->_family, it->get()->_style });
-      continue;
-    }
-
-    if (!g_file_sys.exists(path))
-    {
-      results[i].emplace(std::unexpected(FontLoadErrorType{ FontLoadError::unexist{} }));
-      continue;
-    }
-
-    auto owned_path = std::string{ path };
-    auto [it, inserted] = pending.try_emplace(owned_path, tasks.size());
-    task_indices[i] = it->second;
-    if (!inserted) continue;
-
-    tasks.emplace_back(g_thread_pool.run([path = std::move(owned_path)]() mutable
-    {
-      auto font = std::make_unique<Font>();
-      auto const error = font->init(path);
-      return TaskResult{ std::move(font), error };
-    }));
-  }
-
-  auto task_results = std::vector<Result>{};
-  task_results.reserve(tasks.size());
-  for (auto& task : tasks)
-  {
-    auto [font, error] = task.take_result();
-    if (error)
-      task_results.emplace_back(std::unexpected(FontLoadErrorType{ FontLoadError::freetype_err{ error } }));
-    else
-      task_results.emplace_back(install_font(std::move(font)));
-  }
-
-  auto ordered_results = std::vector<Result>{};
-  ordered_results.reserve(paths.size());
-  for (auto i = 0uz; i < paths.size(); ++i)
-  {
-    if (results[i])
-      ordered_results.emplace_back(std::move(*results[i]));
-    else
-      ordered_results.emplace_back(task_results[*task_indices[i]]);
-  }
-  return ordered_results;
+  auto results = _font_registry.load_fonts(paths);
+  queue_pending_missing_glyphs();
+  return results;
 }
 
-auto TextEngine::install_font(std::unique_ptr<Font> font) noexcept -> FontInfo
+void TextEngine::queue_pending_missing_glyphs() noexcept
 {
-  // create font info
-  auto info = FontInfo{ font->_family, font->_style };
-
-  // store font
-  auto font_idx    = static_cast<uint>(_fonts.size());
-  auto loaded_font = _fonts.emplace_back(std::move(font)).get();
-  auto res         = _font_idxs.emplace(loaded_font->key(), font_idx);
-  assert(res.second);
-  _style_font_idxs[static_cast<size_t>(loaded_font->style())].emplace_back(font_idx);
-
-  // set notdef font if not have
-  if (!_notdef_font) _notdef_font = loaded_font;
-
-  for (auto const& [key, missing_glyphs] : _missing_glyphs)
-    if (key.style == loaded_font->style())
-      regenerate_missing_glyphs(loaded_font, key);
-
-  return info;
+  for (auto const& keys : _font_registry.pending_missing_glyphs() | std::views::values)
+    for (auto const& key : keys)
+      _glyph_store.request(key);
 }
 
-void TextEngine::regenerate_missing_glyphs(Font* font, FontStyleKey key) noexcept
-{
-  auto& missing_glyphs = _missing_glyphs[key];
-  if (missing_glyphs.empty()) return;
-
-  auto& glyphs = _pending_reload_missing_glyphs[key];
-
-  for (auto unicode : missing_glyphs)
-  {
-    auto glyph_idx = font->find_glyph(unicode);
-    if (!glyph_idx) continue;
-
-    _fallback_font_idxs[key][unicode] = _font_idxs.at(font->key());
-    auto glyph_key = GlyphKey{ font->key(), glyph_idx };
-    glyphs.emplace(glyph_key);
-    assert(!_glyph_infos.contains(glyph_key) && !_uncached_glyphs.contains(glyph_key));
-    _ungenerated_glyphs.emplace(glyph_key);
-  }
-}
-
-auto TextEngine::try_to_get_parse_result(uint64 text_id, uint64 text_hash) noexcept -> std::optional<TextParseResultHandle>
+auto TextEngine::try_to_get_parse_result(uint64 text_id, uint64 fallback_id) noexcept -> std::optional<TextParseResultHandle>
 {
   if (auto it = _cached_text_parse_results.find(text_id); it != _cached_text_parse_results.end())
   {
     auto const& result = _parse_result_pool[it->second];
     if (result.generate_complete())
     {
-      _last_ready_text_parse_results[text_hash] = it->second;
+      _last_ready_text_parse_results[fallback_id] = it->second;
       return it->second;
     }
-    if (auto fallback_it = _last_ready_text_parse_results.find(text_hash); fallback_it != _last_ready_text_parse_results.end())
+    if (auto fallback_it = _last_ready_text_parse_results.find(fallback_id); fallback_it != _last_ready_text_parse_results.end())
       return fallback_it->second;
     return it->second;
   }
   return {};
-}
-
-auto TextEngine::shape_text(std::string_view text, Font* font, TextDirection direction, ShapingMode mode) noexcept -> std::vector<ShapedGlyph>
-{
-  assert(font);
-  assert(!text.empty());
-  assert(mode == ShapingMode::normal || direction == TextDirection::vertical);
-
-  auto result = std::vector<ShapedGlyph>{};
-  {
-    std::lock_guard lock{ font->_mutex };
-    hb_buffer_reset(_hb_buf);
-    hb_buffer_add_utf8(_hb_buf, text.data(), static_cast<int>(text.size()), 0, -1);
-    hb_buffer_set_cluster_level(_hb_buf, HB_BUFFER_CLUSTER_LEVEL_MONOTONE_GRAPHEMES);
-    // Emoji composition and sideways Latin both require horizontal shaping in vertical text.
-    if (mode != ShapingMode::normal)
-      hb_buffer_set_direction(_hb_buf, HB_DIRECTION_LTR);
-    else if (direction == TextDirection::vertical)
-      hb_buffer_set_direction(_hb_buf, HB_DIRECTION_TTB);
-    hb_buffer_guess_segment_properties(_hb_buf);
-    hb_shape(font->_hb_font, _hb_buf, nullptr, 0);
-
-    auto const glyph_count     = hb_buffer_get_length(_hb_buf);
-    auto const glyph_infos     = hb_buffer_get_glyph_infos(_hb_buf, nullptr);
-    auto const glyph_positions = hb_buffer_get_glyph_positions(_hb_buf, nullptr);
-    result.reserve(glyph_count);
-    for (auto i = 0u; i < glyph_count; ++i)
-    {
-      auto advance = float2
-      {
-        static_cast<float>(glyph_positions[i].x_advance) / 64,
-        static_cast<float>(glyph_positions[i].y_advance) / 64,
-      };
-      auto offset = float2
-      {
-        static_cast<float>(glyph_positions[i].x_offset) / 64,
-        static_cast<float>(glyph_positions[i].y_offset) / 64,
-      };
-      if (direction == TextDirection::vertical)
-      {
-        if (mode == ShapingMode::normal)
-        {
-          advance.y = -advance.y;
-          offset.y  = -offset.y;
-        }
-        else if (mode == ShapingMode::sideways || mode == ShapingMode::sideways_centered)
-        {
-          advance = { 0.f, advance.x };
-          offset  = { sideways_offset_x(offset.y, _max_ascender, _max_height), offset.x };
-        }
-      }
-      result.emplace_back(glyph_infos[i].codepoint, advance, offset, glyph_infos[i].cluster,
-        mode == ShapingMode::sideways || mode == ShapingMode::sideways_centered
-          ? mode == ShapingMode::sideways_centered
-            ? GlyphOrientation::sideways_centered
-            : GlyphOrientation::sideways
-          : mode == ShapingMode::horizontal_in_vertical
-            ? GlyphOrientation::upright_composed
-            : GlyphOrientation::upright);
-    }
-
-    if (mode == ShapingMode::horizontal_in_vertical)
-    {
-      // Preserve the horizontal composition, then expose the whole grapheme as one vertical cell.
-      auto run_advance = 0.f;
-      for (auto const& glyph : result)
-        run_advance += glyph.advance.x;
-
-      auto pen_x = 0.f;
-      for (auto& glyph : result)
-      {
-        glyph.offset.x += pen_x - run_advance * .5f;
-        glyph.offset.y += font->_ascender;
-        pen_x          += glyph.advance.x;
-        glyph.advance  = {};
-      }
-      result.back().advance.y = font->_height;
-    }
-  }
-  return result;
 }
 
 auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction, float tracking, float limit_len) noexcept -> TextParseResultHandle
@@ -278,1020 +71,197 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
   assert(!text.empty());
 
   auto id = get_text_id(text, family, style, direction, tracking, limit_len);
+  // Pending layouts may reuse a previous result, but never another direction.
+  auto const fallback_id = hash(text.id(), direction);
+  if (auto result = try_to_get_parse_result(id, fallback_id)) return *result;
 
-  if (auto res = try_to_get_parse_result(id, text.id()))
-    return res.value();
-
-  auto res  = ParseResult{};
-  auto size = codepoint_cnt(text.view());
-
-  auto has_missing_glyphs = false;
-
-  // calculate advances
-  res.advances.reserve(size);
-  res.offsets.reserve(size);
-  res.clusters.reserve(size);
-  res.orientations.reserve(size);
-  res.glyph_info_keys.reserve(size);
-  res.direction = direction;
-
-  // split text
+  auto result          = ParseResult{ text.view(), direction };
   auto glyph_style_key = FontStyleKey(family, style);
-  for (auto [sub_text, font] : split_text(text.view(), glyph_style_key))
+  // Resolve by grapheme cluster so ZWJ emoji and variation sequences never
+  // split across fonts before HarfBuzz sees them.
+  auto resolved        = _font_registry.resolve(text.view(), glyph_style_key);
+  for (auto const& run : resolved.runs)
   {
-    auto const cluster_offset = static_cast<uint>(sub_text.data() - text.view());
+    auto const cluster_offset = static_cast<uint>(run.text.data() - text.view());
+    auto font = run.font ? run.font : _font_registry.notdef_font();
 
-    // use hb calculate advances
-    if (font)
+    auto const notdef        = !run.font;
+    auto const shaped_glyphs = notdef
+      ? _shaper.shape_notdef(run.text, font, direction, resolved.metrics)
+      : _shaper.shape(run.text, font, direction, resolved.metrics);
+    for (auto const& glyph : shaped_glyphs)
     {
-      auto append_shaped_text = [&](std::string_view shaped_text, uint offset, ShapingMode mode)
-      {
-        for (auto const& glyph : shape_text(shaped_text, font, direction, mode))
-        {
-          auto key = GlyphKey{ font->key(), glyph.glyph_index };
-          res.emplace_back(glyph, cluster_offset + offset, key);
-          add_uncached_glyph(font, glyph.glyph_index, key, res);
-        }
-      };
-
-      if (direction != TextDirection::vertical)
-        append_shaped_text(sub_text, 0, ShapingMode::normal);
-      else
-      {
-        // Split vertical text into upright, sideways Latin, and upright-composed emoji runs.
-        auto grapheme_breaks = std::vector<char>(sub_text.size());
-        set_graphemebreaks_utf8(reinterpret_cast<utf8_t const*>(sub_text.data()),
-          sub_text.size(), nullptr, grapheme_breaks.data());
-
-        auto cluster_end = [&](uint begin)
-        {
-          auto end = begin;
-          do
-            end += next_codepoint(sub_text, end).size;
-          while (end < sub_text.size() && grapheme_breaks[end - 1] != GRAPHEMEBREAK_BREAK);
-          return end;
-        };
-
-        auto is_sideways_cluster = [](std::string_view cluster)
-        {
-          for (auto index = 0u; index < cluster.size();)
-          {
-            auto const [codepoint, size, valid] = next_codepoint(cluster, index);
-            assert(valid);
-            if (uses_vertical_shaping(codepoint))
-              return false;
-            index += size;
-          }
-          return true;
-        };
-        auto cluster_mode = [&](std::string_view cluster)
-        {
-          if (font->has_color_glyphs() && codepoint_cnt(cluster) > 1)
-            return ShapingMode::horizontal_in_vertical;
-          if (!is_sideways_cluster(cluster)) return ShapingMode::normal;
-
-          auto const codepoint = next_codepoint(cluster, 0).codepoint;
-          auto const category  = hb_unicode_general_category(hb_unicode_funcs_get_default(), codepoint);
-          auto const centered  = category == HB_UNICODE_GENERAL_CATEGORY_OPEN_PUNCTUATION  ||
-                                 category == HB_UNICODE_GENERAL_CATEGORY_CLOSE_PUNCTUATION ||
-                                 codepoint == '<' || codepoint == '>';
-          return centered ? ShapingMode::sideways_centered : ShapingMode::sideways;
-        };
-
-        auto run_begin = 0u;
-        auto run_end   = cluster_end(run_begin);
-        auto run_mode  = cluster_mode(sub_text.substr(run_begin, run_end - run_begin));
-        if (run_mode == ShapingMode::horizontal_in_vertical)
-        {
-          append_shaped_text(sub_text.substr(run_begin, run_end - run_begin), run_begin, run_mode);
-          run_begin = run_end;
-        }
-
-        while (run_end < sub_text.size())
-        {
-          auto const end  = cluster_end(run_end);
-          auto const mode = cluster_mode(sub_text.substr(run_end, end - run_end));
-          if (mode == ShapingMode::horizontal_in_vertical)
-          {
-            if (run_begin < run_end)
-              append_shaped_text(sub_text.substr(run_begin, run_end - run_begin), run_begin, run_mode);
-            append_shaped_text(sub_text.substr(run_end, end - run_end), run_end, mode);
-            run_begin = end;
-          }
-          else if (run_begin == run_end)
-          {
-            run_begin = run_end;
-            run_mode  = mode;
-          }
-          else if (mode != run_mode)
-          {
-            append_shaped_text(sub_text.substr(run_begin, run_end - run_begin), run_begin, run_mode);
-            run_begin = run_end;
-            run_mode  = mode;
-          }
-          run_end = end;
-        }
-        if (run_begin < sub_text.size())
-          append_shaped_text(sub_text.substr(run_begin), run_begin, run_mode);
-      }
-    }
-    // if not have font, the text is missing glyphs
-    else
-    {
-      has_missing_glyphs = true;
-      auto notdef_glyph_font = find_notdef_glyph_font();
-      assert(notdef_glyph_font);
-
-      auto key = GlyphKey{ notdef_glyph_font->key(), 0 };
-      for (auto const& glyph : shape_text(sub_text, notdef_glyph_font, direction))
-        res.emplace_back(glyph, cluster_offset, key);
-      if (add_notdef_glyph()) res.generating_glyph_info_keys.emplace(key);
+      auto const glyph_index = notdef ? 0u : glyph.glyph_index;
+      auto const key         = GlyphKey{ font->key(), glyph_index };
+      result.emplace_back(glyph, cluster_offset, key);
+      if (_glyph_store.request(key))
+        result.generating_glyph_info_keys.emplace(key);
     }
   }
 
-  if (has_missing_glyphs)
-    _cached_texts_with_missing_glyphs[glyph_style_key].emplace_back(id, text.id());
+  if (resolved.has_missing_glyphs)
+    _cached_texts_with_missing_glyphs[glyph_style_key].emplace_back(id, fallback_id);
 
   if (direction == TextDirection::horizontal)
   {
-    res.extent.y = _max_height;
-    res.ascender = _max_ascender;
+    result.extent.y = resolved.metrics.height;
+    result.ascender = resolved.metrics.ascender;
   }
   else
   {
-    res.extent.x = _max_height;
-    res.ascender = res.extent.x * .5f;
-    for (auto& offset : res.offsets)
-      offset.x += res.ascender;
+    result.extent.x = resolved.metrics.height;
+    result.ascender = result.extent.x * .5f;
+    for (auto& offset : result.offsets)
+      offset.x += result.ascender;
   }
 
-  auto deferred_vertical_layout = std::optional<DeferredVerticalLayout>{};
+  auto is_generate_complete = result.generate_complete();
+  auto handle               = _parse_result_pool.alloc();
   if (direction == TextDirection::horizontal)
   {
-    res.apply_tracking(tracking);
-    res.limit_length(text.view(), limit_len);
+    result.apply_tracking(tracking);
+    result.limit_length(text.view(), limit_len);
   }
-  else if (res.generating_glyph_info_keys.empty())
+  else if (is_generate_complete)
   {
-    res.prepare_layout(_glyph_infos);
-    res.apply_tracking(tracking);
-    res.limit_length(text.view(), limit_len);
+    result.prepare_layout(_glyph_store.infos());
+    result.apply_tracking(tracking);
+    result.limit_length(text.view(), limit_len);
   }
   else if (tracking != 0.f || limit_len > 0.f)
   {
-    deferred_vertical_layout.emplace(
-      DeferredVerticalLayout{ res.advances, res.extent, std::string{ text.view() }, tracking, limit_len });
-    res.apply_tracking(tracking);
-    res.limit_length(text.view(), limit_len);
+    // Visible ink metrics are unavailable until bitmap generation completes.
+    // Keep shaped advances so vertical preparation can be replayed before
+    // tracking and wrapping rather than mutating an already wrapped result.
+    _deferred_vertical_layouts.emplace(handle, DeferredVerticalLayout{ result.advances, result.extent, std::string{ text.view() }, tracking, limit_len });
+    result.apply_tracking(tracking);
+    result.limit_length(text.view(), limit_len);
   }
 
-  // cached calculate result
-  auto handle = _parse_result_pool.alloc();
   auto [_, inserted] = _cached_text_parse_results.emplace(id, handle);
   assert(inserted);
 
-  auto const is_generating = !res.generating_glyph_info_keys.empty();
-  if (is_generating)
-  {
+  if (is_generate_complete)
+    result.finalize(_glyph_store.infos());
+  else
     _generating_results.emplace(handle);
-    if (deferred_vertical_layout)
-      _deferred_vertical_layouts.emplace(handle, std::move(*deferred_vertical_layout));
-  }
+
+  _parse_result_pool[handle] = std::move(result);
+
+  if (is_generate_complete)
+    _last_ready_text_parse_results[fallback_id] = handle;
   else
-    // Cached glyphs already have the bitmap metrics needed for final layout.
-    res.finalize(_glyph_infos);
-
-  _parse_result_pool[handle] = std::move(res);
-
-  if (is_generating)
-  {
-    if (auto fallback_it = _last_ready_text_parse_results.find(text.id()); fallback_it != _last_ready_text_parse_results.end())
+    if (auto fallback_it = _last_ready_text_parse_results.find(fallback_id); fallback_it != _last_ready_text_parse_results.end())
       return fallback_it->second;
-  }
-  else
-    _last_ready_text_parse_results[text.id()] = handle;
 
   return handle;
 }
 
-void TextEngine::ParseResult::limit_length(std::string_view text, float len) noexcept
-{
-  if (len <= 0.f) return;
-
-  auto cluster_end = [&](uint beg)
-  {
-    auto end = beg + 1;
-    while (end < clusters.size() && clusters[end] == clusters[beg]) ++end;
-    return end;
-  };
-  auto cluster_length = [&](uint beg, uint end)
-  {
-    auto advance = 0.f;
-    if (direction == TextDirection::horizontal)
-    {
-      for (auto i = beg; i < end; ++i)
-        advance += advances[i].x;
-    }
-    else
-    {
-      for (auto i = beg; i < end; ++i)
-        advance += advances[i].y;
-    }
-    return std::abs(advance);
-  };
-
-  // get max cluster length
-  auto max_cluster_length = 0.f;
-  for (auto beg = 0u; beg < advances.size();)
-  {
-    auto const end = cluster_end(beg);
-    max_cluster_length = std::max(max_cluster_length, cluster_length(beg, end));
-    beg = end;
-  }
-  len = std::max(len, max_cluster_length);
-
-  auto line_breaks = std::vector<char>(text.size());
-  set_linebreaks_utf8(
-    reinterpret_cast<utf8_t const*>(text.data()),
-    text.size(),
-    nullptr,
-    line_breaks.data());
-
-  auto can_break_after = [&](uint end)
-  {
-    auto const text_end = end < clusters.size() ? clusters[end] : static_cast<uint>(text.size());
-    if (!text_end) return false;
-    auto const line_break = line_breaks[text_end - 1];
-    return line_break == LINEBREAK_ALLOWBREAK || line_break == LINEBREAK_MUSTBREAK;
-  };
-
-  auto line_count         = 1u;
-  auto line_has_cluster   = false;
-  auto line_length        = 0.f;
-  auto max_line_length    = 0.f;
-  auto pen                = float2{};
-  auto previous_glyph_pos = float2{};
-  auto line_begin         = 0u;
-  auto break_end          = 0u;
-  auto break_length       = 0.f;
-  auto break_glyph_pos    = float2{};
-
-  for (auto beg = 0u; beg < advances.size();)
-  {
-    auto const end    = cluster_end(beg);
-    auto const length = cluster_length(beg, end);
-
-    if (line_has_cluster && line_length + length > len)
-    {
-      auto const wrap_begin        = break_end > line_begin ? break_end       : beg;
-      auto const wrapped_length    = break_end > line_begin ? break_length    : line_length;
-      auto const wrapped_glyph_pos = break_end > line_begin ? break_glyph_pos : previous_glyph_pos;
-
-      max_line_length = std::max(max_line_length, wrapped_length);
-      ++line_count;
-      auto next_line_pos = direction == TextDirection::horizontal
-        ? float2{ 0.f, static_cast<float>(line_count - 1) * extent.y }
-        : float2{ -static_cast<float>(line_count - 1) * extent.x, 0.f };
-
-      advances[wrap_begin - 1] = next_line_pos - wrapped_glyph_pos;
-      pen          = next_line_pos;
-      line_length -= wrapped_length;
-      line_begin   = wrap_begin;
-      break_end    = {};
-
-      for (auto i = wrap_begin; i < beg; ++i)
-      {
-        previous_glyph_pos = pen;
-        pen               += advances[i];
-      }
-    }
-
-    line_length      += length;
-    line_has_cluster = true;
-    for (auto i = beg; i < end; ++i)
-    {
-      previous_glyph_pos = pen;
-      pen               += advances[i];
-    }
-    if (can_break_after(end))
-    {
-      break_end       = end;
-      break_length    = line_length;
-      break_glyph_pos = previous_glyph_pos;
-    }
-    beg = end;
-  }
-
-  max_line_length = std::max(max_line_length, line_length);
-  if (direction == TextDirection::horizontal)
-    extent = { max_line_length, static_cast<float>(line_count) * extent.y };
-  else
-    extent = { static_cast<float>(line_count) * extent.x, max_line_length };
-}
-
-void TextEngine::ParseResult::apply_tracking(float tracking) noexcept
-{
-  if (tracking == 0.f || advances.empty()) return;
-
-  auto cluster_count = 0u;
-  for (auto begin = 0u; begin < advances.size();)
-  {
-    auto end = begin + 1;
-    while (end < clusters.size() && clusters[end] == clusters[begin]) ++end;
-    if (end < advances.size())
-    {
-      if (direction == TextDirection::horizontal)
-        advances[end - 1].x += tracking;
-      else
-        advances[end - 1].y += tracking;
-      ++cluster_count;
-    }
-    begin = end;
-  }
-
-  if (direction == TextDirection::horizontal)
-    extent.x += tracking * cluster_count;
-  else
-    extent.y += tracking * cluster_count;
-}
-
-auto TextEngine::split_text(std::string_view text, FontStyleKey key) noexcept -> std::vector<std::pair<std::string_view, Font*>>
-{
-  auto result = std::vector<std::pair<std::string_view, Font*>>{};
-  result.reserve(text.size());
-
-  _max_ascender  = {};
-  _max_descender = {};
-  _max_height    = {};
-
-  auto update = [this](Font* font)
-  {
-    if (!font) font = find_notdef_glyph_font();
-    _max_ascender  = std::max(_max_ascender, font->_ascender);
-    _max_descender = std::max(_max_descender, font->_height - font->_ascender);
-    _max_height    = _max_ascender + _max_descender;
-  };
-
-  auto supports_cluster = [](Font const& font, std::string_view cluster)
-  {
-    // Joiners and variation selectors affect shaping but do not require standalone glyphs.
-    for (auto index = 0u; index < cluster.size();)
-    {
-      auto const [codepoint, size, valid] = next_codepoint(cluster, index);
-      assert(valid);
-      if (codepoint  != 0x200d  &&
-         !(codepoint >= 0xfe00  && codepoint <= 0xfe0f)  &&
-         !(codepoint >= 0xe0100 && codepoint <= 0xe01ef) &&
-         !font.find_glyph(codepoint))
-        return false;
-      index += size;
-    }
-    return true;
-  };
-  auto prefers_color_emoji = [](std::string_view cluster)
-  {
-    auto has_emoji = false;
-    for (auto index = 0u; index < cluster.size();)
-    {
-      auto const [codepoint, size, valid] = next_codepoint(cluster, index);
-      assert(valid);
-      if (codepoint == 0xfe0e) return false;
-      has_emoji |= codepoint == 0xfe0f || ub_is_extended_pictographic(codepoint);
-      index += size;
-    }
-    return has_emoji;
-  };
-  auto find_cluster_font = [this, key, &supports_cluster, &prefers_color_emoji](std::string_view cluster) -> Font*
-  {
-    if (prefers_color_emoji(cluster))
-    {
-      auto find_color_font = [&](auto&& fonts) -> Font*
-      {
-        for (auto font_idx : fonts)
-        {
-          auto font = _fonts[font_idx].get();
-          if (font->has_color_glyphs() && supports_cluster(*font, cluster))
-            return font;
-        }
-        return {};
-      };
-
-      if (auto it = _font_idxs.find(key); it != _font_idxs.end())
-      {
-        auto font = _fonts[it->second].get();
-        if (font->has_color_glyphs() && supports_cluster(*font, cluster))
-          return font;
-      }
-      if (auto font = find_color_font(_style_font_idxs[static_cast<size_t>(key.style)]))
-        return font;
-      if (auto font = find_color_font(std::views::iota(0uz, _fonts.size())))
-        return font;
-    }
-
-    if (auto it = _font_idxs.find(key); it != _font_idxs.end())
-    {
-      auto font = _fonts[it->second].get();
-      if (supports_cluster(*font, cluster)) return font;
-    }
-
-    for (auto font_idx : _style_font_idxs[static_cast<size_t>(key.style)])
-    {
-      auto font = _fonts[font_idx].get();
-      if (font->key() != key && supports_cluster(*font, cluster)) return font;
-    }
-    return {};
-  };
-
-  auto grapheme_breaks = std::vector<char>(text.size());
-  set_graphemebreaks_utf8(reinterpret_cast<utf8_t const*>(text.data()), text.size(), nullptr, grapheme_breaks.data());
-
-  auto cluster_end = [&](uint begin)
-  {
-    auto end = begin;
-    do
-      end += next_codepoint(text, end).size;
-    while (end < text.size() && grapheme_breaks[end - 1] != GRAPHEMEBREAK_BREAK);
-    return end;
-  };
-
-  auto run_begin = 0u;
-  auto run_end   = cluster_end(run_begin);
-  auto cur_font  = find_cluster_font(text.substr(run_begin, run_end - run_begin));
-  if (!cur_font)
-    cur_font = find_font(next_codepoint(text, run_begin).codepoint, key);
-  update(cur_font);
-
-  while (run_end < text.size())
-  {
-    auto const end = cluster_end(run_end);
-    auto font = find_cluster_font(text.substr(run_end, end - run_end));
-    if (!font)
-      font = find_font(next_codepoint(text, run_end).codepoint, key);
-
-    if (font != cur_font)
-    {
-      result.emplace_back(text.substr(run_begin, run_end - run_begin), cur_font);
-      run_begin = run_end;
-      cur_font  = font;
-      update(cur_font);
-    }
-    run_end = end;
-  }
-
-  result.emplace_back(text.substr(run_begin), cur_font);
-
-  return result;
-}
-
-auto TextEngine::find_font(uint unicode, FontStyleKey key) noexcept -> Font*
-{
-  if (_missing_glyphs[key].contains(unicode)) return {};
-
-  auto it = _font_idxs.find(key);
-  if (it != _font_idxs.end())
-  {
-    auto font = _fonts[it->second].get();
-    if (font->find_glyph(unicode)) return font;
-  }
-
-  auto& fallback_font_idxs = _fallback_font_idxs[key];
-  if (auto fallback_it = fallback_font_idxs.find(unicode); fallback_it != fallback_font_idxs.end())
-    return _fonts[fallback_it->second].get();
-
-  for (auto font_idx : _style_font_idxs[static_cast<size_t>(key.style)])
-  {
-    auto font = _fonts[font_idx].get();
-    if (!font->find_glyph(unicode)) continue;
-
-    fallback_font_idxs.emplace(unicode, font_idx);
-    return font;
-  }
-
-  _missing_glyphs[key].emplace(unicode);
-  return {};
-}
-
-auto font_style_str(FontStyle style) noexcept
-{
-  switch (style)
-  {
-  case FontStyle::regular:     return "regular";
-  case FontStyle::bold:        return "bold";
-  case FontStyle::italic:      return "italic";
-  case FontStyle::italic_bold: return "italic_bold";
-  default: std::unreachable();
-  }
-}
-
-auto TextEngine::find_notdef_glyph_font() noexcept -> Font*
-{
-  if (_notdef_font) return _notdef_font;
-
-  err_if(true, "there are not have any font be loaded!");
-  std::unreachable();
-}
-
-void TextEngine::add_uncached_glyph(Font* font, uint glyph_idx, GlyphKey const& key, ParseResult& result) noexcept
-{
-  assert(font);
-  if (!_glyph_infos.contains(key))
-  {
-    result.generating_glyph_info_keys.emplace(key);
-    if (_uncached_glyphs.contains(key)) return;
-    _uncached_glyphs.emplace(key);
-    _ungenerated_glyphs.emplace(key);
-  }
-}
-
-auto TextEngine::add_notdef_glyph() noexcept -> bool
-{
-  auto font = find_notdef_glyph_font();
-
-  auto k = GlyphKey{ font->key(), 0 };
-  if (_glyph_infos.contains(k)) return false;
-  if (_uncached_glyphs.contains(k)) return true;
-
-  _uncached_glyphs.emplace(k);
-  _ungenerated_glyphs.emplace(k);
-  return true;
-}
-
-auto TextEngine::calc_glyph_pos(float2 extent) noexcept -> std::pair<uint, float2>
-{
-  check(extent.x > Glyph_Atlas_Width || extent.y > Glyph_Atlas_Height,
-        "too big glyph sdf bitmap, cannot be stored in glyph atlas");
-
-  static auto current_glyph_atlas_idx{ 0u };
-
-  if (auto res = _packer.add(extent.x, extent.y); res)
-    return { current_glyph_atlas_idx, res.value() };
-
-  ++current_glyph_atlas_idx;
-  _glyph_atlas.emplace_back(g_img_mgr.create(Glyph_Atlas_Width, Glyph_Atlas_Height, ImageFormat::rgba8_unorm, ImageType::srv));
-
-  _packer.reset({ Glyph_Atlas_Width, Glyph_Atlas_Height });
-  auto res = _packer.add(extent.x, extent.y);
-  assert(res);
-
-  return { current_glyph_atlas_idx, res.value() };
-}
-
-void TextEngine::submit_bitmap_generation_tasks() noexcept
-{
-  if (_ungenerated_glyphs.empty()) return;
-
-  auto const task_limit = std::min(Glyph_Max_Concurrent_Generation_Tasks, g_thread_pool.size());
-  while (!_ungenerated_glyphs.empty() && _generate_bitmap_tasks.size() < task_limit)
-  {
-    auto glyphs = std::vector<GlyphKey>{};
-    glyphs.reserve(std::min(Glyphs_Per_Generation_Task, _ungenerated_glyphs.size()));
-    for (auto it = _ungenerated_glyphs.begin();
-         it != _ungenerated_glyphs.end() && glyphs.size() < Glyphs_Per_Generation_Task;)
-    {
-      glyphs.emplace_back(*it);
-      it = _ungenerated_glyphs.erase(it);
-    }
-
-    _generate_bitmap_tasks.emplace_back(g_thread_pool.run([glyphs = std::move(glyphs)]
-    {
-      auto bitmaps = std::vector<MSDFBitmap>{};
-      bitmaps.reserve(glyphs.size());
-      for (auto const& key : glyphs)
-        // font should always be valid because I never remove font currently
-        bitmaps.emplace_back(g_text_engine._fonts[g_text_engine._font_idxs.at(key.font_key)]->generate_bitmap(key.glyph_index, key));
-      return bitmaps;
-    }));
-  }
-}
-
-auto TextEngine::upload_bitmaps() noexcept -> bool
-{
-  if (_generate_bitmap_tasks.empty()) return false;
-
-  // check whether have task complete
-  for (auto it = _generate_bitmap_tasks.begin(); it < _generate_bitmap_tasks.end();)
-  {
-    if (it->is_completed())
-    {
-      for (auto const& bitmap : it->take_result())
-      {
-        auto [glyph_atlas_idx, cpy_pos] = calc_glyph_pos(bitmap.extent);
-        _pending_copy_glyphs[glyph_atlas_idx].emplace_back(std::move(bitmap), cpy_pos);
-      }
-      it = _generate_bitmap_tasks.erase(it);
-    }
-    else
-      ++it;
-  }
-
-  if (_pending_copy_glyphs.empty()) return false;
-
-  // use copy engine to upload glyph sdf bitmaps to glyph atlas texture
-  upload_bitmaps(_pending_copy_glyphs);
-
-  return true;
-}
-
 void TextEngine::reload_missing_glyphs() noexcept
 {
-  for (auto& [font_style_key, keys] : _pending_reload_missing_glyphs)
+  for (auto const& [font_style_key, keys] : _font_registry.pending_missing_glyphs())
   {
-    if (keys.empty() || std::ranges::any_of(keys, [&](auto const& key) { return !_glyph_infos.contains(key); }))
+    if (keys.empty() || std::ranges::any_of(keys, [&](auto const& key) { return !_glyph_store.contains(key); }))
       continue;
     remove_missing_glyphs(font_style_key);
-    keys.clear();
   }
 }
 
 void TextEngine::remove_missing_glyphs(FontStyleKey key) noexcept
 {
-  // clear missing glyphs and cached text advances
-  _missing_glyphs[key].clear();
-  for (auto [id, text_hash] : _cached_texts_with_missing_glyphs[key])
+  for (auto [id, fallback_id] : _cached_texts_with_missing_glyphs[key])
   {
     auto it = _cached_text_parse_results.find(id);
     assert(it != _cached_text_parse_results.end());
-    auto h = it->second;
-    assert(h.valid());
-    if (auto fallback_it = _last_ready_text_parse_results.find(text_hash);
-        fallback_it != _last_ready_text_parse_results.end() && fallback_it->second == h)
+    auto handle = it->second;
+    assert(handle.valid());
+    if (auto fallback_it = _last_ready_text_parse_results.find(fallback_id);
+        fallback_it != _last_ready_text_parse_results.end() && fallback_it->second == handle)
       _last_ready_text_parse_results.erase(fallback_it);
-    _discard_text_parse_result_handles.emplace_back(h);
+    _discard_text_parse_result_handles.emplace_back(handle);
     _cached_text_parse_results.erase(it);
   }
   _cached_texts_with_missing_glyphs[key].clear();
-}
-
-auto glyph_rect(GlyphInfo const& info, float2 pos, bool sideways, bool visible) noexcept -> Rect
-{
-  auto const offset = info.pos_offset + (visible ? info.visible_offset : float2{});
-  auto const extent = visible ? info.visible_extent : info.extent;
-  if (!sideways)
-    return { pos + offset, pos + offset + extent };
-  return
-  {
-    pos + float2{ -offset.y - extent.y, offset.x },
-    pos + float2{ -offset.y, offset.x + extent.x },
-  };
-}
-
-void GlyphInfo::set_vertices(renderer::Vertex* vtx, float2 pos, float scale, float ascender, bool sideways, Color color, Color outer_color, float outer_width) const noexcept
-{
-  auto p0 = float2{};
-  auto p1 = float2{};
-  auto p2 = float2{};
-  auto p3 = float2{};
-  if (sideways)
-  {
-    auto const offset       = pos_offset * scale;
-    auto const glyph_extent = extent     * scale;
-    p0 = pos + float2{ -offset.y,                  offset.x                  };
-    p1 = pos + float2{ -offset.y,                  offset.x + glyph_extent.x };
-    p2 = pos + float2{ -offset.y - glyph_extent.y, offset.x + glyph_extent.x };
-    p3 = pos + float2{ -offset.y - glyph_extent.y, offset.x                  };
-  }
-  else
-  {
-    p0 = pos + pos_offset * scale;
-    p0.y += ascender * scale;
-    p1 = float2{ p0.x + extent.x * scale, p0.y };
-    p3 = float2{ p0.x, p0.y + extent.y * scale };
-    p2 = float2{ p1.x, p3.y };
-  }
-
-  auto& img = g_img_mgr[g_text_engine._glyph_atlas[glyph_atlas_index]];
-  auto desc_handle = img.srv();
-  assert(desc_handle.is_valid());
-
-  auto col       = color.to_uint();
-  auto outer_col = outer_color.to_uint();
-  auto packed    = vtx_pack(is_color ? VtxType::color_text : VtxType::text, desc_handle.index());
-  vtx[0] = { p0, { min_x, min_y }, col, packed, outer_col, outer_width };
-  vtx[1] = { p1, { max_x, min_y }, col, packed, outer_col, outer_width };
-  vtx[2] = { p2, { max_x, max_y }, col, packed, outer_col, outer_width };
-  vtx[3] = { p3, { min_x, max_y }, col, packed, outer_col, outer_width };
-}
-
-void TextEngine::postprocess() noexcept
-{
-  for (auto h : _discard_text_parse_result_handles)
-    _parse_result_pool.free(h);
-  _discard_text_parse_result_handles.clear();
-}
-
-void TextEngine::ParseResult::prepare_layout(GlyphKeyMap<GlyphInfo> const& glyph_infos) noexcept
-{
-  assert(generate_complete());
-
-  if (direction == TextDirection::vertical)
-  {
-    auto const cell_height = ascender * 2.f;
-
-    auto column_left  = std::numeric_limits<float>::max();
-    auto column_right = std::numeric_limits<float>::lowest();
-    for (auto begin = 0u; begin < glyph_info_keys.size();)
-    {
-      auto end = begin + 1;
-      while (end < clusters.size() && clusters[end] == clusters[begin])
-        ++end;
-
-      auto has_visible_glyph = false;
-      auto has_color_glyph   = false;
-      auto ink_left          = std::numeric_limits<float>::max();
-      auto ink_right         = std::numeric_limits<float>::lowest();
-      auto render_left       = std::numeric_limits<float>::max();
-      auto render_right      = std::numeric_limits<float>::lowest();
-      auto ink_top           = std::numeric_limits<float>::max();
-      auto ink_bottom        = std::numeric_limits<float>::lowest();
-      auto pen_y             = 0.f;
-      auto cluster_advance   = 0.f;
-      for (auto i = begin; i < end; ++i)
-      {
-        auto const& info          = glyph_infos.at(glyph_info_keys[i]);
-        auto const  sideways      = is_sideways(orientations[i]);
-        auto const  glyph_pos     = float2{ 0.f, pen_y } + offsets[i];
-        auto const  render_bounds = glyph_rect(info, glyph_pos, sideways, false);
-        render_left  = std::min(render_left, render_bounds.left);
-        render_right = std::max(render_right, render_bounds.right);
-        if (info.visible_extent.x > 0.f && info.visible_extent.y > 0.f)
-        {
-          auto const bounds = glyph_rect(info, glyph_pos, sideways, true);
-          ink_left          = std::min(ink_left, bounds.left);
-          ink_right         = std::max(ink_right, bounds.right);
-          if (!sideways)
-          {
-            ink_top    = std::min(ink_top, bounds.top);
-            ink_bottom = std::max(ink_bottom, bounds.bottom);
-          }
-          has_visible_glyph = true;
-          has_color_glyph  |= info.is_color;
-        }
-        if (i + 1 < end)
-          pen_y += advances[i].y;
-        cluster_advance += advances[i].y;
-      }
-
-      if (has_visible_glyph)
-      {
-        auto const orientation = orientations[begin];
-        auto const composed    = orientation == GlyphOrientation::upright_composed;
-        if (composed || has_color_glyph || orientation == GlyphOrientation::sideways_centered)
-        {
-          auto const offset = cell_height * .5f - (ink_left + ink_right) * .5f;
-          for (auto i = begin; i < end; ++i)
-            offsets[i].x += offset;
-          render_left  += offset;
-          render_right += offset;
-        }
-        column_left  = std::min(column_left, render_left);
-        column_right = std::max(column_right, render_right);
-        if ((composed || has_color_glyph) && ink_top <= ink_bottom)
-        {
-          auto const offset = (cell_height - (ink_bottom - ink_top)) * .5f - ink_top;
-          for (auto i = begin; i < end; ++i)
-            offsets[i].y += offset;
-          ink_bottom += offset;
-        }
-        if (has_color_glyph && !is_sideways(orientation))
-        {
-          auto const minimum_advance = std::max(0.f, ink_bottom);
-          if (cluster_advance < minimum_advance)
-          {
-            auto const adjustment = minimum_advance - cluster_advance;
-            advances[end - 1].y += adjustment;
-            extent.y            += adjustment;
-          }
-        }
-      }
-      begin = end;
-    }
-
-    // Wrapping encoded column changes in advance.x using the nominal font height.
-    auto const column_width = std::max(cell_height, column_right - column_left);
-    auto const column_scale = column_width / cell_height;
-    if (column_scale > 1.f)
-    {
-      for (auto& advance : advances)
-        advance.x *= column_scale;
-      extent.x *= column_scale;
-    }
-  }
-
-}
-
-void TextEngine::ParseResult::finalize(GlyphKeyMap<GlyphInfo> const& glyph_infos) noexcept
-{
-  assert(generate_complete());
-
-  auto needs_ink_bounds = false;
-  auto rect             = Rect{};
-  auto pos              = float2{};
-  auto baseline         = direction == TextDirection::vertical ? 0.f : ascender;
-  for (auto i = 0u; i < glyph_info_keys.size(); ++i)
-  {
-    auto const& info = glyph_infos.at(glyph_info_keys[i]);
-    auto const sideways = is_sideways(orientations[i]);
-    needs_ink_bounds |= info.is_color || sideways;
-    auto const bounds = glyph_rect(info, pos + offsets[i] + float2{ 0.f, baseline }, sideways, false);
-    rect.expand(bounds.left_top());
-    rect.expand(bounds.right_bottom());
-    pos += advances[i];
-  }
-
-  if (needs_ink_bounds && !rect.empty())
-  {
-    auto line_count = 1u;
-    if (direction == TextDirection::horizontal)
-      line_count += std::ranges::count_if(advances, [](auto advance) { return advance.y != 0.f; });
-    else
-      line_count += std::ranges::count_if(advances, [](auto advance) { return advance.x != 0.f; });
-
-    auto layout_rect = Rect{};
-    if (direction == TextDirection::horizontal)
-      layout_rect = { float2{}, extent };
-    else
-    {
-      auto const column_width = extent.x / line_count;
-      layout_rect = { -static_cast<float>(line_count - 1) * column_width, 0.f, column_width, extent.y };
-    }
-    rect.expand(layout_rect.left_top());
-    rect.expand(layout_rect.right_bottom());
-
-    // Preserve nominal line cells and expand only for bitmap ink overhang.
-    layout_offset = -rect.left_top();
-    extent        = rect.extent();
-    if (direction == TextDirection::horizontal)
-    {
-      ascender       += layout_offset.y;
-      layout_offset.y = 0.f;
-    }
-    bounding_rect = Rect{ float2{}, extent };
-  }
+  _font_registry.complete_missing_glyph_reload(key);
 }
 
 void TextEngine::update() noexcept
 {
-  auto have_bitmaps_upload = false;
-  have_bitmaps_upload |= upload_bitmaps_from_preload_glyphs();
-  submit_bitmap_generation_tasks();
-  have_bitmaps_upload |= upload_bitmaps();
+  if (!_glyph_store.update(_font_registry))
+    return;
 
-  if (have_bitmaps_upload)
+  for (auto it = _generating_results.begin(); it != _generating_results.end();)
   {
-    // check which text parse result generating is complete
-    for (auto it = _generating_results.begin(); it != _generating_results.end();)
-    {
-      auto& result = _parse_result_pool[*it];
-      assert(!result.generating_glyph_info_keys.empty());
-      if (std::ranges::any_of(result.generating_glyph_info_keys, [&](auto const& k) { return !_glyph_infos.contains(k); }))
-      {
-        ++it;
-        continue;
-      }
-      result.generating_glyph_info_keys.clear();
-      if (result.direction == TextDirection::vertical)
-      {
-        auto deferred = _deferred_vertical_layouts.find(*it);
-        if (deferred != _deferred_vertical_layouts.end())
-        {
-          result.advances = std::move(deferred->second.advances);
-          result.extent   = deferred->second.extent;
-        }
-        result.prepare_layout(_glyph_infos);
-        if (deferred != _deferred_vertical_layouts.end())
-        {
-          result.apply_tracking(deferred->second.tracking);
-          result.limit_length(deferred->second.text, deferred->second.limit_len);
-          _deferred_vertical_layouts.erase(deferred);
-        }
-      }
-      // The same finalization also runs immediately for parse results whose glyphs were cached.
-      result.finalize(_glyph_infos);
-
-      it = _generating_results.erase(it);
-    }
-
-    // remove generated glyphs in uncached glyphs
-    for (auto it = _uncached_glyphs.begin(); it != _uncached_glyphs.end();)
-      _glyph_infos.contains(*it) ? it = _uncached_glyphs.erase(it) : ++it;
-
-    reload_missing_glyphs();
-  }
-}
-
-void TextEngine::clear_pending_copy_glyphs() noexcept
-{
-  // Cache glyphs before clearing
-  g_glyph_cacher.add(_pending_copy_glyphs);
-  _pending_copy_glyphs.clear();
-  _pending_copy_preload_glyphs.clear();
-}
-
-auto TextEngine::upload_bitmaps_from_preload_glyphs() noexcept -> bool
-{
-  // Check ungenerated glyphs which already exist in preload glyphs
-  auto& preload_glyphs = g_glyph_cacher.preload_glyphs();
-  for (auto it = _ungenerated_glyphs.begin(); it != _ungenerated_glyphs.end();)
-  {
-    auto key = *it;
-    auto font = _fonts[_font_idxs.at(key.font_key)].get();
-    if (font->has_color_glyphs())
+    auto& result = _parse_result_pool[*it];
+    assert(!result.generating_glyph_info_keys.empty());
+    if (std::ranges::any_of(result.generating_glyph_info_keys,
+        [&](auto const& key) { return !_glyph_store.contains(key); }))
     {
       ++it;
       continue;
     }
 
-    if (preload_glyphs.contains(key))
+    result.generating_glyph_info_keys.clear();
+    if (result.direction == TextDirection::vertical)
     {
-      // Get cache content of glyph.
-      auto& glyph = preload_glyphs[key];
-
-      // Old cache records contain bitmap bounds only; recover ink bounds from the font.
-      auto const visible = font->get_glyph_bounds(key.glyph_index);
-      auto bitmap = MSDFBitmap{};
-      bitmap.data           = std::move(glyph.bitmap);
-      bitmap.extent         = glyph.extent;
-      bitmap.visible_offset = visible.left_top() - glyph.pos_offset;
-      bitmap.visible_extent = visible.extent();
-      bitmap.pos_offset     = glyph.pos_offset;
-      bitmap.glyph_key      = key;
-      auto [glyph_atlas_idx, cpy_pos] = calc_glyph_pos(bitmap.extent);
-      _pending_copy_preload_glyphs[glyph_atlas_idx].emplace_back(std::move(bitmap), cpy_pos);
-
-      // Remove preload glyph result and ungenerated glyph.
-      preload_glyphs.erase(key);
-      it = _ungenerated_glyphs.erase(it);
+      // Vertical layout depends on actual bitmap ink bounds. Restore the raw
+      // shape result and run the same pipeline used by an immediate cache hit.
+      auto deferred = _deferred_vertical_layouts.find(*it);
+      if (deferred != _deferred_vertical_layouts.end())
+      {
+        result.advances = std::move(deferred->second.advances);
+        result.extent   = deferred->second.extent;
+      }
+      result.prepare_layout(_glyph_store.infos());
+      if (deferred != _deferred_vertical_layouts.end())
+      {
+        result.apply_tracking(deferred->second.tracking);
+        result.limit_length(deferred->second.text, deferred->second.limit_len);
+        _deferred_vertical_layouts.erase(deferred);
+      }
     }
-    else
-      ++it;
+    result.finalize(_glyph_store.infos());
+    it = _generating_results.erase(it);
   }
 
-  // Upload bitmaps
-  upload_bitmaps(_pending_copy_preload_glyphs);
-
-  return !_pending_copy_preload_glyphs.empty();
+  reload_missing_glyphs();
 }
 
-void TextEngine::upload_bitmaps(PendingCopyGlyphsInfoType const& info) noexcept
+void TextEngine::clear_pending_copy_glyphs() noexcept
 {
-  if (info.empty()) return;
-  for (auto const& [glyph_atlas_idx, bitmap_infos] : info)
-  {
-    for (auto const& [bitmap, pos] : bitmap_infos)
-    {
-      auto res = _glyph_infos.emplace(bitmap.glyph_key, GlyphInfo{
-        glyph_atlas_idx,
-        pos,
-        bitmap.extent,
-        bitmap.pos_offset,
-        bitmap.visible_offset,
-        bitmap.visible_extent,
-        bitmap.is_color });
-      assert(res.second);
-    }
+  _glyph_store.clear_pending_copy_glyphs();
+}
 
-    auto bitmap_cpy_infos = bitmap_infos
-      | std::views::filter([](auto const& bitmap_info) { return !bitmap_info.first.empty(); })
-      | std::views::transform([](auto const& bitmap_info)
-        { return BitmapCopyInfo{ bitmap_info.first.to_bitmap_view(), bitmap_info.second }; })
-      | std::ranges::to<std::vector<BitmapCopyInfo>>();
-    g_copy_engine.copy(std::move(bitmap_cpy_infos), _glyph_atlas[glyph_atlas_idx]);
-  }
+void TextEngine::postprocess() noexcept
+{
+  for (auto handle : _discard_text_parse_result_handles)
+    _parse_result_pool.free(handle);
+  _discard_text_parse_result_handles.clear();
 }
 
 auto TextEngine::get_bounding_rect(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction, float tracking, float limit_len) noexcept -> std::optional<Rect>
 {
-  auto  handle = parse(text, family, style, direction, tracking, limit_len);
-  auto& res    = _parse_result_pool[handle];
+  auto handle = parse(text, family, style, direction, tracking, limit_len);
+  auto& result = _parse_result_pool[handle];
 
-  // If bitmap generation complete
-  if (res.generate_complete())
+  if (!result.generate_complete()) return {};
+  if (result.bounding_rect)        return *result.bounding_rect;
+
+  auto rect     = Rect{};
+  auto pos      = float2{};
+  auto ascender = result.direction == TextDirection::vertical ? 0.f : result.ascender;
+  for (auto i = 0uz; i < result.glyph_info_keys.size(); ++i)
   {
-    // Directly use cache result
-    if (res.bounding_rect)
-      return res.bounding_rect.value();
-
-    // Otherwise, calculate bounding rect
-    auto rect = Rect{};
-    auto pos  = float2{};
-    auto ascender = res.direction == TextDirection::vertical ? 0.f : res.ascender;
-    for (auto i = 0; i < res.glyph_info_keys.size(); ++i)
-    {
-      auto const& info = get_glyph_info(res.glyph_info_keys[i]);
-      auto const sideways = is_sideways(res.orientations[i]);
-      auto const bounds   = glyph_rect(info, pos + res.offsets[i] + float2{ 0.f, ascender }, sideways, false);
-      rect.expand(bounds.left_top());
-      rect.expand(bounds.right_bottom());
-
-      pos += res.advances[i];
-    }
-
-    res.bounding_rect = rect;
-
-    return rect;
+    auto const& info = _glyph_store.info(result.glyph_info_keys[i]);
+    auto const bounds = glyph_rect(info, pos + result.offsets[i] + float2{ 0.f, ascender },
+      is_sideways(result.orientations[i]), false);
+    rect.expand(bounds.left_top());
+    rect.expand(bounds.right_bottom());
+    pos += result.advances[i];
   }
 
-  return {};
+  result.bounding_rect = rect;
+  return rect;
 }
 
 }

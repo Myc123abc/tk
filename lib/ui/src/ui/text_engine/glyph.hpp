@@ -55,6 +55,8 @@ struct MSDFBitmap
   auto empty() const noexcept { return !extent.x || !extent.y; }
 };
 
+using PendingCopyGlyphsInfoType = std::unordered_map<uint, std::vector<std::pair<MSDFBitmap, float2>>>;
+
 struct GlyphInfo
 {
   uint   glyph_atlas_index{};
@@ -71,20 +73,8 @@ struct GlyphInfo
 
   GlyphInfo() = default;
 
-  GlyphInfo(
-    uint   glyph_atlas_index,
-    float2 pos,
-    float2 extent,
-    float2 pos_offset,
-    float2 visible_offset,
-    float2 visible_extent,
-    bool   is_color) noexcept
-    : glyph_atlas_index(glyph_atlas_index),
-      extent(extent),
-      pos_offset(pos_offset),
-      visible_offset(visible_offset),
-      visible_extent(visible_extent),
-      is_color(is_color)
+  GlyphInfo(uint glyph_atlas_index, float2 pos, float2 extent, float2 pos_offset, float2 visible_offset, float2 visible_extent, bool is_color) noexcept
+    : glyph_atlas_index(glyph_atlas_index), extent(extent), pos_offset(pos_offset), visible_offset(visible_offset), visible_extent(visible_extent), is_color(is_color)
   {
     min_x = (pos.x + 0.5f) / Glyph_Atlas_Width;
     min_y = (pos.y + 0.5f) / Glyph_Atlas_Height;
@@ -92,7 +82,7 @@ struct GlyphInfo
     max_y = (pos.y + extent.y - 0.5f) / Glyph_Atlas_Height;
   }
 
-  void set_vertices(renderer::Vertex* vtx, float2 pos, float size, float ascender, bool sideways, Color color, Color outer_color, float outer_width) const noexcept;
+  void set_vertices(renderer::Vertex* vtx, float2 pos, float scale, float ascender, bool sideways, uint descriptor_index, Color color, Color outer_color, float outer_width) const noexcept;
 };
 
 }
