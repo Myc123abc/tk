@@ -1,8 +1,21 @@
-#include "iocp.hpp"
-#include "tk/error_handling.hpp"
-#include "../unicode.hpp"
+module;
 
 #include <array>
+#include <string>
+#include <thread>
+#include <mutex>
+#include <cassert>
+#include <coroutine>
+#include <span>
+
+#include <windows.h>
+
+module tk.async;
+
+import :iocp;
+import tk.base;
+import tk.error_handling;
+import tk.unicode;
 
 namespace tk {
 

@@ -1,4 +1,4 @@
-#include "glyph.hpp"
+module tk.ui.text.glyph;
 
 using namespace tk::renderer;
 

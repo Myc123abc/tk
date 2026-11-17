@@ -1,7 +1,14 @@
-#include "compositor.hpp"
-#include "tk/error_handling.hpp"
+module;
+
 #include "effect/effect.h"
-#include "../core.hpp"
+
+module tk.renderer;
+
+import :compositor;
+import :core;
+import tk.base;
+import tk.error_handling;
+import tk.ui.window_config;
 
 using namespace tk;
 using namespace tk::renderer;

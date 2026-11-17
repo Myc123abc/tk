@@ -1,8 +1,6 @@
-#include "tk/benchmark.hpp"
-
-#include "object_pool.hpp"
-
+#include <algorithm>
 #include <array>
+#include <cassert>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -12,6 +10,11 @@
 #include <ranges>
 #include <span>
 #include <vector>
+
+import tk.benchmark;
+import tk.base;
+import tk.object_pool;
+import tk.string_id;
 
 using ns = std::chrono::nanoseconds;
 

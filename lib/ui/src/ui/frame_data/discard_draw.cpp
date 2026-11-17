@@ -1,5 +1,13 @@
-#include "frame_data.hpp"
-#include "../ui_context.hpp"
+module;
+
+#include <cassert>
+#include <functional>
+
+module tk.renderer;
+
+import :frame_data;
+import tk.ui;
+import tk.ui.context;
 
 namespace tk::ui {
 
@@ -56,7 +64,7 @@ void FrameData::_discard_end() noexcept
   add_rect({ rc.left, rc.top }, { rc.right, rc.bottom });
   push_render_cmd(RenderCmdType::discard_composite);
 
-  auto wnd = g_ui_ctx.window();
+  auto wnd = g_ctx.window();
   _render_cmds.back().rect = wnd->is_resizing() ? wnd->rect() : wnd->content_rect(); 
 }
 

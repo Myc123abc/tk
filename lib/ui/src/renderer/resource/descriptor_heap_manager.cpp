@@ -1,13 +1,22 @@
-#include "descriptor_heap_manager.hpp"
-#include "tk/error_handling.hpp"
-#include "../core.hpp"
-#include "../renderer.hpp"
-#include "../config.hpp"
-#include "command.hpp"
+module;
+
+#include <d3d12.h>
+#include <wrl/client.h>
 
 #include <algorithm>
+#include <cassert>
+#include <functional>
 #include <ranges>
 #include <unordered_map>
+#include <vector>
+
+module tk.renderer;
+
+import :descriptor_heap_manager;
+import :command;
+import :core;
+import :config;
+import tk.error_handling;
 
 using namespace tk;
 using namespace tk::renderer;

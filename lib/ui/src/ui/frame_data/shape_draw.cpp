@@ -1,8 +1,21 @@
-#include "frame_data.hpp"
-#include "util.hpp"
-#include "../ui_context.hpp"
-#include "triangulator.hpp"
-#include "../../renderer/resource/line_coverage_atlas.hpp"
+module;
+
+#include <algorithm>
+#include <cassert>
+#include <cmath>
+#include <numbers>
+#include <utility>
+#include <vector>
+
+module tk.renderer;
+
+import :frame_data;
+import tk.flag;
+import tk.ui;
+import tk.ui.context;
+import tk.ui.frame_data.polyline_tessellator;
+import tk.ui.frame_data.triangulator;
+import tk.ui.frame_data.util;
 
 namespace tk::ui {
 
@@ -227,7 +240,7 @@ void FrameData::_add_circle(float2 center, float radius, Color color, float thic
 
   if (thickness <= 0)
   {
-    auto const min_radius = g_ui_ctx.window()->scale() * std::numbers::sqrt2_v<float> * .5f;
+    auto const min_radius = g_ctx.window()->scale() * std::numbers::sqrt2_v<float> * .5f;
     if (radius < min_radius)
     {
       color.a *= radius / min_radius;
@@ -262,7 +275,7 @@ void FrameData::_add_line(float2 p0, float2 p1, Color color, float thickness) no
   if (_using_discard_shapes) color.a = 1.f;
   else if (color.a == 0) return;
 
-  auto const aa_size         = g_ui_ctx.window()->scale();
+  auto const aa_size         = g_ctx.window()->scale();
   auto const can_pixel_align = _transform_stack.empty() || axis_aligned_uniform_transform_scale().has_value();
   if (!_using_discard_shapes && can_pixel_align && thickness <= aa_size)
   {
@@ -666,7 +679,7 @@ void FrameData::add_poly_line(Color color, float thickness, bool is_closed, bool
 
   is_closed     &= _points.size() > 2;
   stroke_inside &= is_closed;
-  auto const screen_aa_size = g_ui_ctx.window()->scale();
+  auto const screen_aa_size = g_ctx.window()->scale();
   auto const aa_size        = screen_aa_size / geometry_scale;
   if (thickness < aa_size / 255.f)
   {

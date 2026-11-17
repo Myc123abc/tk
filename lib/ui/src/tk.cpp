@@ -1,11 +1,15 @@
-#include "tk.hpp"
-#include "renderer/renderer.hpp"
-#include "renderer/window/window_manager.hpp"
-#include "ui/ui_context.hpp"
-#include "util/async/thread_pool.hpp"
-#include "util/file_system.hpp"
-#include "util/async/iocp.hpp"
-#include "ui/text_engine/glyph_cacher.hpp"
+module;
+
+#include <algorithm>
+#include <thread>
+
+module tk.ui;
+
+import tk.async;
+import tk.file_system;
+import tk.renderer;
+import tk.ui.context;
+import tk.ui.text.glyph_cacher;
 
 using namespace tk::renderer;
 using namespace tk::ui;
@@ -20,7 +24,7 @@ void init() noexcept
   g_glyph_cacher.init();
   g_renderer.init();
   g_wnd_mgr.init();
-  g_ui_ctx.init();
+  ui::g_ctx.init();
 }
 
 void destroy() noexcept
@@ -29,7 +33,7 @@ void destroy() noexcept
   g_glyph_cacher.destroy();
   g_renderer.wait_idle();
   g_thread_pool.destroy();
-  g_ui_ctx.destroy();
+  ui::g_ctx.destroy();
   g_renderer.destroy();
   g_wnd_mgr.destroy();
   g_file_sys.destroy();
@@ -39,10 +43,10 @@ void destroy() noexcept
 void update() noexcept
 {
   g_img_mgr.update();
-  g_ui_ctx.render();
+  ui::g_ctx.render();
   g_wnd_mgr.message_process();
   g_renderer.render();
-  g_ui_ctx.postprocess();
+  ui::g_ctx.postprocess();
 }
 
 }

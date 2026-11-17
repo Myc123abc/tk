@@ -1,4 +1,14 @@
-#include "context.hpp"
+module;
+
+#include <d3d12.h>
+#include <directx/d3dx12.h>
+
+#include <cassert>
+#include <utility>
+
+module tk.renderer;
+
+import :context;
 
 namespace tk::renderer {
 

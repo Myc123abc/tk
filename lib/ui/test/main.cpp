@@ -1,8 +1,14 @@
-#include "tk/tk.hpp"
-#include "window/font_select_window.hpp"
-#include "window/test_window_1.hpp"
-#include "window/test_window_2.hpp"
-#include "font.hpp"
+import tk.base;
+import tk.flag;
+import tk.hash;
+import tk.log;
+import tk.rect;
+import tk.string_id;
+import tk.ui;
+import tk.ui.test.font;
+import tk.ui.test.window.font_select_window;
+import tk.ui.test.window.test_window_1;
+import tk.ui.test.window.test_window_2;
 
 using namespace tk;
 

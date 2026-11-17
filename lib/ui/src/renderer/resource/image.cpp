@@ -1,7 +1,22 @@
-#include "image.hpp"
-#include "../core.hpp"
-#include "tk/error_handling.hpp"
-#include "command.hpp"
+module;
+
+#include <d3d12.h>
+#include <dxgi1_6.h>
+#include <directx/d3dx12.h>
+#include <wrl/client.h>
+
+#include <algorithm>
+#include <cassert>
+#include <optional>
+#include <vector>
+
+module tk.renderer;
+
+import :image;
+import :core;
+import :command;
+import tk.error_handling;
+import tk.flag;
 
 using namespace tk;
 using namespace tk::renderer;

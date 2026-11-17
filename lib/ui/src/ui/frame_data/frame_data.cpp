@@ -1,8 +1,19 @@
-#include "frame_data.hpp"
-#include "util.hpp"
-#include "../config.hpp"
+module;
 
+#include <algorithm>
+#include <array>
+#include <cassert>
+#include <cmath>
 #include <numbers>
+
+module tk.renderer;
+
+import :frame_data;
+import tk.error_handling;
+import tk.ui;
+import tk.ui.config;
+import tk.ui.frame_data.util;
+import tk.ui.text.engine;
 
 namespace tk::ui {
 

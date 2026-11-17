@@ -1,14 +1,25 @@
+module;
+
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-#include "image_manager.hpp"
-#include "../../util/file_system.hpp"
-#include "../../util/async/thread_pool.hpp"
-#include "../engine/copy_engine.hpp"
-#include "../engine/compute_engine.hpp"
-#include "../renderer.hpp"
-
 #include <algorithm>
+#include <cmath>
+#include <expected>
+#include <ranges>
+#include <string>
+#include <string_view>
+#include <utility>
+
+module tk.renderer;
+
+import :image_manager;
+import :engine.copy_engine;
+import :engine.compute_engine;
+import tk.async;
+import tk.file_system;
+import tk.flag;
+import tk.ui.image_error;
 
 using namespace tk::ui;
 

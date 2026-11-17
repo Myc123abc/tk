@@ -1,9 +1,10 @@
-#include "tk/memory_pool.hpp"
-
 #include <array>
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <vector>
+
+import tk.memory_pool;
 
 using namespace tk;
 

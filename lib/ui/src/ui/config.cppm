@@ -1,0 +1,27 @@
+export module tk.ui.config;
+
+export namespace tk::ui {
+
+constexpr auto Title_Bar_Height             = 35;
+constexpr auto Title_Bar_Button_Width       = 46;
+constexpr auto Title_Bar_Button_Icon_Width  = 10;
+constexpr auto Title_Bar_Button_Icon_Height = 10;
+
+constexpr auto Viewport_Zoom_Factor        = 1.1f;
+// Limit zoom before float geometry loses pixel precision and destabilizes tessellation.
+constexpr auto Viewport_Max_Scale          = 8192.f;
+constexpr auto Window_Active_Response_Time = 200'000;
+
+constexpr auto Image_Pool_Init_Capacity = 32;
+
+constexpr auto Union_Cache_Max_Entries = 128uz;
+constexpr auto Union_Cache_Max_Bytes   = 16uz * 1024 * 1024;
+
+constexpr auto Glyph_Atlas_Width                     = 1024;
+constexpr auto Glyph_Atlas_Height                    = 1024;
+constexpr auto FT_Pixel_Size                         = 32;
+constexpr auto Glyph_MSDF_Pixel_Range                = 4.f;
+constexpr auto Glyph_Max_Concurrent_Generation_Tasks = 2uz;
+constexpr auto Glyphs_Per_Generation_Task            = 4uz;
+
+}

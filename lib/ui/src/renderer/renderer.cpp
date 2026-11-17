@@ -1,21 +1,31 @@
-#include "renderer.hpp"
-#include "core.hpp"
-#include "engine/graphics_engine.hpp"
-#include "engine/compute_engine.hpp"
-#include "engine/copy_engine.hpp"
-#include "tk/error_handling.hpp"
-#include "resource/descriptor_heap_manager.hpp"
-#include "resource/line_coverage_atlas.hpp"
-#include "pipeline/pipeline_system.hpp"
-#include "window/window_manager.hpp"
-#include "context.hpp"
-#include "resource/shader_type.hpp"
-#include "config.hpp"
-#include "../ui/ui_context.hpp"
+module;
 
+#include <windows.h>
 #include <dwmapi.h>
 
+#include <algorithm>
+#include <cassert>
+#include <functional>
 #include <ranges>
+#include <utility>
+
+module tk.renderer;
+
+import :core;
+import :engine.compute_engine;
+import :engine.graphics_engine;
+import :engine.copy_engine;
+import :descriptor_heap_manager;
+import :line_coverage_atlas;
+import :pipeline_system;
+import :window_manager;
+import :config;
+import :context;
+import :frame_data;
+import tk.ui.context;
+import tk.error_handling;
+import tk.flag;
+import tk.renderer.shader_type;
 
 namespace tk::renderer {
 
@@ -165,7 +175,7 @@ void Renderer::process_render() noexcept
   // use duration to promise vsync avoid this case.
   if (_need_vsync)
   {
-    _vsync_dur += ui::g_ui_ctx.delta_time();
+    _vsync_dur += ui::g_ctx.delta_time();
     if (_vsync_dur > Cancel_Vsync_Duration)
       _need_vsync = false;
   }

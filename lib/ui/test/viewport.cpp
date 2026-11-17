@@ -1,8 +1,12 @@
-#include "tk/tk.hpp"
-#include "tk/ui/transform.hpp"
-#include "tk/ui/ui.hpp"
-
 #include <algorithm>
+
+import tk.base;
+import tk.flag;
+import tk.hash;
+import tk.log;
+import tk.rect;
+import tk.string_id;
+import tk.ui;
 
 using namespace tk;
 

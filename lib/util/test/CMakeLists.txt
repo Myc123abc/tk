@@ -13,5 +13,5 @@ target_link_libraries(benchmark-memory-pool
 
 add_test(
   NAME memory-pool
-  COMMAND test_memory-pool
+  COMMAND test-memory-pool
 )

@@ -1,5 +1,19 @@
-#include "font_select_window.hpp"
-#include "../font.hpp"
+module;
+
+#include <algorithm>
+#include <format>
+#include <iterator>
+#include <string>
+
+module tk.ui.test.window.font_select_window;
+
+import tk.base;
+import tk.log;
+import tk.string_id;
+import tk.ui;
+import tk.ui.test.font;
+
+using namespace tk;
 
 void FontSelectWindow::draw() noexcept
 {

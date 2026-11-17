@@ -1,9 +1,23 @@
-#include "pipeline_system.hpp"
-#include "../core.hpp"
-#include "../resource/render_resource.hpp"
-#include "tk/error_handling.hpp"
-#include "../resource/shader_type.hpp"
-#include "../../util/async/thread_pool.hpp"
+module;
+
+#include <d3d12.h>
+#include <directx/d3dx12.h>
+#include <wrl/client.h>
+
+#include <algorithm>
+#include <cassert>
+#include <ranges>
+#include <utility>
+#include <vector>
+
+module tk.renderer;
+
+import :pipeline_system;
+import :core;
+import :render_resource;
+import tk.renderer.shader_type;
+import tk.error_handling;
+import tk.async;
 
 namespace tk::renderer {
 

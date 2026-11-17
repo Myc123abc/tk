@@ -1,10 +1,20 @@
-#include "glyph_cacher.hpp"
-#include "../../util/file_system.hpp"
-#include "../../util/async/thread_pool.hpp"
-#include "../../util/compressor/compressor.hpp"
-#include "../../util/binary_file_format.hpp"
+module;
 
+#include <coroutine>
 #include <ranges>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <vector>
+
+module tk.ui.text.glyph_cacher;
+
+import tk.async;
+import tk.binary_file_format;
+import tk.compressor;
+import tk.error_handling;
+import tk.file_system;
+import tk.string_id;
 
 namespace tk::ui {
 

@@ -1,11 +1,22 @@
-#include "command.hpp"
-#include "tk/error_handling.hpp"
-#include "../core.hpp"
-#include "../../util/align.hpp"
-#include "descriptor_heap_manager.hpp"
-#include "tk/base.hpp"
+module;
 
+#include <d3d12.h>
+#include <directx/d3dx12.h>
+#include <wrl/client.h>
+
+#include <optional>
 #include <ranges>
+#include <span>
+#include <vector>
+
+module tk.renderer;
+
+import :command;
+import :core;
+import :frame_data;
+import tk.error_handling;
+import tk.align;
+import tk.flag;
 
 namespace tk::renderer {
 

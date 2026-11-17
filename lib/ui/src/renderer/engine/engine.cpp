@@ -1,6 +1,18 @@
-#include "engine.hpp"
-#include "../core.hpp"
-#include "tk/error_handling.hpp"
+module;
+
+#include <windows.h>
+
+#include <d3d12.h>
+#include <wrl/client.h>
+
+#include <optional>
+#include <span>
+
+module tk.renderer;
+
+import :engine;
+import :core;
+import tk.error_handling;
 
 namespace tk::renderer {
 

@@ -1,5 +1,3 @@
-#include "tk/memory_pool.hpp"
-
 #include <algorithm>
 #include <chrono>
 #include <cstddef>
@@ -8,6 +6,8 @@
 #include <print>
 #include <string_view>
 #include <vector>
+
+import tk.memory_pool;
 
 using namespace tk;
 

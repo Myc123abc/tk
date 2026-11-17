@@ -1,15 +1,30 @@
-#include "font_registry.hpp"
-#include "grapheme_iterator.hpp"
-#include "tk/error_handling.hpp"
-#include "../../util/file_system.hpp"
-#include "../../util/async/thread_pool.hpp"
+module;
 
 extern "C"
 {
 #include <emojidef.h>
 }
 
+#include <algorithm>
+#include <cassert>
+#include <expected>
+#include <memory>
+#include <optional>
 #include <ranges>
+#include <span>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
+module tk.ui.text.font_registry;
+
+import tk.async;
+import tk.error_handling;
+import tk.file_system;
+import tk.unicode;
+import tk.ui.text.grapheme_iterator;
 
 namespace tk::ui {
 
@@ -136,8 +151,8 @@ auto FontRegistry::resolve(std::string_view text, FontStyleKey key) noexcept -> 
   auto update_metrics = [&](Font* font)
   {
     if (!font) font = notdef_font();
-    result.metrics.ascender = std::max(result.metrics.ascender, font->_ascender);
-    max_descender           = std::max(max_descender, font->_height - font->_ascender);
+    result.metrics.ascender = std::max(result.metrics.ascender, font->ascender());
+    max_descender           = std::max(max_descender, font->height() - font->ascender());
     result.metrics.height   = result.metrics.ascender + max_descender;
   };
   auto supports_cluster = [](Font const& font, std::string_view cluster)

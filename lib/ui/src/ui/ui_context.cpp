@@ -1,11 +1,29 @@
-#include "ui_context.hpp"
-#include "tk/error_handling.hpp"
-#include "../renderer/window/window_manager.hpp"
-#include "../renderer/renderer.hpp"
-#include "tk/hash.hpp"
-#include "text_engine/text_engine.hpp"
-#include "input_system.hpp"
-#include "../renderer/window/monitor.hpp"
+module;
+
+#include <windows.h>
+
+#include <algorithm>
+#include <bit>
+#include <cassert>
+#include <chrono>
+#include <cmath>
+#include <expected>
+#include <functional>
+#include <optional>
+#include <ranges>
+#include <string_view>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
+module tk.ui.context;
+
+import tk.error_handling;
+import tk.hash;
+import tk.renderer;
+import tk.ui.input_system;
+import tk.ui.config;
+import tk.ui.text.engine;
 
 using namespace tk::renderer;
 
@@ -425,21 +443,26 @@ auto UIContext::is_cursor_move_out(size_t id) noexcept -> bool
 void UIContext::render_on(float x, float y, std::move_only_function<void()>&& func) noexcept
 {
   assert(func);
-  auto org_pos = g_ui_ctx.get_render_pos();
-  g_ui_ctx.set_render_pos(x, y);
+  auto org_pos = g_ctx.get_render_pos();
+  g_ctx.set_render_pos(x, y);
   func();
-  g_ui_ctx.set_render_pos(org_pos.x - Window_Shadow_Thickness, org_pos.y - Window_Shadow_Thickness);
+  g_ctx.set_render_pos(org_pos.x - Window_Shadow_Thickness, org_pos.y - Window_Shadow_Thickness);
 }
 
 auto UIContext::is_hover_on(size_t id, Rect rc) noexcept -> bool
 {
-  if (!rc.empty() && ui::is_hover_on(rc))
-  {
-    _hovered_widget_ids.emplace(id);
-    _last_hovered_widget_id = id;
-    return id == _prev_hovered_widget_id;
-  }
-  return false;
+  if (!can_hover_current_window()) return false;
+
+  auto const& wnd = window();
+  rc = intersect(rc, { 0, 0, wnd->width(), wnd->height() });
+  if (rc.empty()) return false;
+
+  auto p = cursor_pos_on_window();
+  if (!rc.adjust_right_bottom(float2(-1)).contains(p)) return false;
+
+  _hovered_widget_ids.emplace(id);
+  _last_hovered_widget_id = id;
+  return id == _prev_hovered_widget_id;
 }
 
 auto UIContext::cursor_pos_for_widget() const noexcept -> float2
@@ -596,7 +619,7 @@ void UIContext::reset_tween(size_t id) noexcept
 
 auto UIContext::ping_pong(bool b, size_t id, double forward_dur, double reverse_dur, Tween::Ease ease) noexcept -> double
 {
-  auto tween = g_ui_ctx.get_tween(id, forward_dur, reverse_dur, ease);
+  auto tween = g_ctx.get_tween(id, forward_dur, reverse_dur, ease);
 
   if (b)
   {
@@ -623,7 +646,7 @@ auto UIContext::ping_pong(bool b, size_t id, double forward_dur, double reverse_
   auto value = tween->get();
 
   if (tween->is_finished() && tween->is_reversed())
-    g_ui_ctx.remove_tween(id);
+    g_ctx.remove_tween(id);
 
   return value;
 }

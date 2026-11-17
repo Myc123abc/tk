@@ -1,0 +1,93 @@
+module;
+
+#include <d3d12.h>
+#include <wrl/client.h>
+
+#include <ranges>
+
+export module tk.renderer:buffer;
+
+import :gpu_resource;
+import :descriptor_heap_manager;
+import tk.base;
+import tk.object_pool;
+import tk.singleton;
+
+export namespace tk::renderer {
+
+class Buffer : private GPUResource
+{
+  friend class Command;
+public:
+  Buffer()                         = default;
+  ~Buffer()                        = default;
+  Buffer(Buffer const&)            = delete;
+  Buffer(Buffer&&)                 = delete;
+  Buffer& operator=(Buffer const&) = delete;
+  Buffer& operator=(Buffer&&)      = delete;
+
+  void init(uint size, bool use_descriptor) noexcept;
+
+  void destroy() noexcept { _descriptor_handle.release(); }
+
+  void clear() noexcept { _size = {}; }
+
+  auto append(void const* data, uint size) noexcept -> uint;
+
+  template <std::ranges::range T>
+  requires std::ranges::sized_range<T> && std::ranges::contiguous_range<T>
+  auto append_range(T&& values) noexcept -> uint
+  {
+    return append(std::ranges::data(values), std::ranges::size(values) * sizeof(std::ranges::range_value_t<T>));
+  }
+
+  void offset(uint size) noexcept;
+  void copy(void const* data, uint size) const noexcept;
+
+  void resize(uint size) noexcept;
+  void reserve(uint size) noexcept;
+
+  auto gpu_address() const noexcept { return _handle->GetGPUVirtualAddress(); }
+  auto size()        const noexcept { return _size;                           }
+  auto capacity()    const noexcept { return _capacity;                       }
+  auto gpu_handle()  const noexcept { return _descriptor_handle.gpu_handle(); }
+  auto handle()      const noexcept { return _handle.Get();                   }
+
+private:
+  Microsoft::WRL::ComPtr<ID3D12Resource> _handle;
+  DescriptorHandle                       _descriptor_handle;
+  uint8*                                 _data{};
+  uint                                   _capacity{};
+  uint                                   _size{};
+};
+
+class BufferPool : public Singleton<BufferPool>
+{
+public:
+  using Pool   = ObjectPool<Buffer>;
+  using Handle = Pool::Handle;
+
+  auto create(uint size, bool use_descriptor) noexcept
+  {
+    auto h = _pool.alloc();
+    _pool[h].init(size, use_descriptor);
+    return h;
+  }
+
+  void destroy(Handle& h) noexcept
+  {
+    _pool[h].destroy();
+    _pool.free(h);
+  }
+
+  auto& operator[](Handle h) noexcept { return _pool[h]; }
+
+private:
+  Pool _pool;
+};
+
+auto& g_buf_pool = BufferPool::instance();
+
+using BufferHandle = BufferPool::Handle;
+
+}

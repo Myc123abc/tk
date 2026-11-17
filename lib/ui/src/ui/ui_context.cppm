@@ -1,0 +1,229 @@
+module;
+
+#include <windows.h>
+
+#include <cassert>
+#include <expected>
+#include <functional>
+#include <optional>
+#include <string_view>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+
+export module tk.ui.context;
+
+import tk.base;
+import tk.error_handling;
+import tk.rect;
+import tk.renderer;
+import tk.singleton;
+import tk.string_id;
+import tk.ui;
+
+export namespace tk::ui {
+
+auto is_caps_locked() noexcept -> bool;
+
+struct WindowContext
+{
+  WindowContext() = default;
+  WindowContext(HWND handle) noexcept : handle(handle) {}
+
+  StringID              name{};
+  HWND                  handle{};
+  bool                  is_called{};
+  bool                  can_be_closed{};
+  bool                  is_closed{};
+  float2                render_pos{};
+  bool                  need_clear{};
+  bool                  set_fullscreen{};
+  bool                  first_time_call{ true };
+  bool                  auto_size{};
+  bool                  auto_size_waiting_for_content{};
+  std::optional<float2> init_pos;
+  Rect                  monitor_work_rect;
+  Rect                  content_bounds;
+  FrameData             frame_data;
+};
+
+class UIContext : public Singleton<UIContext>
+{
+  friend class Singleton<UIContext>;
+  friend struct WindowContext;
+
+  UIContext() = default;
+  ~UIContext() = default;
+
+public:
+  void init() noexcept;
+  void destroy() noexcept;
+
+  void close_window() noexcept;
+
+  void begin(StringID name, std::optional<float2> extent, std::optional<float2> pos, bool* is_closed, WindowConfig const& cfg) noexcept;
+  void end() noexcept;
+
+  void check_draw() const noexcept;
+
+  void render() noexcept;
+
+  auto is_hover_on(size_t id, Rect rc) noexcept -> bool;
+  auto is_hover_on(size_t id, float2 left_top, float2 right_bottom) noexcept { return is_hover_on(id, { left_top, right_bottom }); }
+  auto transform_widget_rect(Rect rect) const noexcept -> Rect;
+  void add_move_invalid_area(Rect rect) noexcept;
+  void register_item(Rect rect) noexcept;
+  void custom_transform_beg() noexcept { ++_custom_transform_depth; }
+  void custom_transform_end() noexcept { err_if(_custom_transform_depth == 0, "transform_end called without transform_beg"); --_custom_transform_depth; }
+  auto has_custom_transform() const noexcept { return _custom_transform_depth != 0; }
+
+  void set_render_pos(float x, float y) noexcept { _wnd_ctx->render_pos = { x + renderer::Window_Shadow_Thickness, y + renderer::Window_Shadow_Thickness }; }
+  auto get_render_pos() const noexcept { return _wnd_ctx->render_pos; }
+  // Raw physical pixels for window-space hit testing.
+  auto cursor_pos_on_window() const noexcept { return _cursor_pos_on_window; }
+  // Logical widget coordinates after DPI/title-bar conversion, without undoing
+  // viewport or custom transforms.
+  auto cursor_pos_for_widget() const noexcept -> float2;
+  auto can_hover_current_window() const noexcept { return _can_hover_current_window; }
+
+  void render_on(float x, float y, std::move_only_function<void()>&& func) noexcept;
+
+  auto generic_id(StringID name) noexcept -> size_t;
+  auto get_id(StringID name) const noexcept -> size_t;
+
+  auto delta_time() const noexcept { return _delta_time; }
+
+  auto get_tween(size_t id, double forward_dur, double reverse_dur, Tween::Ease ease = {}) noexcept -> Tween*;
+  auto get_tween(size_t id, double dur, Tween::Ease ease = {}) noexcept { return get_tween(id, dur, dur, ease); }
+  void remove_tween(size_t id) noexcept;
+  void reset_tween(size_t id) noexcept;
+  auto ping_pong(bool b, size_t id, double forward_dur, double reverse_dur, Tween::Ease ease = {}) noexcept -> double;
+  auto ping_pong(bool b, size_t id, double dur, Tween::Ease ease = {}) noexcept { return ping_pong(b, id, dur, dur, ease); }
+
+  auto image(std::string_view path, float2 left_top, float2 right_bottom, uint8 alpha, std::optional<ImageConfig> cfg) noexcept -> std::expected<void, ImageLoadErrorType>;
+  auto text(StringLiteral text, float2 pos, float size, Color inner_color, TextConfig const& cfg) noexcept -> TextResult;
+  auto get_text_bounding_rect(StringLiteral text, float size, TextConfig const& cfg) noexcept -> std::optional<Rect>;
+  void render(TextLayout const& layout) noexcept;
+
+  void fullscreen_window() noexcept;
+  void restore_fullscreen_window() noexcept;
+
+  auto is_use_title_bar_now() const noexcept { return _wnd->cfg().display_title_bar && !_wnd->is_fullscreen(); }
+  void draw_on_title_bar(std::move_only_function<void(float2)>&& func) noexcept;
+
+  auto get_window_context(HWND handle) noexcept { assert(_wnd_names.contains(handle)); return &_wnd_ctxs[_wnd_names[handle]]; }
+  void clear_fullscreen_window() noexcept { _fullscreen_window_need_clear = true; }
+  void close_window(HWND handle) noexcept { get_window_context(handle)->is_closed = true; }
+  void clear_state() noexcept;
+  void clear_state_unfocused_window() noexcept;
+
+  auto window() const noexcept { return _wnd; }
+  auto frame_data() noexcept { return &_wnd_ctx->frame_data; }
+
+  void postprocess() const noexcept;
+
+  void scissor_area_begin(Rect rect) noexcept;
+  void scissor_area_end() noexcept;
+  void viewport_begin(StringID name, Rect rect) noexcept;
+  void viewport_end();
+
+private:
+  void update_window_config(WindowConfig const& cfg) noexcept;
+
+  void preprocess_render() noexcept;
+  void postprocess_render() noexcept;
+
+  void add_title_bar() noexcept;
+  void fullscreen_process() noexcept;
+  void window_shadow_wireframe_process(WindowContext& wnd_ctx, renderer::Window const& wnd, Rect scissor_rect) noexcept;
+
+private:
+  //
+  // misc
+  //
+  std::unordered_map<StringID, WindowContext> _wnd_ctxs;
+  std::unordered_map<HWND, StringID>          _wnd_names;
+
+  renderer::Window* _wnd{};
+  renderer::Window  _measurement_wnd;
+  WindowContext*    _wnd_ctx{};
+  HWND              _fullscreen_window{};
+  bool              _fullscreen_window_need_clear{};
+
+  bool   _call_begin{};
+  uint   _custom_transform_depth{};
+  double _delta_time{};
+  float2 _cursor_pos_on_window{};
+  bool   _can_hover_current_window{};
+
+  std::move_only_function<void(float2)> _user_title_bar_draw_func;
+
+public:
+  //
+  // widget ids
+  //
+  std::unordered_set<size_t>        _hovered_widget_ids;
+  size_t                            _last_hovered_widget_id{};
+  size_t                            _prev_hovered_widget_id{};
+  std::unordered_map<size_t, Tween> _tweens;
+  std::unordered_set<size_t>        _ids;
+
+  //
+  // mouse state
+  //
+public:
+  HWND                cursor_on_window{};
+  HWND                mouse_down_window{};
+  HWND                mouse_up_window{};
+  std::optional<int2> mouse_down_window_pos;
+  std::optional<int2> mouse_up_window_pos;
+  bool                is_move_from_maximize{};
+  bool                draw_title_bar{};
+  bool                is_last_mouse_up{};
+
+  //
+  // button state
+  //
+private:
+  struct ButtonState
+  {
+    size_t id{};
+    float2 left_top{};
+    float2 right_bottom{};
+    bool   move_out{};
+  } _btn_state;
+public:
+  auto add_mouse_left_button_state(size_t id, float2 left_top, float2 right_bottom) noexcept -> bool;
+  auto is_cursor_move_out(size_t id) noexcept -> bool;
+  auto is_last_mouse_down_id(size_t id) const noexcept { return _btn_state.id == id; }
+
+  //
+  // Shape Operation
+  //
+private:
+  std::vector<Rect> _scissor_area_stack;
+
+  struct ViewPortInfo
+  {
+    float2 offset;
+    float  scale{ 1 };
+    uint call_cnt{};
+  };
+
+  struct ViewportScope
+  {
+    Rect   rect;
+    Rect   screen_rect;
+    Rect   interaction_rect;
+    Matrix transform;
+    bool   using_transform{};
+  };
+
+  std::unordered_map<uint64, ViewPortInfo> _viewport_infos;
+  std::vector<ViewportScope>               _viewport_stack;
+  size_t                                   _dragging_viewport_id{};
+};
+
+auto& g_ctx = UIContext::instance();
+
+}

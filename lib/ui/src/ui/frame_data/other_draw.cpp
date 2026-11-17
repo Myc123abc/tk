@@ -1,8 +1,19 @@
-#include "frame_data.hpp"
-#include "util.hpp"
-#include "../ui_context.hpp"
+module;
 
+#include <cassert>
 #include <cmath>
+#include <optional>
+#include <span>
+
+module tk.renderer;
+
+import :frame_data;
+import tk.flag;
+import tk.ui;
+import tk.ui.context;
+import tk.ui.frame_data.util;
+import tk.ui.text.engine;
+import tk.ui.text.handle;
 
 namespace tk::ui {
 
@@ -204,7 +215,7 @@ void FrameData::_add_image_rounded(ImageHandle handle, float2 left_top, float2 r
 
   auto& img = renderer::g_img_mgr[handle];
 
-  auto const aa_width = g_ui_ctx.window()->scale();
+  auto const aa_width = g_ctx.window()->scale();
   auto const col      = Color{ 1, 1, 1, static_cast<float>(alpha) / 255 }.to_uint();
   auto const aa_col   = Color{ 1, 1, 1, 0.f }.to_uint();
   auto const packed   = renderer::vtx_pack(renderer::VtxType::image, img.srv().index());

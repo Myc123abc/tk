@@ -1,6 +1,11 @@
-#include "test_window_1.hpp"
-#include "test_window_2.hpp"
-#include "font_select_window.hpp"
+module tk.ui.test.window.test_window_1;
+
+import tk.base;
+import tk.ui;
+import tk.ui.test.window.font_select_window;
+import tk.ui.test.window.test_window_2;
+
+using namespace tk;
 
 void TestWindow1::draw() noexcept
 {

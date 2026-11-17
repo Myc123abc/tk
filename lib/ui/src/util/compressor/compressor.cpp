@@ -1,5 +1,11 @@
-#include "compressor.hpp"
-#include "tk/error_handling.hpp"
+module;
+
+#include <span>
+#include <vector>
+
+module tk.compressor;
+
+import tk.error_handling;
 
 namespace tk {
 

@@ -1,12 +1,21 @@
-#include "compute_engine.hpp"
-#include "../resource/descriptor_heap_manager.hpp"
-#include "../pipeline/pipeline_system.hpp"
-#include "../resource/shader_type.hpp"
-#include "graphics_engine.hpp"
-#include "../context.hpp"
-#include "../renderer.hpp"
+module;
 
-#include <assert.h>
+#include <algorithm>
+#include <array>
+#include <cassert>
+#include <cmath>
+#include <ranges>
+#include <utility>
+#include <vector>
+
+module tk.renderer;
+
+import :engine.compute_engine;
+import :engine.graphics_engine;
+import :descriptor_heap_manager;
+import :pipeline_system;
+import :context;
+import tk.renderer.shader_type;
 
 using namespace tk::renderer;
 

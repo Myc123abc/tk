@@ -1,7 +1,19 @@
-#include "text_engine.hpp"
-#include "vertical_orientation.hpp"
+module;
 
+#include <algorithm>
+#include <cassert>
+#include <expected>
+#include <optional>
 #include <ranges>
+#include <span>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
+module tk.ui.text.engine;
+
+import tk.ui.text.vertical_orientation;
 
 namespace tk::ui {
 

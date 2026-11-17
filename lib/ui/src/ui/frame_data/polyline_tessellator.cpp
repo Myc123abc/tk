@@ -1,8 +1,11 @@
-#include "polyline_tessellator.hpp"
+module;
 
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <span>
+
+module tk.ui.frame_data.polyline_tessellator;
 
 namespace tk::ui {
 

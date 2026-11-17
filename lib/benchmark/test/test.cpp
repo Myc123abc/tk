@@ -1,14 +1,16 @@
-#include "tk/benchmark.hpp"
-
 #include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <ranges>
+#include <span>
 #include <unordered_map>
 #include <vector>
-#include <ranges>
+
+import tk.benchmark;
+import tk.string_id;
 
 using ns = std::chrono::nanoseconds;
 using us = std::chrono::microseconds;

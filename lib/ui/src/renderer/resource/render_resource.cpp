@@ -1,13 +1,23 @@
-#include "render_resource.hpp"
-#include "../core.hpp"
-#include "../engine/graphics_engine.hpp"
-#include "tk/error_handling.hpp"
-#include "command.hpp"
+module;
 
-#include <directx/d3dx12.h>
 #include <windows.h>
 
+#include <d3d12.h>
+#include <dcomp.h>
+#include <dxgi1_6.h>
+#include <wrl/client.h>
+
+#include <array>
 #include <ranges>
+
+module tk.renderer;
+
+import :render_resource;
+import :core;
+import :command;
+import :engine.graphics_engine;
+import :frame_data;
+import tk.error_handling;
 
 using namespace Microsoft::WRL;
 

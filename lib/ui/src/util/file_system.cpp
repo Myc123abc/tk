@@ -1,11 +1,18 @@
-#include "file_system.hpp"
-#include "async/iocp.hpp"
-
-#include "tk/error_handling.hpp"
+module;
 
 #include <filesystem>
 #include <limits>
 #include <utility>
+#include <coroutine>
+#include <cassert>
+#include <span>
+#include <expected>
+
+#include <windows.h>
+
+module tk.file_system;
+
+import tk.error_handling;
 
 namespace fs = std::filesystem;
 

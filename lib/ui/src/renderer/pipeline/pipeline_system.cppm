@@ -1,0 +1,214 @@
+module;
+
+#include <d3d12.h>
+#include <wrl/client.h>
+
+#include <initializer_list>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <variant>
+#include <vector>
+
+export module tk.renderer:pipeline_system;
+
+import :image;
+import :compiler;
+import tk.variant;
+import tk.singleton;
+
+export namespace tk::renderer {
+
+enum class PipelineType
+{
+  ui,
+  window_shadow,
+
+  blur_horizontal_pass,
+  blur_vertical_pass,
+
+  mask_write_max,
+  mask_write_add,
+
+  discard_draw,
+
+  mipmap,
+  image_scale,
+};
+
+enum class StencilOp
+{
+  keep     = D3D12_STENCIL_OP_KEEP,
+  zero     = D3D12_STENCIL_OP_ZERO,
+  replace  = D3D12_STENCIL_OP_REPLACE,
+  incr_sat = D3D12_STENCIL_OP_INCR_SAT,
+  decr_sat = D3D12_STENCIL_OP_DECR_SAT,
+  invert   = D3D12_STENCIL_OP_INVERT,
+  incr     = D3D12_STENCIL_OP_INCR,
+  decr     = D3D12_STENCIL_OP_DECR,
+};
+
+enum class CompFunc
+{
+  none          = D3D12_COMPARISON_FUNC_NONE,
+  never         = D3D12_COMPARISON_FUNC_NEVER,
+  less          = D3D12_COMPARISON_FUNC_LESS,
+  equal         = D3D12_COMPARISON_FUNC_EQUAL,
+  less_equal    = D3D12_COMPARISON_FUNC_LESS_EQUAL,
+  greater       = D3D12_COMPARISON_FUNC_GREATER,
+  not_equal     = D3D12_COMPARISON_FUNC_NOT_EQUAL,
+  greater_equal = D3D12_COMPARISON_FUNC_GREATER_EQUAL,
+  always        = D3D12_COMPARISON_FUNC_ALWAYS,
+};
+
+struct StencilState
+{
+  StencilOp op          = StencilOp::keep;
+  CompFunc  comp        = CompFunc::always;
+  bool      write_color = false;
+};
+
+enum class Blend
+{
+  zero             = D3D12_BLEND_ZERO,
+  one              = D3D12_BLEND_ONE,
+  src_color        = D3D12_BLEND_SRC_COLOR,
+  inv_src_color    = D3D12_BLEND_INV_SRC_COLOR,
+  src_alpha        = D3D12_BLEND_SRC_ALPHA,
+  inv_src_alpha    = D3D12_BLEND_INV_SRC_ALPHA,
+  dest_alpha       = D3D12_BLEND_DEST_ALPHA,
+  inv_dest_alpha   = D3D12_BLEND_INV_DEST_ALPHA,
+  dest_color       = D3D12_BLEND_DEST_COLOR,
+  inv_dest_color   = D3D12_BLEND_INV_DEST_COLOR,
+  src_alpha_sat    = D3D12_BLEND_SRC_ALPHA_SAT,
+  blend_factor     = D3D12_BLEND_BLEND_FACTOR,
+  inv_blend_factor = D3D12_BLEND_INV_BLEND_FACTOR,
+  src1_color       = D3D12_BLEND_SRC1_COLOR,
+  inv_src1_color   = D3D12_BLEND_INV_SRC1_COLOR,
+  alpha_factor     = D3D12_BLEND_ALPHA_FACTOR,
+  inv_alpha_factor = D3D12_BLEND_INV_ALPHA_FACTOR,
+};
+
+enum class BlendOp
+{
+  add          = D3D12_BLEND_OP_ADD,
+  subtract     = D3D12_BLEND_OP_SUBTRACT,
+  rev_subtract = D3D12_BLEND_OP_REV_SUBTRACT,
+  min          = D3D12_BLEND_OP_MIN,
+  max          = D3D12_BLEND_OP_MAX,
+};
+
+struct BlendState
+{
+  Blend   src;
+  Blend   dst;
+  BlendOp op;
+  Blend   src_alpha;
+  Blend   dst_alpha;
+  BlendOp op_alpha;
+
+  static auto Default() noexcept -> BlendState { return { Blend::src_alpha, Blend::inv_src_alpha, BlendOp::add, Blend::one, Blend::inv_src_alpha, BlendOp::add }; }
+  static auto Max()     noexcept -> BlendState { return { Blend::one,       Blend::one,           BlendOp::max, Blend::one, Blend::one,           BlendOp::max }; }
+  static auto Add()     noexcept -> BlendState { return { Blend::one,       Blend::one,           BlendOp::add, Blend::one, Blend::one,           BlendOp::add }; }
+};
+
+struct PipelineCreateInfo
+{
+  std::string_view                     shader;
+  std::vector<std::string_view>        includes;
+  std::optional<RootSignatureResult>   root_signature_result;
+  std::unordered_set<std::string_view> volatile_descs;
+
+  struct Graphics
+  {
+    std::string_view            vs;
+    std::string_view            ps;
+    ImageFormat                 rtv_format;
+    bool                        use_depth_test{};
+    std::optional<BlendState>   blend{};
+    std::optional<StencilState> stencil{};
+  };
+
+  struct Compute
+  {
+    std::string_view cs;
+  };
+
+  Variant<std::monostate, Graphics, Compute> info;
+};
+
+struct GraphicsPipelineInfo
+{
+  PipelineType                       type;
+  std::string_view                   shader;
+  std::string_view                   vs;
+  std::string_view                   ps;
+  std::vector<std::string_view>      includes;
+  ImageFormat                        rt_fmt;
+  std::optional<BlendState>          blend;
+  std::optional<RootSignatureResult> root_sign;
+};
+
+struct ComputePipelineInfo
+{
+  PipelineType                       type;
+  std::string_view                   shader;
+  std::string_view                   cs;
+  std::vector<std::string_view>      includes;
+  std::optional<RootSignatureResult> root_sign;
+};
+
+class PipelineSystem : public Singleton<PipelineSystem>
+{
+public:
+  void init() noexcept;
+
+  auto pipe(PipelineType type) noexcept { return &_pipes[type]; }
+
+private:
+  void create_graphics_pipeline(GraphicsPipelineInfo const& info) noexcept;
+  void create_compute_pipeline(ComputePipelineInfo const& info) noexcept;
+  void create_graphics_pipelines(std::initializer_list<GraphicsPipelineInfo> infos) noexcept { for (auto const& info : infos) create_graphics_pipeline(info); }
+  void create_compute_pipelines(std::initializer_list<ComputePipelineInfo> infos) noexcept { for (auto const& info : infos) create_compute_pipeline(info); }
+  void compile_pipelines() noexcept;
+
+  auto get_root_signature(Compiler::CompileResult& compile_result) noexcept -> ID3D12RootSignature*;
+
+  struct Pipeline
+  {
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> pipe_state{};
+    ID3D12RootSignature*                        root_signature{};
+    D3D_PRIMITIVE_TOPOLOGY                      primive_topology{ D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST };
+
+    Pipeline() = default;
+
+    Pipeline(
+      PipelineCreateInfo const&   info,
+      Compiler::CompileResult&&   compile_result,
+      ID3D12RootSignature*        resolved_root_signature) noexcept
+    {
+      info.info.visit(
+        [&](PipelineCreateInfo::Graphics) { init_graphics(info, std::move(compile_result), resolved_root_signature); },
+        [&](PipelineCreateInfo::Compute) { init_compute(info, std::move(compile_result), resolved_root_signature); },
+        VariantUnreachableCase
+      );
+    }
+
+    void init_graphics(PipelineCreateInfo const& info, Compiler::CompileResult&& compile_result, ID3D12RootSignature* resolved_root_signature) noexcept;
+    void init_compute(PipelineCreateInfo const& info, Compiler::CompileResult&& compile_result, ID3D12RootSignature* resolved_root_signature) noexcept;
+  
+    auto root_param_idx(std::string_view name) noexcept { return _root_param_idxs[name.data()]; }
+  private:
+    std::unordered_map<std::string, uint> _root_param_idxs;
+  };
+  std::unordered_map<PipelineType, Pipeline> _pipes;
+  std::vector<std::pair<PipelineType, PipelineCreateInfo>> _pipeline_create_infos;
+  std::vector<Microsoft::WRL::ComPtr<ID3D12RootSignature>> _root_signatures;
+};
+
+auto& g_pipe_sys = PipelineSystem::instance();
+
+}

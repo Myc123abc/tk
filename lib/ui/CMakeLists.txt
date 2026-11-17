@@ -1,4 +1,4 @@
-option(BUILD_TK_UI_TEST "Build tk ui test program." OFF)
+option(BUILD_TK_UI_TEST "Build tk ui test program." ON)
 
 set(FT_DISABLE_ZLIB     ON)
 set(FT_DISABLE_BZIP2    ON)
@@ -56,16 +56,29 @@ target_include_directories(libunibreak
   PUBLIC ../../vendor/libunibreak/src
 )
 
-file(GLOB_RECURSE TK_SRC CONFIGURE_DEPENDS src/*.cpp)
+file(GLOB_RECURSE TK_PUB_MODULE_FILE CONFIGURE_DEPENDS module/*.cppm)
+file(GLOB_RECURSE TK_PRI_MODULE_FILE CONFIGURE_DEPENDS src/*.cppm)
+file(GLOB_RECURSE TK_SRC_FILE        CONFIGURE_DEPENDS src/*.cpp)
+list(REMOVE_ITEM TK_PRI_MODULE_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/util/object_pool.cppm")
 
-add_library(tk-ui ${TK_SRC})
+add_library(tk-ui ${TK_SRC_FILE})
 add_library(tk::ui ALIAS tk-ui)
+
+target_sources(tk-ui
+  PUBLIC
+    FILE_SET tk_pub_module
+    TYPE     CXX_MODULES
+    FILES    ${TK_PUB_MODULE_FILE} "${CMAKE_CURRENT_SOURCE_DIR}/src/util/object_pool.cppm"
+  PRIVATE
+    FILE_SET tk_pri_module
+    TYPE     CXX_MODULES
+    FILES    ${TK_PRI_MODULE_FILE}
+)
 
 target_include_directories(tk-ui
   PUBLIC
     include
   PRIVATE
-    include/tk
     ../../vendor/stb
     ../../vendor/freetype/include
     ../../vendor/Clipper2/CPP/Clipper2Lib/include

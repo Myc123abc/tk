@@ -1,10 +1,28 @@
-#include "compiler.hpp"
-#include "tk/error_handling.hpp"
-#include "../core.hpp"
-#include "../../util/unicode.hpp"
+module;
 
-#include <vector>
+#include <d3d12.h>
+#include <d3d12shader.h>
+#include <dxcapi.h>
+#include <directx/d3dx12.h>
+#include <wrl/client.h>
+
+#include <cstdio>
+#include <optional>
+#include <queue>
 #include <ranges>
+#include <span>
+#include <string>
+#include <string_view>
+#include <unordered_set>
+#include <utility>
+#include <vector>
+
+module tk.renderer;
+
+import :compiler;
+import :core;
+import tk.unicode;
+import tk.error_handling;
 
 using namespace tk;
 using namespace tk::renderer;

@@ -1,10 +1,20 @@
-#include "buffer.hpp"
-#include "tk/error_handling.hpp"
-#include "../core.hpp"
-#include "../renderer.hpp"
-#include "../../util/align.hpp"
+module;
 
+#include <d3d12.h>
 #include <directx/d3dx12.h>
+#include <wrl/client.h>
+
+#include <cassert>
+#include <cstddef>
+#include <cstring>
+#include <vector>
+
+module tk.renderer;
+
+import :buffer;
+import :core;
+import tk.align;
+import tk.error_handling;
 
 using namespace tk;
 using namespace tk::renderer;

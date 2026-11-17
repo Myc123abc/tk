@@ -1,6 +1,17 @@
-#include "text_shaper.hpp"
-#include "vertical_orientation.hpp"
-#include "grapheme_iterator.hpp"
+module;
+
+#include <hb.h>
+
+#include <cassert>
+#include <mutex>
+#include <string_view>
+#include <vector>
+
+module tk.ui.text.font;
+
+import tk.unicode;
+import tk.ui.text.grapheme_iterator;
+import tk.ui.text.vertical_orientation;
 
 namespace tk::ui {
 

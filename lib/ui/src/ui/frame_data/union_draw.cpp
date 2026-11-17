@@ -1,12 +1,21 @@
-#include "frame_data.hpp"
-#include "util.hpp"
-#include "../config.hpp"
-#include "../ui_context.hpp"
+module;
 
 #include <clipper2/clipper.h>
 
 #include <algorithm>
+#include <cassert>
+#include <numbers>
+#include <span>
 #include <type_traits>
+
+module tk.renderer;
+
+import :frame_data;
+import tk.error_handling;
+import tk.ui;
+import tk.ui.config;
+import tk.ui.context;
+import tk.ui.frame_data.util;
 
 namespace {
 

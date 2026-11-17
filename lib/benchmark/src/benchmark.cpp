@@ -1,10 +1,19 @@
-#include "tk/benchmark.hpp"
+module;
 
-#include "tk/tk.hpp"
-#include "tk/error_handling.hpp"
-#include "tk/ui/line_chart.hpp"
-
+#include <algorithm>
+#include <cassert>
 #include <ranges>
+#include <span>
+#include <utility>
+#include <vector>
+
+module tk.benchmark;
+
+import tk.base;
+import tk.error_handling;
+import tk.rect;
+import tk.string_id;
+import tk.ui;
 
 using namespace tk;
 

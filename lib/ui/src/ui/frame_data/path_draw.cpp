@@ -1,5 +1,14 @@
-#include "frame_data.hpp"
-#include "util.hpp"
+module;
+
+#include <cassert>
+#include <cmath>
+#include <utility>
+
+module tk.renderer;
+
+import :frame_data;
+import tk.ui;
+import tk.ui.frame_data.util;
 
 namespace tk::ui {
 

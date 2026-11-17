@@ -1,4 +1,4 @@
-#include "input_system.hpp"
+module tk.ui.input_system;
 
 namespace {
 

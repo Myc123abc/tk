@@ -1,10 +1,21 @@
-#include "text_parse_result.hpp"
-#include "../../util/unicode.hpp"
+module;
+
+#include <algorithm>
+#include <cassert>
+#include <cmath>
+#include <limits>
+#include <ranges>
+#include <string_view>
+#include <vector>
 
 extern "C"
 {
 #include <linebreak.h>
 }
+
+module tk.ui.text.parse_result;
+
+import tk.unicode;
 
 namespace tk::ui {
 

@@ -1,0 +1,148 @@
+module;
+
+#include <algorithm>
+#include <bit>
+#include <cassert>
+#include <ranges>
+#include <span>
+#include <string_view>
+#include <vector>
+
+module tk.ui;
+
+import :text_layout;
+import tk.base;
+import tk.string_id;
+import tk.ui.config;
+import tk.ui.context;
+import tk.ui.text.engine;
+
+namespace tk::ui {
+
+TextLayout::TextLayout(std::vector<StringLiteral> const& texts, std::string_view family, FontStyle style, TextDirection direction) noexcept
+{
+  assert(!texts.empty());
+
+  _texts.reserve(texts.size());
+  for (auto text : texts)
+  {
+    auto handle = g_text_engine.parse(text, family, style, direction, 0, 0);
+    auto extent = g_text_engine.get_parse_result(handle).extent;
+
+    _texts.emplace_back(text.view(), float2{}, extent, std::bit_cast<uint64>(handle));
+
+    _max_width  = std::max(_max_width,  extent.x);
+    _max_height = std::max(_max_height, extent.y);
+  }
+}
+
+auto TextLayout::adjust_size(float size) noexcept -> TextLayout&
+{
+  _scale = size / FT_Pixel_Size;
+  for (auto& text : _texts) text.extent *= _scale;
+  _max_width  *= _scale;
+  _max_height *= _scale;
+  _extent     *= _scale;
+  return *this;
+}
+
+auto TextLayout::alignment(Alignment align, Direction direction, TextOrder order) noexcept -> TextLayout&
+{
+  _direction  = direction;
+  _text_order = order;
+
+  auto offset = 0.f;
+  auto width  = unit_width();
+  auto height = unit_height();
+
+  auto aligned_offset = [](float space, float padding, float extent, Alignment align) noexcept
+  {
+    auto padding_offset = padding / 2;
+    switch (align)
+    {
+    case Alignment::left:   return padding_offset;
+    case Alignment::center: return (space - extent) / 2;
+    case Alignment::right:  return space - padding_offset - extent;
+    }
+    return 0.f;
+  };
+
+  auto align_text = [&](Text& text) noexcept
+  {
+    if (direction == Direction::horizontal)
+    {
+      text.pos.x = offset + aligned_offset(width, _padding.x, text.extent.x, align);
+      text.pos.y = aligned_offset(height, _padding.y, text.extent.y, Alignment::center);
+      offset += width;
+    }
+    else
+    {
+      text.pos.x = aligned_offset(width, _padding.x, text.extent.x, align);
+      text.pos.y = offset + aligned_offset(height, _padding.y, text.extent.y, Alignment::center);
+      offset += height;
+    }
+  };
+
+  if (order == TextOrder::reverse)
+    for (auto& text : std::views::reverse(_texts)) align_text(text);
+  else
+    for (auto& text : _texts) align_text(text);
+
+  if (direction == Direction::horizontal)
+    _extent = { offset, height };
+  else
+    _extent = { width, offset };
+
+  return *this;
+}
+
+auto TextLayout::adjust_ratios(std::span<float> ratios) noexcept -> TextLayout&
+{
+  assert(ratios.size() == _texts.size() - 1);
+
+  auto width  = unit_width();
+  auto height = unit_height();
+
+  auto adjust_forward = [&](auto texts, auto ratio_view, auto size)
+  {
+    auto offset = 0.f;
+    auto const& first_text = *std::ranges::begin(texts);
+    auto first_center = _direction == Direction::horizontal
+      ? first_text.pos.x + first_text.extent.x / 2
+      : first_text.pos.y + first_text.extent.y / 2;
+    for (auto&& [text, ratio] : std::views::zip(texts | std::views::drop(1), ratio_view))
+    {
+      offset += size * ratio;
+      if (_direction == Direction::horizontal)
+        text.pos.x = first_center + offset - text.extent.x / 2;
+      else
+        text.pos.y = first_center + offset - text.extent.y / 2;
+    }
+
+    return size + offset;
+  };
+
+  if (_text_order == TextOrder::reverse)
+  {
+    if (_direction == Direction::horizontal)
+      _extent.x = adjust_forward(_texts | std::views::reverse, ratios | std::views::reverse, width);
+    else
+      _extent.y = adjust_forward(_texts | std::views::reverse, ratios | std::views::reverse, height);
+  }
+  else
+  {
+    if (_direction == Direction::horizontal)
+      _extent.x = adjust_forward(_texts | std::views::all, ratios, width);
+    else
+      _extent.y = adjust_forward(_texts | std::views::all, ratios, height);
+  }
+
+  return *this;
+}
+
+void TextLayout::render() const noexcept
+{
+  g_ctx.render(*this);
+}
+
+}

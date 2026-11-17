@@ -1,0 +1,80 @@
+module;
+
+#include <string>
+
+export module tk.string_id;
+
+import tk.hash;
+
+export namespace tk {
+
+struct StringID
+{
+  consteval StringID() noexcept = default;
+
+  template <size_t N>
+  consteval StringID(char const (&str)[N]) noexcept
+    : _id(hash(str, N - 1)) {}
+
+  constexpr StringID(uint64_t id) noexcept
+    : _id(id) {}
+
+  StringID(std::string const& str) noexcept
+    : _id(hash(str)) {}
+
+  StringID(std::string_view str) noexcept
+    : _id(hash(str)) {}
+
+  constexpr operator uint64_t() const noexcept { return _id; }
+
+private:
+  uint64_t _id{};
+};
+
+struct StringLiteral
+{
+  consteval StringLiteral() noexcept = default;
+
+  template <size_t N>
+  consteval StringLiteral(char const (&str)[N]) noexcept
+    : _id(hash(str, N - 1)), _str(str) {}
+
+  StringLiteral(std::string const& str) noexcept
+    : _id(hash(str)), _str(str.data()) {}
+
+  StringLiteral(std::string_view str) noexcept
+    : _id(hash(str)), _str(str.data()) {}
+  
+  template <typename T>
+  requires std::is_pointer_v<std::remove_reference_t<T>> && std::is_convertible_v<T, char const*>
+  StringLiteral(T&& str) noexcept
+    : StringLiteral(std::string_view{str}) {}
+  
+  constexpr auto view() const noexcept { return _str; }
+  constexpr auto id()   const noexcept { return _id;  }
+
+  constexpr auto empty() const noexcept
+  {
+    constexpr auto Empty_Str_ID = hash(static_cast<char const*>(""), size_t{});
+    return !_str || _id == Empty_Str_ID;
+  }
+
+private:
+  uint64_t    _id{};
+  char const* _str{};
+};
+
+}
+
+namespace std {
+
+template <>
+struct hash<tk::StringID>
+{
+  auto operator()(tk::StringID id) const noexcept -> size_t
+  {
+    return static_cast<uint64_t>(id);
+  }
+};
+
+}

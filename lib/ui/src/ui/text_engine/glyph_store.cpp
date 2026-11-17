@@ -1,11 +1,20 @@
-#include "glyph_store.hpp"
-#include "font_registry.hpp"
-#include "glyph_cacher.hpp"
-#include "tk/error_handling.hpp"
-#include "../../renderer/engine/copy_engine.hpp"
-#include "../../util/async/thread_pool.hpp"
+module;
 
+#include <cassert>
 #include <ranges>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <vector>
+
+module tk.ui.text.glyph_store;
+
+import tk.async;
+import tk.error_handling;
+import tk.renderer;
+import tk.ui.config;
+import tk.ui.text.font_registry;
+import tk.ui.text.glyph_cacher;
 
 #define check(x, msg) err_if(static_cast<bool>(x), "[GlyphStore] {}", msg)
 

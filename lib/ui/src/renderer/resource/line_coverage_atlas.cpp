@@ -1,9 +1,15 @@
-#include "line_coverage_atlas.hpp"
-
-#include "../engine/copy_engine.hpp"
+module;
 
 #include <algorithm>
+#include <array>
 #include <cassert>
+#include <optional>
+#include <ranges>
+
+module tk.renderer;
+
+import :line_coverage_atlas;
+import :engine.copy_engine;
 
 namespace tk::renderer {
 

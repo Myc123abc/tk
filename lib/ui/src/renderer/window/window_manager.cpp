@@ -1,14 +1,24 @@
-#include "window_manager.hpp"
-#include "tk/error_handling.hpp"
-#include "../../ui/ui_context.hpp"
-#include "../renderer.hpp"
-#include "monitor.hpp"
-#include "compositor.hpp"
-#include "../../ui/input_system.hpp"
+module;
 
 #include <shellscalingapi.h>
 
 #include <algorithm>
+#include <cassert>
+#include <optional>
+#include <ranges>
+#include <string>
+#include <utility>
+
+module tk.renderer;
+
+import :window_manager;
+import :monitor;
+import :compositor;
+import tk.ui.input_system;
+import tk.ui.context;
+import tk.ui.input_types;
+import tk.ui.window_config;
+import tk.error_handling;
 
 using namespace tk;
 using namespace tk::ui;
@@ -222,7 +232,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   {
   case WM_CLOSE:
   {
-    g_ui_ctx.close_window(handle);
+    ui::g_ctx.close_window(handle);
     return 0;
   }
 
@@ -285,7 +295,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
       finish_moving_or_resizing(handle);
       g_input_sys.release_all();
       if (GetAsyncKeyState(VK_LBUTTON) >= 0)
-        g_ui_ctx.clear_state_unfocused_window();
+        ui::g_ctx.clear_state_unfocused_window();
     }
 
     if (windows.contains(handle))
@@ -492,9 +502,9 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
     g_input_sys.key_up(Key::Mouse_Left_Button);
 
     if (finish_moving_or_resizing(handle))
-      g_ui_ctx.clear_state_unfocused_window();
+      ui::g_ctx.clear_state_unfocused_window();
     else
-      g_ui_ctx.is_last_mouse_up = true;
+      ui::g_ctx.is_last_mouse_up = true;
     break;
   }
 
@@ -502,7 +512,7 @@ LRESULT CALLBACK WindowManager::wnd_proc(HWND handle, UINT msg, WPARAM w_param, 
   {
     finish_moving_or_resizing(handle);
     g_input_sys.release_all();
-    g_ui_ctx.clear_state_unfocused_window();
+    ui::g_ctx.clear_state_unfocused_window();
     break;
   }
 
@@ -523,9 +533,9 @@ void WindowManager::update_cursor() noexcept
   if (_resizing) return;
   if (GetAsyncKeyState(VK_LBUTTON) < 0) return;
 
-  if (g_ui_ctx.cursor_on_window = get_cursor_on_window(); g_ui_ctx.cursor_on_window)
+  if (ui::g_ctx.cursor_on_window = get_cursor_on_window(); ui::g_ctx.cursor_on_window)
   {
-    auto const& cursor_on_window = _windows[g_ui_ctx.cursor_on_window];
+    auto const& cursor_on_window = _windows[ui::g_ctx.cursor_on_window];
     _cursor_type = cursor_on_window.get_resize_type(cursor_on_window.cursor_pos());
     set_cursor(_cursor_type);
   }

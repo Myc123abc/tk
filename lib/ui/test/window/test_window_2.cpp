@@ -1,5 +1,25 @@
-#include "test_window_2.hpp"
-#include "../font.hpp"
+module;
+
+#include <algorithm>
+#include <cmath>
+#include <expected>
+#include <format>
+#include <span>
+#include <string>
+#include <vector>
+
+module tk.ui.test.window.test_window_2;
+
+import tk.base;
+import tk.flag;
+import tk.hash;
+import tk.log;
+import tk.rect;
+import tk.string_id;
+import tk.ui;
+import tk.ui.test.font;
+
+using namespace tk;
 
 auto point_in_circle(float2 center, float radius, float theta) noexcept -> float2
 {
@@ -22,7 +42,7 @@ struct ButtonConfig
 auto button(StringID name, float2 pos, float width, float height, ButtonConfig const& cfg) noexcept
 {
   auto text_res = ui::text(cfg.text, cfg.text_size);
-  auto res = button(name, pos.x, pos.y, width + cfg.padding.x + cfg.padding.z, (height ? height : text_res.extent.y) + cfg.padding.y + cfg.padding.w,
+  auto res      = ui::button(name, pos.x, pos.y, width + cfg.padding.x + cfg.padding.z, (height ? height : text_res.extent.y) + cfg.padding.y + cfg.padding.w,
     cfg.button_color, cfg.hover_color, cfg.click_color);
   ui::text(cfg.text, pos + float2{ cfg.padding.x, cfg.padding.y }, cfg.text_size, cfg.text_color);
   return res;

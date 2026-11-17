@@ -1,13 +1,22 @@
-#include "font.hpp"
-#include "glyph.hpp"
-#include "../config.hpp"
-#include "tk/error_handling.hpp"
+module;
 
+#include <ft2build.h>
+#include FT_FREETYPE_H
 #include FT_OUTLINE_H
 #include FT_BBOX_H
 #include <hb-ft.h>
 #include <msdfgen.h>
 #include <core/ShapeDistanceFinder.h>
+
+#include <algorithm>
+#include <cassert>
+#include <mutex>
+
+module tk.ui.text.font;
+
+import tk.error_handling;
+import tk.ui.config;
+import tk.ui.text.glyph;
 
 using namespace tk;
 using namespace tk::ui;

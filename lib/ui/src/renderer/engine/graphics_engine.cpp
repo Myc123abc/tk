@@ -1,4 +1,6 @@
-#include "graphics_engine.hpp"
+module tk.renderer;
+
+import :engine.graphics_engine;
 
 namespace tk::renderer {
 

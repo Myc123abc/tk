@@ -1,10 +1,19 @@
-#include "window.hpp"
-#include "../renderer.hpp"
-#include "window_manager.hpp"
-#include "../../ui/ui_context.hpp"
-#include "../config.hpp"
-#include "tk/error_handling.hpp"
-#include "monitor.hpp"
+module;
+
+#include <windows.h>
+
+#include <algorithm>
+#include <optional>
+
+module tk.renderer;
+
+import :config;
+import :monitor;
+import :window;
+import :window_manager;
+import tk.error_handling;
+import tk.ui.context;
+import tk.ui.window_config;
 
 using namespace tk::ui;
 
@@ -374,7 +383,7 @@ void Window::resize(ResizeType type, int dx, int dy) noexcept
   if (!_resizing)
   {
     _resizing = true;
-    auto ctx = g_ui_ctx.get_window_context(_handle);
+    auto ctx = ui::g_ctx.get_window_context(_handle);
     ctx->need_clear = true;
   }
 }
@@ -382,7 +391,7 @@ void Window::resize(ResizeType type, int dx, int dy) noexcept
 void Window::resize_end() noexcept
 {
   _resizing = false;
-  g_ui_ctx.clear_fullscreen_window();
+  ui::g_ctx.clear_fullscreen_window();
   g_renderer.resize_window_resource(_handle, real_width(), real_height());
   g_renderer.clear_blur_resize_data();
   resize_window();

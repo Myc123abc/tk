@@ -1,12 +1,23 @@
-#include "copy_engine.hpp"
-#include "../resource/image.hpp"
-#include "../renderer.hpp"
-#include "../../util/align.hpp"
-#include "../../ui/text_engine/text_engine.hpp"
+module;
 
-#include <algorithm>
+#include <d3d12.h>
+#include <directx/d3dx12.h>
 
 #include <stb_image.h>
+
+#include <algorithm>
+#include <cassert>
+#include <functional>
+#include <ranges>
+#include <utility>
+#include <vector>
+
+module tk.renderer;
+
+import :engine.copy_engine;
+import :image;
+import tk.align;
+import tk.ui.text.engine;
 
 namespace tk::renderer {
 
