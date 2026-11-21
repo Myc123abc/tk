@@ -87,9 +87,11 @@ public:
 
     auto width  = _txt_layout.extent().x;
     auto height = _txt_layout.unit_height();
+    ui::IDScope scope{ _name };
     for (auto i = 0; i < _txt_layout.texts().size(); ++i)
     {
-      if (ui::button(hash(_name, i), pos.x, pos.y, width, height, 0x00ff00ff, 0x0000ffff))
+      ui::IDScope item{ i };
+      if (ui::button("item", pos.x, pos.y, width, height, 0x00ff00ff, 0x0000ffff))
       {
         _is_selected  = true;
         _selected_idx =  i;

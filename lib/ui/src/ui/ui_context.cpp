@@ -173,6 +173,7 @@ void UIContext::end() noexcept
   err_if(!_scissor_area_stack.empty(), "scissor_area_begin is called but scissor_area_end not be called");
   err_if(!_viewport_stack.empty(), "viewport_begin is called but viewport_end not be called");
   err_if(_custom_transform_depth != 0, "transform_end not be called");
+  err_if(!_id_stack.empty(), "push_id is called but pop_id not be called");
   if (_wnd_ctx->auto_size && _wnd_ctx->first_time_call && !_wnd_ctx->auto_size_waiting_for_content)
   {
     auto desired    = _wnd_ctx->content_bounds.right_bottom() + float2{ 0.f, is_use_title_bar_now() ? Title_Bar_Height : 0.f };
@@ -588,7 +589,22 @@ void UIContext::add_title_bar() noexcept
 
 auto UIContext::get_id(StringID name) const noexcept -> size_t
 {
+  // pushed ids already contain the window handle, so the top of the stack is a full seed
+  if (!_id_stack.empty())
+    return hash(_id_stack.back(), name);
   return hash(_wnd_ctx->handle, name);
+}
+
+void UIContext::push_id(StringID name) noexcept
+{
+  check_draw();
+  _id_stack.emplace_back(get_id(name));
+}
+
+void UIContext::pop_id() noexcept
+{
+  err_if(_id_stack.empty(), "pop_id called without push_id");
+  _id_stack.pop_back();
 }
 
 auto UIContext::generic_id(StringID name) noexcept -> size_t

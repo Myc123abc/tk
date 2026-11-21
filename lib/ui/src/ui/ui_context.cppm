@@ -90,6 +90,8 @@ public:
 
   auto generic_id(StringID name) noexcept -> size_t;
   auto get_id(StringID name) const noexcept -> size_t;
+  void push_id(StringID name) noexcept;
+  void pop_id() noexcept;
 
   auto delta_time() const noexcept { return _delta_time; }
 
@@ -167,6 +169,7 @@ public:
   size_t                            _prev_hovered_widget_id{};
   std::unordered_map<size_t, Tween> _tweens;
   std::unordered_set<size_t>        _ids;
+  std::vector<size_t>               _id_stack;  // seeds pushed by push_id, innermost at back
 
   //
   // mouse state
