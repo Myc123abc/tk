@@ -2,9 +2,13 @@ module;
 
 #include <functional>
 #include <optional>
+#include <string_view>
+#include <vector>
 
 export module tk.ui:widget;
 
+import :text;
+import :text_layout;
 import tk.ui.color;
 import tk.base;
 import tk.string_id;
@@ -174,7 +178,41 @@ auto slider(StringID name, float x, float y, float width, float height, float be
 
 struct SelectListConfig
 {
-
+  float                 text_size{};
+  float2                padding;
+  Color                 text_color;
+  std::string_view      family;
+  FontStyle             style{};
+  float                 min_width{};    // item width is max(min_width, widest text + padding.x)
+  Color                 item_color;     // item background, alpha 0 means transparent
+  Color                 hover_color;
+  Color                 click_color;    // alpha 0 disables the click color
+  Color                 selected_color; // background of the selected item, alpha 0 disables the highlight
+  TextLayout::Alignment align{ TextLayout::Alignment::left };
 };
+
+struct SelectListState
+{
+  int    hovered{ -1 };  // hovered item index, -1 if none
+  int    clicked{ -1 };  // clicked item index this frame, -1 if none
+  float2 extent;         // extent of the whole list
+
+  constexpr operator bool() const noexcept
+  {
+    return clicked >= 0;
+  }
+};
+
+/**
+ * draw a vertical list of text items, a clicked item becomes the selected one.
+ * it only draws the list itself, so it can be the body of a combo box or a popup menu.
+ * @param name name cannot be duplicate in the window
+ * @param pos left top of the list
+ * @param items item texts, empty list draws nothing
+ * @param selected selected index, -1 for no selection, updated when an item is clicked
+ * @param cfg select list config
+ * @return select list state
+ */
+auto select_list(StringID name, float2 pos, std::vector<StringLiteral> const& items, int& selected, SelectListConfig const& cfg = {}) noexcept -> SelectListState;
 
 }

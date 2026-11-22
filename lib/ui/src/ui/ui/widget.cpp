@@ -4,13 +4,16 @@ module;
 #include <cassert>
 #include <cmath>
 #include <functional>
+#include <vector>
 
 module tk.ui;
 
 import :animation;
+import :common;
 import :geometry;
 import :input;
 import :text;
+import :text_layout;
 import :widget;
 import tk.base;
 import tk.error_handling;
@@ -353,6 +356,45 @@ auto slider(StringID name, float x, float y, float width, float height, float be
     cfg.draw_cfg->knob_draw(knob_pos, cfg.draw_cfg->knob_extent, knob_color);
 
   return knob_state.dragged || bar_state.dragged;
+}
+
+auto select_list(StringID name, float2 pos, std::vector<StringLiteral> const& items, int& selected, SelectListConfig const& cfg) noexcept -> SelectListState
+{
+  if (items.empty()) return {};
+  assert(cfg.text_size > 0);
+
+  auto layout = TextLayout{ items, cfg.family, cfg.style }
+    .set_pos(pos)
+    .adjust_size(cfg.text_size)
+    .set_color(cfg.text_color)
+    .set_padding(cfg.padding)
+    .alignment(cfg.align, TextLayout::Direction::vertical);
+
+  auto count   = static_cast<int>(items.size());
+  auto width   = std::max(cfg.min_width, layout.width());
+  auto height  = layout.unit_height();
+  auto draw_bg = cfg.item_color.a || cfg.hover_color.a || cfg.click_color.a || cfg.selected_color.a;
+  auto state   = SelectListState{ .extent = { width, height * count } };
+
+  IDScope scope{ name };
+  auto y = pos.y;
+  for (auto i = 0; i < count; ++i, y += height)
+  {
+    IDScope item{ i };
+    auto color = i == selected && cfg.selected_color.a ? cfg.selected_color : cfg.item_color;
+    auto btn   = draw_bg
+      ? button("item", pos.x, y, width, height, color, cfg.hover_color.a ? cfg.hover_color : color, cfg.click_color)
+      : button("item", pos.x, y, width, height);
+    if (btn.hovered) state.hovered = i;
+    if (btn)
+    {
+      state.clicked = i;
+      selected      = i;
+    }
+  }
+
+  layout.render();
+  return state;
 }
 
 }

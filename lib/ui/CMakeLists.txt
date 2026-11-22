@@ -76,8 +76,6 @@ target_sources(tk-ui
 )
 
 target_include_directories(tk-ui
-  PUBLIC
-    include
   PRIVATE
     ../../vendor/stb
     ../../vendor/freetype/include

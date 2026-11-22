@@ -76,31 +76,16 @@ public:
 
   auto operator()(float2 pos, float size, float2 padding) noexcept -> float2
   {
-    _is_selected = false;
-
-    _txt_layout = ui::TextLayout{ _font_name_views }
-      .set_pos(pos)
-      .adjust_size(size)
-      .set_color(0x000000ff)
-      .set_padding(padding)
-      .alignment(ui::TextLayout::Alignment::left, ui::TextLayout::Direction::vertical);
-
-    auto width  = _txt_layout.extent().x;
-    auto height = _txt_layout.unit_height();
-    ui::IDScope scope{ _name };
-    for (auto i = 0; i < _txt_layout.texts().size(); ++i)
+    auto state = ui::select_list(_name, pos, _font_name_views, _selected_idx,
     {
-      ui::IDScope item{ i };
-      if (ui::button("item", pos.x, pos.y, width, height, 0x00ff00ff, 0x0000ffff))
-      {
-        _is_selected  = true;
-        _selected_idx =  i;
-      }
-      pos.y += height;
-    }
-
-    _txt_layout.render();
-    return _txt_layout.extent();
+      .text_size   = size,
+      .padding     = padding,
+      .text_color  = 0x000000ff,
+      .item_color  = 0x00ff00ff,
+      .hover_color = 0x0000ffff,
+    });
+    _is_selected = state;
+    return state.extent;
   }
 
   auto is_selected() const noexcept { return _is_selected; }
@@ -113,7 +98,6 @@ private:
   std::deque<std::string>    _font_names;
   std::vector<StringLiteral> _font_name_views;
   StringID                   _name{ "FontSelector" };
-  ui::TextLayout             _txt_layout;
   bool                       _is_selected{};
   int                        _selected_idx{ -1 };
 };
