@@ -24,20 +24,19 @@ Is still in the early stages of development.
 - [tk-util](lib/util/README.md)
 - [tk-benchmark](lib/benchmark/README.md)
 
-## External Libraries
-
-| Library | License | Link |
-|--|--|--|
-|DirectX-Headers|MIT|https://github.com/microsoft/DirectX-Headers|
-|freetype|FLT|https://gitlab.freedesktop.org/freetype/freetype|
-|harfbuzz|Old MIT|https://github.com/harfbuzz/harfbuzz|
-|stb|MIT|https://github.com/nothings/stb|
-|Clipper2|BSL-1.0|https://github.com/AngusJohnson/Clipper2|
-|msdfgen|MIT|https://github.com/Chlumsky/msdfgen|
-|xxHash|BSD 2-Clause|https://github.com/Cyan4973/xxHash|
-|constexpr-xxh3|BSD 2-Clause|https://github.com/chys87/constexpr-xxh3|
-|zstd|BSD/GPLv2|https://github.com/meta/zstd|
-|libunibreak|Zlib|https://github.com/adah1972/libunibreak|
+## Third-Party Libraries
+| Library | Link |
+|--|--|
+|DirectX-Headers|https://github.com/microsoft/DirectX-Headers|
+|freetype|https://gitlab.freedesktop.org/freetype/freetype|
+|harfbuzz|https://github.com/harfbuzz/harfbuzz|
+|stb|https://github.com/nothings/stb|
+|Clipper2|https://github.com/AngusJohnson/Clipper2|
+|msdfgen|https://github.com/Chlumsky/msdfgen|
+|xxHash|https://github.com/Cyan4973/xxHash|
+|constexpr-xxh3|https://github.com/chys87/constexpr-xxh3|
+|zstd|https://github.com/meta/zstd|
+|libunibreak|https://github.com/adah1972/libunibreak|
 
 ## License
 The following licenses are available:

@@ -61,27 +61,6 @@ auto load_font(std::string const& path) noexcept -> std::expected<FontInfo, Font
  */
 auto load_fonts(std::span<std::string const> paths) noexcept -> std::vector<std::expected<FontInfo, FontLoadErrorType>>;
 
-enum class language
-{
-  en,
-  ch,
-  jp,
-};
-
-struct CacheCommonGlyphInfo
-{
-  language      lang;
-  StringID      font_family;
-  FontStyle     font_style;
-  TextDirection direction{ TextDirection::horizontal };
-};
-
-/**
- * Cache specific language glyphs to cache file.
- * @param infos
- */
-void cache_common_glyphs(std::span<CacheCommonGlyphInfo> infos) noexcept;
-
 struct TextConfig
 {
   std::string_view family;
@@ -128,5 +107,39 @@ auto text(StringLiteral text, float size, TextConfig const& cfg = {}) noexcept -
  * @return bounding rectangle if text generation complete.
  */
 auto get_text_bounding_rect(StringLiteral text, float size, TextConfig const& cfg = {}) noexcept -> std::optional<Rect>;
+
+/**
+ * Generate a specific font's glyph cache for UTF-8 text
+ * @param path font path
+ * @param chars UTF-8 encoded text
+ */
+void generate_glyphs_cache(std::string_view path, std::string_view chars) noexcept;
+
+/**
+ * Generate a specific font's glyph cache for UTF-8 bytes.
+ * @param path font path
+ * @param chars UTF-8 encoded text
+ */
+void generate_glyphs_cache(std::string_view path, std::span<uint8> chars) noexcept;
+
+enum class Language
+{
+  en,
+  zh_cn,
+  zh_tw,
+  jp,
+  ko,
+  ru,
+};
+
+/**
+ * Generate specific font's glyphs cache of common characters
+ * Traditional Chinese uses CLDR 48's primary and auxiliary exemplars for Taiwan.
+ * Russian includes the 33 uppercase and lowercase letters of the Russian alphabet.
+ * Korean includes compatibility jamo and the 2,350 KS X 1001 Hangul syllables.
+ * @param path font path
+ * @param langs languages to include
+ */
+void generate_glyphs_cache(std::string_view path, std::span<Language> langs) noexcept;
 
 }

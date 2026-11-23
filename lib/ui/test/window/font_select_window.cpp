@@ -27,6 +27,9 @@ void FontSelectWindow::draw() noexcept
     selected_family = selected_font.family;
     selected_style  = selected_font.style;
     info("selected font : {}", selected_family);
+
+    // generate glyphs cache of specific font if need
+    // ui::generate_glyphs_cache(selected_font.path);
   }
 
   static constexpr StringLiteral Test_Cases[]
