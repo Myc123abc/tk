@@ -26,6 +26,7 @@ namespace tk::ui {
 namespace {
 
 constexpr auto Cache_Completion_Batch_Size             = 256uz;
+constexpr auto Cache_Completion_Max_Concurrent_Tasks   = 4uz;
 constexpr auto Glyph_Max_Concurrent_Generation_Tasks   = 2uz;
 constexpr auto Glyphs_Per_Generation_Task              = 4uz;
 
@@ -311,17 +312,35 @@ void GlyphStore::complete_cache_generation(FontRegistry const& fonts) noexcept
     }
     if (glyphs.empty()) continue;
 
-    auto task = g_thread_pool.run([glyphs = std::move(glyphs)]
+    auto const task_count = std::min({Cache_Completion_Max_Concurrent_Tasks, g_thread_pool.size(), glyphs.size() });
+    auto task_glyphs = std::vector<std::vector<std::pair<Font*, GlyphKey>>>(task_count);
+    for (auto i = 0uz; i < glyphs.size(); ++i)
+      task_glyphs[i % task_count].emplace_back(glyphs[i]);
+
+    auto tasks = std::vector<Task<std::vector<MSDFBitmap>>>{};
+    tasks.reserve(task_count);
+    for (auto& batch : task_glyphs)
     {
-      auto bitmaps = std::vector<MSDFBitmap>{};
-      bitmaps.reserve(glyphs.size());
-      for (auto const& [font, key] : glyphs)
-        bitmaps.emplace_back(font->generate_bitmap(key.glyph_index, key));
-      return bitmaps;
-    });
-    auto bitmaps = task.take_result();
+      tasks.emplace_back(g_thread_pool.run([batch = std::move(batch)]
+      {
+        auto bitmaps = std::vector<MSDFBitmap>{};
+        bitmaps.reserve(batch.size());
+        for (auto const& [font, key] : batch)
+          bitmaps.emplace_back(font->generate_bitmap(key.glyph_index, key));
+        return bitmaps;
+      }));
+    }
+
+    auto bitmaps = std::vector<MSDFBitmap>{};
+    bitmaps.reserve(glyphs.size());
+    for (auto& task : tasks)
+    {
+      auto generated = task.take_result();
+      bitmaps.append_range(std::move(generated));
+    }
+
     g_glyph_cacher.store(bitmaps);
-    g_glyph_cacher.flush();
+    g_glyph_cacher.update();
   }
 }
 

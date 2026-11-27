@@ -268,6 +268,12 @@ auto Font::generate_msdf_bitmap(uint glyph_idx, GlyphKey const& key) const noexc
 auto Font::generate_bitmap(uint glyph_idx, GlyphKey const& key) const noexcept -> MSDFBitmap
 {
   auto lock = std::unique_lock{ _mutex };
+  if (!FT_HAS_COLOR(_face))
+  {
+    lock.unlock();
+    return generate_msdf_bitmap(glyph_idx, key);
+  }
+
   check(FT_Load_Glyph(_face, glyph_idx, FT_LOAD_COLOR | FT_LOAD_DEFAULT), "failed to load color glyph");
   if (_face->glyph->format != FT_GLYPH_FORMAT_BITMAP)
     check(FT_Render_Glyph(_face->glyph, FT_RENDER_MODE_NORMAL), "failed to render color glyph");
