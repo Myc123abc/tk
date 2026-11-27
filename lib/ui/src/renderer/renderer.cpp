@@ -19,7 +19,6 @@ import :descriptor_heap_manager;
 import :line_coverage_atlas;
 import :pipeline_system;
 import :window_manager;
-import :config;
 import :context;
 import :frame_data;
 import tk.ui.context;
@@ -28,6 +27,14 @@ import tk.flag;
 import tk.renderer.shader_type;
 
 namespace tk::renderer {
+
+namespace {
+
+constexpr auto Default_Image_Init_Width  = 512;
+constexpr auto Default_Image_Init_Height = 512;
+constexpr auto Cancel_Vsync_Duration     = 200'000;
+
+}
 
 void Renderer::init() noexcept
 {

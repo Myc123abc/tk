@@ -1,5 +1,6 @@
 module;
 
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -24,8 +25,11 @@ public:
   void init() noexcept;
   void destroy() noexcept;
 
-  auto request(GlyphKey key) noexcept -> bool;
+  auto emplace(GlyphKey key) noexcept -> bool;
+  void add_glyph_cache(GlyphKey key) noexcept;
   auto update(FontRegistry const& fonts) noexcept -> bool;
+  void complete_cache_generation(FontRegistry const& fonts) noexcept;
+  void cancel_cache_generation() noexcept;
   void clear_pending_copy_glyphs() noexcept;
 
   auto contains(GlyphKey const& key) const noexcept { return _glyph_infos.contains(key); }
@@ -36,19 +40,24 @@ public:
 private:
   auto calc_glyph_pos(float2 extent) noexcept -> std::pair<uint, float2>;
   void submit_bitmap_generation_tasks(FontRegistry const& fonts) noexcept;
+  void submit_cache_generation_task(FontRegistry const& fonts) noexcept;
   auto upload_bitmaps() noexcept -> bool;
   auto upload_bitmaps_from_preload(FontRegistry const& fonts) noexcept -> bool;
   void upload_bitmaps(PendingCopyGlyphsInfoType const& info) noexcept;
+  static void retain_bitmaps(PendingCopyGlyphsInfoType& destination, PendingCopyGlyphsInfoType&& source) noexcept;
 
-  std::vector<ImageHandle>                   _glyph_atlas;
-  GlyphKeyMap<GlyphInfo>                     _glyph_infos;
-  GlyphKeySet                                _uncached_glyphs;
-  GlyphKeySet                                _ungenerated_glyphs;
-  PendingCopyGlyphsInfoType                  _pending_copy_glyphs;
-  PendingCopyGlyphsInfoType                  _pending_copy_preload_glyphs;
-  std::vector<Task<std::vector<MSDFBitmap>>> _generate_bitmap_tasks;
-  SkylinePacker                              _packer;
-  uint                                       _current_glyph_atlas_idx{};
+  std::vector<ImageHandle>                     _glyph_atlas;
+  GlyphKeyMap<GlyphInfo>                       _glyph_infos;
+  GlyphKeySet                                  _unuploaded_glyphs;
+  GlyphKeySet                                  _ungenerated_glyphs;
+  GlyphKeySet                                  _cache_ungenerated_glyphs;
+  GlyphKeySet                                  _cache_generating_glyphs;
+  PendingCopyGlyphsInfoType                    _pending_copy_glyphs;
+  PendingCopyGlyphsInfoType                    _pending_copy_preload_glyphs;
+  std::vector<Task<std::vector<MSDFBitmap>>>   _generate_bitmap_tasks;
+  std::optional<Task<std::vector<MSDFBitmap>>> _generate_cache_task;
+  SkylinePacker                                _packer;
+  uint                                         _current_glyph_atlas_idx{};
 };
 
 }

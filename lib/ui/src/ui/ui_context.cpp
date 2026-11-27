@@ -23,11 +23,19 @@ import tk.hash;
 import tk.renderer;
 import tk.ui.input_system;
 import tk.ui.config;
+import tk.ui.text.config;
 import tk.ui.text.engine;
 
 using namespace tk::renderer;
 
 namespace tk::ui {
+
+namespace {
+
+constexpr auto Viewport_Zoom_Factor        = 1.1f;
+constexpr auto Window_Active_Response_Time = 200'000;
+
+}
 
 auto is_caps_locked() noexcept -> bool
 {

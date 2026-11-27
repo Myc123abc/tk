@@ -90,6 +90,7 @@ public:
 
   auto is_selected() const noexcept { return _is_selected; }
   auto& selected_font() const noexcept { return _font_infos[_selected_idx]; }
+  auto selected_font_path() const noexcept -> std::string_view { return _paths[_selected_idx]; }
 
 private:
   std::vector<std::string>   _added_paths;

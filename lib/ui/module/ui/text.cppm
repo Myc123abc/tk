@@ -109,14 +109,16 @@ auto text(StringLiteral text, float size, TextConfig const& cfg = {}) noexcept -
 auto get_text_bounding_rect(StringLiteral text, float size, TextConfig const& cfg = {}) noexcept -> std::optional<Rect>;
 
 /**
- * Generate a specific font's glyph cache for UTF-8 text
+ * Queue low-priority disk-cache generation for glyphs produced by UTF-8 text.
+ * Visible text generation takes priority, and generated glyphs are not uploaded
+ * to the atlas until rendered.
  * @param path font path
  * @param chars UTF-8 encoded text
  */
 void generate_glyphs_cache(std::string_view path, std::string_view chars) noexcept;
 
 /**
- * Generate a specific font's glyph cache for UTF-8 bytes.
+ * Queue low-priority disk-cache generation for glyphs produced by UTF-8 bytes.
  * @param path font path
  * @param chars UTF-8 encoded text
  */
@@ -133,13 +135,19 @@ enum class Language
 };
 
 /**
- * Generate specific font's glyphs cache of common characters
+ * Queue low-priority disk-cache generation for supported common characters.
  * Traditional Chinese uses CLDR 48's primary and auxiliary exemplars for Taiwan.
  * Russian includes the 33 uppercase and lowercase letters of the Russian alphabet.
  * Korean includes compatibility jamo and the 2,350 KS X 1001 Hangul syllables.
  * @param path font path
  * @param langs languages to include
  */
-void generate_glyphs_cache(std::string_view path, std::span<Language> langs) noexcept;
+void generate_glyphs_cache(std::string_view path, std::span<Language const> langs) noexcept;
+
+/**
+ * Complete every queued glyph-cache request and persist glyphs.bin.
+ * Intended for offline asset generation, not an interactive render loop.
+ */
+void complete_glyphs_cache_generation() noexcept;
 
 }

@@ -1,5 +1,6 @@
 module;
 
+#include <array>
 #include <string_view>
 
 export module tk.ui.test.font;
@@ -36,4 +37,10 @@ export inline void font_init() noexcept
   for (auto path : startup_font_paths)
     font_selector.add(path);
   font_selector.load_fonts();
+
+  auto const jp_languages = std::array{ ui::Language::en, ui::Language::jp };
+  ui::generate_glyphs_cache(fallback_font_paths[0], jp_languages);
+
+  auto const zh_cn_languages = std::array{ ui::Language::zh_cn };
+  ui::generate_glyphs_cache(fallback_font_paths[1], zh_cn_languages);
 }

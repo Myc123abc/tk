@@ -1,6 +1,7 @@
 module;
 
 #include <cassert>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -48,6 +49,8 @@ class GlyphCacher : public Singleton<GlyphCacher>
 public:
   void init() noexcept;
   void destroy() noexcept;
+  void wait_preload() noexcept;
+  void flush() noexcept;
 
   auto preload_complete() const noexcept
   {
@@ -60,11 +63,22 @@ public:
     return _preload_glyphs;
   }
 
+  auto contains(GlyphKey const& key) const noexcept
+  {
+    assert(preload_complete());
+    return _cached_glyph_keys.contains(key);
+  }
+
+  void update() noexcept;
   void store(PendingCopyGlyphsInfoType& info) noexcept;
+  void store(std::vector<MSDFBitmap>& bitmaps) noexcept;
 
 private:
   auto preload() noexcept -> Task<>;
-  void write_cache() noexcept;
+  auto write_cache_batch(std::vector<GlyphCacheField> glyphs) noexcept -> Task<>;
+  void start_write_cache() noexcept;
+  void finish_write_cache() noexcept;
+  void store(MSDFBitmap& bitmap) noexcept;
   void deserialize(std::span<uint8> data) noexcept;
 
 private:
@@ -73,6 +87,7 @@ private:
   GlyphKeyMap<PreloadGlyphData> _preload_glyphs;
   GlyphKeySet                   _cached_glyph_keys;
   Task<>                        _preload_task;
+  std::optional<Task<>>         _write_task;
 };
 
 auto& g_glyph_cacher = GlyphCacher::instance();

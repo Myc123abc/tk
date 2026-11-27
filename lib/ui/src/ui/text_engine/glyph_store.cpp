@@ -1,6 +1,7 @@
 module;
 
 #include <cassert>
+#include <iterator>
 #include <ranges>
 #include <unordered_map>
 #include <unordered_set>
@@ -12,7 +13,7 @@ module tk.ui.text.glyph_store;
 import tk.async;
 import tk.error_handling;
 import tk.renderer;
-import tk.ui.config;
+import tk.ui.text.config;
 import tk.ui.text.font_registry;
 import tk.ui.text.glyph_cacher;
 
@@ -21,6 +22,14 @@ import tk.ui.text.glyph_cacher;
 using namespace tk::renderer;
 
 namespace tk::ui {
+
+namespace {
+
+constexpr auto Cache_Completion_Batch_Size             = 256uz;
+constexpr auto Glyph_Max_Concurrent_Generation_Tasks   = 2uz;
+constexpr auto Glyphs_Per_Generation_Task              = 4uz;
+
+}
 
 void GlyphStore::init() noexcept
 {
@@ -36,21 +45,34 @@ void GlyphStore::destroy() noexcept
     g_img_mgr.destroy(handle);
   _glyph_atlas.clear();
   _glyph_infos.clear();
-  _uncached_glyphs.clear();
+  _unuploaded_glyphs.clear();
   _ungenerated_glyphs.clear();
+  _cache_ungenerated_glyphs.clear();
+  _cache_generating_glyphs.clear();
   _pending_copy_glyphs.clear();
   _pending_copy_preload_glyphs.clear();
   _generate_bitmap_tasks.clear();
+  _generate_cache_task.reset();
 }
 
-auto GlyphStore::request(GlyphKey key) noexcept -> bool
+auto GlyphStore::emplace(GlyphKey key) noexcept -> bool
 {
   if (_glyph_infos.contains(key))
     return false;
 
-  if (_uncached_glyphs.emplace(key).second)
+  if (_unuploaded_glyphs.emplace(key).second && !_cache_generating_glyphs.contains(key))
+  {
+    _cache_ungenerated_glyphs.erase(key);
     _ungenerated_glyphs.emplace(key);
+  }
   return true;
+}
+
+void GlyphStore::add_glyph_cache(GlyphKey key) noexcept
+{
+  if (_glyph_infos.contains(key) || _unuploaded_glyphs.contains(key) || _cache_generating_glyphs.contains(key))
+    return;
+  _cache_ungenerated_glyphs.emplace(key);
 }
 
 auto GlyphStore::calc_glyph_pos(float2 extent) noexcept -> std::pair<uint, float2>
@@ -76,7 +98,8 @@ void GlyphStore::submit_bitmap_generation_tasks(FontRegistry const& fonts) noexc
   if (_ungenerated_glyphs.empty()) return;
 
   auto const task_limit = std::min(Glyph_Max_Concurrent_Generation_Tasks, g_thread_pool.size());
-  while (!_ungenerated_glyphs.empty() && _generate_bitmap_tasks.size() < task_limit)
+  auto active_task_count = _generate_bitmap_tasks.size() + static_cast<size_t>(_generate_cache_task.has_value());
+  while (!_ungenerated_glyphs.empty() && active_task_count < task_limit)
   {
     auto glyphs = std::vector<std::pair<Font*, GlyphKey>>{};
     glyphs.reserve(std::min(Glyphs_Per_Generation_Task, _ungenerated_glyphs.size()));
@@ -95,12 +118,38 @@ void GlyphStore::submit_bitmap_generation_tasks(FontRegistry const& fonts) noexc
         bitmaps.emplace_back(font->generate_bitmap(key.glyph_index, key));
       return bitmaps;
     }));
+    ++active_task_count;
+  }
+}
+
+void GlyphStore::submit_cache_generation_task(FontRegistry const& fonts) noexcept
+{
+  if (_generate_cache_task || _cache_ungenerated_glyphs.empty() || !_unuploaded_glyphs.empty() || !_generate_bitmap_tasks.empty())
+    return;
+
+  while (!_cache_ungenerated_glyphs.empty())
+  {
+    auto const it  = _cache_ungenerated_glyphs.begin();
+    auto const key = *it;
+    _cache_ungenerated_glyphs.erase(it);
+    if (g_glyph_cacher.contains(key))
+      continue;
+
+    _cache_generating_glyphs.emplace(key);
+    auto font = fonts.font(key.font_key);
+    _generate_cache_task.emplace(g_thread_pool.run([font, key]
+    {
+      auto bitmaps = std::vector<MSDFBitmap>{};
+      bitmaps.emplace_back(font->generate_bitmap(key.glyph_index, key));
+      return bitmaps;
+    }));
+    return;
   }
 }
 
 auto GlyphStore::upload_bitmaps() noexcept -> bool
 {
-  if (_generate_bitmap_tasks.empty()) return false;
+  auto generated = PendingCopyGlyphsInfoType{};
 
   for (auto it = _generate_bitmap_tasks.begin(); it < _generate_bitmap_tasks.end();)
   {
@@ -109,7 +158,7 @@ auto GlyphStore::upload_bitmaps() noexcept -> bool
       for (auto& bitmap : it->take_result())
       {
         auto [glyph_atlas_idx, copy_pos] = calc_glyph_pos(bitmap.extent);
-        _pending_copy_glyphs[glyph_atlas_idx].emplace_back(std::move(bitmap), copy_pos);
+        generated[glyph_atlas_idx].emplace_back(std::move(bitmap), copy_pos);
       }
       it = _generate_bitmap_tasks.erase(it);
     }
@@ -117,14 +166,34 @@ auto GlyphStore::upload_bitmaps() noexcept -> bool
       ++it;
   }
 
-  if (_pending_copy_glyphs.empty()) return false;
-  upload_bitmaps(_pending_copy_glyphs);
+  if (_generate_cache_task && _generate_cache_task->is_completed())
+  {
+    auto cache_only = std::vector<MSDFBitmap>{};
+    for (auto& bitmap : _generate_cache_task->take_result())
+    {
+      _cache_generating_glyphs.erase(bitmap.glyph_key);
+      if (_unuploaded_glyphs.contains(bitmap.glyph_key))
+      {
+        auto [glyph_atlas_idx, copy_pos] = calc_glyph_pos(bitmap.extent);
+        generated[glyph_atlas_idx].emplace_back(std::move(bitmap), copy_pos);
+      }
+      else
+        cache_only.emplace_back(std::move(bitmap));
+    }
+    _generate_cache_task.reset();
+    g_glyph_cacher.store(cache_only);
+  }
+
+  if (generated.empty()) return false;
+  upload_bitmaps(generated);
+  retain_bitmaps(_pending_copy_glyphs, std::move(generated));
   return true;
 }
 
 auto GlyphStore::upload_bitmaps_from_preload(FontRegistry const& fonts) noexcept -> bool
 {
   auto& preload_glyphs = g_glyph_cacher.preload_glyphs();
+  auto generated = PendingCopyGlyphsInfoType{};
   for (auto it = _ungenerated_glyphs.begin(); it != _ungenerated_glyphs.end();)
   {
     auto key  = *it;
@@ -147,7 +216,7 @@ auto GlyphStore::upload_bitmaps_from_preload(FontRegistry const& fonts) noexcept
       bitmap.pos_offset     = glyph.pos_offset;
       bitmap.glyph_key      = key;
       auto [glyph_atlas_idx, copy_pos] = calc_glyph_pos(bitmap.extent);
-      _pending_copy_preload_glyphs[glyph_atlas_idx].emplace_back(std::move(bitmap), copy_pos);
+      generated[glyph_atlas_idx].emplace_back(std::move(bitmap), copy_pos);
 
       preload_glyphs.erase(key);
       it = _ungenerated_glyphs.erase(it);
@@ -156,8 +225,19 @@ auto GlyphStore::upload_bitmaps_from_preload(FontRegistry const& fonts) noexcept
       ++it;
   }
 
-  upload_bitmaps(_pending_copy_preload_glyphs);
-  return !_pending_copy_preload_glyphs.empty();
+  if (generated.empty()) return false;
+  upload_bitmaps(generated);
+  retain_bitmaps(_pending_copy_preload_glyphs, std::move(generated));
+  return true;
+}
+
+void GlyphStore::retain_bitmaps(PendingCopyGlyphsInfoType& destination, PendingCopyGlyphsInfoType&& source) noexcept
+{
+  for (auto& [atlas_idx, bitmaps] : source)
+  {
+    auto& pending = destination[atlas_idx];
+    pending.insert(pending.end(), std::make_move_iterator(bitmaps.begin()), std::make_move_iterator(bitmaps.end()));
+  }
 }
 
 void GlyphStore::upload_bitmaps(PendingCopyGlyphsInfoType const& info) noexcept
@@ -189,16 +269,71 @@ auto GlyphStore::update(FontRegistry const& fonts) noexcept -> bool
   if (!g_glyph_cacher.preload_complete())
     return false;
 
+  g_glyph_cacher.update();
+
   auto have_bitmaps_upload = false;
   have_bitmaps_upload |= upload_bitmaps_from_preload(fonts);
-  submit_bitmap_generation_tasks(fonts);
   have_bitmaps_upload |= upload_bitmaps();
 
   if (have_bitmaps_upload)
-    for (auto it = _uncached_glyphs.begin(); it != _uncached_glyphs.end();)
-      _glyph_infos.contains(*it) ? it = _uncached_glyphs.erase(it) : ++it;
+    for (auto it = _unuploaded_glyphs.begin(); it != _unuploaded_glyphs.end();)
+      _glyph_infos.contains(*it) ? it = _unuploaded_glyphs.erase(it) : ++it;
+
+  submit_bitmap_generation_tasks(fonts);
+  submit_cache_generation_task(fonts);
 
   return have_bitmaps_upload;
+}
+
+void GlyphStore::complete_cache_generation(FontRegistry const& fonts) noexcept
+{
+  g_glyph_cacher.wait_preload();
+
+  if (_generate_cache_task)
+  {
+    auto bitmaps = _generate_cache_task->take_result();
+    _generate_cache_task.reset();
+    _cache_generating_glyphs.clear();
+    g_glyph_cacher.store(bitmaps);
+  }
+
+  while (!_cache_ungenerated_glyphs.empty())
+  {
+    auto glyphs = std::vector<std::pair<Font*, GlyphKey>>{};
+    glyphs.reserve(std::min(Cache_Completion_Batch_Size, _cache_ungenerated_glyphs.size()));
+    while (!_cache_ungenerated_glyphs.empty() && glyphs.size() < Cache_Completion_Batch_Size)
+    {
+      auto const it  = _cache_ungenerated_glyphs.begin();
+      auto const key = *it;
+      _cache_ungenerated_glyphs.erase(it);
+      if (!g_glyph_cacher.contains(key))
+        glyphs.emplace_back(fonts.font(key.font_key), key);
+    }
+    if (glyphs.empty()) continue;
+
+    auto task = g_thread_pool.run([glyphs = std::move(glyphs)]
+    {
+      auto bitmaps = std::vector<MSDFBitmap>{};
+      bitmaps.reserve(glyphs.size());
+      for (auto const& [font, key] : glyphs)
+        bitmaps.emplace_back(font->generate_bitmap(key.glyph_index, key));
+      return bitmaps;
+    });
+    auto bitmaps = task.take_result();
+    g_glyph_cacher.store(bitmaps);
+    g_glyph_cacher.flush();
+  }
+}
+
+void GlyphStore::cancel_cache_generation() noexcept
+{
+  _cache_ungenerated_glyphs.clear();
+  if (!_generate_cache_task) return;
+
+  auto bitmaps = _generate_cache_task->take_result();
+  _generate_cache_task.reset();
+  _cache_generating_glyphs.clear();
+  g_glyph_cacher.store(bitmaps);
 }
 
 void GlyphStore::clear_pending_copy_glyphs() noexcept

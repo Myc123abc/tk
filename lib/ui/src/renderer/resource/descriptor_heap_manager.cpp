@@ -15,7 +15,6 @@ module tk.renderer;
 import :descriptor_heap_manager;
 import :command;
 import :core;
-import :config;
 import tk.error_handling;
 
 using namespace tk;
@@ -23,6 +22,10 @@ using namespace tk::renderer;
 using namespace Microsoft::WRL;
 
 namespace {
+
+constexpr auto CBV_SRV_UAV_Heap_Size = 256;
+constexpr auto RTV_Heap_Size         = 256;
+constexpr auto DSV_Heap_Size         = 32;
 
 auto dx12_descriptor_size(DescriptorHeapType type) noexcept
 {
@@ -140,7 +143,7 @@ void DescriptorHeapManager::init() noexcept
   using enum DescriptorHeapType;
   _heaps[cbv_srv_uav].init(cbv_srv_uav, CBV_SRV_UAV_Heap_Size);
   _heaps[rtv].init(rtv, RTV_Heap_Size);
-  _heaps[dsv].init(dsv, DSV_Size);
+  _heaps[dsv].init(dsv, DSV_Heap_Size);
 }
 
 void DescriptorHeapManager::bind_heaps(Command const* cmd) noexcept

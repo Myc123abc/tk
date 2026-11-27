@@ -14,6 +14,7 @@ module tk.renderer;
 import :window_manager;
 import :monitor;
 import :compositor;
+import :window.config;
 import tk.ui.input_system;
 import tk.ui.context;
 import tk.ui.input_types;

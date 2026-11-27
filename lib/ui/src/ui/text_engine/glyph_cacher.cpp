@@ -20,8 +20,9 @@ namespace tk::ui {
 
 namespace {
 
-constexpr auto Cache_Path = StringLiteral{ ".cache\\glyphs.bin" };
-constexpr auto Magic_Text = StringID{ "tk::ui::glyph_cacher::glyph_cache_file" };
+constexpr auto Cache_Path       = StringLiteral{ ".cache\\glyphs.bin" };
+constexpr auto Magic_Text       = StringID{ "tk::ui::glyph_cacher::glyph_cache_file" };
+constexpr auto Write_Batch_Size = 256uz;
 
 }
 
@@ -64,7 +65,21 @@ void GlyphCacher::deserialize(std::span<uint8> data) noexcept
 
 void GlyphCacher::destroy() noexcept
 {
-  write_cache();
+  wait_preload();
+  flush();
+}
+
+void GlyphCacher::wait_preload() noexcept
+{
+  if (!preload_complete())
+    _preload_task.wait();
+}
+
+void GlyphCacher::flush() noexcept
+{
+  finish_write_cache();
+  start_write_cache();
+  finish_write_cache();
 }
 
 void serialize(BinaryFileFormat& fmt, std::span<GlyphCacheField> glyphs, bool has_magic) noexcept
@@ -75,27 +90,59 @@ void serialize(BinaryFileFormat& fmt, std::span<GlyphCacheField> glyphs, bool ha
   fmt.build();
 }
 
-void GlyphCacher::write_cache() noexcept
+auto GlyphCacher::write_cache_batch(std::vector<GlyphCacheField> glyphs) noexcept -> Task<>
 {
-  if (_glyphs.empty()) return;
-  g_thread_pool.submit([this, file = _file, glyphs = std::move(_glyphs)] mutable
+  auto data = co_await g_thread_pool.run([glyphs = std::move(glyphs), has_magic = _file->size() != 0] mutable
   {
     auto file_fmt = BinaryFileFormat{};
-    serialize(file_fmt, glyphs, _file->size());
-    auto data = g_compressor.compression(file_fmt.data());
-    err_if(!file->append(data), "failed to save glyph cache file: file I/O is still pending");
+    serialize(file_fmt, glyphs, has_magic);
+    return g_compressor.compression(file_fmt.data());
   });
+
+  co_await _file->completion();
+  err_if(!_file->append(data), "failed to save glyph cache file");
+  co_await _file->completion();
+}
+
+void GlyphCacher::start_write_cache() noexcept
+{
+  if (_write_task || _glyphs.empty()) return;
+  _write_task.emplace(write_cache_batch(std::exchange(_glyphs, {})));
+}
+
+void GlyphCacher::finish_write_cache() noexcept
+{
+  if (!_write_task) return;
+  _write_task->wait();
+  _write_task.reset();
+}
+
+void GlyphCacher::update() noexcept
+{
+  if (_write_task && _write_task->is_completed())
+    _write_task.reset();
+  if (!_write_task && _glyphs.size() >= Write_Batch_Size)
+    start_write_cache();
+}
+
+void GlyphCacher::store(MSDFBitmap& bitmap) noexcept
+{
+  // Color glyphs depend on bitmap strike data and visible-alpha bounds, so regenerate them.
+  if (!bitmap.is_color && _cached_glyph_keys.emplace(bitmap.glyph_key).second)
+    _glyphs.emplace_back(GlyphCacheHeader{ bitmap.glyph_key, bitmap.extent, bitmap.pos_offset }, std::move(bitmap.data));
 }
 
 void GlyphCacher::store(PendingCopyGlyphsInfoType& info) noexcept
 {
-  if (info.empty()) return;
-  _glyphs.reserve(_glyphs.size() + std::ranges::distance(info | std::views::values | std::views::join));
-  for (auto const& bitmap_infos : info | std::views::values)
-    for (auto const& [bitmap, _] : bitmap_infos)
-      // Color glyphs depend on bitmap strike data and visible-alpha bounds, so regenerate them.
-      if (!bitmap.is_color && _cached_glyph_keys.emplace(bitmap.glyph_key).second)
-        _glyphs.emplace_back(GlyphCacheHeader{ bitmap.glyph_key, bitmap.extent, bitmap.pos_offset }, std::move(bitmap.data));
+  for (auto& bitmap_infos : info | std::views::values)
+    for (auto& [bitmap, _] : bitmap_infos)
+      store(bitmap);
+}
+
+void GlyphCacher::store(std::vector<MSDFBitmap>& bitmaps) noexcept
+{
+  for (auto& bitmap : bitmaps)
+    store(bitmap);
 }
 
 }

@@ -15,6 +15,7 @@ import tk.rect;
 import tk.string_id;
 import tk.ui.context;
 import tk.ui.text.engine;
+import tk.ui.text.glyph_cacher;
 import tk.ui.text.ideographs;
 import tk.error_handling;
 import tk.unicode;
@@ -58,16 +59,23 @@ auto get_text_bounding_rect(StringLiteral text, float size, TextConfig const& cf
   return g_ctx.get_text_bounding_rect(text, size, cfg);
 }
 
-void generate_glyphs_cache(std::string_view path, std::string_view chars) noexcept
+namespace {
+
+void generate_glyphs_cache(std::string_view path, std::string_view chars, bool shape_text) noexcept
 {
   err_if(chars.empty(), "chars is empty for generating glyphs cache");
 
   auto font = load_font(std::string{ path });
   err_if(!font, "failed to load font {} for glyph cache generation", path);
 
-  auto text = std::string{ chars };
-  // TODO: any better way?
-  (void)g_text_engine.parse(StringLiteral{ text }, font->family, font->style, TextDirection::horizontal, 0.f, 0.f);
+  g_text_engine.cache_glyphs(chars, font->family, font->style, shape_text);
+}
+
+}
+
+void generate_glyphs_cache(std::string_view path, std::string_view chars) noexcept
+{
+  generate_glyphs_cache(path, chars, true);
 }
 
 void generate_glyphs_cache(std::string_view path, std::span<uint8> chars) noexcept
@@ -75,7 +83,7 @@ void generate_glyphs_cache(std::string_view path, std::span<uint8> chars) noexce
   generate_glyphs_cache(path, std::string{ chars.begin(), chars.end() });
 }
 
-void generate_glyphs_cache(std::string_view path, std::span<Language> langs) noexcept
+void generate_glyphs_cache(std::string_view path, std::span<Language const> langs) noexcept
 {
   auto chars = std::string{};
 
@@ -117,7 +125,13 @@ void generate_glyphs_cache(std::string_view path, std::span<Language> langs) noe
       err_if(true, "unsupport language for generating glyphs cache");
     }
   }
-  generate_glyphs_cache(path, chars);
+  generate_glyphs_cache(path, chars, false);
+}
+
+void complete_glyphs_cache_generation() noexcept
+{
+  g_text_engine.complete_glyph_cache_generation();
+  g_glyph_cacher.flush();
 }
 
 }

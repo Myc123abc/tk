@@ -19,6 +19,9 @@ import tk.ui.frame_data.util;
 
 namespace {
 
+constexpr auto Union_Cache_Max_Entries = 128uz;
+constexpr auto Union_Cache_Max_Bytes   = 16uz * 1024 * 1024;
+
 template <typename T>
 requires std::is_trivially_copyable_v<T>
 void append_value(std::vector<std::byte>& key, T const& value)

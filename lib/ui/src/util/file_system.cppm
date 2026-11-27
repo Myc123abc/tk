@@ -74,6 +74,7 @@ struct File
   auto data() const noexcept { return _data.get(); }
   auto size() const noexcept { return _size; }
 
+  auto completion() noexcept { return g_iocp.completion(_handle); }
   auto is_complete() const noexcept -> bool;
   void wait() const noexcept;
 

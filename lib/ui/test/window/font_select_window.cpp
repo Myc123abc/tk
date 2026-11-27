@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <array>
 #include <format>
 #include <iterator>
 #include <string>
@@ -26,10 +27,6 @@ void FontSelectWindow::draw() noexcept
     auto const& selected_font = font_selector.selected_font();
     selected_family = selected_font.family;
     selected_style  = selected_font.style;
-    info("selected font : {}", selected_family);
-
-    // generate glyphs cache of specific font if need
-    // ui::generate_glyphs_cache(selected_font.path);
   }
 
   static constexpr StringLiteral Test_Cases[]

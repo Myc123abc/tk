@@ -8,8 +8,8 @@ module;
 
 export module tk.renderer:window;
 
-import :config;
 import :compositor;
+import :window.config;
 import tk.base;
 import tk.rect;
 

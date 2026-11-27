@@ -14,6 +14,8 @@ module;
 module tk.ui.text.engine;
 
 import tk.ui.text.vertical_orientation;
+import tk.error_handling;
+import tk.unicode;
 
 namespace tk::ui {
 
@@ -54,25 +56,69 @@ auto TextEngine::load_fonts(std::span<std::string const> paths) noexcept -> std:
   return results;
 }
 
+void TextEngine::cache_glyphs(std::string_view text, std::string_view family, FontStyle style, bool shape_text) noexcept
+{
+  auto font = _font_registry.font({ family, style });
+  if (shape_text)
+  {
+    for (auto const& glyph : _shaper.shape(text, font, TextDirection::horizontal, {}))
+      if (glyph.glyph_index)
+        _glyph_store.add_glyph_cache({ font->key(), glyph.glyph_index });
+    return;
+  }
+
+  for (auto index = 0u; index < text.size();)
+  {
+    auto const [codepoint, size, valid] = next_codepoint(text, index);
+    err_if(!valid, "invalid UTF-8 for generating glyph cache");
+    if (auto const glyph_index = font->find_glyph(codepoint))
+      _glyph_store.add_glyph_cache({ font->key(), glyph_index });
+    index += size;
+  }
+}
+
 void TextEngine::queue_pending_missing_glyphs() noexcept
 {
   for (auto const& keys : _font_registry.pending_missing_glyphs() | std::views::values)
     for (auto const& key : keys)
-      _glyph_store.request(key);
+      _glyph_store.emplace(key);
 }
 
-auto TextEngine::try_to_get_parse_result(uint64 text_id, uint64 fallback_id) noexcept -> std::optional<TextParseResultHandle>
+auto TextEngine::find_ready_parse_result(uint64 direction_fallback_id, uint64 any_direction_fallback_id) const noexcept -> std::optional<TextParseResultHandle>
+{
+  if (auto it = _last_ready_text_parse_results.find(direction_fallback_id); it != _last_ready_text_parse_results.end())
+    return it->second;
+  if (auto it = _last_ready_any_direction_text_parse_results.find(any_direction_fallback_id); it != _last_ready_any_direction_text_parse_results.end())
+    return it->second;
+  return {};
+}
+
+void TextEngine::cache_ready_parse_result(TextParseResultHandle handle, uint64 direction_fallback_id, uint64 any_direction_fallback_id) noexcept
+{
+  _last_ready_text_parse_results[direction_fallback_id]                   = handle;
+  _last_ready_any_direction_text_parse_results[any_direction_fallback_id] = handle;
+}
+
+void TextEngine::remove_ready_parse_result(TextParseResultHandle handle, uint64 direction_fallback_id, uint64 any_direction_fallback_id) noexcept
+{
+  if (auto it = _last_ready_text_parse_results.find(direction_fallback_id); it != _last_ready_text_parse_results.end() && it->second == handle)
+    _last_ready_text_parse_results.erase(it);
+  if (auto it = _last_ready_any_direction_text_parse_results.find(any_direction_fallback_id); it != _last_ready_any_direction_text_parse_results.end() && it->second == handle)
+    _last_ready_any_direction_text_parse_results.erase(it);
+}
+
+auto TextEngine::try_to_get_parse_result(uint64 text_id, uint64 direction_fallback_id, uint64 any_direction_fallback_id) noexcept -> std::optional<TextParseResultHandle>
 {
   if (auto it = _cached_text_parse_results.find(text_id); it != _cached_text_parse_results.end())
   {
     auto const& result = _parse_result_pool[it->second];
     if (result.generate_complete())
     {
-      _last_ready_text_parse_results[fallback_id] = it->second;
+      cache_ready_parse_result(it->second, direction_fallback_id, any_direction_fallback_id);
       return it->second;
     }
-    if (auto fallback_it = _last_ready_text_parse_results.find(fallback_id); fallback_it != _last_ready_text_parse_results.end())
-      return fallback_it->second;
+    if (auto fallback = find_ready_parse_result(direction_fallback_id, any_direction_fallback_id))
+      return fallback;
     return it->second;
   }
   return {};
@@ -83,9 +129,10 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
   assert(!text.empty());
 
   auto id = get_text_id(text, family, style, direction, tracking, limit_len);
-  // Pending layouts may reuse a previous result, but never another direction.
-  auto const fallback_id = hash(text.id(), direction);
-  if (auto result = try_to_get_parse_result(id, fallback_id)) return *result;
+  auto const direction_fallback_id     = hash(text.id(), direction);
+  auto const any_direction_fallback_id = text.id();
+  if (auto result = try_to_get_parse_result(id, direction_fallback_id, any_direction_fallback_id))
+    return *result;
 
   auto result          = ParseResult{ text.view(), direction };
   auto glyph_style_key = FontStyleKey(family, style);
@@ -106,13 +153,13 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
       auto const glyph_index = notdef ? 0u : glyph.glyph_index;
       auto const key         = GlyphKey{ font->key(), glyph_index };
       result.emplace_back(glyph, cluster_offset, key);
-      if (_glyph_store.request(key))
+      if (_glyph_store.emplace(key))
         result.generating_glyph_info_keys.emplace(key);
     }
   }
 
   if (resolved.has_missing_glyphs)
-    _cached_texts_with_missing_glyphs[glyph_style_key].emplace_back(id, fallback_id);
+    _cached_texts_with_missing_glyphs[glyph_style_key].emplace_back(id, direction_fallback_id, any_direction_fallback_id);
 
   if (direction == TextDirection::horizontal)
   {
@@ -161,10 +208,9 @@ auto TextEngine::parse(StringLiteral text, std::string_view family, FontStyle st
   _parse_result_pool[handle] = std::move(result);
 
   if (is_generate_complete)
-    _last_ready_text_parse_results[fallback_id] = handle;
-  else
-    if (auto fallback_it = _last_ready_text_parse_results.find(fallback_id); fallback_it != _last_ready_text_parse_results.end())
-      return fallback_it->second;
+    cache_ready_parse_result(handle, direction_fallback_id, any_direction_fallback_id);
+  else if (auto fallback = find_ready_parse_result(direction_fallback_id, any_direction_fallback_id))
+    return *fallback;
 
   return handle;
 }
@@ -181,15 +227,13 @@ void TextEngine::reload_missing_glyphs() noexcept
 
 void TextEngine::remove_missing_glyphs(FontStyleKey key) noexcept
 {
-  for (auto [id, fallback_id] : _cached_texts_with_missing_glyphs[key])
+  for (auto [id, direction_fallback_id, any_direction_fallback_id] : _cached_texts_with_missing_glyphs[key])
   {
     auto it = _cached_text_parse_results.find(id);
     assert(it != _cached_text_parse_results.end());
     auto handle = it->second;
     assert(handle.valid());
-    if (auto fallback_it = _last_ready_text_parse_results.find(fallback_id);
-        fallback_it != _last_ready_text_parse_results.end() && fallback_it->second == handle)
-      _last_ready_text_parse_results.erase(fallback_it);
+    remove_ready_parse_result(handle, direction_fallback_id, any_direction_fallback_id);
     _discard_text_parse_result_handles.emplace_back(handle);
     _cached_text_parse_results.erase(it);
   }
@@ -242,6 +286,16 @@ void TextEngine::update() noexcept
 void TextEngine::clear_pending_copy_glyphs() noexcept
 {
   _glyph_store.clear_pending_copy_glyphs();
+}
+
+void TextEngine::complete_glyph_cache_generation() noexcept
+{
+  _glyph_store.complete_cache_generation(_font_registry);
+}
+
+void TextEngine::cancel_glyph_cache_generation() noexcept
+{
+  _glyph_store.cancel_cache_generation();
 }
 
 void TextEngine::postprocess() noexcept

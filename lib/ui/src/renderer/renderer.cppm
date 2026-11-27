@@ -20,6 +20,7 @@ export import :image_manager;
 export import :line_coverage_atlas;
 export import :monitor;
 export import :window;
+export import :window.config;
 export import :window_manager;
 export import tk.renderer.image_handle;
 export import tk.renderer.shader_type;

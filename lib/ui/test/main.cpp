@@ -1,3 +1,6 @@
+#include <chrono>
+#include <functional>
+
 import tk.base;
 import tk.flag;
 import tk.hash;
@@ -12,11 +15,20 @@ import tk.ui.test.window.test_window_2;
 
 using namespace tk;
 
+auto timing(std::move_only_function<void()> func) noexcept
+{
+  auto beg = std::chrono::steady_clock::now();
+  func();
+  return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - beg).count();
+}
+
 int main()
 {
   tk::init();
 
   font_init();
+  auto dur = timing([] { ui::complete_glyphs_cache_generation(); });
+  tk::info("complete glyphs cache generation : {}ms", dur);
 
   test_window_1.init();
   test_window_2.init();

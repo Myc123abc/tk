@@ -13,8 +13,8 @@ module tk.ui;
 import :text_layout;
 import tk.base;
 import tk.string_id;
-import tk.ui.config;
 import tk.ui.context;
+import tk.ui.text.config;
 import tk.ui.text.engine;
 
 namespace tk::ui {

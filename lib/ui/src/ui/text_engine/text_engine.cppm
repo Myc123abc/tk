@@ -58,6 +58,7 @@ public:
 
   auto load_font(std::string const& path) noexcept -> std::expected<FontInfo, FontLoadErrorType>;
   auto load_fonts(std::span<std::string const> paths) noexcept -> std::vector<std::expected<FontInfo, FontLoadErrorType>>;
+  void cache_glyphs(std::string_view text, std::string_view family, FontStyle style, bool shape_text) noexcept;
 
   using ParseResultPool       = ObjectPool<ParseResult, 32, TextParseResultHandleTag>;
   using TextParseResultHandle = ui::TextParseResultHandle;
@@ -65,11 +66,13 @@ public:
   auto parse(StringLiteral text, std::string_view family, FontStyle style, TextDirection direction, float tracking, float limit_len) noexcept -> TextParseResultHandle;
 
   auto& get_parse_result(TextParseResultHandle handle) const noexcept { return _parse_result_pool[handle]; }
-  auto try_to_get_parse_result(uint64 text_id, uint64 fallback_id) noexcept -> std::optional<TextParseResultHandle>;
+  auto try_to_get_parse_result(uint64 text_id, uint64 direction_fallback_id, uint64 any_direction_fallback_id) noexcept -> std::optional<TextParseResultHandle>;
 
   auto get_bounding_rect(StringLiteral text, std::string_view family = {}, FontStyle style = {}, TextDirection direction = {}, float tracking = {}, float limit_len = {}) noexcept -> std::optional<Rect>;
 
   void update() noexcept;
+  void complete_glyph_cache_generation() noexcept;
+  void cancel_glyph_cache_generation() noexcept;
   void clear_pending_copy_glyphs() noexcept;
   void postprocess() noexcept;
 
@@ -77,21 +80,32 @@ public:
   auto glyph_atlas(uint index) const noexcept { return _glyph_store.atlas(index); }
 
 private:
+  struct TextCacheIDs
+  {
+    uint64 text_id{};
+    uint64 direction_fallback_id{};
+    uint64 any_direction_fallback_id{};
+  };
+
   template <typename T>
   using TextMap               = std::unordered_map<size_t, T>;
   using ParseResultMap        = std::unordered_map<uint64, TextParseResultHandle>;
-  using TextIDFallbackIDPairs = std::vector<std::pair<uint64, uint64>>;
+  using MissingTextCacheIDs   = std::vector<TextCacheIDs>;
 
   void queue_pending_missing_glyphs() noexcept;
   void reload_missing_glyphs() noexcept;
   void remove_missing_glyphs(FontStyleKey key) noexcept;
+  auto find_ready_parse_result(uint64 direction_fallback_id, uint64 any_direction_fallback_id) const noexcept -> std::optional<TextParseResultHandle>;
+  void cache_ready_parse_result(TextParseResultHandle handle, uint64 direction_fallback_id, uint64 any_direction_fallback_id) noexcept;
+  void remove_ready_parse_result(TextParseResultHandle handle, uint64 direction_fallback_id, uint64 any_direction_fallback_id) noexcept;
 
   FontRegistry                                                      _font_registry;
   TextShaper                                                        _shaper;
   GlyphStore                                                        _glyph_store;
-  FontStyleMap<TextIDFallbackIDPairs>                               _cached_texts_with_missing_glyphs;
+  FontStyleMap<MissingTextCacheIDs>                                 _cached_texts_with_missing_glyphs;
   ParseResultMap                                                    _cached_text_parse_results;
   TextMap<TextParseResultHandle>                                    _last_ready_text_parse_results;
+  TextMap<TextParseResultHandle>                                    _last_ready_any_direction_text_parse_results;
   ParseResultPool                                                   _parse_result_pool;
   std::vector<TextParseResultHandle>                                _discard_text_parse_result_handles;
   std::unordered_set<TextParseResultHandle>                         _generating_results;

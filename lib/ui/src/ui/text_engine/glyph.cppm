@@ -12,7 +12,7 @@ import tk.hash;
 import tk.renderer;
 import tk.ui;
 import tk.ui.color;
-import tk.ui.config;
+import tk.ui.text.config;
 import tk.ui.text.font;
 
 export namespace tk::ui {

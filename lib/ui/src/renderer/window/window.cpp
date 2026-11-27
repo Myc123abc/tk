@@ -7,9 +7,9 @@ module;
 
 module tk.renderer;
 
-import :config;
 import :monitor;
 import :window;
+import :window.config;
 import :window_manager;
 import tk.error_handling;
 import tk.ui.context;

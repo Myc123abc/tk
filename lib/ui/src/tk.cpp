@@ -9,6 +9,7 @@ import tk.async;
 import tk.file_system;
 import tk.renderer;
 import tk.ui.context;
+import tk.ui.text.engine;
 import tk.ui.text.glyph_cacher;
 
 using namespace tk::renderer;
@@ -30,6 +31,7 @@ void init() noexcept
 void destroy() noexcept
 {
   update();
+  g_text_engine.cancel_glyph_cache_generation();
   g_glyph_cacher.destroy();
   g_renderer.wait_idle();
   g_thread_pool.destroy();

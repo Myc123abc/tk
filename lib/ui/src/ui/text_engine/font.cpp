@@ -15,7 +15,7 @@ module;
 module tk.ui.text.font;
 
 import tk.error_handling;
-import tk.ui.config;
+import tk.ui.text.config;
 import tk.ui.text.glyph;
 
 using namespace tk;
@@ -25,6 +25,8 @@ using namespace tk::renderer;
 #define check(x, msg) err_if(static_cast<bool>(x), "[TextEngine] {}", msg)
 
 namespace {
+
+constexpr auto Glyph_MSDF_Pixel_Range = 4.f;
 
 struct FtContext
 {
